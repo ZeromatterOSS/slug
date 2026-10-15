@@ -2125,7 +2125,6 @@ mod tests {
     use dice::ActivationData;
     use dice::ActivationKind;
     use dice::ActivationTracker;
-    use dice::DetectCycles;
     use dice::Dice;
     use dice::DynKey;
     use dice::Key;
@@ -2353,7 +2352,7 @@ mod tests {
         )
     }
 
-    const MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, generated='first')\n";
+    const MODULE: &str = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, generated='first')\n";
     const EXTENSION: &str = r#"
 def write(ctx):
     print('repository-file-effect')
@@ -2857,7 +2856,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let tracker = Arc::new(EffectTracker::default());
         let mut transaction =
@@ -2945,7 +2944,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let tracker = Arc::new(EffectTracker::default());
         let mut transaction =
             transaction_with_tracker(&dice, MODULE, LOCAL_JDK_EXTENSION, true, tracker.clone())
@@ -3003,7 +3002,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let tracker = Arc::new(EffectTracker::default());
         let base =
@@ -3179,7 +3178,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let tracker = Arc::new(EffectTracker::default());
         let base =
@@ -3249,7 +3248,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let tracker = Arc::new(EffectTracker::default());
         let base =
@@ -3312,7 +3311,7 @@ def impl(ctx):
 ext = module_extension(implementation = impl)
 "#;
         for link_target in ["missingfile", ".netrc"] {
-            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
             let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
             let tracker = Arc::new(EffectTracker::default());
             let base =
@@ -3554,7 +3553,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let base = base_transaction_untracked(&dice, MODULE, WHICH_EXTENSION, true).await;
         let mut transaction = with_host_inputs_for(
@@ -3648,7 +3647,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let tracker = Arc::new(EffectTracker::default());
         let base =
@@ -3918,7 +3917,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let snapshot = environment_snapshot(&[("PATH", "/which/target")]);
         let frontier = environment_frontier(&["PATH"]);
@@ -4119,7 +4118,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let snapshot = environment_snapshot(&[("PATH", "/which/target")]);
         let frontier = environment_frontier(&["PATH"]);
@@ -4287,7 +4286,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let base = base_transaction_untracked(&dice, MODULE, BRANCH_EXTENSION, true).await;
         let mut transaction = with_host_inputs_for(
@@ -4363,7 +4362,7 @@ ext = module_extension(implementation = impl)
 
     #[tokio::test]
     async fn repository_label_path_enforces_distinct_address_cap() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         for count in [
             RepositoryEffectLimits::LABEL_PATHS,
@@ -5202,7 +5201,7 @@ def impl(ctx):
     repo(name = "first")
 ext = module_extension(implementation = impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let base = base_transaction_untracked(&dice, MODULE, HOST_EXTENSION, true).await;
         let snapshot_a = environment_snapshot(&[
@@ -5432,7 +5431,7 @@ ext = module_extension(implementation = impl)
 
     #[tokio::test]
     async fn selected_repository_file_effect_is_owner_ordinal_scoped_and_observed() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let mut transaction = transaction_untracked(&dice, MODULE, EXTENSION, true).await;
         let owner = owner(&mut transaction).await;
@@ -5509,7 +5508,10 @@ ext = module_extension(implementation = impl)
             panic!("fixture definition must be root")
         };
         let child = transaction
-            .compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label))
+            .compute(&HostBzlModuleObservationKey::new_bzlmod(
+                workspace.dupe(),
+                label,
+            ))
             .await
             .unwrap();
         let SourcePreparationOutcome::Complete(Ok(child)) = child else {
@@ -5535,7 +5537,10 @@ ext = module_extension(implementation = impl)
             unreachable!()
         };
         let mismatch_module = mismatch
-            .compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label))
+            .compute(&HostBzlModuleObservationKey::new_bzlmod(
+                workspace.dupe(),
+                label,
+            ))
             .await
             .unwrap();
         let SourcePreparationOutcome::Complete(Ok(mismatch_module)) = mismatch_module else {
@@ -5566,7 +5571,7 @@ ext = module_extension(implementation = impl)
 
     #[tokio::test]
     async fn selected_repository_file_effect_owns_cold_warm_events_and_recovers_after_cancel() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let tracker = Arc::new(EffectTracker::default());
         let mut transaction =
@@ -5606,7 +5611,7 @@ ext = module_extension(implementation = impl)
             name == &key.to_string() && *kind == ActivationKind::Reused && batch.is_none()
         }));
 
-        let cancelled_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancelled_dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let cancelled_tracker = Arc::new(EffectTracker::default());
         let mut cancelled = transaction_with_tracker(
             &cancelled_dice,
@@ -5654,7 +5659,7 @@ ext = module_extension(implementation = impl)
 
     #[tokio::test]
     async fn selected_repository_file_effect_reloads_implementation_and_is_complete_only() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let replacement = EXTENSION.replace("from-rule", "from-reloaded-rule");
         let mut values = Vec::new();
@@ -5704,7 +5709,7 @@ ext = module_extension(implementation = impl)
 
     #[tokio::test]
     async fn repository_context_attributes_restore_warm_effects_for_ordinary_and_innate_owners() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let definition = r#"
 def write(ctx):
@@ -5718,7 +5723,7 @@ repo=repository_rule(implementation=write, attrs={'s':attr.string(), 'words':att
         };
         let innate_module = |s: &str, words: &str, groups: &str| {
             format!(
-                "module(name='bazel_tools')\nrepo=use_repo_rule('//:ext.bzl','repo')\nrepo(name='first', s='{s}', words={words}, groups={groups})\n"
+                "module(name='consumer')\nrepo=use_repo_rule('//:ext.bzl','repo')\nrepo(name='first', s='{s}', words={words}, groups={groups})\n"
             )
         };
         for (module, requested) in [
@@ -5818,13 +5823,13 @@ repo=repository_rule(implementation=write, attrs={'s':attr.string(), 'words':att
 
         fn innate(name: &str) -> String {
             format!(
-                "module(name='bazel_tools')\nrepo=use_repo_rule('//:ext.bzl','repo')\nrepo(name='{name}')\n"
+                "module(name='consumer')\nrepo=use_repo_rule('//:ext.bzl','repo')\nrepo(name='{name}')\n"
             )
         }
 
         fn ordinary_module(name: &str) -> String {
             format!(
-                "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, generated='{name}')\n"
+                "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, generated='{name}')\n"
             )
         }
 
@@ -5855,7 +5860,7 @@ repo=repository_rule(implementation=write, attrs={'s':attr.string(), 'words':att
             value.as_ref().as_ref().unwrap().plan().effects()[0].content()
         }
 
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         for innate_owner in [false, true] {
             let mut defaults = Vec::new();
@@ -5979,7 +5984,7 @@ repo=repository_rule(implementation=write, attrs={'s':attr.string(), 'words':att
 
     #[tokio::test]
     async fn selected_repository_file_effect_forwards_real_observed_need_without_batch() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let tracker = Arc::new(EffectTracker::default());
         let mut transaction =
@@ -6035,7 +6040,7 @@ def impl(ctx):
     second(name='second')
 ext=module_extension(implementation=impl)
 "#;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let mut transaction = transaction_untracked(&dice, MODULE, extension, true).await;
         let selected_owner = owner(&mut transaction).await;
@@ -6063,7 +6068,7 @@ ext=module_extension(implementation=impl)
             "ctx.file('BUILD.bazel', content='exports_files([\\\"generated.txt\\\"])\\\\n')",
             "fail('repository-rule semantic failure')",
         );
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let mut semantic = transaction_untracked(&dice, MODULE, &semantic_extension, true).await;
         let semantic_owner = owner(&mut semantic).await;
         let legacy = semantic
@@ -6093,7 +6098,7 @@ ext=module_extension(implementation=impl)
         ));
 
         let tracker = Arc::new(EffectTracker::default());
-        let event_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let event_dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let mut observed_transaction = transaction_with_tracker(
             &event_dice,
             MODULE,
@@ -6128,9 +6133,9 @@ ext=module_extension(implementation=impl)
 
     #[tokio::test]
     async fn selected_repository_file_effect_keys_distinguish_owner_and_ordinal() {
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nf=use_extension('//:ext.bzl','other')\nuse_repo(e, first='first')\nuse_repo(f, second='first')\n";
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nf=use_extension('//:ext.bzl','other')\nuse_repo(e, first='first')\nuse_repo(f, second='first')\n";
         let extension = format!("{EXTENSION}\nother=module_extension(implementation=impl)\n");
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let mut transaction = transaction_untracked(&dice, module, &extension, true).await;
         let first = owner(&mut transaction).await;

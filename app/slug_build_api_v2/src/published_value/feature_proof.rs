@@ -203,7 +203,7 @@ fn map_peak(count: usize) -> Result<usize, PublishedValueError> {
 
 #[cfg(test)]
 #[path = "feature_proof/basic_tests.rs"]
-mod basic_tests;
+pub(super) mod basic_tests;
 #[cfg(test)]
 #[path = "feature_proof/tests.rs"]
 mod tests;

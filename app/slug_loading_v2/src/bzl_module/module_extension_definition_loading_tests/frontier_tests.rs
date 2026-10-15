@@ -2,7 +2,7 @@ use super::*;
 
 fn request_module(rows: &[(&str, &str)]) -> String {
     format!(
-        "module(name='bazel_tools')\n{}",
+        "module(name='consumer')\n{}",
         rows.iter()
             .enumerate()
             .map(|(index, (file, export))| format!(
@@ -75,10 +75,16 @@ fn assert_no_upper(rows: &[BzlActivationRow]) {
 async fn observed_extension_definition_frontier_batches_repairs_and_preserves_legacy() {
     assert_loaded_definition_production_slice_has_no_upper_keys();
     let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-    let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(workspace.dupe());
-    let legacy_key = HostLoadedModuleExtensionDefinitionsKey::new(workspace);
+    let key = HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+        workspace.dupe(),
+        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+    );
+    let legacy_key = HostLoadedModuleExtensionDefinitionsKey::new_with_scope(
+        workspace,
+        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+    );
     for order in [["ext.bzl", "other.bzl"], ["other.bzl", "ext.bzl"]] {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let module = request_module(&[(order[0], "ext"), (order[1], "ext")]);
         let mut transaction = case_transaction_with_other(
@@ -173,7 +179,7 @@ async fn observed_extension_definition_frontier_batches_repairs_and_preserves_le
         .unwrap();
         assert!(weak.upgrade().is_none());
     }
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = builtin_environment_dice();
     let source = format!(
         "{}alternate=module_extension(implementation=implementation)\n",
         loaded_test_source("")
@@ -200,8 +206,9 @@ async fn observed_extension_definition_frontier_batches_repairs_and_preserves_le
 
 #[tokio::test]
 async fn observed_extension_definition_frontier_preserves_semantic_barriers() {
-    let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+    let key = HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
         NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
     );
     for (source, export, kind) in [
         ("def broken(\n".to_owned(), "ext", "Bzl"),
@@ -209,7 +216,7 @@ async fn observed_extension_definition_frontier_preserves_semantic_barriers() {
         (loaded_test_source(""), "missing", "Export"),
     ] {
         for error_first in [true, false] {
-            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let dice = builtin_environment_dice();
             let tracker = Arc::new(BzlEventTracker::default());
             let rows = if error_first {
                 [

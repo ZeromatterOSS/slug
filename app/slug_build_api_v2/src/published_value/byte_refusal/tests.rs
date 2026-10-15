@@ -166,9 +166,22 @@ fn owner_and_shared_body_refusals_preserve_uncommitted_certificates_and_guards()
     let owner = owner(part.clone());
     let body = owner.intrinsic_shape().bytes;
     let active = 3 * std::mem::size_of::<usize>();
+    // The completed leaf reference measures the actual traversal prefix, now
+    // including its prepaid frame, active-table growth and completed entry.
+    // Leave exactly 127 bytes for the same 128-byte SharedBody admission.
+    let mut reference = PublishedValueArenaBuilder::new();
+    reference
+        .audit_shared_input(&SharedPublicationInput::new(fact.clone()), 0)
+        .unwrap();
+    assert_eq!(reference.shared_payload.bytes, 128);
+    let shared_prefix = reference.charged_bytes() - reference.shared_payload.bytes;
+    drop(reference);
     for (remaining, context) in [
         (active + body - 1, PublicationByteContext::OwnerBody),
-        (active + body + 127, PublicationByteContext::SharedBody),
+        (
+            active + body + shared_prefix + 127,
+            PublicationByteContext::SharedBody,
+        ),
     ] {
         let mut b = PublishedValueArenaBuilder::new();
         b.charge_bytes(BYTE_LIMIT - remaining).unwrap();

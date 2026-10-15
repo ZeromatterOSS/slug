@@ -167,7 +167,14 @@ async fn original_provider_functions_and_constructors_use_current_actions_and_sh
         CanonicalLabel::parse("@@//test/moved:producer.bzl").unwrap()
     );
     assert_eq!(
-        descriptor.code.source.data().root.workspace_path,
+        descriptor
+            .code
+            .source
+            .data()
+            .root
+            .source
+            .workspace_path()
+            .expect("workspace fixture source"),
         root.join("test/moved/producer.bzl")
     );
     assert!(

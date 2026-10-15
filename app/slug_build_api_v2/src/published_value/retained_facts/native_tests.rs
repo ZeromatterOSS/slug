@@ -161,15 +161,15 @@ fn full_native_payload_counts_survive_sealing_and_preclone_failure() {
     });
     assert!(counts[1].0 > counts[0].0 + 200);
     assert_eq!(counts[1].1 - counts[0].1, counts[1].0 - counts[0].0);
-    // Exactly five producer admissions remain for one native row's sealing:
-    // source scratch admission, row, certificate read, slot, original root.
+    // Exactly fourteen producer admissions remain for one native row:
+    // view setup8, source setup, row, certificate read, empty backing, slot, root.
     // Rewalking the large native model would exhaust this shared allowance.
     let mut cached = PublishedValueArenaBuilder::new();
     atom(
         &mut cached,
         AnalysisValue::cc_toolchain_features(large.clone()),
     );
-    let padding = NODE_LIMIT - 5 - cached.charged_visits();
+    let padding = NODE_LIMIT - 14 - cached.charged_visits();
     for _ in 0..padding {
         cached.charge_visit().unwrap();
     }

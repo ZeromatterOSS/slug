@@ -609,8 +609,8 @@ mod tests {
 
     use super::*;
     use crate::HostSelectedExtensionOwnerCertificateObservationKey;
+    use crate::canonical_repository_route_tests::tests::CONSUMER_MODULE;
     use crate::canonical_repository_route_tests::tests::EXTENSION_A;
-    use crate::canonical_repository_route_tests::tests::MODULE;
     use crate::canonical_repository_route_tests::tests::WORKSPACE;
     use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
     use crate::canonical_repository_route_tests::tests::builtin_graph_module;
@@ -1110,7 +1110,7 @@ mod tests {
     #[tokio::test]
     async fn ordinary_certificate_output_is_unchanged_by_innate_dispatch() {
         let dice = builtin_graph_dice();
-        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let mut tx = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let owner = selected_owner(&mut tx, &workspace, "+ext+first").await;
         assert_eq!(

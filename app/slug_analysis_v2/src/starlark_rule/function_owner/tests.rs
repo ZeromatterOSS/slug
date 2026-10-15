@@ -162,9 +162,9 @@ fn configured_owner_borrowed_audit_refuses_transient_functions_and_excess_depth(
             .unwrap_err()
             .contains("structural evaluation owner")
     );
-    // The completed source-owner certificate keeps all 65536 facts while
-    // witness/name/owner lookup work stays on the independent producer ledger.
-    let near_limit = exported_closures_with_visits(65_536);
+    // Empty owner completion pays22 work. Two genuine completed source owners
+    // still retain all65536 facts; witness/name/lookup work stays independent.
+    let near_limit = exported_closures_with_visits(65_536 - 22);
     let selected = near_limit.get("selected").unwrap();
     let mut audit = Audit::default();
     audit
@@ -172,9 +172,36 @@ fn configured_owner_borrowed_audit_refuses_transient_functions_and_excess_depth(
         .unwrap();
     assert_eq!(audit.native.charged_visits(), 4);
     assert_eq!(audit.native.intrinsic_shape().visits, 4);
-    assert_eq!(audit.native.local_shape().visits, 65_536 + 4);
-    assert_eq!(audit.native.owners()[0].retained_shape().visits, 65_536);
+    assert_eq!(audit.native.local_shape().visits, 65_536 - 22 + 4);
+    assert_eq!(
+        audit.native.owners()[0].retained_shape().visits,
+        65_536 - 22
+    );
     assert_eq!(audit.native.owners().len(), 1);
+    let tail = exported_closures_with_visits(22);
+    audit
+        .callable(
+            tail.get("selected")
+                .unwrap()
+                .value()
+                .unpack_frozen()
+                .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(audit.native.charged_visits(), 8);
+    assert_eq!(audit.native.intrinsic_shape().visits, 8);
+    assert_eq!(audit.native.local_shape().visits, 65_536 + 8);
+    assert_eq!(audit.native.owners().len(), 2);
+    assert_eq!(
+        audit
+            .native
+            .owners()
+            .iter()
+            .map(|o| o.intrinsic_shape().visits)
+            .sum::<usize>(),
+        65_536,
+        "complete retained source-owner bodies still fill the same quota"
+    );
     let mut nested = CoercedAttributeValue::None;
     for _ in 0..257 {
         nested = CoercedAttributeValue::Selector {

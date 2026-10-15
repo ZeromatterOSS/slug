@@ -13,24 +13,68 @@ use crate::provider::ProviderConstructorView;
 use crate::provider::ProviderSchemaRef;
 use crate::provider::provider_constructor_view;
 
-fn owner(
+pub(super) fn owner(
     manifest: &BzlLoadManifest,
     source: &str,
     bzlmod: bool,
     children: impl IntoIterator<Item = FunctionEvaluationOwner>,
 ) -> anyhow::Result<FunctionEvaluationOwner> {
-    bzl_evaluation_owner(
+    let environment = crate::bzl_environment::PreparedBzlEnvironment::uninjected(if bzlmod {
+        crate::bzl_environment::BzlEnvironmentMode::Bzlmod
+    } else {
+        crate::bzl_environment::BzlEnvironmentMode::BzlmodBootstrap
+    })
+    .unwrap();
+    owner_with_environment(manifest, source, &environment, children)
+}
+pub(super) fn owner_with_environment(
+    manifest: &BzlLoadManifest,
+    source: &str,
+    environment: &crate::bzl_environment::PreparedBzlEnvironment,
+    children: impl IntoIterator<Item = FunctionEvaluationOwner>,
+) -> anyhow::Result<FunctionEvaluationOwner> {
+    let context = crate::bzl_environment::BzlModuleSourceContext::new(
         manifest,
+        environment,
+        std::iter::empty(),
+    )
+    .map_err(anyhow::Error::msg)?;
+    bzl_evaluation_owner(
+        crate::starlark_label::PreparedDefiningModuleMetadata::RawManifest {
+            manifest,
+            transient_context: &context,
+        },
         starlark::codemap::CodeMap::new("same.bzl".to_owned(), source.to_owned()),
-        bzlmod,
+        environment,
         false,
         children.into_iter().map(Ok),
     )
 }
-fn manifest() -> BzlLoadManifest {
+async fn ordinary_bzlmod_environment() -> crate::bzl_environment::PreparedBzlEnvironment {
+    use crate::bzl_environment::BuiltinCatalogSnapshot;
+    use crate::bzl_environment::BuiltinRepositoryMapping;
+    use crate::bzl_environment::BuiltinSourceCatalogKey;
+    use crate::bzl_environment::BzlEnvironmentMode;
+    use crate::bzl_environment::prepare_source_environment;
+    let dice = dice::Dice::builder().build(dice::DetectCycles::Enabled);
+    let mut tx = dice.updater().commit().await;
+    // Actual bundled semantic producers and paired original exports; the
+    // explicit fixture mapping is source input, not an empty ordinary seed.
+    prepare_source_environment(
+        &mut tx,
+        &BuiltinSourceCatalogKey::Bundled(BuiltinCatalogSnapshot::Bazel9_2),
+        &BuiltinRepositoryMapping::new(Arc::from([])).unwrap(),
+        BzlEnvironmentMode::Bzlmod,
+    )
+    .await
+    .unwrap()
+}
+pub(super) fn manifest() -> BzlLoadManifest {
     let root = BzlModuleIdentity {
         label: slug_identity_v2::CanonicalLabel::parse("@@unrelated+//moved:api.bzl").unwrap(),
-        workspace_path: PathBuf::from("/same/display-name.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/same/display-name.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     BzlLoadManifest {
@@ -63,24 +107,43 @@ fn freeze(source: &str) -> FrozenModule {
     drop(evaluator);
     module.freeze().unwrap()
 }
-#[test]
-fn structural_bzl_owner_compares_source_bytes_mapping_and_load_mode() {
+#[tokio::test]
+async fn structural_bzl_owner_compares_source_bytes_mapping_and_load_mode() {
     let first = manifest();
     let a = owner(&first, "def f(): return 1", false, []).unwrap();
     let b = owner(&first, "def f(): return 2", false, []).unwrap();
     let again = owner(&first, "def f(): return 1", false, []).unwrap();
     assert_ne!(a, b); // Deliberately identical integrity digests do not alias code.
     assert_eq!(a, again);
-    assert_ne!(a, owner(&first, "def f(): return 1", true, []).unwrap());
+    let ordinary = ordinary_bzlmod_environment().await;
     assert_ne!(
         a,
-        bzl_evaluation_owner(
-            &first,
-            starlark::codemap::CodeMap::new("same.bzl".into(), "def f(): return 1".into()),
-            false,
-            true,
-            []
-        )
+        owner_with_environment(&first, "def f(): return 1", &ordinary, []).unwrap()
+    );
+    assert_ne!(
+        a,
+        {
+            let environment = crate::bzl_environment::PreparedBzlEnvironment::uninjected(
+                crate::bzl_environment::BzlEnvironmentMode::BzlmodBootstrap,
+            )
+            .unwrap();
+            let context = crate::bzl_environment::BzlModuleSourceContext::new(
+                &first,
+                &environment,
+                std::iter::empty(),
+            )
+            .unwrap();
+            bzl_evaluation_owner(
+                crate::starlark_label::PreparedDefiningModuleMetadata::RawManifest {
+                    manifest: &first,
+                    transient_context: &context,
+                },
+                starlark::codemap::CodeMap::new("same.bzl".into(), "def f(): return 1".into()),
+                &environment,
+                true,
+                [],
+            )
+        }
         .unwrap()
     );
     let mut changed = first.clone();
@@ -100,12 +163,14 @@ fn structural_bzl_owner_compares_source_bytes_mapping_and_load_mode() {
     assert_eq!(parent_a, owner(&parent, "parent", false, [again]).unwrap());
 }
 /// Model genuine distinct modules while retaining the complete flat manifest.
-fn parent_manifest(level: usize, child: &BzlLoadManifest) -> BzlLoadManifest {
+pub(super) fn parent_manifest(level: usize, child: &BzlLoadManifest) -> BzlLoadManifest {
     let mut root = manifest().root;
     root.label =
         slug_identity_v2::CanonicalLabel::parse(&format!("@@unrelated+//moved:level{level}.bzl"))
             .unwrap();
-    root.workspace_path = PathBuf::from(format!("/same/level{level}.bzl"));
+    root.source = slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
+        "/same/level{level}.bzl"
+    )));
     let mut reachable = vec![crate::BzlModuleSourceProvenance::new(root.clone(), [0; 32])];
     reachable.extend(child.reachable.iter().cloned());
     BzlLoadManifest {
@@ -149,7 +214,7 @@ fn shared_diamond_owner_flattens_comparison_hash_and_construction_work() {
             // row twice, irrespective of the number of expanded load paths.
             assert_eq!(validity.rows.len(), level + 1);
             assert_eq!(validity.shape.nodes, 0);
-            assert_eq!(validity.shared_inputs.len(), level + 1);
+            assert_eq!(validity.shared_inputs.len(), validity.rows.len());
             assert_eq!(current.retained_shape().nodes, level + 1);
             assert_eq!(validity.rows[0].children.len(), 2);
             assert!(Arc::ptr_eq(
@@ -188,9 +253,22 @@ fn shared_diamond_owner_flattens_comparison_hash_and_construction_work() {
     let mut expected = CountHash::default();
     first.domain().hash(&mut expected);
     first.stable_key().hash_part(&mut expected);
+    // Complete environments are hashed once through the lossless reference
+    // plan. Each local row then hashes only its own full fields; ordered child
+    // environment uses remain represented by the plan's ordinal sequence.
+    validity.references.hash(&mut expected);
     validity.rows.len().hash(&mut expected);
     for row in &*validity.rows {
-        row.hash(&mut expected);
+        row.key.identity.hash(&mut expected);
+        row.key.bazel_internal_strings.hash(&mut expected);
+        row.source_digest.hash(&mut expected);
+        row.fingerprint.hash(&mut expected);
+        row.source.source().hash(&mut expected);
+        row.children.len().hash(&mut expected);
+        for child in &*row.children {
+            child.identity.hash(&mut expected);
+            child.bazel_internal_strings.hash(&mut expected);
+        }
     }
     assert_eq!(
         (actual.bytes, actual.writes),
@@ -327,18 +405,28 @@ fn shared_fact_certificates_reuse_actual_rows_and_separate_payload_from_referenc
     // The generic view borrows the exact existing allocation, not a cookie.
     let fact = parent.input_validity().shared_inputs()[1].retained_shape();
     assert_eq!(fact.nodes, 1);
-    assert_eq!(fact.bytes, c.rows[0].shape.bytes);
-    assert_eq!(fact.visits, c.rows[0].shape.visits);
+    assert_eq!(fact.bytes, c.rows[0].retained_shape().bytes);
+    assert_eq!(fact.visits, c.rows[0].retained_shape().visits);
     let handle_bytes =
         std::mem::size_of::<Arc<LocalBzlInput>>() + std::mem::size_of::<SharedPublicationInput>();
     assert_eq!(p.shape.nodes, 0);
-    assert_eq!(p.shape.visits, 1 + p.rows.len());
-    assert_eq!(p.shape.edges, 2 + 2 * p.rows.len());
+    // Validity, environment-owner slice, and shared-payload expansion each
+    // have a fixed paid header. Empty expansion has zero bytes/edges, but its
+    // record remains; all ordered row and physical plan records stay exact.
+    assert_eq!(
+        p.shape.visits,
+        3 + p.rows.len() + p.references.owner_table_budget().unwrap().0.records
+    );
+    assert_eq!(
+        p.shape.edges,
+        2 + 2 * p.rows.len() + p.references.owner_table_budget().unwrap().0.records
+    );
     assert_eq!(
         p.shape.bytes,
         std::mem::size_of::<BzlInputValidity>()
-            + 4 * std::mem::size_of::<usize>()
+            + 6 * std::mem::size_of::<usize>()
             + p.rows.len() * handle_bytes
+            + p.references.owner_table_budget().unwrap().0.bytes
     );
     let independent = owner(&child_manifest, &text, false, []).unwrap();
     assert_eq!(child, independent);
@@ -359,7 +447,13 @@ fn shared_fact_certificates_reuse_actual_rows_and_separate_payload_from_referenc
         separate.audit_owner_shape(&independent).unwrap();
         let separate = separate.local_shape();
         assert_eq!(separate.nodes - shared.nodes, fact.nodes);
-        assert_eq!(separate.visits - shared.visits, fact.visits);
+        assert_eq!(
+            separate.visits - shared.visits,
+            c.rows[0].intrinsic_shape().visits
+                + c.rows[0].key.intrinsic_shape().visits
+                + c.rows[0].key.environment.intrinsic_shape().visits
+                + 4 // A fresh row follows its key and environment; a row hit stops.
+        );
         assert!(separate.bytes - shared.bytes >= fact.bytes);
     }
 }
@@ -635,3 +729,265 @@ fn flat_row_indexes_refuse_tree_allocation_before_new_or_duplicate_occurrence_gr
     assert_eq!(occurrences.len(), 1);
     assert!(!occurrences.contains(&(Arc::as_ptr(&candidate) as usize)));
 }
+
+#[path = "tests/client_data.rs"]
+mod client_data;
+
+#[test]
+fn stable_owner_declares_the_same_complete_root_and_keeps_strict_foreign_accounting() {
+    use slug_build_api_v2::published_value::PublishedValueArenaBuilder;
+    let metadata = manifest();
+    let first = owner(&metadata, "def f(): return 1", false, []).unwrap();
+    let foreign = owner(&metadata, "def f(): return 1", false, []).unwrap();
+    fn validity(owner: &FunctionEvaluationOwner) -> &BzlInputValidity {
+        owner
+            .input_validity()
+            .as_any()
+            .downcast_ref::<BzlInputValidity>()
+            .unwrap()
+    }
+    let stable = first
+        .stable_key()
+        .as_any()
+        .downcast_ref::<BzlStableOwner>()
+        .unwrap();
+    let p = validity(&first);
+    let root = stable.root();
+    assert!(Arc::ptr_eq(root, &p.rows[0]));
+    assert_eq!(stable.shared_inputs().len(), 1);
+    let declared = stable.shared_inputs()[0].retained_shape();
+    let fields = |s: PublicationShape| (s.nodes, s.edges, s.bytes, s.visits, s.depth);
+    assert_eq!(fields(declared), fields(root.retained_shape()));
+    assert_eq!(
+        fields(p.shared_inputs[0].retained_shape()),
+        fields(root.retained_shape())
+    );
+    let h = BzlStableOwner::shape();
+    assert_eq!(
+        fields(h),
+        (0, 2, std::mem::size_of::<BzlStableOwner>(), 3, 1)
+    );
+    let intrinsic = first.intrinsic_shape();
+    assert_eq!(intrinsic.visits, h.visits + p.shape.visits);
+    assert_eq!(intrinsic.edges, h.edges + p.shape.edges);
+    assert_eq!(intrinsic.nodes, h.nodes + p.shape.nodes);
+    assert_eq!(p.shared_inputs.len(), 1);
+    // Completion retains every full row/key/env body and every declaration
+    // cell, with only the row stored directly. Encounter work stays
+    // separately checked by the strict audit below.
+    let shared = root.intrinsic_shape().visits
+        + root.key.intrinsic_shape().visits
+        + root.key.environment.intrinsic_shape().visits;
+    let references = stable.shared_inputs().len()
+        + p.shared_inputs.len()
+        + root.shared_inputs().len()
+        + root.key.shared_inputs().len()
+        + root.key.environment.shared_inputs().len();
+    assert_eq!(references, 4);
+    assert_eq!(
+        first.retained_shape().visits,
+        intrinsic.visits + shared + references
+    );
+    assert_eq!(first.retained_shape().nodes, root.shape.nodes);
+    assert_eq!(first, foreign);
+    let hash = |owner: &FunctionEvaluationOwner| {
+        let mut h = DefaultHasher::new();
+        owner.hash_fields(&mut h);
+        h.finish()
+    };
+    assert_eq!(hash(&first), hash(&foreign));
+    assert!(!Arc::ptr_eq(root, &validity(&foreign).rows[0]));
+    let mut expected = DefaultHasher::new();
+    root.key.hash(&mut expected);
+    let mut actual = DefaultHasher::new();
+    stable.hash_part(&mut actual);
+    assert_eq!(actual.finish(), expected.finish());
+    for (a, b) in [(&first, &foreign), (&foreign, &first)] {
+        let mut audit = PublishedValueArenaBuilder::new();
+        audit.audit_owner_shape(a).unwrap();
+        assert_eq!(audit.charged_visits(), 10);
+        assert_eq!(audit.local_shape().visits, intrinsic.visits + shared + 10);
+        audit.audit_owner_shape(b).unwrap();
+        assert_eq!(audit.charged_visits(), 20);
+        assert_eq!(
+            audit.local_shape().visits,
+            2 * (intrinsic.visits + shared) + 20
+        );
+        assert_eq!(audit.local_shape().nodes, 2 * root.shape.nodes);
+    }
+}
+
+#[test]
+fn stable_owner_preflight_checks_work_full_retention_and_joint_peak_before_guard_clones() {
+    let original = owner(&manifest(), "def f(): return 1", false, []).unwrap();
+    let root = original
+        .stable_key()
+        .as_any()
+        .downcast_ref::<BzlStableOwner>()
+        .unwrap()
+        .root();
+    let guards = Arc::strong_count(root);
+    let h = BzlStableOwner::shape();
+    let construction = BzlStableOwner::construction_shape();
+    assert_eq!(construction.visits, 5);
+    assert_eq!(construction.edges, 2);
+    assert_eq!(
+        construction.bytes,
+        h.bytes + 2 * std::mem::size_of::<usize>()
+    );
+    for (remaining, succeeds) in [
+        (construction.visits, true),
+        (construction.visits - 1, false),
+    ] {
+        let mut work = PublicationShape {
+            visits: 65536 - remaining,
+            ..zero_shape()
+        };
+        let result = BzlStableOwner::new(root, root.shape, &mut work);
+        assert_eq!(result.is_ok(), succeeds);
+        if let Ok(stable) = result {
+            assert_eq!(work.visits, 65536);
+            assert_eq!(Arc::strong_count(root), guards + 2);
+            assert!(Arc::ptr_eq(stable.root(), root));
+            drop(stable);
+        }
+        assert_eq!(Arc::strong_count(root), guards);
+    }
+    for extra in [0, 1] {
+        let retained = PublicationShape {
+            visits: 65536 - h.visits + extra,
+            ..root.shape
+        };
+        let result = BzlStableOwner::new(root, retained, &mut zero_shape());
+        assert_eq!(result.is_ok(), extra == 0);
+        drop(result);
+        assert_eq!(Arc::strong_count(root), guards);
+        let mut work = PublicationShape {
+            bytes: 64 * 1024 * 1024 - root.shape.bytes - h.bytes - construction.bytes + extra,
+            ..zero_shape()
+        };
+        let result = BzlStableOwner::new(root, root.shape, &mut work);
+        assert_eq!(result.is_ok(), extra == 0);
+        drop(result);
+        assert_eq!(Arc::strong_count(root), guards);
+    }
+    assert!(
+        BzlStableOwner::new(
+            root,
+            root.shape,
+            &mut PublicationShape {
+                bytes: usize::MAX,
+                ..zero_shape()
+            }
+        )
+        .is_err()
+    );
+    assert_eq!(Arc::strong_count(root), guards);
+}
+
+#[test]
+fn stable_owner_keeps_whole_validity_and_last_root_guard_lifetime() {
+    use slug_build_api_v2::published_value::PublishedOriginalBinding;
+    use slug_build_api_v2::published_value::PublishedValueArena;
+    use slug_build_api_v2::published_value::PublishedValueArenaBuilder;
+    #[derive(Debug)]
+    struct Originals(Vec<PublishedValueArena>);
+    impl PublishedOriginalBinding for Originals {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn root_count(&self) -> usize {
+            0
+        }
+        fn imported_arenas(&self) -> &[PublishedValueArena] {
+            &self.0
+        }
+    }
+    fn seal(mut b: PublishedValueArenaBuilder) -> PublishedValueArena {
+        b.charge_bytes(
+            std::mem::size_of::<Originals>()
+                + 2 * std::mem::size_of::<usize>()
+                + 2 * b.imports().len() * std::mem::size_of::<PublishedValueArena>(),
+        )
+        .unwrap();
+        let imports = b.imports().to_vec();
+        b.seal(Arc::new(Originals(imports))).unwrap()
+    }
+    let metadata = manifest();
+    let first = owner(&metadata, "def f(): return 1", false, []).unwrap();
+    let changed = owner(&metadata, "def f(): return 2", false, []).unwrap();
+    assert!(first.stable_key().eq_part(changed.stable_key()));
+    assert_ne!(
+        first, changed,
+        "whole row source still participates independently"
+    );
+    let stable = first
+        .stable_key()
+        .as_any()
+        .downcast_ref::<BzlStableOwner>()
+        .unwrap();
+    let weak = Arc::downgrade(stable.root());
+    let mut audit = PublishedValueArenaBuilder::new();
+    audit.audit_owner_shape(&first).unwrap();
+    drop(first);
+    assert!(weak.upgrade().is_some());
+    let arena = seal(audit);
+    let mut importing = PublishedValueArenaBuilder::new();
+    importing.import(arena.clone()).unwrap();
+    let retained = seal(importing);
+    assert_eq!(retained.shape().visits, arena.shape().visits + 1);
+    assert_eq!(retained.shape().nodes, arena.shape().nodes);
+    drop(arena);
+    assert!(weak.upgrade().is_some());
+    drop(retained);
+    assert!(weak.upgrade().is_none());
+
+    // Semantically equal foreign rows cannot replace the paired actual root.
+    // Compose two genuine complete private parts to exercise the integrity
+    // guard, without fabricating any row/key/payload shape or source facts.
+    let a = owner(&metadata, "same", false, []).unwrap();
+    let b = owner(&metadata, "same", false, []).unwrap();
+    let stable_a = a
+        .stable_key()
+        .as_any()
+        .downcast_ref::<BzlStableOwner>()
+        .unwrap();
+    let validity_b = b
+        .input_validity()
+        .as_any()
+        .downcast_ref::<BzlInputValidity>()
+        .unwrap();
+    assert_eq!(stable_a.root().key, validity_b.rows[0].key);
+    assert!(!Arc::ptr_eq(stable_a.root(), &validity_b.rows[0]));
+    let stable =
+        BzlStableOwner::new(stable_a.root(), stable_a.root().shape, &mut zero_shape()).unwrap();
+    let references = crate::bzl_environment::references::EnvironmentReferencePlan::prepare(
+        validity_b.rows.iter().flat_map(|row| {
+            std::iter::once(&row.key.environment)
+                .chain(row.children.iter().map(|key| &key.environment))
+        }),
+    )
+    .unwrap();
+    let malformed = FunctionEvaluationOwner::new(
+        FunctionOwnerDomain::BzlLoad,
+        stable,
+        Arc::new(BzlInputValidity {
+            rows: validity_b.rows.clone(),
+            shared_inputs: validity_b.shared_inputs.clone(),
+            shape: validity_b.shape,
+            environment_owners: validity_b.environment_owners.clone(),
+            references,
+        }),
+    )
+    .unwrap();
+    let parent = parent_manifest(1, &metadata);
+    assert!(
+        owner(&parent, "parent", false, [malformed])
+            .unwrap_err()
+            .to_string()
+            .contains("Bzl child owner root certificate mismatch")
+    );
+}
+
+#[path = "tests/row_declarations.rs"]
+mod row_declarations;

@@ -1,10 +1,29 @@
 //! Canonical retained records, independent of the producer's inspection history.
 use super::*;
 
+#[path = "retained_facts/checked_backing.rs"]
+mod checked_backing;
 #[path = "retained_facts/metadata.rs"]
 mod metadata;
 #[path = "retained_facts/sources.rs"]
 mod sources;
+pub(super) use checked_backing::CertificationPhase;
+pub(super) use checked_backing::checked_local_visits;
+pub(super) use checked_backing::prepare_checked_draft;
+
+/// Successful canonical local contributions, not a physical allocation partition.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct LocalRetainedFacts {
+    pub(super) total: usize,
+    pub(super) source: usize,
+    pub(super) native: usize,
+}
+impl LocalRetainedFacts {
+    pub(super) fn other(self) -> usize {
+        // Each subset is committed only after its disjoint successful total add.
+        self.total - self.source - self.native
+    }
+}
 
 struct Meter<'a> {
     work: &'a mut usize,
@@ -12,6 +31,8 @@ struct Meter<'a> {
     scratch: &'a mut usize,
     failed: &'a mut bool,
     retained: usize,
+    source: usize,
+    native: usize,
 }
 impl Meter<'_> {
     fn work(&mut self) -> Result<(), PublishedValueError> {
@@ -63,10 +84,24 @@ impl Meter<'_> {
             }
         }
     }
+    /// Immutable array metadata supplies the FULL record count. The new
+    /// constant operation is paid even for empty arrays, before reading len.
+    fn count_records<T>(&mut self, records: &[T]) -> Result<(), PublishedValueError> {
+        self.work()?;
+        self.bytes(std::mem::size_of::<usize>())?;
+        self.add(records.len())
+    }
     fn native(&mut self, count: usize) -> Result<(), PublishedValueError> {
         self.work()?; // Read a private, successful complete strict-audit certificate.
         self.bytes(std::mem::size_of::<NativeCertificate>())?;
-        self.add(count)
+        self.add(count)?;
+        self.native += count; // Bounded by the successful total <= F.
+        Ok(())
+    }
+    fn source(&mut self, count: usize) -> Result<(), PublishedValueError> {
+        self.add(count)?;
+        self.source += count; // Bounded by the successful total <= F.
+        Ok(())
     }
 }
 
@@ -126,21 +161,55 @@ pub(super) fn local_visits(
     bytes: &mut usize,
     scratch: &mut usize,
     failed: &mut bool,
-) -> Result<(usize, Vec<CallableSourceAuthority>), PublishedValueError> {
+) -> Result<(LocalRetainedFacts, Vec<CallableSourceAuthority>), PublishedValueError> {
+    let mut phase = CertificationPhase::SourceSetup;
+    local_visits_with::<checked_backing::Raw>(
+        Draft {
+            rows,
+            edges,
+            imports,
+        },
+        slots,
+        owner_count,
+        root_count,
+        work,
+        bytes,
+        scratch,
+        failed,
+        &mut phase,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn local_visits_with<B: checked_backing::Backing>(
+    draft: Draft<'_>,
+    slots: &[Option<PublishedRootSlot>],
+    owner_count: usize,
+    root_count: usize,
+    work: &mut usize,
+    bytes: &mut usize,
+    scratch: &mut usize,
+    failed: &mut bool,
+    phase: &mut CertificationPhase,
+) -> Result<(LocalRetainedFacts, Vec<CallableSourceAuthority>), PublishedValueError> {
     let mut meter = Meter {
         work,
         bytes,
         scratch,
         failed,
         retained: 0,
+        source: 0,
+        native: 0,
     };
     let result = (|| {
-        let draft = Draft {
+        let Draft {
             rows,
-            edges,
+            edges: _,
             imports,
-        };
+        } = draft;
+        *phase = CertificationPhase::SourceSetup;
         let mut sources = sources::LocalSources::new(rows.len(), &mut meter)?;
+        *phase = CertificationPhase::Rows;
         for row in rows {
             meter.record()?;
             let row = row
@@ -148,23 +217,19 @@ pub(super) fn local_visits(
                 .ok_or(PublishedValueError::Invalid("incomplete row"))?;
             metadata::row(row, &draft, &mut sources, &mut meter)?;
         }
-        // Count the entire backing, including unused edges and None root slots.
-        for edge in edges {
-            draft.edge(*edge, &mut meter)?;
-        }
+        // Both paths retain the FULL backing, including unused entries.
+        *phase = CertificationPhase::BackingEdges;
+        B::count(&draft, &mut meter)?;
+        *phase = CertificationPhase::RootSlots;
         if slots.len() != rows.len() {
             return Err(PublishedValueError::Invalid("retained root slots"));
         }
-        for slot in slots {
-            meter.record()?;
-            if slot.is_some_and(|slot| slot.index() >= root_count) {
-                return Err(PublishedValueError::Invalid("original slot"));
-            }
-        }
+        B::slots(slots, root_count, &mut meter)?;
         // These immutable length fields certify stored reference counts; there
         // is no per-reference inspection in these former counting-only loops.
         // Payloads remain covered by the guarded owner/arena walk and source
         // certificates above. Keep their FULL canonical retained counts.
+        *phase = CertificationPhase::StoredReferences;
         let references = imports
             .len()
             .checked_add(owner_count)
@@ -175,13 +240,21 @@ pub(super) fn local_visits(
             meter.bytes(3 * std::mem::size_of::<usize>())?;
             meter.add(references)?;
         }
+        *phase = CertificationPhase::SourceCount;
         let source_count = sources.values().len();
         if source_count != 0 {
             meter.work()?;
             meter.bytes(std::mem::size_of::<usize>())?;
             meter.add(source_count)?;
         }
-        Ok((meter.retained, sources.finish()))
+        Ok((
+            LocalRetainedFacts {
+                total: meter.retained,
+                source: meter.source,
+                native: meter.native,
+            },
+            sources.finish(),
+        ))
     })();
     if result.is_err() {
         *meter.failed = true;
@@ -191,4 +264,4 @@ pub(super) fn local_visits(
 
 #[cfg(test)]
 #[path = "retained_facts/tests.rs"]
-mod tests;
+pub(super) mod tests;

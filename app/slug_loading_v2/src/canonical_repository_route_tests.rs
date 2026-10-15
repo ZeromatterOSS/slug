@@ -93,6 +93,8 @@ pub(super) mod tests {
 
     pub(crate) const WORKSPACE: &str = "/generated-repository-definition";
     pub(crate) const MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, first='first', second='second')\n";
+    // Positive generated-repository consumers use the ordinary main self alias.
+    pub(crate) const CONSUMER_MODULE: &str = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, first='first', second='second')\n";
     pub(crate) fn builtin_graph_module() -> String {
         let mut module = include_str!("../../slug_bzlmod_v2/builtin/bazel_tools/MODULE.bazel")
             .replacen(
@@ -166,9 +168,47 @@ ext=module_extension(implementation=impl)
         }
     }
 
+    pub(crate) fn builtin_graph_registry_io() -> Arc<dyn RegistryIo> {
+        Arc::new(BuiltinGraphRegistryIo)
+    }
+
     pub(crate) fn builtin_graph_dice() -> Arc<Dice> {
         let mut builder = Dice::builder();
-        slug_bzlmod_v2::install_registry_io(&mut builder, Arc::new(BuiltinGraphRegistryIo));
+        slug_bzlmod_v2::install_registry_io(&mut builder, builtin_graph_registry_io());
+        builder.build(DetectCycles::Enabled)
+    }
+
+    // These route fixtures deliberately ask for missing/1 to exercise the
+    // selected-module terminal before generated fallback. Keep that authored
+    // registry row absent even though the builtin metadata fixture is synthetic.
+    struct GeneratedRegistryIo;
+
+    #[async_trait]
+    impl RegistryIo for GeneratedRegistryIo {
+        async fn read_exact(
+            &self,
+            url: &RegistryFileUrl,
+        ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+            let parts = url.as_str().split('/').collect::<Vec<_>>();
+            if matches!(
+                parts.as_slice(),
+                [
+                    ..,
+                    "modules",
+                    "missing",
+                    "1",
+                    "MODULE.bazel" | "source.json"
+                ]
+            ) {
+                return Ok(RegistryIoOutcome::NotFound);
+            }
+            BuiltinGraphRegistryIo.read_exact(url).await
+        }
+    }
+
+    pub(crate) fn generated_graph_dice() -> Arc<Dice> {
+        let mut builder = Dice::builder();
+        slug_bzlmod_v2::install_registry_io(&mut builder, Arc::new(GeneratedRegistryIo));
         builder.build(DetectCycles::Enabled)
     }
 
@@ -586,9 +626,12 @@ ext=module_extension(implementation=impl)
         transaction: &mut dice::DiceTransaction,
     ) -> HostValidatedGeneratedRepositorySpecsOutcome {
         transaction
-            .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap()
     }
@@ -759,7 +802,7 @@ ext=module_extension(implementation=impl)
         };
         let route = value.as_ref().as_ref().unwrap();
         let view = route.view();
-        let mapping = ["bazel_tools", "first", "second"].map(|name| {
+        let mapping = ["consumer", "first", "second"].map(|name| {
             route
                 .mapping_target(&ApparentRepoName::new(name).unwrap())
                 .map(ToString::to_string)
@@ -1070,9 +1113,16 @@ ext=module_extension(implementation=impl)
     }
     #[tokio::test]
     async fn canonical_route_selects_before_missing_only_generated_fallback() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = generated_graph_dice();
         let tracker = Arc::new(LookupTracker::default());
-        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        let mut tx = transaction(
+            &dice,
+            CONSUMER_MODULE,
+            EXTENSION_A,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
         let generated = names(&validated(&mut tx).await);
         tracker.canonical.lock().unwrap().clear();
         tracker.selected.lock().unwrap().clear();
@@ -1174,7 +1224,7 @@ ext=module_extension(implementation=impl)
         assert!(rejected(builtin.clone(), builtin));
         let other = CanonicalRepoName::new("other+").unwrap();
         assert!(rejected(generated[0].clone(), other));
-        let generated_terminal = transaction(&dice, MODULE, EXTENSION_A, false, None)
+        let generated_terminal = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, false, None)
             .await
             .compute(&generated_key)
             .await
@@ -1241,7 +1291,8 @@ ext=module_extension(implementation=impl)
         );
         assert_eq!(tracker.lookup.lock().unwrap().len(), 2);
         assert!(tracker.forbidden.lock().unwrap().is_empty());
-        let generated_b = canonical_lookup(&dice, MODULE, EXTENSION_B, generated[0].clone()).await;
+        let generated_b =
+            canonical_lookup(&dice, CONSUMER_MODULE, EXTENSION_B, generated[0].clone()).await;
         assert!(!HostCanonicalRepositoryRouteKey::equality(
             &generated_value,
             &generated_b,
@@ -1249,13 +1300,13 @@ ext=module_extension(implementation=impl)
         assert_ne!(route_hash(&generated_value), route_hash(&generated_b));
         assert!(HostCanonicalRepositoryRouteKey::equality(
             &generated_value,
-            &canonical_lookup(&dice, MODULE, EXTENSION_A, generated[0].clone()).await,
+            &canonical_lookup(&dice, CONSUMER_MODULE, EXTENSION_A, generated[0].clone()).await,
         ));
         let selected_b = canonical_lookup(
             &dice,
-            &MODULE.replace(
-                "module(name='bazel_tools')",
-                "module(name='bazel_tools', repo_name='changed')",
+            &CONSUMER_MODULE.replace(
+                "module(name='consumer')",
+                "module(name='consumer', repo_name='changed')",
             ),
             EXTENSION_A,
             CanonicalRepoName::root(),
@@ -1268,7 +1319,13 @@ ext=module_extension(implementation=impl)
         assert_ne!(route_hash(&root), route_hash(&selected_b));
         assert!(HostCanonicalRepositoryRouteKey::equality(
             &root,
-            &canonical_lookup(&dice, MODULE, EXTENSION_A, CanonicalRepoName::root(),).await,
+            &canonical_lookup(
+                &dice,
+                CONSUMER_MODULE,
+                EXTENSION_A,
+                CanonicalRepoName::root(),
+            )
+            .await,
         ));
         let mut updater = dice.updater_with_data(UserComputationData {
             cycle_detector: Some(crate::bzl_load_cycle_detector()),
@@ -1418,9 +1475,16 @@ ext=module_extension(implementation=impl)
 
     #[tokio::test]
     async fn real_lookup_borrows_exact_definition_and_restores() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = generated_graph_dice();
         let tracker = Arc::new(LookupTracker::default());
-        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        let mut tx = transaction(
+            &dice,
+            CONSUMER_MODULE,
+            EXTENSION_A,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
         let validation = validated(&mut tx).await;
         let generated = names(&validation);
         assert_eq!(generated.len(), 2);
@@ -1487,22 +1551,22 @@ ext=module_extension(implementation=impl)
 
         let baseline = snapshot(&first);
         for (case, (module, extension, changed_fields)) in [
-            (MODULE.to_owned(), EXTENSION_B.to_owned(), &[2][..]),
+            (CONSUMER_MODULE.to_owned(), EXTENSION_B.to_owned(), &[2][..]),
             (
-                MODULE.replace("first='first'", "first='renamed'"),
+                CONSUMER_MODULE.replace("first='first'", "first='renamed'"),
                 EXTENSION_A.replacen("name='first'", "name='renamed'", 1),
                 &[0, 1, 4, 5],
             ),
-            (MODULE.to_owned(), EXTENSION_A.replace("value", "renamed_value"), &[3][..]),
-            (MODULE.to_owned(), EXTENSION_A.replace("value='one'", "value='changed'"), &[3][..]),
+            (CONSUMER_MODULE.to_owned(), EXTENSION_A.replace("value", "renamed_value"), &[3][..]),
+            (CONSUMER_MODULE.to_owned(), EXTENSION_A.replace("value='one'", "value='changed'"), &[3][..]),
             (
-                MODULE.to_owned(),
+                CONSUMER_MODULE.to_owned(),
                 EXTENSION_A.replace("value='one', target=':local'", "target=':local', value='one'"),
                 &[][..],
             ),
-            (MODULE.to_owned(), EXTENSION_A.replace("target=':local'", "target=':changed'"), &[3][..]),
+            (CONSUMER_MODULE.to_owned(), EXTENSION_A.replace("target=':local'", "target=':changed'"), &[3][..]),
             (
-                MODULE.to_owned(),
+                CONSUMER_MODULE.to_owned(),
                 EXTENSION_A.replace(
                     "repo(name='first', value='one', target=':local')\n    repo(name='second', value='two', target='@first//:item')",
                     "repo(name='second', value='two', target='@first//:item')\n    repo(name='first', value='one', target=':local')",
@@ -1525,15 +1589,15 @@ ext=module_extension(implementation=impl)
                 changed_fields.iter().all(|index| baseline[*index] != changed[*index]),
                 "case {case}: {baseline:?} == {changed:?}"
             );
-            let a2 = lookup(&dice, MODULE, EXTENSION_A, None).await;
+            let a2 = lookup(&dice, CONSUMER_MODULE, EXTENSION_A, None).await;
             assert!(HostGeneratedRepositoryDefinitionKey::equality(&first, &a2));
         }
 
         let inject_a = format!(
-            "{MODULE}inject_repo(e, injected='bazel_tools')\ninject_repo(e, other='bazel_tools')\n"
+            "{CONSUMER_MODULE}inject_repo(e, injected='consumer')\ninject_repo(e, other='consumer')\n"
         );
         let inject_b = format!(
-            "{MODULE}inject_repo(e, other='bazel_tools')\ninject_repo(e, injected='bazel_tools')\n"
+            "{CONSUMER_MODULE}inject_repo(e, other='consumer')\ninject_repo(e, injected='consumer')\n"
         );
         let mapping_a = lookup(&dice, &inject_a, EXTENSION_A, None).await;
         let mapping_b = lookup(&dice, &inject_b, EXTENSION_A, None).await;
@@ -1550,7 +1614,7 @@ ext=module_extension(implementation=impl)
         ));
         let overridden = lookup(
             &dice,
-            &format!("{MODULE}override_repo(e, first='bazel_tools')\n"),
+            &format!("{CONSUMER_MODULE}override_repo(e, first='consumer')\n"),
             EXTENSION_A,
             None,
         )
@@ -1566,15 +1630,15 @@ ext=module_extension(implementation=impl)
         );
         assert!(HostGeneratedRepositoryDefinitionKey::equality(
             &first,
-            &lookup(&dice, MODULE, EXTENSION_A, None).await,
+            &lookup(&dice, CONSUMER_MODULE, EXTENSION_A, None).await,
         ));
 
         let multi_extension = EXTENSION_A.replace(
             "ext=module_extension(implementation=impl)",
             "first=module_extension(implementation=impl)\nsecond=module_extension(implementation=impl)",
         );
-        let request_a = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
-        let request_b = "module(name='bazel_tools')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\n";
+        let request_a = "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
+        let request_b = "module(name='consumer')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\n";
         let order_a = lookup(&dice, request_a, &multi_extension, None).await;
         let fixed = CanonicalRepoName::new(&snapshot(&order_a)[0]).unwrap();
         let order_b = lookup(&dice, request_b, &multi_extension, Some(&fixed)).await;
@@ -1603,9 +1667,16 @@ ext=module_extension(implementation=impl)
     }
     #[tokio::test]
     async fn real_apparent_mapping_borrows_effective_target_and_restores() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = generated_graph_dice();
         let tracker = Arc::new(LookupTracker::default());
-        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        let mut tx = transaction(
+            &dice,
+            CONSUMER_MODULE,
+            EXTENSION_A,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
         let generated = names(&validated(&mut tx).await);
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let definition_key =
@@ -1623,7 +1694,7 @@ ext=module_extension(implementation=impl)
         };
         let self_key = key(generated[0].clone(), "first");
         let sibling_key = key(generated[0].clone(), "second");
-        let host_key = key(generated[0].clone(), "bazel_tools");
+        let host_key = key(generated[0].clone(), "consumer");
         let self_mapping = tx.compute(&self_key).await.unwrap();
         let sibling_mapping = tx.compute(&sibling_key).await.unwrap();
         let host_mapping = tx.compute(&host_key).await.unwrap();
@@ -1741,7 +1812,7 @@ ext=module_extension(implementation=impl)
         let root_builtin_key = HostCanonicalRepositoryApparentMappingKey::new(
             workspace.clone(),
             CanonicalRepoName::root(),
-            ApparentRepoName::new("bazel_tools").unwrap(),
+            ApparentRepoName::new("consumer").unwrap(),
         );
         let root_builtin = tx.compute(&root_builtin_key).await.unwrap();
         assert_eq!(target(&root_builtin), CanonicalRepoName::root());
@@ -1800,7 +1871,7 @@ ext=module_extension(implementation=impl)
                 .await
                 .unwrap()
         }
-        let override_module = format!("{MODULE}override_repo(e, first='bazel_tools')\n");
+        let override_module = format!("{CONSUMER_MODULE}override_repo(e, first='consumer')\n");
         let overridden = resolve(&dice, &override_module, "first").await;
         assert_eq!(target(&overridden), CanonicalRepoName::root());
         let SourcePreparationOutcome::Complete(overridden_value) = &overridden else {
@@ -1831,9 +1902,9 @@ ext=module_extension(implementation=impl)
         ));
         assert!(HostCanonicalRepositoryApparentMappingKey::equality(
             &self_mapping,
-            &resolve(&dice, MODULE, "first").await,
+            &resolve(&dice, CONSUMER_MODULE, "first").await,
         ));
-        let root_a = resolve_root(&dice, MODULE, "first").await;
+        let root_a = resolve_root(&dice, CONSUMER_MODULE, "first").await;
         let root_b = resolve_root(&dice, &override_module, "first").await;
         assert_eq!(target(&root_a), generated[0]);
         assert_eq!(target(&root_b), CanonicalRepoName::root());
@@ -1842,9 +1913,9 @@ ext=module_extension(implementation=impl)
         ));
         assert!(HostCanonicalRepositoryApparentMappingKey::equality(
             &root_a,
-            &resolve_root(&dice, MODULE, "first").await,
+            &resolve_root(&dice, CONSUMER_MODULE, "first").await,
         ));
-        let order_module = "module(name='bazel_tools')\n\
+        let order_module = "module(name='consumer')\n\
             e=use_extension('//:ext.bzl','ext')\n\
             use_repo(e, second='second', first='first')\n";
         let root_order = resolve_root(&dice, order_module, "first").await;
@@ -1855,11 +1926,11 @@ ext=module_extension(implementation=impl)
         ));
         assert!(HostCanonicalRepositoryApparentMappingKey::equality(
             &root_a,
-            &resolve_root(&dice, MODULE, "first").await,
+            &resolve_root(&dice, CONSUMER_MODULE, "first").await,
         ));
-        let named_root_module = MODULE.replacen(
-            "module(name='bazel_tools')",
-            "module(name='bazel_tools', repo_name='root_self')",
+        let named_root_module = CONSUMER_MODULE.replacen(
+            "module(name='consumer')",
+            "module(name='consumer', repo_name='root_self')",
             1,
         );
         let named_root = resolve_root(&dice, &named_root_module, "first").await;
@@ -1870,13 +1941,13 @@ ext=module_extension(implementation=impl)
         ));
         assert!(HostCanonicalRepositoryApparentMappingKey::equality(
             &root_a,
-            &resolve_root(&dice, MODULE, "first").await,
+            &resolve_root(&dice, CONSUMER_MODULE, "first").await,
         ));
         let alternate_extension = EXTENSION_A.replace(
             "ext=module_extension(implementation=impl)",
             "ext=module_extension(implementation=impl)\nother=module_extension(implementation=impl)",
         );
-        let alternate_module = "module(name='bazel_tools')\n\
+        let alternate_module = "module(name='consumer')\n\
             e=use_extension('//:ext.bzl','other')\n\
             use_repo(e, first='first', second='second')\n";
         let alternate_root = transaction(&dice, alternate_module, &alternate_extension, true, None)
@@ -1895,7 +1966,7 @@ ext=module_extension(implementation=impl)
         ));
         assert!(HostCanonicalRepositoryApparentMappingKey::equality(
             &root_a,
-            &resolve_root(&dice, MODULE, "first").await,
+            &resolve_root(&dice, CONSUMER_MODULE, "first").await,
         ));
         let mut invalid_tx = transaction(
             &dice,
@@ -1940,7 +2011,7 @@ ext=module_extension(implementation=impl)
         ));
         let root_injected = resolve_root(
             &dice,
-            &format!("{MODULE}inject_repo(e, injected='bazel_tools')\n"),
+            &format!("{CONSUMER_MODULE}inject_repo(e, injected='consumer')\n"),
             "first",
         )
         .await;
@@ -1951,7 +2022,7 @@ ext=module_extension(implementation=impl)
         ));
         assert!(HostCanonicalRepositoryApparentMappingKey::equality(
             &root_a,
-            &resolve_root(&dice, MODULE, "first").await,
+            &resolve_root(&dice, CONSUMER_MODULE, "first").await,
         ));
         assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
             &root_a,
@@ -1959,9 +2030,9 @@ ext=module_extension(implementation=impl)
         ));
         assert!(HostCanonicalRepositoryApparentMappingKey::equality(
             &root_a,
-            &resolve_root(&dice, MODULE, "first").await,
+            &resolve_root(&dice, CONSUMER_MODULE, "first").await,
         ));
-        let root_missing = resolve_root(&dice, MODULE, "missing").await;
+        let root_missing = resolve_root(&dice, CONSUMER_MODULE, "missing").await;
         assert!(matches!(
             root_missing,
             SourcePreparationOutcome::Complete(value)
@@ -1977,7 +2048,7 @@ ext=module_extension(implementation=impl)
         ));
         let injected = resolve(
             &dice,
-            &format!("{MODULE}inject_repo(e, injected='bazel_tools')\n"),
+            &format!("{CONSUMER_MODULE}inject_repo(e, injected='consumer')\n"),
             "injected",
         )
         .await;
@@ -1993,7 +2064,8 @@ ext=module_extension(implementation=impl)
             };
             predecessor.view().canonical_repo().clone()
         };
-        let invalid_override_module = format!("{MODULE}override_repo(e, injected='bazel_tools')\n");
+        let invalid_override_module =
+            format!("{CONSUMER_MODULE}override_repo(e, injected='consumer')\n");
         let mut invalid_override_tx =
             transaction(&dice, &invalid_override_module, EXTENSION_A, true, None).await;
         let invalid_override = invalid_override_tx
@@ -2023,16 +2095,16 @@ ext=module_extension(implementation=impl)
             &injected,
             &resolve(
                 &dice,
-                &format!("{MODULE}inject_repo(e, injected='bazel_tools')\n"),
+                &format!("{CONSUMER_MODULE}inject_repo(e, injected='consumer')\n"),
                 "injected",
             )
             .await,
         ));
         let inject_a = format!(
-            "{MODULE}inject_repo(e, injected='bazel_tools')\ninject_repo(e, other='bazel_tools')\n"
+            "{CONSUMER_MODULE}inject_repo(e, injected='consumer')\ninject_repo(e, other='consumer')\n"
         );
         let inject_b = format!(
-            "{MODULE}inject_repo(e, other='bazel_tools')\ninject_repo(e, injected='bazel_tools')\n"
+            "{CONSUMER_MODULE}inject_repo(e, other='consumer')\ninject_repo(e, injected='consumer')\n"
         );
         let order_a = resolve(&dice, &inject_a, "injected").await;
         let order_b = resolve(&dice, &inject_b, "injected").await;
@@ -2048,7 +2120,7 @@ ext=module_extension(implementation=impl)
             "ext=module_extension(implementation=impl)",
             "first=module_extension(implementation=impl)\nsecond=module_extension(implementation=impl)",
         );
-        let multi_module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first_a='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, first_b='first')\n";
+        let multi_module = "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first_a='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, first_b='first')\n";
         let mut multi_tx = transaction(&dice, multi_module, &multi_extension, true, None).await;
         let contexts = names(&validated(&mut multi_tx).await);
         let first_context = HostCanonicalRepositoryApparentMappingKey::new(
@@ -2094,10 +2166,10 @@ ext=module_extension(implementation=impl)
         assert_eq!(hash(&key), hash(&same));
         assert_ne!(hash(&key), hash(&other));
 
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut initial = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let dice = generated_graph_dice();
+        let mut initial = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let generated = names(&validated(&mut initial).await);
-        let success = observed_lookup(&dice, MODULE, EXTENSION_A, true, generated[0].clone(), None).await;
+        let success = observed_lookup(&dice, CONSUMER_MODULE, EXTENSION_A, true, generated[0].clone(), None).await;
         let carrier = observed_carrier(&success);
         assert!(carrier.result().is_ok());
         assert!(!carrier.observations().observations().is_empty());
@@ -2105,7 +2177,7 @@ ext=module_extension(implementation=impl)
         assert!(HostGeneratedRepositoryDefinitionObservationKey::equality(&success, &success));
 
         let missing_name = CanonicalRepoName::new("missing").unwrap();
-        let missing = observed_lookup(&dice, MODULE, EXTENSION_A, true, missing_name.clone(), None).await;
+        let missing = observed_lookup(&dice, CONSUMER_MODULE, EXTENSION_A, true, missing_name.clone(), None).await;
         assert!(matches!(
             observed_carrier(&missing).result().as_ref(),
             Err(HostGeneratedRepositoryDefinitionError {
@@ -2113,7 +2185,7 @@ ext=module_extension(implementation=impl)
                 kind: HostGeneratedRepositoryDefinitionErrorKind::Missing {},
             }) if requested == &missing_name
         ));
-        let loading = observed_lookup(&dice, MODULE, EXTENSION_A, false, generated[0].clone(), None).await;
+        let loading = observed_lookup(&dice, CONSUMER_MODULE, EXTENSION_A, false, generated[0].clone(), None).await;
         assert!(matches!(
             observed_carrier(&loading).result().as_ref(),
             Err(HostGeneratedRepositoryDefinitionError {
@@ -2203,12 +2275,12 @@ first=module_extension(implementation=first_impl)
 second=module_extension(implementation=second_impl)
 "#;
         let module =
-            "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
-        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
+        let prep = generated_graph_dice();
         let mut prep_tx = transaction(&prep, module, extension, true, None).await;
         let requested = names(&validated(&mut prep_tx).await).remove(0);
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = generated_graph_dice();
         let tracker = Arc::new(LookupTracker::default());
         let mut tx = transaction(&dice, module, extension, true, Some(tracker.clone())).await;
         let observed_key = HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone());
@@ -2269,7 +2341,7 @@ second=module_extension(implementation=second_impl)
         assert!(tracker.activations.lock().unwrap().iter().all(|(_, _, batch)| batch.is_none()));
 
         for (present, requested_case, expected) in [(false, requested.clone(), "Loading"), (true, CanonicalRepoName::new("missing").unwrap(), "Missing")] {
-            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let case_dice = generated_graph_dice();
             let observed = observed_lookup(&case_dice, module, extension, present, requested_case.clone(), None).await;
             let mut legacy_tx = transaction(&case_dice, module, extension, present, None).await;
             let legacy = legacy_tx
@@ -2285,7 +2357,7 @@ second=module_extension(implementation=second_impl)
 
         let terminal_tracker = Arc::new(LookupTracker::default());
         let _ = observed_lookup(
-            &Dice::builder().build(DetectCycles::Enabled),
+            &generated_graph_dice(),
             module,
             extension,
             false,
@@ -2309,29 +2381,29 @@ second=module_extension(implementation=second_impl)
     #[rustfmt::skip]
     async fn observed_generated_definition_lifecycle_cancellation_and_nonactivation() {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut prep_tx = transaction(&prep, MODULE, EXTENSION_A, true, None).await;
+        let prep = generated_graph_dice();
+        let mut prep_tx = transaction(&prep, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let requested = names(&validated(&mut prep_tx).await).remove(0);
-        let order = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, second='second', first='first')\n";
-        let mapping = format!("{MODULE}override_repo(e, first='bazel_tools')\n");
-        let same_semantic = format!("{MODULE}\n");
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let order = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, second='second', first='first')\n";
+        let mapping = format!("{CONSUMER_MODULE}override_repo(e, first='consumer')\n");
+        let same_semantic = format!("{CONSUMER_MODULE}\n");
+        let dice = generated_graph_dice();
         let key = HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), requested.clone());
         let mut held = Vec::new();
         for (module, extension) in [
-            (MODULE, EXTENSION_A),
-            (MODULE, EXTENSION_B),
-            (MODULE, EXTENSION_A),
+            (CONSUMER_MODULE, EXTENSION_A),
+            (CONSUMER_MODULE, EXTENSION_B),
+            (CONSUMER_MODULE, EXTENSION_A),
             (order, EXTENSION_A),
-            (MODULE, EXTENSION_A),
+            (CONSUMER_MODULE, EXTENSION_A),
             (mapping.as_str(), EXTENSION_A),
-            (MODULE, EXTENSION_A),
+            (CONSUMER_MODULE, EXTENSION_A),
             (same_semantic.as_str(), EXTENSION_A),
         ] {
             let mut tx = transaction(&dice, module, extension, true, None).await;
             let global = tx.compute(&PathObservationEpochKey).await.unwrap();
             let carrier = observed_carrier(&tx.compute(&key).await.unwrap()).clone();
-            let child = tx.compute(&HostValidatedModuleExtensionRepositoriesObservationKey::new(workspace.clone())).await.unwrap();
+            let child = tx.compute(&HostValidatedModuleExtensionRepositoriesObservationKey::new_with_scope(workspace.clone(), slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages)).await.unwrap();
             let SourcePreparationOutcome::Complete(Ok(child)) = child else {
                 panic!("observed validation child must complete")
             };
@@ -2351,7 +2423,7 @@ second=module_extension(implementation=second_impl)
         assert_ne!(held[0].observations(), held[7].observations());
 
         let warm_tracker = Arc::new(LookupTracker::default());
-        let mut warm_tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(warm_tracker.clone())).await;
+        let mut warm_tx = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, true, Some(warm_tracker.clone())).await;
         let first = observed_carrier(&warm_tx.compute(&key).await.unwrap()).clone();
         warm_tracker.activations.lock().unwrap().clear();
         let reused = observed_carrier(&warm_tx.compute(&key).await.unwrap()).clone();
@@ -2365,9 +2437,9 @@ second=module_extension(implementation=second_impl)
                 .any(|(name, kind, batch)| { name == &key.to_string() && *kind == ActivationKind::Reused && batch.is_none() })
         );
 
-        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancel_dice = generated_graph_dice();
         let cancel_tracker = Arc::new(LookupTracker::default());
-        let mut cancelled = transaction(&cancel_dice, MODULE, EXTENSION_A, true, Some(cancel_tracker.clone())).await;
+        let mut cancelled = transaction(&cancel_dice, CONSUMER_MODULE, EXTENSION_A, true, Some(cancel_tracker.clone())).await;
         let mut future = Box::pin(cancelled.compute(&key));
         std::future::poll_fn(|context| {
             assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
@@ -2378,7 +2450,7 @@ second=module_extension(implementation=second_impl)
         assert!(cancel_tracker.activations.lock().unwrap().iter().all(|(name, _, _)| name != &key.to_string()));
         assert!(cancel_tracker.dependencies.lock().unwrap().iter().all(|(name, _)| name != &key.to_string()));
 
-        let mut recovery = transaction(&cancel_dice, MODULE, EXTENSION_A, true, Some(cancel_tracker.clone())).await;
+        let mut recovery = transaction(&cancel_dice, CONSUMER_MODULE, EXTENSION_A, true, Some(cancel_tracker.clone())).await;
         let global = recovery.compute(&PathObservationEpochKey).await.unwrap();
         let recovered = observed_carrier(&recovery.compute(&key).await.unwrap()).clone();
         assert_eq!(recovered.result(), held[0].result());
@@ -2435,8 +2507,8 @@ second=module_extension(implementation=second_impl)
         assert_eq!(key.to_string(), format!("observed-host-canonical-repository-route:{workspace}:{requested}"));
         assert_eq!(key, same); assert_ne!(key, other); assert_eq!(hash(&key), hash(&same)); assert_ne!(hash(&key), hash(&other));
 
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let root = observed_canonical_lookup(&dice, MODULE, EXTENSION_A, true, CanonicalRepoName::root(), None).await;
+        let dice = generated_graph_dice();
+        let root = observed_canonical_lookup(&dice, CONSUMER_MODULE, EXTENSION_A, true, CanonicalRepoName::root(), None).await;
         let root_carrier = observed_canonical_carrier(&root);
         assert!(matches!(
             root_carrier.result().as_ref(),
@@ -2446,22 +2518,22 @@ second=module_extension(implementation=second_impl)
         assert!(HostCanonicalRepositoryRouteObservationKey::validity(&root));
         assert!(HostCanonicalRepositoryRouteObservationKey::equality(&root, &root));
 
-        let mut prep = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let mut prep = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let generated_name = names(&validated(&mut prep).await).remove(0);
-        let generated = observed_canonical_lookup(&dice, MODULE, EXTENSION_A, true, generated_name.clone(), None).await;
+        let generated = observed_canonical_lookup(&dice, CONSUMER_MODULE, EXTENSION_A, true, generated_name.clone(), None).await;
         assert!(matches!(
             observed_canonical_carrier(&generated).result().as_ref(),
             Ok(route) if route.view().kind() == HostCanonicalRepositoryRouteKind::Generated
         ));
         let missing_name = CanonicalRepoName::new("missing").unwrap();
-        let missing = observed_canonical_lookup(&dice, MODULE, EXTENSION_A, true, missing_name.clone(), None).await;
+        let missing = observed_canonical_lookup(&dice, CONSUMER_MODULE, EXTENSION_A, true, missing_name.clone(), None).await;
         assert!(matches!(observed_canonical_carrier(&missing).result().as_ref(), Err(HostCanonicalRepositoryRouteError { canonical_repo, kind: HostCanonicalRepositoryRouteErrorKind::Missing { selected_missing, generated_missing } }) if canonical_repo == &missing_name && selected_missing.disposition() == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing && matches!(generated_missing.kind, HostGeneratedRepositoryDefinitionErrorKind::Missing { .. })));
-        let loading = observed_canonical_lookup(&dice, MODULE, EXTENSION_A, false, generated_name, None).await;
+        let loading = observed_canonical_lookup(&dice, CONSUMER_MODULE, EXTENSION_A, false, generated_name, None).await;
         assert!(matches!(observed_canonical_carrier(&loading).result().as_ref(), Err(HostCanonicalRepositoryRouteError { kind: HostCanonicalRepositoryRouteErrorKind::Generated { selected_missing, error: HostGeneratedRepositoryDefinitionError { kind: HostGeneratedRepositoryDefinitionErrorKind::Loading(_), .. } }, .. }) if selected_missing.disposition() == HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing));
         let selected_terminal = observed_canonical_lookup(&dice, "module(name='root')\nbazel_dep(name='missing', version='1')\n", EXTENSION_A, true, CanonicalRepoName::root(), None).await;
         assert!(matches!(observed_canonical_carrier(&selected_terminal).result().as_ref(), Err(HostCanonicalRepositoryRouteError { kind: HostCanonicalRepositoryRouteErrorKind::Selected(error), .. }) if error.disposition() == HostCanonicalSelectedModuleDefinitionErrorDisposition::Terminal));
 
-        let mut selected_tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let mut selected_tx = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let selected_key = HostCanonicalSelectedModuleDefinitionObservationKey::new(workspace.clone(), missing_name.clone());
         let selected_value = selected_tx.compute(&selected_key).await.unwrap();
         let SourcePreparationOutcome::Complete(Ok(selected_carrier)) = &selected_value else { panic!("selected Missing carrier must complete") };
@@ -2549,8 +2621,8 @@ def second_impl(ctx):
 first=module_extension(implementation=first_impl)
 second=module_extension(implementation=second_impl)
 "#;
-        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
-        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
+        let prep = generated_graph_dice();
         let mut prep_tx = transaction(&prep, module, extension, true, None).await;
         let generated = names(&validated(&mut prep_tx).await).remove(0);
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
@@ -2558,13 +2630,13 @@ second=module_extension(implementation=second_impl)
         let empty: &[&str] = &[];
         let generated_prints = ["load", "invoke-first"];
         for (case, case_module, case_extension, present, requested, generated_stage, expected_prints) in [
-            ("selected-success", MODULE, EXTENSION_A, true, CanonicalRepoName::root(), false, empty),
+            ("selected-success", CONSUMER_MODULE, EXTENSION_A, true, CanonicalRepoName::root(), false, empty),
             ("selected-failure", selected_failure, EXTENSION_A, true, CanonicalRepoName::root(), false, empty),
             ("generated-success", module, extension, true, generated.clone(), true, generated_prints.as_slice()),
             ("generated-failure", module, extension, false, generated.clone(), true, empty),
             ("generated-missing", module, extension, true, CanonicalRepoName::new("missing").unwrap(), true, empty),
         ] {
-            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let dice = generated_graph_dice();
             let tracker = Arc::new(LookupTracker::default());
             let mut tx = transaction(&dice, case_module, case_extension, present, Some(tracker.clone())).await;
             let key = HostCanonicalRepositoryRouteObservationKey::new(workspace.clone(), requested.clone());
@@ -2588,7 +2660,7 @@ second=module_extension(implementation=second_impl)
             let prints = activations.iter().filter_map(|(_, _, batch)| batch.as_ref()).flat_map(EventBatch::events).filter_map(|event| match event { EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()), _ => None }).collect::<Vec<_>>();
             assert_eq!(prints, expected_prints, "{case}: {activations:#?}");
             drop(activations);
-            let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let legacy_dice = generated_graph_dice();
             let mut legacy_tx = transaction(&legacy_dice, case_module, case_extension, present, None).await;
             let SourcePreparationOutcome::Complete(legacy) = legacy_tx.compute(&HostCanonicalRepositoryRouteKey::new(workspace.clone(), requested)).await.unwrap() else { panic!("{case}: legacy must complete") };
             assert_eq!(legacy.as_ref(), carrier.result().as_ref(), "{case}");
@@ -2611,16 +2683,16 @@ second=module_extension(implementation=second_impl)
     #[rustfmt::skip]
     async fn observed_canonical_repository_route_lifecycle_cancellation_and_nonactivation() {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut prep_tx = transaction(&prep, MODULE, EXTENSION_A, true, None).await;
+        let prep = generated_graph_dice();
+        let mut prep_tx = transaction(&prep, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let generated = names(&validated(&mut prep_tx).await).remove(0);
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = generated_graph_dice();
         let selected_tracker = Arc::new(LookupTracker::default());
         let selected_parent_key = HostCanonicalRepositoryRouteObservationKey::new(workspace.clone(), CanonicalRepoName::root());
         let selected_child_key = HostCanonicalSelectedModuleDefinitionObservationKey::new(workspace.clone(), CanonicalRepoName::root());
-        let selected_b = MODULE.replacen("bazel_tools", "root", 1);
+        let selected_b = CONSUMER_MODULE.replacen("name='consumer'", "name='root'", 1);
         let mut selected_held = Vec::new();
-        for module in [MODULE, selected_b.as_str(), MODULE] {
+        for module in [CONSUMER_MODULE, selected_b.as_str(), CONSUMER_MODULE] {
             let mut tx = transaction(&dice, module, EXTENSION_A, true, Some(selected_tracker.clone())).await;
             let global = tx.compute(&PathObservationEpochKey).await.unwrap();
             let parent = observed_canonical_carrier(&tx.compute(&selected_parent_key).await.unwrap()).clone();
@@ -2640,9 +2712,9 @@ second=module_extension(implementation=second_impl)
         let generated_tracker = Arc::new(LookupTracker::default());
         let generated_parent_key = HostCanonicalRepositoryRouteObservationKey::new(workspace.clone(), generated.clone());
         let generated_child_key = HostGeneratedRepositoryDefinitionObservationKey::new(workspace.clone(), generated.clone());
-        let same_semantic = format!("{MODULE}\n");
+        let same_semantic = format!("{CONSUMER_MODULE}\n");
         let mut generated_held = Vec::new();
-        for (module, extension) in [(MODULE, EXTENSION_A), (MODULE, EXTENSION_B), (MODULE, EXTENSION_A), (same_semantic.as_str(), EXTENSION_A)] {
+        for (module, extension) in [(CONSUMER_MODULE, EXTENSION_A), (CONSUMER_MODULE, EXTENSION_B), (CONSUMER_MODULE, EXTENSION_A), (same_semantic.as_str(), EXTENSION_A)] {
             let mut tx = transaction(&dice, module, extension, true, Some(generated_tracker.clone())).await;
             let global = tx.compute(&PathObservationEpochKey).await.unwrap();
             let parent = observed_canonical_carrier(&tx.compute(&generated_parent_key).await.unwrap()).clone();
@@ -2666,9 +2738,9 @@ second=module_extension(implementation=second_impl)
         let mut trackers = vec![selected_tracker, generated_tracker];
         for (case, module, requested, generated_stage) in [
             ("selected-terminal", selected_failure, CanonicalRepoName::root(), false),
-            ("missing-fallback", MODULE, CanonicalRepoName::new("missing").unwrap(), true),
+            ("missing-fallback", CONSUMER_MODULE, CanonicalRepoName::new("missing").unwrap(), true),
         ] {
-            let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let cancel_dice = generated_graph_dice();
             let tracker = Arc::new(LookupTracker::default());
             let mut cancelled = transaction(&cancel_dice, module, EXTENSION_A, true, Some(tracker.clone())).await;
             let key = HostCanonicalRepositoryRouteObservationKey::new(workspace.clone(), requested.clone());
@@ -2688,7 +2760,7 @@ second=module_extension(implementation=second_impl)
                 _ => unreachable!(),
             }
             for (demand, result) in recovered.observations().observations() { assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref()); }
-            let clean_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let clean_dice = generated_graph_dice();
             let clean = observed_canonical_lookup(&clean_dice, module, EXTENSION_A, true, requested.clone(), None).await;
             assert_eq!(recovered.result(), observed_canonical_carrier(&clean).result(), "{case}");
             let mut expected_children = vec![HostCanonicalSelectedModuleDefinitionObservationKey::new(workspace.clone(), requested.clone()).to_string()];
@@ -2735,9 +2807,9 @@ second=module_extension(implementation=second_impl)
         assert_eq!(key, same); assert_ne!(key, other); assert_eq!(hash(&key), hash(&same)); assert_ne!(hash(&key), hash(&other));
         assert_eq!(key.to_string(), "observed-host-canonical-repository-apparent-mapping:\"/generated-repository-definition\":@@:@first");
 
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = generated_graph_dice();
         let tracker = Arc::new(LookupTracker::default());
-        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        let mut tx = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
         let generated = names(&validated(&mut tx).await).remove(0);
         tracker.dependencies.lock().unwrap().clear();
         let root_value = tx.compute(&key).await.unwrap();
@@ -2769,8 +2841,8 @@ second=module_extension(implementation=second_impl)
         assert!(observed_apparent_mapping_carrier(&root_apparent).observations().observations().is_empty());
         assert!(activation_dependencies(&tracker, &root_apparent_key.to_string()).is_empty());
 
-        let need_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let _ = transaction(&need_dice, MODULE, EXTENSION_A, true, None).await;
+        let need_dice = generated_graph_dice();
+        let _ = transaction(&need_dice, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let mut updater = need_dice.updater();
         updater.changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())]).unwrap();
         let need = updater.commit().await.compute(&key).await.unwrap();
@@ -2793,19 +2865,19 @@ second=module_extension(implementation=second_impl)
         let success = finish_mapping(&nonroot_key.0, CanonicalRepositoryApparentMappingChildOutcome::Complete { result: Ok(ApparentMappingPredecessor::Canonical(predecessor)), observations: definition_child.observations().clone() });
         assert!(matches!(success, SourcePreparationOutcome::Complete(Ok((result, observations))) if result.as_ref().as_ref().unwrap().resolved_target() == nonroot_carrier.result().as_ref().as_ref().unwrap().resolved_target() && observations == *definition_child.observations()));
 
-        let bad_root_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let bad_root_dice = generated_graph_dice();
         let mut bad_root_tx = transaction(&bad_root_dice, "this is not valid Starlark\n", EXTENSION_A, true, None).await;
         let bad_root = bad_root_tx.compute(&key).await.unwrap();
         assert!(matches!(observed_apparent_mapping_carrier(&bad_root).result().as_ref(), Err(error @ HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::RootMapping(_), .. }) if error.disposition() == HostCanonicalRepositoryApparentMappingErrorDisposition::Other));
-        let bad_definition_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut bad_definition_tx = transaction(&bad_definition_dice, MODULE, EXTENSION_A, false, None).await;
+        let bad_definition_dice = generated_graph_dice();
+        let mut bad_definition_tx = transaction(&bad_definition_dice, CONSUMER_MODULE, EXTENSION_A, false, None).await;
         let bad_definition = bad_definition_tx.compute(&nonroot_key).await.unwrap();
         assert!(matches!(observed_apparent_mapping_carrier(&bad_definition).result().as_ref(), Err(HostCanonicalRepositoryApparentMappingError { kind: HostCanonicalRepositoryApparentMappingErrorKind::Route(_), .. })));
 
         let missing_definition = tx.compute(&HostCanonicalRepositoryRouteKey::new(workspace.clone(), CanonicalRepoName::new("missing").unwrap())).await.unwrap();
         let SourcePreparationOutcome::Complete(missing_definition) = missing_definition else { panic!("missing definition must complete") };
         let HostCanonicalRepositoryRouteErrorKind::Missing { selected_missing, .. } = &missing_definition.as_ref().as_ref().unwrap_err().kind else { panic!("missing definition terminal expected") };
-        let conflict = merge_route_observations(&generated_definition_observation_epoch(MODULE, EXTENSION_A, true), &generated_definition_observation_epoch(&format!("{MODULE}\n"), EXTENSION_A, true)).unwrap_err();
+        let conflict = merge_route_observations(&generated_definition_observation_epoch(CONSUMER_MODULE, EXTENSION_A, true), &generated_definition_observation_epoch(&format!("{CONSUMER_MODULE}\n"), EXTENSION_A, true)).unwrap_err();
         let outer = finish_mapping(&nonroot_key.0, CanonicalRepositoryApparentMappingChildOutcome::Outer(CanonicalRepositoryApparentMappingObservationError::Route(HostCanonicalRepositoryRouteObservationError(CanonicalRepositoryRouteObservationError::Merge { selected_missing: selected_missing.clone(), error: conflict }))));
         let outer_value: <HostCanonicalRepositoryApparentMappingObservationKey as Key>::Value = match outer { SourcePreparationOutcome::Complete(Err(error @ CanonicalRepositoryApparentMappingObservationError::Route(_))) => SourcePreparationOutcome::Complete(Err(HostCanonicalRepositoryApparentMappingObservationError(error))), _ => panic!("definition outer expected") };
         assert!(HostCanonicalRepositoryApparentMappingObservationKey::validity(&outer_value));
@@ -2836,9 +2908,9 @@ def second_impl(ctx):
 first=module_extension(implementation=first_impl)
 second=module_extension(implementation=second_impl)
 "#;
-        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
+        let module = "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, second='second')\n";
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let prep = generated_graph_dice();
         let mut prep_tx = transaction(&prep, module, extension, true, None).await;
         let generated = names(&validated(&mut prep_tx).await);
         for (case, case_module, present, context, expected) in [
@@ -2847,7 +2919,7 @@ second=module_extension(implementation=second_impl)
             ("nonroot-success", module, true, generated[0].clone(), "success"),
             ("nonroot-error", module, false, generated[0].clone(), "definition-error"),
         ] {
-            let observed_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let observed_dice = generated_graph_dice();
             let observed_tracker = Arc::new(LookupTracker::default());
             let mut observed_tx = transaction(&observed_dice, case_module, extension, present, Some(observed_tracker.clone())).await;
             let observed_key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), context.clone(), ApparentRepoName::new("first").unwrap());
@@ -2864,7 +2936,7 @@ second=module_extension(implementation=second_impl)
             assert_eq!(observed_parent.1, ActivationKind::Evaluated); assert!(observed_parent.2.is_none());
             let observed_prints = starlark_print_owners(&observed_tracker);
 
-            let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let legacy_dice = generated_graph_dice();
             let legacy_tracker = Arc::new(LookupTracker::default());
             let mut legacy_tx = transaction(&legacy_dice, case_module, extension, present, Some(legacy_tracker.clone())).await;
             let legacy_key = HostCanonicalRepositoryApparentMappingKey::new(workspace.clone(), context.clone(), ApparentRepoName::new("first").unwrap());
@@ -2872,7 +2944,7 @@ second=module_extension(implementation=second_impl)
             assert_eq!(activation_dependencies(&legacy_tracker, &legacy_key.to_string()), [legacy_child], "{case}");
             let SourcePreparationOutcome::Complete(legacy_result) = &legacy_value else { panic!("{case}: legacy must complete") };
             assert_eq!(legacy_result.as_ref(), carrier.result().as_ref(), "{case}");
-            let child_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let child_dice = generated_graph_dice();
             let child_tracker = Arc::new(LookupTracker::default());
             let mut child_tx = transaction(&child_dice, case_module, extension, present, Some(child_tracker.clone())).await;
             if context.is_root() {
@@ -2913,17 +2985,17 @@ second=module_extension(implementation=second_impl)
     #[rustfmt::skip]
     async fn observed_canonical_repository_apparent_mapping_lifecycle_cancellation_and_nonactivation() {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let prep = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut prep_tx = transaction(&prep, MODULE, EXTENSION_A, true, None).await;
+        let prep = generated_graph_dice();
+        let mut prep_tx = transaction(&prep, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let generated = names(&validated(&mut prep_tx).await).remove(0);
         let root_key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), CanonicalRepoName::root(), ApparentRepoName::new("first").unwrap());
         let nonroot_key = HostCanonicalRepositoryApparentMappingObservationKey::new(workspace.clone(), generated.clone(), ApparentRepoName::new("first").unwrap());
-        let root_b = format!("{MODULE}override_repo(e, first='bazel_tools')\n");
-        let same_semantic = format!("{MODULE}\n");
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let root_b = format!("{CONSUMER_MODULE}override_repo(e, first='consumer')\n");
+        let same_semantic = format!("{CONSUMER_MODULE}\n");
+        let dice = generated_graph_dice();
 
         let mut root_held = Vec::new();
-        for module in [MODULE, root_b.as_str(), MODULE, same_semantic.as_str()] {
+        for module in [CONSUMER_MODULE, root_b.as_str(), CONSUMER_MODULE, same_semantic.as_str()] {
             let mut tx = transaction(&dice, module, EXTENSION_A, true, None).await;
             let global = tx.compute(&PathObservationEpochKey).await.unwrap();
             let parent = observed_apparent_mapping_carrier(&tx.compute(&root_key).await.unwrap()).clone();
@@ -2940,7 +3012,7 @@ second=module_extension(implementation=second_impl)
         assert_eq!(root_held[0].1.result(), root_held[3].1.result()); assert_ne!(root_held[0].1.observations(), root_held[3].1.observations());
 
         let mut nonroot_held = Vec::new();
-        for (module, extension) in [(MODULE, EXTENSION_A), (MODULE, EXTENSION_B), (MODULE, EXTENSION_A), (same_semantic.as_str(), EXTENSION_A)] {
+        for (module, extension) in [(CONSUMER_MODULE, EXTENSION_A), (CONSUMER_MODULE, EXTENSION_B), (CONSUMER_MODULE, EXTENSION_A), (same_semantic.as_str(), EXTENSION_A)] {
             let mut tx = transaction(&dice, module, extension, true, None).await;
             let global = tx.compute(&PathObservationEpochKey).await.unwrap();
             let parent = observed_apparent_mapping_carrier(&tx.compute(&nonroot_key).await.unwrap()).clone();
@@ -2958,7 +3030,7 @@ second=module_extension(implementation=second_impl)
 
         for key in [&root_key, &nonroot_key] {
             let tracker = Arc::new(LookupTracker::default());
-            let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+            let mut tx = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
             let first = observed_apparent_mapping_carrier(&tx.compute(key).await.unwrap()).clone();
             tracker.activations.lock().unwrap().clear();
             let reused = observed_apparent_mapping_carrier(&tx.compute(key).await.unwrap()).clone();
@@ -2971,16 +3043,16 @@ second=module_extension(implementation=second_impl)
             ("root", root_key.clone(), HostRootRepositoryMappingObservationKey::new(workspace.clone()).to_string()),
             ("nonroot", nonroot_key.clone(), HostCanonicalRepositoryRouteObservationKey::new(workspace.clone(), generated.clone()).to_string()),
         ] {
-            let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let cancel_dice = generated_graph_dice();
             let tracker = Arc::new(LookupTracker::default());
-            let mut cancelled = transaction(&cancel_dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+            let mut cancelled = transaction(&cancel_dice, CONSUMER_MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
             let mut future = Box::pin(cancelled.compute(&key));
             std::future::poll_fn(|context| { assert!(std::future::Future::poll(future.as_mut(), context).is_pending()); std::task::Poll::Ready(()) }).await;
             drop(future); drop(cancelled);
             assert!(tracker.activations.lock().unwrap().iter().all(|(name, _, _)| name != &key.to_string()), "{case}");
             assert!(tracker.dependencies.lock().unwrap().iter().all(|(name, _)| name != &key.to_string()), "{case}");
 
-            let mut recovery = transaction(&cancel_dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+            let mut recovery = transaction(&cancel_dice, CONSUMER_MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
             let global = recovery.compute(&PathObservationEpochKey).await.unwrap();
             let recovered = observed_apparent_mapping_carrier(&recovery.compute(&key).await.unwrap()).clone();
             let expected = if case == "root" { root_held[0].0.result() } else { nonroot_held[0].0.result() };
@@ -3004,8 +3076,8 @@ second=module_extension(implementation=second_impl)
 
     #[tokio::test]
     async fn predecessor_need_and_error_precede_lookup() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut initial = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let dice = generated_graph_dice();
+        let mut initial = transaction(&dice, CONSUMER_MODULE, EXTENSION_A, true, None).await;
         let generated = names(&validated(&mut initial).await);
         let key = HostGeneratedRepositoryDefinitionKey::new(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
@@ -3041,10 +3113,10 @@ second=module_extension(implementation=second_impl)
             &mapping_need,
             &mapping_need,
         ));
-        let root_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let root_dice = generated_graph_dice();
         let _root_tx = transaction(
             &root_dice,
-            "module(name='bazel_tools')\n\
+            "module(name='consumer')\n\
              local_path_override(module_name='local', path='local')\n\
              bazel_dep(name='local', version='1', repo_name='local_alias')\n",
             EXTENSION_A,
@@ -3081,7 +3153,8 @@ second=module_extension(implementation=second_impl)
             &root_mapping_need,
         ));
 
-        let mut missing_source = transaction(&dice, MODULE, EXTENSION_A, false, None).await;
+        let mut missing_source =
+            transaction(&dice, CONSUMER_MODULE, EXTENSION_A, false, None).await;
         let terminal = missing_source.compute(&key).await.unwrap();
         assert!(HostGeneratedRepositoryDefinitionKey::validity(&terminal));
         assert!(matches!(

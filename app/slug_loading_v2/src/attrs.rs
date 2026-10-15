@@ -564,7 +564,7 @@ pub struct TransitionDefinition {
     inputs: Arc<[TransitionSetting]>,
     outputs: Arc<[TransitionSetting]>,
     definition_source: Arc<BzlModuleIdentity>,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    source_identities_by_filename: crate::source_table::CertifiedSourceTable,
 }
 impl TransitionDefinition {
     pub fn new(
@@ -573,6 +573,28 @@ impl TransitionDefinition {
         outputs: Arc<[TransitionSetting]>,
         definition_source: Arc<BzlModuleIdentity>,
         source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    ) -> Result<Self, String> {
+        let mut work = crate::bzl_module::semantic_evaluation::budget::Budget::default();
+        work.charge(4, std::mem::size_of::<Self>())?;
+        let table = crate::source_table::SourceTableCapture::from_raw(
+            source_identities_by_filename,
+            &mut work,
+        );
+        let table = table.certified(&mut work)?;
+        Ok(Self::with_source_table(
+            implementation,
+            inputs,
+            outputs,
+            definition_source,
+            table,
+        ))
+    }
+    pub(crate) fn with_source_table(
+        implementation: FrozenValue,
+        inputs: Arc<[TransitionSetting]>,
+        outputs: Arc<[TransitionSetting]>,
+        definition_source: Arc<BzlModuleIdentity>,
+        source_identities_by_filename: crate::source_table::CertifiedSourceTable,
     ) -> Self {
         Self {
             implementation,
@@ -581,6 +603,18 @@ impl TransitionDefinition {
             definition_source,
             source_identities_by_filename,
         }
+    }
+    #[cfg(test)]
+    pub(crate) fn certified_source_table(&self) -> &crate::source_table::CertifiedSourceTable {
+        &self.source_identities_by_filename
+    }
+    pub fn evaluation_context(
+        &self,
+    ) -> Result<crate::provider::TransitionEvaluationContext, String> {
+        crate::provider::TransitionEvaluationContext::with_table(
+            (*self.definition_source).clone(),
+            &self.source_identities_by_filename,
+        )
     }
     pub fn implementation(&self) -> FrozenValue {
         self.implementation
@@ -597,7 +631,7 @@ impl TransitionDefinition {
     pub fn source_identities_by_filename(
         &self,
     ) -> &Arc<[(CompactString, BzlModuleSourceProvenance)]> {
-        &self.source_identities_by_filename
+        self.source_identities_by_filename.raw()
     }
 }
 impl PartialEq for TransitionDefinition {

@@ -1,6 +1,5 @@
 //! Bounded native semantic graph for actual callable publication.
 use std::fmt;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -13,6 +12,11 @@ use slug_identity_v2::CanonicalRepoName;
 use crate::AnalysisValue;
 use crate::AnalysisValueKind;
 use crate::ProviderIdentity;
+
+mod source_audit;
+mod source_origin;
+pub use source_origin::BuiltinSourceOrigin;
+pub use source_origin::ModuleSourceOrigin;
 
 pub const CALLABLE_GRAPH_NODE_LIMIT: usize = 65_536;
 pub const CALLABLE_GRAPH_EDGE_LIMIT: usize = 524_288;
@@ -40,7 +44,7 @@ impl std::error::Error for CallableGraphError {}
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub struct CallableModuleIdentity {
     pub label: CanonicalLabel,
-    pub workspace_path: PathBuf,
+    pub source: ModuleSourceOrigin,
     pub repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
 }
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
@@ -48,18 +52,27 @@ pub struct CallableModuleSource {
     pub identity: CallableModuleIdentity,
     pub digest: [u8; 32],
 }
+/// An effective global is a separate dependency from a source `load()`.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct CallableEnvironmentBinding {
+    pub global: CompactString,
+    pub export: CompactString,
+    pub module: CallableModuleIdentity,
+}
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct CallableSourceAuthorityData {
     pub root: CallableModuleIdentity,
     pub direct_children: Arc<[CallableModuleIdentity]>,
+    pub environment_bindings: Arc<[CallableEnvironmentBinding]>,
     pub reachable: Arc<[CallableModuleSource]>,
     pub fingerprint: [u8; 32],
 }
 #[derive(Debug, Allocative)]
 struct CallableSourceAuthorityStorage {
     data: CallableSourceAuthorityData,
-    // Only new() can create this complete, successfully admitted certificate.
+    // Only complete successful constructors create these private certificates.
     fact_count: usize,
+    byte_cost: usize,
 }
 #[derive(Debug, Clone, Dupe, Allocative)]
 pub struct CallableSourceAuthority(Arc<CallableSourceAuthorityStorage>);
@@ -84,6 +97,7 @@ impl PreparedCallableSourceAuthority {
         CallableSourceAuthority(Arc::new(CallableSourceAuthorityStorage {
             data: self.data,
             fact_count: self.fact_count,
+            byte_cost: self.bytes,
         }))
     }
 }
@@ -96,6 +110,7 @@ impl CallableSourceAuthority {
     ) -> Result<PreparedCallableSourceAuthority, CallableGraphError> {
         if data.reachable.len() > CALLABLE_GRAPH_NODE_LIMIT
             || data.direct_children.len() > CALLABLE_GRAPH_NODE_LIMIT
+            || data.environment_bindings.len() > CALLABLE_GRAPH_NODE_LIMIT
         {
             return Err(CallableGraphError::Limit("source facts"));
         }
@@ -112,6 +127,18 @@ impl CallableSourceAuthority {
             fact_count,
             bytes,
         })
+    }
+    pub(crate) fn publication_audit_scratch_bytes(
+        identity_bound: usize,
+    ) -> Result<usize, crate::published_value::PublishedValueError> {
+        source_audit::scratch_bytes(identity_bound)
+    }
+    pub(crate) fn prepare_for_publication(
+        data: CallableSourceAuthorityData,
+        identity_bound: usize,
+        charge_visit: impl FnMut() -> Result<(), crate::published_value::PublishedValueError>,
+    ) -> Result<PreparedCallableSourceAuthority, crate::published_value::PublishedValueError> {
+        source_audit::prepare(data, identity_bound, charge_visit)
     }
     pub(crate) fn shares_storage_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
@@ -137,24 +164,32 @@ impl CallableSourceAuthority {
     fn data_fact_count(data: &CallableSourceAuthorityData) -> usize {
         std::iter::once(&data.root)
             .chain(data.direct_children.iter())
+            .chain(
+                data.environment_bindings
+                    .iter()
+                    .map(|binding| &binding.module),
+            )
             .chain(data.reachable.iter().map(|s| &s.identity))
-            .fold(0usize, |n, m| {
+            .fold(data.environment_bindings.len().saturating_mul(2), |n, m| {
                 n.saturating_add(1)
                     .saturating_add(m.repository_mapping.len())
             })
     }
     pub(crate) fn byte_cost(&self) -> usize {
-        Self::data_byte_cost(self.data())
+        self.0.byte_cost
+    }
+    fn module_prefix_bytes(m: &CallableModuleIdentity) -> usize {
+        std::mem::size_of::<CallableModuleIdentity>()
+            .saturating_add(m.label.package().repo().as_str().len())
+            .saturating_add(m.label.package().package().as_str().len())
+            .saturating_add(m.label.target().as_str().len())
+            .saturating_add(m.label.mapping_id().map_or(0, |id| id.as_str().len()))
+            .saturating_add(m.source.retained_text_bytes().unwrap_or(usize::MAX))
     }
     fn data_byte_cost(data: &CallableSourceAuthorityData) -> usize {
         fn module(m: &CallableModuleIdentity) -> usize {
             m.repository_mapping.iter().fold(
-                std::mem::size_of::<CallableModuleIdentity>()
-                    .saturating_add(m.label.package().repo().as_str().len())
-                    .saturating_add(m.label.package().package().as_str().len())
-                    .saturating_add(m.label.target().as_str().len())
-                    .saturating_add(m.label.mapping_id().map_or(0, |id| id.as_str().len()))
-                    .saturating_add(m.workspace_path.as_os_str().len())
+                CallableSourceAuthority::module_prefix_bytes(m)
                     .saturating_add(2 * std::mem::size_of::<usize>()),
                 |n, (a, c)| {
                     n.saturating_add(std::mem::size_of::<(ApparentRepoName, CanonicalRepoName)>())
@@ -167,6 +202,15 @@ impl CallableSourceAuthority {
             .direct_children
             .iter()
             .fold(module(&data.root), |n, m| n.saturating_add(module(m)));
+        let n = data.environment_bindings.iter().fold(n, |n, binding| {
+            n.saturating_add(module(&binding.module))
+                .saturating_add(
+                    std::mem::size_of::<CallableEnvironmentBinding>()
+                        - std::mem::size_of::<CallableModuleIdentity>(),
+                )
+                .saturating_add(binding.global.capacity())
+                .saturating_add(binding.export.capacity())
+        });
         data.reachable
             .iter()
             .fold(n, |n, s| {
@@ -176,14 +220,14 @@ impl CallableSourceAuthority {
                 )
             })
             // The root's inline identity was counted above. Admit every other
-            // envelope field/padding, Arc counters, and both array Arc headers
+            // envelope field/padding, Arc counters, and all three array Arc headers
             // before constructing or retaining this complete immutable owner.
             .saturating_add(
                 std::mem::size_of::<CallableSourceAuthorityData>()
                     - std::mem::size_of::<CallableModuleIdentity>(),
             )
             .saturating_add(Self::storage_overhead_bytes())
-            .saturating_add(4 * std::mem::size_of::<usize>())
+            .saturating_add(6 * std::mem::size_of::<usize>())
     }
 }
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]

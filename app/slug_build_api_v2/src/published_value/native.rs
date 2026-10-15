@@ -104,6 +104,7 @@ pub(super) fn audit(
             }
             Ok(())
         }
+        AnalysisValueKind::DottedVersion(v) => dotted_version(b, v, depth + 1),
         AnalysisValueKind::String(s) => text(b, s),
         AnalysisValueKind::Label(l) => label(b, l),
         AnalysisValueKind::Artifact(a) => artifact(b, a),
@@ -152,6 +153,39 @@ pub(super) fn audit(
         )),
     }
 }
+/// Audit the complete actual borrowed payload before constructing/cloning a
+/// native AnalysisValue wrapper. The caller supplies its enclosing depth.
+pub(super) fn audit_dotted_version(
+    b: &mut PublishedValueArenaBuilder,
+    value: &crate::DottedVersion,
+    depth: usize,
+) -> Result<(), PublishedValueError> {
+    b.charge_visit()?;
+    b.observe_depth(depth)?;
+    b.charge_bytes(std::mem::size_of::<AnalysisValue>())?;
+    dotted_version(b, value, depth + 1)
+}
+
+/// The model is privately validated and immutable. Its layout covers complete
+/// spelling (including ignored suffix), Arc/header, all ranges and scalar fields.
+fn dotted_version(
+    b: &mut PublishedValueArenaBuilder,
+    value: &crate::DottedVersion,
+    depth: usize,
+) -> Result<(), PublishedValueError> {
+    b.charge_visit()?;
+    b.observe_depth(depth)?;
+    b.charge_bytes(crate::analysis_value::published_projection_forecast())?;
+    b.charge_bytes(value.storage().retained_bytes())?;
+    b.charge_owner_edge()?; // Complete original spelling/count/header record.
+    for _component in value.components() {
+        b.charge_visit()?;
+        b.observe_depth(depth + 1)?;
+        b.charge_owner_edge()?; // Full numeric/alpha/spelling-range record.
+    }
+    Ok(())
+}
+
 pub(super) fn audit_depset_borrowed(
     b: &mut PublishedValueArenaBuilder,
     value: &crate::AnalysisDepset,
@@ -460,7 +494,6 @@ pub(super) fn provider_value(
             }
             Ok(())
         }
-        P::XcodeVersionInfo(_) => Ok(()),
         P::FeatureFlagInfo(v) => text(b, v.value()),
         P::PackageSpecificationInfo(v) => owner::package_groups(b, v, depth + 1),
     }

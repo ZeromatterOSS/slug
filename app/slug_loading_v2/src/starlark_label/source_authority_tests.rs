@@ -28,7 +28,7 @@ fn manifest(
     let root = BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
         // All evaluators deliberately share this path and CodeMap filename.
-        workspace_path: PathBuf::from("/same/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from("/same/defs.bzl")),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("alias").unwrap(),
             CanonicalRepoName::new(mapped).unwrap(),

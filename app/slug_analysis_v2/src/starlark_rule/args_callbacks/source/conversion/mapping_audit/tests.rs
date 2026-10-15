@@ -41,11 +41,11 @@ fn actual_mapping_guards_reuse_complete_bytes_and_release_with_the_session() {
         let value = manifest(&shared);
         let (first, first_work) = convert_cost(&value, &mut audits, &mut builder);
         let (again, again_work) = convert_cost(&value, &mut audits, &mut builder);
-        // Three identities: prefix/global/pending each, eight pairs, and both
-        // insertions, plus two prepaid preparation probe/commit operations.
-        // Subsequent conversion pays all three prefixes+lookups plus those two.
-        assert_eq!(first_work, 21);
-        assert_eq!(again_work, 8);
+        // Host mapping scans remain unchanged (21 first, 8 repeated). Each
+        // constructor additionally pays 3+4*3+8+1=24 real native operations:
+        // two identity passes, actual mapping scan, probe/guard and insertion.
+        assert_eq!(first_work, 45);
+        assert_eq!(again_work, 32);
         assert_eq!(first, again);
         assert_eq!(audits.committed.len(), 1);
         let separate: Mapping = shared.to_vec().into();
@@ -296,6 +296,7 @@ fn mapping_split_keeps_complete_output_and_paid_total_after_scratch_is_dropped()
                     .unwrap(),
             output_transfer_bytes(value.direct_children.len(), value.reachable.len()).unwrap(),
             scratch,
+            identity_bound(SourceManifest::Raw(&value)).unwrap(),
         )
         .unwrap()
         .abort();
@@ -306,6 +307,7 @@ fn mapping_split_keeps_complete_output_and_paid_total_after_scratch_is_dropped()
             &mut forecast_builder,
             &mut 65536,
             output_transfer_bytes(value.direct_children.len(), value.reachable.len()).unwrap(),
+            identity_bound(SourceManifest::Raw(&value)).unwrap(),
         )
         .unwrap();
     preparation.abort();
@@ -377,6 +379,7 @@ fn source_preparation_pending_work_is_native_first_and_abandonment_poisoned() {
             &mut builder,
             &mut remaining,
             output_transfer_bytes(value.direct_children.len(), value.reachable.len()).unwrap(),
+            identity_bound(SourceManifest::Raw(&value)).unwrap(),
         ) {
             Ok((_, preparation)) => {
                 assert!(!host_exhausted);
@@ -435,7 +438,13 @@ fn transfer_backing_is_checked_for_empty_arrays_and_cannot_cover_retained_underp
         } else {
             1
         };
-        match plan.admit(&audits, &mut builder, &mut 65536, transfer) {
+        match plan.admit(
+            &audits,
+            &mut builder,
+            &mut 65536,
+            transfer,
+            identity_bound(SourceManifest::Raw(&manifest)).unwrap(),
+        ) {
             Err(error) => {
                 assert!(beyond_peak);
                 assert_eq!(error, "Args source transfer byte underflow");

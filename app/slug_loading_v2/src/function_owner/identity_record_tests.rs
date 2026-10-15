@@ -12,7 +12,9 @@ fn identity(entries: usize, mapped_label: bool) -> BzlModuleIdentity {
     }
     BzlModuleIdentity {
         label,
-        workspace_path: "/workspace/longer/path/defs.bzl".into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(
+            "/workspace/longer/path/defs.bzl".into(),
+        ),
         repository_mapping: (0..entries)
             .map(|index| {
                 (
@@ -44,7 +46,11 @@ fn previous_shape(identity: &BzlModuleIdentity) -> PublicationShape {
     }
     add_shape(
         &mut shape,
-        fact(identity.workspace_path.as_os_str().len() * 2, 0, 0),
+        fact(
+            identity.source.retained_text_bytes().unwrap_or(usize::MAX) * 2,
+            0,
+            0,
+        ),
         1,
     )
     .unwrap();
@@ -141,8 +147,19 @@ fn identity_record_limits_refuse_each_entry_and_precede_full_hash_or_clone() {
         }
         let mut hash = Writes::default();
         assert!(
-            write_candidate_index_hash(&identity, false, true, complete, &mut work, &mut hash,)
-                .is_err()
+            write_candidate_index_hash(
+                &identity,
+                crate::bzl_environment::PreparedBzlEnvironment::uninjected(
+                    crate::bzl_environment::BzlEnvironmentMode::BzlmodBootstrap
+                )
+                .unwrap()
+                .inputs(),
+                true,
+                complete,
+                &mut work,
+                &mut hash,
+            )
+            .is_err()
         );
         assert_eq!(hash.0, 0);
         assert_eq!(Arc::strong_count(&identity.repository_mapping), refs);

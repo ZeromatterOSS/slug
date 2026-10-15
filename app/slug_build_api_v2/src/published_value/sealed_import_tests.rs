@@ -273,7 +273,9 @@ fn seal_caps_full_import_owner_shared_and_local_facts_independently_of_work() {
         } else {
             assert!(matches!(
                 result,
-                Err(PublishedValueError::Limit("retained closure visits"))
+                Err(PublishedValueError::RetainedFactBudget(ref report))
+                    if report.checked_total_facts() == Some(RETAINED_FACT_LIMIT + 1)
+                        && report.limit_facts() == RETAINED_FACT_LIMIT
             ));
         }
     }
@@ -282,11 +284,14 @@ fn seal_caps_full_import_owner_shared_and_local_facts_independently_of_work() {
 #[test]
 fn owner_constructor_checks_complete_work_plus_import_facts_before_retaining_parts() {
     for extra in [0, 1] {
-        // Two child bodies add two real walk operations to the former leaf case.
-        let prior = pair(RETAINED_FACT_LIMIT - 5 + extra);
+        // Constructor policy counts original D2 +one root reference R1;
+        // all three real arena bodies remain complete I. Work stays separate.
+        let prior = pair(RETAINED_FACT_LIMIT - 3 + extra);
+        let prior_weak = Arc::downgrade(&prior.0);
         let a = part(3, vec![], vec![]);
         let b = part(4, vec![prior], vec![]);
         let before = (Arc::strong_count(&a), Arc::strong_count(&b));
+        let parts_weak = (Arc::downgrade(&a), Arc::downgrade(&b));
         let result =
             FunctionEvaluationOwner::new(FunctionOwnerDomain::ConfiguredRule, a.clone(), b.clone());
         if extra == 0 {
@@ -296,11 +301,49 @@ fn owner_constructor_checks_complete_work_plus_import_facts_before_retaining_par
             );
             assert_eq!(Arc::strong_count(&a), before.0 + 1);
         } else {
-            assert!(matches!(
-                result,
-                Err(PublishedValueError::Limit("owner retained visits"))
-            ));
+            let Err(PublishedValueError::OwnerRetainedVisitBudget(report)) = result else {
+                panic!("expected final owner refusal, got {result:?}");
+            };
+            assert_eq!(
+                (
+                    report.domain(),
+                    report.stable_key_visits(),
+                    report.input_validity_visits(),
+                    report.intrinsic_visits(),
+                    report.legacy_local_visits(),
+                    report.owner_visits(),
+                    report.imported_visits(),
+                    report.shared_visits(),
+                    report.certified_shared_visits(),
+                    report.producer_work(),
+                    report.complete_visits(),
+                    report.limit_visits()
+                ),
+                (
+                    FunctionOwnerDomain::ConfiguredRule,
+                    1,
+                    1,
+                    2,
+                    27,
+                    0,
+                    RETAINED_FACT_LIMIT - 3 + 1,
+                    0,
+                    0,
+                    Some(27),
+                    RETAINED_FACT_LIMIT + 1,
+                    RETAINED_FACT_LIMIT
+                )
+            );
+            assert_eq!(report.declaration_reference_visits(), 1);
             assert_eq!((Arc::strong_count(&a), Arc::strong_count(&b)), before);
+            drop((a, b));
+            let cloned = report.clone();
+            assert_eq!(report, cloned);
+            assert!(parts_weak.0.upgrade().is_none() && parts_weak.1.upgrade().is_none());
+            assert!(
+                prior_weak.upgrade().is_none(),
+                "numeric report retains no imported arena"
+            );
         }
     }
 }

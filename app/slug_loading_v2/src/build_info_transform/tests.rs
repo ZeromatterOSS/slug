@@ -27,34 +27,6 @@ const SOURCE: &str = include_str!(concat!(
 ));
 const FILE: &str = "build_info.bzl";
 
-#[test]
-fn builtin_mapping_promotion_is_limited_to_the_zero_import_pinned_cpp_module() {
-    assert!(needs_builtin_mapping(
-        &CanonicalLabel::parse(LABEL).unwrap(),
-        &[]
-    ));
-    for label in [
-        "@@bazel_tools//tools/build_defs/build_info:bazel_java_build_info.bzl",
-        "@@bazel_tools//tools/build_defs:unrelated.bzl",
-        "@@copied//tools/build_defs/build_info:bazel_cc_build_info.bzl",
-        "@@bazel_tools//copied:bazel_cc_build_info.bzl",
-    ] {
-        assert!(!needs_builtin_mapping(
-            &CanonicalLabel::parse(label).unwrap(),
-            &[]
-        ));
-    }
-    for loads in [
-        vec![":relative.bzl".to_owned()],
-        vec!["@other//:defs.bzl".to_owned()],
-    ] {
-        assert!(!needs_builtin_mapping(
-            &CanonicalLabel::parse(LABEL).unwrap(),
-            &loads
-        ));
-    }
-}
-
 #[derive(Debug, Default)]
 struct Sink(
     Mutex<
@@ -139,7 +111,7 @@ fn provenance(label: &str, digest: [u8; 32]) -> (CompactString, BzlModuleSourceP
         BzlModuleSourceProvenance::new(
             BzlModuleIdentity {
                 label: CanonicalLabel::parse(label).unwrap(),
-                workspace_path: PathBuf::from(FILE),
+                source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(FILE)),
                 // Match the installed builtin route: the unchanged rule's
                 // template defaults resolve its apparent self-repository.
                 repository_mapping: Arc::from([(

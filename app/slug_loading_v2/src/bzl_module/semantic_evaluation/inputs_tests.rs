@@ -11,7 +11,9 @@ use super::*;
 fn identity(name: &str) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@//:{name}.bzl")).unwrap(),
-        workspace_path: format!("/semantic-inputs/{name}.bzl").into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(
+            format!("/semantic-inputs/{name}.bzl").into(),
+        ),
         repository_mapping: Arc::from([]),
     }
 }
@@ -22,6 +24,7 @@ fn leaf_key(identity: &BzlModuleIdentity, source: &Arc<[u8]>) -> SemanticBzlEval
         "/semantic-inputs/source.bzl",
         source,
         BzlModuleContext::Build,
+        &test_environment(),
         std::iter::empty(),
     )
     .unwrap()
@@ -56,6 +59,7 @@ fn complete_source_mapping_label_provenance_and_modes_determine_keys() {
             "/semantic-inputs/source.bzl",
             &source,
             BzlModuleContext::Bzlmod,
+            &test_environment(),
             std::iter::empty()
         )
         .unwrap()
@@ -67,6 +71,7 @@ fn complete_source_mapping_label_provenance_and_modes_determine_keys() {
             "/semantic-inputs/other.bzl",
             &source,
             BzlModuleContext::Build,
+            &test_environment(),
             std::iter::empty()
         )
         .unwrap()
@@ -127,6 +132,7 @@ async fn ordered_repeated_loads_and_conflicting_complete_child_rows_are_checked(
             "root.bzl",
             &source_a,
             BzlModuleContext::Build,
+            &test_environment(),
             children.iter().copied(),
         )
     };
@@ -169,6 +175,7 @@ async fn ordered_repeated_loads_and_conflicting_complete_child_rows_are_checked(
             &root,
             "root.bzl",
             &source_a,
+            &test_environment(),
             std::iter::repeat((":wide.bzl", wide_inputs.rows[0].key.as_ref())).take(600)
         )
         .is_err()
@@ -180,6 +187,7 @@ async fn ordered_repeated_loads_and_conflicting_complete_child_rows_are_checked(
             "root.bzl",
             &source_a,
             BzlModuleContext::Build,
+            &test_environment(),
             std::iter::repeat((":wide.bzl", wide)).take(600)
         )
         .is_err()
@@ -193,6 +201,7 @@ async fn ordered_repeated_loads_and_conflicting_complete_child_rows_are_checked(
         "root.bzl",
         &source_a,
         BzlModuleContext::Build,
+        &test_environment(),
         std::iter::repeat((":child.bzl", a)).take(budget::RECORD_LIMIT),
     )
     .unwrap_err();

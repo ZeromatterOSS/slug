@@ -7,7 +7,9 @@ fn leaf_manifest(name: usize) -> BzlLoadManifest {
         "@@unrelated+//moved:canonical{name}.bzl"
     ))
     .unwrap();
-    value.root.workspace_path = format!("/same/canonical{name}.bzl").into();
+    value.root.source = slug_build_api_v2::ModuleSourceOrigin::Workspace(
+        format!("/same/canonical{name}.bzl").into(),
+    );
     value.reachable = Arc::from([crate::BzlModuleSourceProvenance::new(
         value.root.clone(),
         [0; 32],
@@ -42,8 +44,8 @@ fn local(owner: &FunctionEvaluationOwner) -> &BzlInputValidity {
     owner.input_validity().as_any().downcast_ref().unwrap()
 }
 
-#[test]
-fn canonical_manifest_order_preserves_raw_child_multiplicity_and_modes() {
+#[tokio::test]
+async fn canonical_manifest_order_preserves_raw_child_multiplicity_and_modes() {
     let leaf_manifest = leaf_manifest(0);
     let leaf = owner(&leaf_manifest, "leaf", false, []).unwrap();
     let left_manifest = joined_manifest(1, &[&leaf_manifest]);
@@ -66,7 +68,8 @@ fn canonical_manifest_order_preserves_raw_child_multiplicity_and_modes() {
     );
     // Same module identity under different load modes remains two complete
     // local facts; label-first original provenance does not erase those modes.
-    let bzlmod = owner(&leaf_manifest, "leaf", true, []).unwrap();
+    let ordinary = ordinary_bzlmod_environment().await;
+    let bzlmod = owner_with_environment(&leaf_manifest, "leaf", &ordinary, []).unwrap();
     let mixed_manifest = joined_manifest(4, &[&leaf_manifest, &leaf_manifest]);
     let mixed = owner(&mixed_manifest, "mixed", false, [leaf, bzlmod]).unwrap();
     assert_eq!(local(&mixed).rows.len(), 3);
@@ -87,7 +90,8 @@ fn canonical_manifest_validation_refuses_missing_extra_reordered_and_changed_ful
     changed.reachable = Arc::from([]);
     variants.push(changed);
     let mut changed = valid.clone();
-    changed.root.workspace_path = "/different/root.bzl".into();
+    changed.root.source =
+        slug_build_api_v2::ModuleSourceOrigin::Workspace("/different/root.bzl".into());
     variants.push(changed);
     let mut changed = valid.clone();
     changed.direct_children = Arc::from([b_manifest.root.clone(), a_manifest.root.clone()]);
@@ -112,7 +116,10 @@ fn canonical_manifest_validation_refuses_missing_extra_reordered_and_changed_ful
             1 => sources.push(sources[1].clone()),
             2 => sources.swap(1, 2),
             3 => sources[1].source_digest = [9; 32],
-            4 => sources[1].identity.workspace_path = "/different/child.bzl".into(),
+            4 => {
+                sources[1].identity.source =
+                    slug_build_api_v2::ModuleSourceOrigin::Workspace("/different/child.bzl".into())
+            }
             5 => {
                 sources[1].identity.repository_mapping = Arc::from([(
                     slug_identity_v2::ApparentRepoName::new("alias").unwrap(),
@@ -206,11 +213,25 @@ fn oversized_original_manifest_refuses_before_retaining_child_handles_or_copying
         consumed.set(consumed.get() + 1);
         Some(child.clone())
     });
-    assert!(
+    let guards = Arc::strong_count(&oversized.root.repository_mapping);
+    // Counting all actual source occurrences exhausts the constructor work
+    // ledger; the next plan admission refuses BEFORE any retained clone.
+    let counted = crate::bzl_module::semantic_evaluation::budget::Budget {
+        records: crate::bzl_module::semantic_evaluation::budget::RECORD_LIMIT,
+        ..Default::default()
+    };
+    assert_eq!(
         owner(&oversized, "root", false, children)
             .unwrap_err()
-            .to_string()
-            .contains("shape limit")
+            .to_string(),
+        counted.context(
+            "effective source plan peak",
+            crate::bzl_module::semantic_evaluation::budget::limit(),
+        )
     );
     assert_eq!(consumed.get(), 0);
+    assert_eq!(
+        Arc::strong_count(&oversized.root.repository_mapping),
+        guards
+    );
 }

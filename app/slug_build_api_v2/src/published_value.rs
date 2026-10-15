@@ -20,7 +20,19 @@ mod runfiles;
 mod shared_input;
 pub use builder::PublicationByteContext;
 pub use builder::PublicationByteRefusal;
+pub use builder::PublicationClosureCensus;
+pub use builder::PublicationEdgeContext;
+pub use builder::PublicationEdgeRefusal;
+pub use builder::PublicationOwnerDomainCensus;
+pub use builder::PublicationNativeChannel;
+pub use builder::PublicationNativeRetentionCensus;
+pub use builder::PublicationNativeRootFamily;
+pub use builder::PublicationNativeStatistics;
+pub use builder::PublicationRowKind;
+pub use builder::PublicationOwnerRetainedVisitRefusal;
 pub use builder::PublicationRecord;
+pub use builder::PublicationRetainedFactRefusal;
+pub use builder::PublicationRetainedCertificateWorkRefusal;
 pub use builder::PublicationScratch;
 pub use builder::PublicationSourcePreparation;
 pub use builder::PublishedValueArenaBuilder;
@@ -44,6 +56,10 @@ pub const DEPTH_LIMIT: usize = 256;
 pub enum PublishedValueError {
     Limit(&'static str),
     ByteBudget(Box<PublicationByteRefusal>),
+    EdgeBudget(Box<PublicationEdgeRefusal>),
+    RetainedFactBudget(Box<PublicationRetainedFactRefusal>),
+    RetainedCertificateWork(Box<PublicationRetainedCertificateWorkRefusal>),
+    OwnerRetainedVisitBudget(Box<PublicationOwnerRetainedVisitRefusal>),
     Invalid(&'static str),
     Unsupported(&'static str),
 }
@@ -52,6 +68,30 @@ impl fmt::Display for PublishedValueError {
         match self {
             Self::ByteBudget(refusal) => {
                 write!(f, "published value: bytes admission refused: {refusal:?}")
+            }
+            Self::EdgeBudget(refusal) => {
+                write!(
+                    f,
+                    "published value: owner edges admission refused: {refusal:?}"
+                )
+            }
+            Self::RetainedFactBudget(refusal) => {
+                write!(
+                    f,
+                    "published value: retained closure visits admission refused: {refusal:?}"
+                )
+            }
+            Self::RetainedCertificateWork(refusal) => {
+                write!(
+                    f,
+                    "published value: retained certificate work admission refused at sealLocalCertification: {refusal:?}"
+                )
+            }
+            Self::OwnerRetainedVisitBudget(refusal) => {
+                write!(
+                    f,
+                    "published value: owner retained visits admission refused: {refusal:?}"
+                )
             }
             _ => write!(f, "published value: {self:?}"),
         }

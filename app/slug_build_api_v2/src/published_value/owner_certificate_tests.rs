@@ -164,7 +164,9 @@ fn joint_owner_import_facts_are_capped_before_body_growth_in_both_orders() {
 #[test]
 fn raw_combined_visits_above_work_cap_seal_with_same_loan_and_full_canonical_cap() {
     let (middle, _) = owner(14_999); // C=30000, genuine immutable field storage
-    for (remaining, succeeds) in [(2, true), (1, false)] {
+    // View8 + source setup1 + checked empty backing1 + empty slots1 + owner refs1.
+    // R=0 slots add positive1 work; preserve the same W=N / W=N+1 boundary.
+    for (remaining, succeeds) in [(12, true), (11, false)] {
         let mut b = PublishedValueArenaBuilder::new();
         b.audit_owner_shape(&middle).unwrap();
         pad(&mut b, remaining);
@@ -181,19 +183,37 @@ fn raw_combined_visits_above_work_cap_seal_with_same_loan_and_full_canonical_cap
             assert_eq!(arena.shape().visits, 30_001);
         }
     }
-    let (full, _) = owner(32_767); // constructor complete exactly65536
-    assert_eq!(full.retained_shape().visits, NODE_LIMIT);
+    // Empty completion prepays22 actual work. Two genuine immutable owners
+    // still fill the complete O ledger to N, with two explicit retained roots.
+    let (full, _) = owner(32_756); // D=N-22, constructor W=N
+    let (tail, _) = owner(10); // D=22
+    assert_eq!(full.retained_shape().visits, NODE_LIMIT - 22);
+    assert_eq!(
+        full.retained_shape().visits + tail.retained_shape().visits,
+        NODE_LIMIT
+    );
     let mut b = PublishedValueArenaBuilder::new();
     b.audit_owner_shape(&full).unwrap();
-    assert_eq!(b.charged_visits(), 2);
+    b.audit_owner_shape(&tail).unwrap();
+    assert_eq!(b.charged_visits(), 4);
     assert_eq!(b.owner_payload.visits, NODE_LIMIT);
     let arena = finish(b).unwrap();
-    assert_eq!(arena.shape().visits, NODE_LIMIT + 1);
+    assert_eq!(arena.shape().visits, NODE_LIMIT + 2);
     let mut imported = PublishedValueArenaBuilder::new();
     imported.import(arena).unwrap();
     assert_eq!(imported.owner_payload.visits, NODE_LIMIT);
-    assert_eq!(imported.import_visits, 1);
-    assert_eq!(finish(imported).unwrap().shape().visits, NODE_LIMIT + 2);
+    assert_eq!(imported.import_visits, 2);
+    assert_eq!(finish(imported).unwrap().shape().visits, NODE_LIMIT + 3);
+    // D=N itself leaves no room for the newly paid constructor completion.
+    assert_eq!(
+        FunctionEvaluationOwner::new(
+            FunctionOwnerDomain::ConfiguredRule,
+            Fields::new(32_767),
+            Fields::new(32_767)
+        )
+        .unwrap_err(),
+        PublishedValueError::Limit("visits")
+    );
     // Constructor cap remains paid even though publication can reuse its private proof.
     assert!(
         FunctionEvaluationOwner::new(
@@ -241,3 +261,6 @@ fn owner_lookup_depth_and_body_bytes_still_refuse_and_poison_without_new_guards(
         "failed byte admission retained no owner guard"
     );
 }
+
+#[path = "owner_completion_tests.rs"]
+mod completion_tests;

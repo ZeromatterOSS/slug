@@ -55,7 +55,7 @@ mod mixed_bzl_tests {
         let select_owner = consumer == 5;
         let consumer = if select_owner { 1 } else { consumer };
         let with_tools = consumer != 0;
-        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:b.bzl','other')\nuse_repo(f, other='other')\n";
+        const MODULE: &str = "module(name='consumer')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:b.bzl','other')\nuse_repo(f, other='other')\n";
         const SAFE: &str = "repo=repository_rule(lambda ctx:None)\ndef impl(ctx):\n    repo(name='proof')\next=module_extension(implementation=impl,environ=['FACTOR','MISSING','FACTOR'])\n";
         let mut builder = Dice::builder();
         install_registry_io(&mut builder, Arc::new(MixedRegistryIo));

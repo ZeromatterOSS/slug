@@ -101,7 +101,6 @@ pub enum ProviderError {
     FilesToRunAlreadyComplete,
     RunfilesMissingExecutable,
     InvalidFeatureFlagInfoOccurrence,
-    InvalidXcodeVersionInfoOccurrence,
 }
 
 impl fmt::Display for ProviderError {
@@ -111,9 +110,6 @@ impl fmt::Display for ProviderError {
             Self::DuplicateProvider { name } => write!(f, "provider {name} specified twice"),
             Self::InvalidFeatureFlagInfoOccurrence => f.write_str(
                 "FeatureFlagInfo requires a native typed instance, not a generic provider occurrence",
-            ),
-            Self::InvalidXcodeVersionInfoOccurrence => f.write_str(
-                "XcodeVersionInfo requires a native typed instance, not a generic provider occurrence",
             ),
             Self::MissingDefaultInfo => {
                 f.write_str("collection did not receive a `DefaultInfo` provider")
@@ -631,20 +627,6 @@ impl PlatformInfo {
     }
 }
 
-/// The sole admitted `XcodeVersionInfo` constructor result: the pinned Linux
-/// empty-version tuple. Its type carries the complete validated default fact;
-/// no evaluator closure or duplicate option store is retained in the graph.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
-pub struct XcodeVersionInfo {
-    _private: (),
-}
-
-impl XcodeVersionInfo {
-    pub const fn default_empty_version() -> Self {
-        Self { _private: () }
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum ProviderValue {
     TemplateVariableInfo(crate::TemplateVariableInfo),
@@ -654,7 +636,6 @@ pub enum ProviderValue {
     RunEnvironmentInfo(RunEnvironmentInfo),
     FilesToRunProvider(FilesToRunProvider),
     PlatformInfo(PlatformInfo),
-    XcodeVersionInfo(XcodeVersionInfo),
     Occurrence(ProviderOccurrence),
     FeatureFlagInfo(crate::FeatureFlagInfo),
 }
@@ -670,7 +651,6 @@ impl ProviderValue {
             Self::RunEnvironmentInfo(_) => ProviderName("RunEnvironmentInfo".into()),
             Self::FilesToRunProvider(_) => ProviderName("FilesToRunProvider".into()),
             Self::PlatformInfo(_) => ProviderName("PlatformInfo".into()),
-            Self::XcodeVersionInfo(_) => ProviderName("XcodeVersionInfo".into()),
             Self::Occurrence(provider) => ProviderName(provider.identity().name().into()),
         }
     }
@@ -687,7 +667,6 @@ impl ProviderValue {
             Self::RunEnvironmentInfo(_) => ProviderIdentity::builtin("RunEnvironmentInfo"),
             Self::FilesToRunProvider(_) => ProviderIdentity::builtin("FilesToRunProvider"),
             Self::PlatformInfo(_) => ProviderIdentity::builtin("PlatformInfo"),
-            Self::XcodeVersionInfo(_) => ProviderIdentity::builtin("XcodeVersionInfo"),
             Self::Occurrence(provider) => provider.identity().clone(),
         }
     }
@@ -714,7 +693,6 @@ impl ProviderValue {
                 left.publication_eq_with(right, state)
             }
             (Self::PlatformInfo(left), Self::PlatformInfo(right)) => left == right,
-            (Self::XcodeVersionInfo(left), Self::XcodeVersionInfo(right)) => left == right,
             (Self::Occurrence(left), Self::Occurrence(right)) => {
                 left.publication_eq_with(right, state)
             }
@@ -750,10 +728,7 @@ impl ProviderCollection {
             {
                 return Err(ProviderError::InvalidFeatureFlagInfoOccurrence);
             }
-            if matches!(&value, ProviderValue::Occurrence(occurrence) if occurrence.identity().is_builtin("XcodeVersionInfo"))
-            {
-                return Err(ProviderError::InvalidXcodeVersionInfoOccurrence);
-            }
+
             let name = value.name();
             if providers.insert(value.identity(), value).is_some() {
                 return Err(ProviderError::DuplicateProvider { name });
@@ -832,13 +807,6 @@ impl ProviderCollection {
     pub fn feature_flag_info(&self) -> Option<&crate::FeatureFlagInfo> {
         match self.get(&ProviderIdentity::builtin("FeatureFlagInfo")) {
             Some(ProviderValue::FeatureFlagInfo(info)) => Some(info),
-            _ => None,
-        }
-    }
-
-    pub fn xcode_version_info(&self) -> Option<&XcodeVersionInfo> {
-        match self.get(&ProviderIdentity::builtin("XcodeVersionInfo")) {
-            Some(ProviderValue::XcodeVersionInfo(info)) => Some(info),
             _ => None,
         }
     }

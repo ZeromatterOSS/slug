@@ -34,6 +34,8 @@ pub trait StructuralFunctionOwnerPart: Any + Debug + Send + Sync + Allocative {
         }
     }
 
+    /// Stable immutable declarations: retain these exact guards and their full
+    /// immutable shapes for this part's lifetime, including after owner audit.
     fn shared_inputs(&self) -> &[super::SharedPublicationInput] {
         &[]
     }
@@ -53,6 +55,17 @@ struct OwnerData {
     complete: super::PublicationShape,
     stable_key: Arc<dyn StructuralFunctionOwnerPart>,
     input_validity: Arc<dyn StructuralFunctionOwnerPart>,
+}
+// No detached scalar or public input can construct this completion witness.
+// The original private OwnerData owns both immutable declaration/guard slices.
+pub(in crate::published_value) struct OwnerSharedAudit<'a> {
+    _owner: &'a OwnerData,
+    input: &'a super::SharedPublicationInput,
+}
+impl<'a> OwnerSharedAudit<'a> {
+    pub(in crate::published_value) fn input(self) -> &'a super::SharedPublicationInput {
+        self.input
+    }
 }
 #[derive(Debug, Clone, Dupe, Allocative)]
 pub struct FunctionEvaluationOwner(Arc<OwnerData>);
@@ -87,7 +100,7 @@ impl FunctionEvaluationOwner {
         };
         // Audit the borrowed draft before allocating the published owner. Prior
         // immutable owners/arenas cannot refer to this not-yet-created owner.
-        let mut audit = super::PublishedValueArenaBuilder::new();
+        let mut audit = super::PublishedValueArenaBuilder::new_strict_shared_audit();
         audit.charge_storage(crate::DepsetStorageCharge {
             nodes: intrinsic.nodes,
             edges: intrinsic.edges,
@@ -106,11 +119,20 @@ impl FunctionEvaluationOwner {
                 audit.audit_arena_closure(arena, 1)?;
             }
         }
-        let complete = audit.complete_shape()?;
+        let completion =
+            audit.complete_owner_shape(&*stable_key, &*input_validity, intrinsic.visits)?;
+        let complete = completion.shape;
         // Constructors do not pass through arena seal: retain the full closure
         // cap here even when work and sealed-import facts are each admitted.
         if complete.visits > super::RETAINED_FACT_LIMIT {
-            return Err(PublishedValueError::Limit("owner retained visits"));
+            return Err(audit.owner_retained_visit_refusal(
+                domain,
+                a.visits,
+                b.visits,
+                intrinsic.visits,
+                completion.declaration_references,
+                complete.visits,
+            ));
         }
         Ok(Self(Arc::new(OwnerData {
             domain,
@@ -140,6 +162,14 @@ impl FunctionEvaluationOwner {
             .shared_inputs()
             .iter()
             .chain(self.input_validity().shared_inputs())
+    }
+    pub(in crate::published_value) fn certified_shared_inputs(
+        &self,
+    ) -> impl Iterator<Item = OwnerSharedAudit<'_>> {
+        self.shared_inputs().map(|input| OwnerSharedAudit {
+            _owner: self.0.as_ref(),
+            input,
+        })
     }
     pub fn retained_owners(&self) -> impl Iterator<Item = &FunctionEvaluationOwner> {
         self.stable_key()

@@ -57,9 +57,7 @@ pub(super) fn row(
             parameters(&function.parameters, draft, meter)?;
             draft.optional_edge(function.return_annotation, meter)?;
             draft.range(function.captures)?;
-            for _ in &*function.capture_names {
-                meter.record()?;
-            }
+            meter.count_records(&function.capture_names)?;
         }
         PublishedNode::Intrinsic(intrinsic) => {
             meter.record()?; // Complete canonical API ID and version.
@@ -76,9 +74,7 @@ pub(super) fn row(
                 | PublishedProviderSchema::Documented(names)
                 | PublishedProviderSchema::Initialized(names) => &**names,
             };
-            for _ in names {
-                meter.record()?;
-            }
+            meter.count_records(names)?;
             draft.optional_edge(constructor.init, meter)?;
         }
         PublishedNode::RawProviderConstructor { provider, .. } => draft.edge(*provider, meter)?,
@@ -89,16 +85,12 @@ pub(super) fn row(
         | PublishedNode::Dictionary(range) => draft.range(*range)?,
         PublishedNode::Struct { names, values } => {
             draft.range(*values)?;
-            for _ in &**names {
-                meter.record()?;
-            }
+            meter.count_records(names)?;
         }
         PublishedNode::Provider(provider) => {
             meter.record()?; // Complete Builtin name or User ProviderId.
             draft.range(provider.values)?;
-            for _ in &*provider.names {
-                meter.record()?;
-            }
+            meter.count_records(&provider.names)?;
             if let Some(value) = &provider.files_to_run {
                 meter.native(value.retained_visits())?;
             }

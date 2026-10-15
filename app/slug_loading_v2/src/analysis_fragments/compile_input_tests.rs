@@ -119,7 +119,7 @@ fn evaluate(source: &str, changed: bool, allowed: bool) -> anyhow::Result<String
             "@@//ordinary:compile_inputs.bzl"
         })
         .unwrap(),
-        workspace_path: PathBuf::from(FILENAME),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(FILENAME)),
         repository_mapping: Arc::from([]),
     };
     let ast = AstModule::parse(FILENAME, source.to_owned(), &Dialect::Bazel)

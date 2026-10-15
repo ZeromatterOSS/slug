@@ -238,7 +238,7 @@ fn names(value: &ObservedHostPackageOutcome) -> Vec<String> {
 
 #[tokio::test]
 async fn observed_root_package_syntax_reuses_across_child_need_and_source_revisions() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(SyntaxTracker::default());
     let key = observed_package_key();
     let base = fixture(BUILD_A, false, 1);
@@ -366,7 +366,7 @@ async fn observed_root_package_syntax_reuses_across_child_need_and_source_revisi
 
 #[tokio::test]
 async fn root_package_syntax_preserves_exact_source_identity_and_retirement() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(SyntaxTracker::default());
     let key = observed_package_key();
     let mut tx = tracked(&dice, fixture(BUILD_A, false, 1), tracker.dupe()).await;
@@ -393,7 +393,7 @@ async fn root_package_syntax_preserves_exact_source_identity_and_retirement() {
     drop(tx);
 
     // Independent source-key graph supplies equal bytes with distinct actual storage.
-    let other_dice = Dice::builder().build(DetectCycles::Enabled);
+    let other_dice = host_fixture_dice();
     let mut other = transaction(&other_dice, fixture(BUILD_A, false, 1), false, None).await;
     let source_key =
         RootPackageSourceObservationKey::for_build(workspace(), PackagePath::parse("pkg").unwrap());

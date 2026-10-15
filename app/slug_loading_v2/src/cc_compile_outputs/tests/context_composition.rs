@@ -84,7 +84,7 @@ fn layout_query(label: Option<&str>, source: &str) -> anyhow::Result<String> {
                 &ast,
                 crate::BzlModuleIdentity {
                     label: CanonicalLabel::parse(label).unwrap(),
-                    workspace_path: "layout.bzl".into(),
+                    source: slug_build_api_v2::ModuleSourceOrigin::Workspace("layout.bzl".into()),
                     repository_mapping: Arc::from([]),
                 },
                 &[],

@@ -15,16 +15,6 @@ use crate::subrule_invocation::AnalysisArtifactValue;
 const LABEL: &str = BuildInfoCallbackRecipe::SOURCE_LABEL;
 const SHA: [u8; 32] = BuildInfoCallbackRecipe::SOURCE_DIGEST;
 
-/// The unchanged module has no imports, but its attr defaults still require
-/// the selected builtin repository's complete mapping. Only the builtin route
-/// may call this finite gate; it grants no callback authentication authority.
-pub(crate) fn needs_builtin_mapping(
-    source: &slug_identity_v2::CanonicalLabel,
-    loads: &[String],
-) -> bool {
-    loads.is_empty() && source.to_string() == LABEL
-}
-
 #[derive(Debug)]
 pub struct BuildInfoTransformRequest<'a> {
     pub callback: BuildInfoCallbackRecipe,

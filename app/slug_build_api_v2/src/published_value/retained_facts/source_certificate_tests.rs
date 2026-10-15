@@ -12,6 +12,8 @@ fn one_paid_source_certificate_read_keeps_full_retained_count() {
         scratch: &mut 0,
         failed: &mut failed,
         retained: 0,
+        source: 0,
+        native: 0,
     };
     let mut sources = sources::LocalSources::new(1, &mut meter).unwrap();
     let table = 2 * (4 * (std::mem::size_of::<usize>() + 1) + 32);
@@ -41,6 +43,8 @@ fn one_paid_source_certificate_read_keeps_full_retained_count() {
         sources.values()[0].storage_identity(),
         authority.storage_identity()
     );
+    assert_eq!(meter.source, authority.fact_count());
+    assert_eq!(meter.native, 0);
     assert!(!*meter.failed);
 }
 
@@ -58,6 +62,8 @@ fn source_read_refusal_precedes_guard_clone_and_poisons_reuse() {
             scratch: &mut 0,
             failed: &mut failed,
             retained: 0,
+            source: 0,
+            native: 0,
         };
         let mut sources = sources::LocalSources::new(1, &mut meter).unwrap();
         if bytes_limited {
@@ -68,6 +74,7 @@ fn source_read_refusal_precedes_guard_clone_and_poisons_reuse() {
         assert!(sources.observe(&authority, &mut meter).is_err());
         assert!(*meter.failed);
         assert_eq!(meter.retained, 0);
+        assert_eq!((meter.source, meter.native), (0, 0));
         assert!(
             sources.values().is_empty(),
             "failed read cannot retain a new source guard"
@@ -111,7 +118,31 @@ fn sealed_source_count_survives_scalar_reuse_with_independent_import_work() {
 
 #[test]
 fn complete_large_source_seals_with_exact_scalar_read_work_allowance() {
-    for (remaining, succeeds) in [(7, true), (6, false)] {
+    // The unchanged raw source walk takes seven operations. Consuming seal
+    // additionally pays view setup and one full empty-backing length read.
+    let mut probe = PublishedValueArenaBuilder::new();
+    code(&mut probe, source(2048));
+    let mut raw_work = 0;
+    local_visits(
+        &probe.rows,
+        &probe.edges,
+        &probe.slots,
+        &probe.imports,
+        0,
+        0,
+        &mut raw_work,
+        &mut 0,
+        &mut 0,
+        &mut false,
+    )
+    .unwrap();
+    assert_eq!(raw_work, 7);
+    let mut setup_work = 0;
+    super::prepare_checked_draft(&mut setup_work, &mut 0, &mut 0, &mut false).unwrap();
+    assert_eq!(setup_work, 8);
+    let required = raw_work + setup_work + 1;
+    assert_eq!(required, 16);
+    for (remaining, succeeds) in [(required, true), (required - 1, false)] {
         let authority = source(2048);
         let mut builder = PublishedValueArenaBuilder::new();
         code(&mut builder, authority.clone());
@@ -129,4 +160,31 @@ fn complete_large_source_seals_with_exact_scalar_read_work_allowance() {
             assert_eq!(arena.shape().visits, arena.0.local_shape.visits);
         }
     }
+}
+
+#[test]
+fn source_partition_counts_successful_actual_guard_bodies_and_preserves_foreign_equality() {
+    let authority = source(2048);
+    let foreign = source(2048);
+    assert_eq!(authority, foreign);
+    assert_ne!(authority.storage_identity(), foreign.storage_identity());
+    let mut meter = Meter {
+        work: &mut 0,
+        bytes: &mut 0,
+        scratch: &mut 0,
+        failed: &mut false,
+        retained: 0,
+        source: 0,
+        native: 0,
+    };
+    let mut sources = sources::LocalSources::new(2, &mut meter).unwrap();
+    sources.observe(&authority, &mut meter).unwrap();
+    sources.observe(&authority, &mut meter).unwrap();
+    assert_eq!(meter.source, authority.fact_count());
+    sources.observe(&foreign, &mut meter).unwrap();
+    assert_eq!(meter.source, 2 * authority.fact_count());
+    assert_eq!(meter.retained, meter.source);
+    assert_eq!(meter.native, 0);
+    assert_eq!(*meter.work, 6); // Setup, two successful reads, and one alias lookup.
+    assert_eq!(sources.values().len(), 2);
 }

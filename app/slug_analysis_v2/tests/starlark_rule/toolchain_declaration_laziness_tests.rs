@@ -92,33 +92,28 @@ async fn request(
     tracker: Arc<Tracker>,
 ) -> Outcome {
     let workspace = NormalizedAbsolutePath::new(root.clone()).unwrap();
-    let mut data = UserComputationData {
-        activation_tracker: Some(tracker.clone()),
-        cycle_detector: Some(analysis_cycle_detector()),
-        ..Default::default()
+    // Prepare only the registration source prefix before the consumer tracker
+    // exists. The zero-effects assertions below still cover every consumer.
+    let request_data = |activation_tracker: Option<Arc<dyn ActivationTracker>>| {
+        let mut data = UserComputationData {
+            activation_tracker,
+            cycle_detector: Some(analysis_cycle_detector()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let host = builtin_fixture::RepositoryHostInputs::prepare(root, &mut data);
+        (data, host)
     };
-    data.data.set(CaptureEvaluationEvents);
-    data.data
-        .set(slug_bzlmod_v2::RepositoryHostInputTransaction::default());
-    data.data
-        .set(slug_bzlmod_v2::SelectedExtensionDownloadTransaction::empty(
-            workspace.clone(),
-        ));
+    let (data, host) = request_data(None);
     let mut updater = dice.updater_with_data(data);
-    inject_root_target_inputs(&mut updater, root, root_epoch(root), &[]);
-    updater
-        .changed_to(vec![(
-            slug_bzlmod_v2::RepositoryPlatformKey::new(workspace.clone()),
-            slug_bzlmod_v2::RepositoryPlatform::new("linux", "x86_64"),
-        )])
+    host.inject(&mut updater);
+    let entries = inject_root_target_inputs_with_entries(&mut updater, root, root_epoch(root), &[]);
+    let transaction = updater.commit().await;
+    let transaction = builtin_fixture::prepare_generated_registrations(transaction, root, entries)
+        .await
         .unwrap();
-    updater
-        .changed_to(vec![(
-            slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey::new(workspace.clone()),
-            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
-        )])
-        .unwrap();
-    let mut transaction = updater.commit().await;
+    let (data, _) = request_data(Some(tracker.clone()));
+    let mut transaction = transaction.into_updater().commit_with_data(data).await;
     let key = ConfiguredNodeAnalysisObservationKey::new(
         workspace,
         ConfiguredTargetKey::new(

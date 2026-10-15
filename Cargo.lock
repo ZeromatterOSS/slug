@@ -3395,6 +3395,7 @@ dependencies = [
  "async-trait",
  "compact_str",
  "dice",
+ "dice_error",
  "dice_futures",
  "dupe",
  "futures 0.3.33",

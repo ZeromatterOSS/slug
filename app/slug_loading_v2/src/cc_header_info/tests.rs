@@ -23,7 +23,9 @@ fn internal() -> FrozenModule {
     let source = "i = cc_common.internal_DO_NOT_USE()";
     let identity = crate::BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private:header_test.bzl").unwrap(),
-        workspace_path: "/header-fixture/cc/private/header_test.bzl".into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(
+            "/header-fixture/cc/private/header_test.bzl".into(),
+        ),
         repository_mapping: Arc::from([]),
     };
     let digest: [u8; 32] = Sha256::digest(source.as_bytes()).into();

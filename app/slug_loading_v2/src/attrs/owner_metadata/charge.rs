@@ -22,11 +22,11 @@ fn emit(raw: usize, rows: usize, visit: &mut Visitor<'_>) -> Result<(), String> 
     })
 }
 
-pub(super) fn normal(raw: usize, visit: &mut Visitor<'_>) -> Result<(), String> {
+pub(crate) fn normal(raw: usize, visit: &mut Visitor<'_>) -> Result<(), String> {
     emit(raw, 1, visit)
 }
 
-pub(super) fn source_prefix(
+pub(crate) fn source_prefix(
     value: &crate::bzl_module::BzlModuleIdentity,
     visit: &mut Visitor<'_>,
 ) -> Result<(), String> {
@@ -39,7 +39,10 @@ pub(super) fn source_prefix(
         value.label.package().repo().as_str().len(),
         value.label.package().package().as_str().len(),
         value.label.target().as_str().len(),
-        value.workspace_path.as_os_str().len(),
+        value
+            .source
+            .retained_text_bytes()
+            .ok_or("rule owner metadata byte overflow")?,
     ]
     .into_iter()
     .try_fold(0usize, usize::checked_add)
@@ -55,7 +58,7 @@ pub(super) fn source_prefix(
     emit(raw, rows, visit)
 }
 
-pub(super) fn mapping_entry(
+pub(crate) fn mapping_entry(
     apparent: &str,
     canonical: &str,
     visit: &mut Visitor<'_>,

@@ -167,7 +167,7 @@ fn assert_child_parse_error(value: &ObservedExternalBzlOutcome, target: &str) {
 
 #[tokio::test]
 async fn observed_sibling_need_precedes_later_semantic_error_and_repairs_strict_closure() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(FrontierTracker::default());
     let mut cold =
         tracked_transaction(&dice, epoch(ROOT, b"LEFT = 1\n", false), tracker.dupe()).await;
@@ -229,7 +229,7 @@ async fn observed_sibling_need_precedes_later_semantic_error_and_repairs_strict_
 
 #[tokio::test]
 async fn earlier_semantic_error_does_not_probe_missing_later_sibling() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(FrontierTracker::default());
     let mut transaction =
         tracked_transaction(&dice, epoch(REVERSED, b"LEFT = 1\n", false), tracker.dupe()).await;
@@ -324,7 +324,7 @@ fn synopsis_result(value: &ObservedExternalBzlOutcome) -> i32 {
 
 #[tokio::test]
 async fn external_bzl_synopsis_reuses_across_child_need_and_current_epoch_changes() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(FrontierTracker::default());
     let mut first = synopsis_transaction(
         &dice,
@@ -463,7 +463,7 @@ async fn external_bzl_synopsis_reuses_across_child_need_and_current_epoch_change
 
 #[tokio::test]
 async fn external_bzl_synopsis_preserves_source_identity_encoding_and_error_order() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(FrontierTracker::default());
     let mut a = synopsis_transaction(
         &dice,
@@ -721,7 +721,7 @@ async fn external_bzl_child_prefix_retains_original_carriers_until_settlement() 
         carrier: Mutex::new(Weak::new()),
         observed_count: Mutex::new(None),
     });
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let make_epoch = |root_name: &str, right: Option<&[u8]>| {
         let mut epoch = EpochBuilder::external_sources(&[
             (root_name, b"load(':left.bzl', 'LEFT')\nload(':right.bzl', 'RIGHT')\nprint('settled prefix')\nRESULT = LEFT + RIGHT\n"),

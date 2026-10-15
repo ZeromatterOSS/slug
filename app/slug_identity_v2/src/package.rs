@@ -52,6 +52,11 @@ impl PackagePath {
         &self.0
     }
 
+    /// Retained allocation capacity; semantic identity uses the string contents.
+    pub fn retained_capacity_bytes(&self) -> usize {
+        self.0.capacity()
+    }
+
     pub fn default_target_name(&self) -> Result<TargetName, String> {
         let Some(name) = self.0.rsplit('/').next().filter(|name| !name.is_empty()) else {
             return Err("root package labels require an explicit target name".to_owned());
@@ -126,6 +131,11 @@ impl TargetName {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Retained allocation capacity; semantic identity uses the string contents.
+    pub fn retained_capacity_bytes(&self) -> usize {
+        self.0.capacity()
     }
 }
 

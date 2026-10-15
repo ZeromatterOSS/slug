@@ -19,7 +19,9 @@ fn row(name: &str, source: &str, mappings: usize) -> Arc<LocalBzlInput> {
     let identity = BzlModuleIdentity {
         label: slug_identity_v2::CanonicalLabel::parse(&format!("@@source+//pkg:{name}.bzl"))
             .unwrap(),
-        workspace_path: format!("/source/{name}.bzl").into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(
+            format!("/source/{name}.bzl").into(),
+        ),
         repository_mapping: (0..mappings)
             .map(|index| {
                 (
@@ -36,10 +38,23 @@ fn row(name: &str, source: &str, mappings: usize) -> Arc<LocalBzlInput> {
         reachable: Arc::from([crate::BzlModuleSourceProvenance::new(identity, [0; 32])]),
         fingerprint: [0; 32],
     };
-    let owner = bzl_evaluation_owner(
+    let environment = crate::bzl_environment::PreparedBzlEnvironment::uninjected(
+        crate::bzl_environment::BzlEnvironmentMode::BzlmodBootstrap,
+    )
+    .unwrap();
+    let context = crate::bzl_environment::BzlModuleSourceContext::new(
         &manifest,
+        &environment,
+        std::iter::empty(),
+    )
+    .unwrap();
+    let owner = bzl_evaluation_owner(
+        crate::starlark_label::PreparedDefiningModuleMetadata::RawManifest {
+            manifest: &manifest,
+            transient_context: &context,
+        },
         CodeMap::new("index.bzl".into(), source.into()),
-        false,
+        &environment,
         true,
         [],
     )
@@ -53,20 +68,34 @@ fn row(name: &str, source: &str, mappings: usize) -> Arc<LocalBzlInput> {
         .clone()
 }
 fn cached_variant(row: &Arc<LocalBzlInput>, hash: u64) -> Arc<LocalBzlInput> {
+    let key = Arc::new(BzlStableKey {
+        identity: row.key.identity.clone(),
+        environment: row.key.environment.clone(),
+        bazel_internal_strings: row.key.bazel_internal_strings,
+        candidate_index_hash: hash,
+        shape: row.key.shape,
+        comparison: row.key.comparison,
+        publication: row.key.publication.clone(),
+    });
+    let publication = row.publication.with_test_children(
+        std::iter::once(SharedPublicationInput::new(key.clone()))
+            .chain(
+                row.children
+                    .iter()
+                    .map(|child| SharedPublicationInput::new(child.clone())),
+            )
+            .collect(),
+    );
     Arc::new(LocalBzlInput {
-        key: Arc::new(BzlStableKey {
-            identity: row.key.identity.clone(),
-            bzlmod: row.key.bzlmod,
-            bazel_internal_strings: row.key.bazel_internal_strings,
-            candidate_index_hash: hash,
-            shape: row.key.shape,
-        }),
+        key,
         source_digest: row.source_digest,
         fingerprint: row.fingerprint,
         source: row.source.clone(),
         original_metadata: row.original_metadata,
         children: row.children.clone(),
         shape: row.shape,
+        comparison: row.comparison,
+        publication,
     })
 }
 fn semantic_hash(key: &BzlStableKey) -> u64 {
@@ -105,7 +134,7 @@ fn candidate_index_cache_preserves_complete_semantic_hash_and_equality() {
     assert_eq!(semantic_hash(&original.key), semantic_hash(&altered.key));
     let mut expected = DefaultHasher::new();
     original.key.identity.hash(&mut expected);
-    original.key.bzlmod.hash(&mut expected);
+    original.key.environment.hash(&mut expected);
     original.key.bazel_internal_strings.hash(&mut expected);
     assert_eq!(semantic_hash(&original.key), expected.finish());
     assert_eq!(original.key.candidate_index_hash, expected.finish());
@@ -113,7 +142,7 @@ fn candidate_index_cache_preserves_complete_semantic_hash_and_equality() {
     original.key.hash(&mut actual);
     let mut old_fields = CountHasher::default();
     original.key.identity.hash(&mut old_fields);
-    original.key.bzlmod.hash(&mut old_fields);
+    original.key.environment.hash(&mut old_fields);
     original.key.bazel_internal_strings.hash(&mut old_fields);
     assert_eq!(
         (actual.writes, actual.bytes),
@@ -176,7 +205,7 @@ fn candidate_index_full_hash_is_paid_once_and_imports_pay_fixed_reads() {
     let mut construction = zero_shape();
     write_candidate_index_hash(
         &wide.key.identity,
-        wide.key.bzlmod,
+        &wide.key.environment,
         wide.key.bazel_internal_strings,
         wide.key.shape,
         &mut construction,
@@ -219,7 +248,7 @@ fn candidate_index_limit_refuses_before_hash_writes_key_clones_and_index_growth(
         assert!(
             write_candidate_index_hash(
                 &original.key.identity,
-                original.key.bzlmod,
+                &original.key.environment,
                 original.key.bazel_internal_strings,
                 original.key.shape,
                 &mut work,

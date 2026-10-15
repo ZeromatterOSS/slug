@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn large_stored_root_count_keeps_full_facts_and_independent_import_work_limit() {
-    for (remaining, succeeds) in [(5, true), (4, false)] {
+    // Original five non-backing operations + view setup8 + empty backing1.
+    for (remaining, succeeds) in [(14, true), (13, false)] {
         let mut builder = PublishedValueArenaBuilder::new();
         atom(&mut builder, AnalysisValue::integer(7));
         while builder.charged_visits() < NODE_LIMIT - remaining {
@@ -64,7 +65,7 @@ fn empty_groups_cost_no_aggregate_and_all_lengths_keep_full_counts() {
     )
     .unwrap();
     assert_eq!(work, NODE_LIMIT, "only source-table setup is inspected");
-    assert_eq!(count, 0);
+    assert_eq!(count.total, 0);
     assert!(sources.is_empty());
     assert!(!failed);
     let mut work = 0;
@@ -87,7 +88,7 @@ fn empty_groups_cost_no_aggregate_and_all_lengths_keep_full_counts() {
         work, 2,
         "setup plus one complete nonempty reference aggregate"
     );
-    assert_eq!(count, 9);
+    assert_eq!(count.total, 9);
     // An actual imported arena contributes its stored reference even when it
     // has no local rows; imported payload admission remains a separate walk.
     let prior = seal(PublishedValueArenaBuilder::new(), 0);
@@ -106,7 +107,7 @@ fn empty_groups_cost_no_aggregate_and_all_lengths_keep_full_counts() {
     )
     .unwrap();
     assert_eq!(work, 2);
-    assert_eq!(count, 10);
+    assert_eq!(count.total, 10);
 }
 
 #[test]
@@ -162,7 +163,7 @@ fn reference_sum_overflow_and_retained_limit_poison_without_partial_count() {
         &mut false,
     )
     .unwrap();
-    assert_eq!(full, RETAINED_FACT_LIMIT);
+    assert_eq!(full.total, RETAINED_FACT_LIMIT);
     let prior = seal(PublishedValueArenaBuilder::new(), 0);
     let mut failed = false;
     assert!(
@@ -221,7 +222,7 @@ fn aggregate_scalar_bytes_are_prepaid_and_slot_integrity_stays_strict() {
         assert_eq!(result.is_ok(), succeeds);
         assert_eq!(failed, !succeeds);
         if let Ok((count, _)) = result {
-            assert_eq!(count, 7000);
+            assert_eq!(count.total, 7000);
             assert_eq!(bytes, BYTE_LIMIT);
         }
     }

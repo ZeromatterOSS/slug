@@ -1297,11 +1297,12 @@ async fn external_fixture_source(
     Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
     dice::DiceTransaction,
 ) {
-    use crate::canonical_repository_route_tests::tests::MODULE;
+    use crate::canonical_repository_route_tests::tests::CONSUMER_MODULE;
     use crate::canonical_repository_route_tests::tests::WORKSPACE;
+    use crate::canonical_repository_route_tests::tests::generated_graph_dice;
     use crate::canonical_repository_route_tests::tests::transaction;
-    let dice = Dice::builder().build(DetectCycles::Enabled);
-    let mut tx = transaction(&dice, MODULE, extension, true, None).await;
+    let dice = generated_graph_dice();
+    let mut tx = transaction(&dice, CONSUMER_MODULE, extension, true, None).await;
     let key = crate::HostRootRepositoryLoadRouteKey::new(
         path(WORKSPACE),
         slug_identity_v2::ApparentRepoName::new("first").unwrap(),

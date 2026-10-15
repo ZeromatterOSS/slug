@@ -256,6 +256,30 @@ impl NativeArgsBudget {
                 continue;
             }
             match value.kind() {
+                AnalysisValueKind::DottedVersion(v) => {
+                    if depth
+                        .checked_add(2)
+                        .is_none_or(|n| n > CALLABLE_GRAPH_DEPTH_LIMIT)
+                    {
+                        return Err(ArgsExpansionError::Limit(
+                            "native dotted version depth".into(),
+                        ));
+                    }
+                    self.visits = self
+                        .visits
+                        .checked_add(1)
+                        .and_then(|n| n.checked_add(v.components().len()))
+                        .filter(|n| *n <= CALLABLE_GRAPH_NODE_LIMIT)
+                        .ok_or_else(|| {
+                            ArgsExpansionError::Limit("native dotted version work".into())
+                        })?;
+                    bytes = bytes
+                        .checked_add(crate::analysis_value::published_projection_forecast())
+                        .and_then(|n| n.checked_add(v.storage().retained_bytes()))
+                        .ok_or_else(|| {
+                            ArgsExpansionError::Limit("native dotted version bytes".into())
+                        })?;
+                }
                 AnalysisValueKind::String(s) => bytes = bytes.saturating_add(s.len()),
                 AnalysisValueKind::Number(n) => {
                     if let Some(integer) = n.as_integer() {

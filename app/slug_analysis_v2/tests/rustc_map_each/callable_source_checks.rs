@@ -449,7 +449,7 @@ impl Check {
                 assert!(
                     l.identity.label.to_string() == "@@rules_cc+//cc/private:cc_info.bzl",
                     "unexpected changed source: {}",
-                    l.identity.workspace_path.display()
+                    l.identity.source.diagnostic_path().display()
                 );
                 let hex = |digest: &[u8]| {
                     digest

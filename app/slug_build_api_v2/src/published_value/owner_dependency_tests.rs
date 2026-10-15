@@ -142,21 +142,38 @@ fn deeper_owner_and_arena_memo_hits_recheck_depth_and_poison_failure() {
 }
 #[test]
 fn constructor_preflights_complete_dependency_closure_before_publishing_owner() {
-    let part = |id| {
+    // Two D=N-22 bodies plus a genuine D44 body keep full O=F while
+    // each constructor retains positive completion-work headroom.
+    let part = |id, visits| {
         Arc::new(ShapePart {
             id,
             shape: PublicationShape {
-                visits: NODE_LIMIT / 2,
+                visits,
                 bytes: 1,
                 ..PublicationShape::default()
             },
         })
     };
-    let large =
-        FunctionEvaluationOwner::new(FunctionOwnerDomain::BzlLoad, part(1), part(2)).unwrap();
-    // Two independently constructed full native bodies fill the retained ledger.
-    let second =
-        FunctionEvaluationOwner::new(FunctionOwnerDomain::BzlLoad, part(4), part(5)).unwrap();
+    let large = FunctionEvaluationOwner::new(
+        FunctionOwnerDomain::BzlLoad,
+        part(1, (NODE_LIMIT - 22) / 2),
+        part(2, (NODE_LIMIT - 22) / 2),
+    )
+    .unwrap();
+    let second = FunctionEvaluationOwner::new(
+        FunctionOwnerDomain::BzlLoad,
+        part(4, (NODE_LIMIT - 22) / 2),
+        part(5, (NODE_LIMIT - 22) / 2),
+    )
+    .unwrap();
+    let tail = FunctionEvaluationOwner::new(FunctionOwnerDomain::BzlLoad, part(6, 22), part(7, 22))
+        .unwrap();
+    assert_eq!(
+        large.intrinsic_shape().visits
+            + second.intrinsic_shape().visits
+            + tail.intrinsic_shape().visits,
+        RETAINED_FACT_LIMIT
+    );
     let key = Arc::new(ShapePart {
         id: 3,
         shape: PublicationShape {
@@ -165,17 +182,56 @@ fn constructor_preflights_complete_dependency_closure_before_publishing_owner() 
             ..PublicationShape::default()
         },
     });
-    assert!(matches!(
-        FunctionEvaluationOwner::new(
-            FunctionOwnerDomain::ConfiguredRule,
-            key,
-            Arc::new(Dependencies {
-                owners: vec![large, second],
-                arenas: vec![]
-            })
+    let dependencies = Arc::new(Dependencies {
+        owners: vec![large, second, tail],
+        arenas: vec![],
+    });
+    let key_weak = Arc::downgrade(&key);
+    let dependencies_weak = Arc::downgrade(&dependencies);
+    let error =
+        FunctionEvaluationOwner::new(FunctionOwnerDomain::ConfiguredRule, key, dependencies)
+            .unwrap_err();
+    let PublishedValueError::OwnerRetainedVisitBudget(report) = error else {
+        panic!("expected final owner refusal, got {error:?}");
+    };
+    assert_eq!(
+        (
+            report.domain(),
+            report.stable_key_visits(),
+            report.input_validity_visits(),
+            report.intrinsic_visits(),
+            report.legacy_local_visits(),
+            report.owner_visits(),
+            report.imported_visits(),
+            report.shared_visits(),
+            report.certified_shared_visits(),
+            report.producer_work(),
+            report.complete_visits(),
+            report.limit_visits()
         ),
-        Err(PublishedValueError::Limit("owner retained visits"))
-    ));
+        (
+            FunctionOwnerDomain::ConfiguredRule,
+            1,
+            1,
+            2,
+            RETAINED_FACT_LIMIT + 60,
+            RETAINED_FACT_LIMIT,
+            0,
+            0,
+            0,
+            Some(60),
+            RETAINED_FACT_LIMIT + 5,
+            RETAINED_FACT_LIMIT
+        )
+    );
+    assert_eq!(report.declaration_reference_visits(), 3);
+    let cloned = report.clone();
+    assert_eq!(report, cloned);
+    assert!(key_weak.upgrade().is_none());
+    assert!(
+        dependencies_weak.upgrade().is_none(),
+        "numeric errors retain no owner declarations"
+    );
 }
 #[test]
 fn dependency_guards_outlive_producer_and_release_with_unpublished_builder() {

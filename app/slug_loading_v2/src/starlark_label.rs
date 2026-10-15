@@ -33,11 +33,13 @@ use starlark_map::StarlarkHasher;
 use crate::bzl_module::BzlModuleIdentity;
 
 mod defining_module_context;
+pub(crate) use defining_module_context::PreparedDefiningModuleMetadata;
 pub(crate) use defining_module_context::attach_defining_module_context;
 pub(crate) use defining_module_context::attach_defining_module_manifest;
 pub(crate) use defining_module_context::attach_defining_module_owner;
 pub(crate) use defining_module_context::defining_module_function_owner;
 pub use defining_module_context::defining_module_identity;
+pub use defining_module_context::defining_module_source_context;
 pub use defining_module_context::defining_module_source_manifest;
 pub(crate) use defining_module_context::validate_defining_module_source;
 

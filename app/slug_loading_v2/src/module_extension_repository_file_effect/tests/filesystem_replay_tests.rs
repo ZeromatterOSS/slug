@@ -26,7 +26,7 @@ ext = module_extension(implementation=impl)
 
 #[tokio::test]
 async fn delete_callback_replays_actual_booleans_prunes_known_descendants_and_seals_delete_only() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let mut transaction = transaction_untracked(&dice, MODULE, DELETE, true).await;
     let owner = owner(&mut transaction).await;
     let key = HostSelectedRepositoryFileEffectKey::new(
@@ -110,7 +110,7 @@ ext = module_extension(implementation=impl)
 
 #[tokio::test]
 async fn archive_delete_archive_share_ordered_prefix_without_generated_read_authority() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let mut transaction = transaction_untracked(&dice, MODULE, MIXED, true).await;
     let owner = owner(&mut transaction).await;
     let key = HostSelectedRepositoryFileEffectKey::new(
@@ -186,7 +186,7 @@ async fn archive_delete_archive_share_ordered_prefix_without_generated_read_auth
 
 #[tokio::test]
 async fn delete_changed_path_prefix_kind_and_revoked_epoch_do_not_resume() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let mut transaction = transaction_untracked(&dice, MODULE, DELETE, true).await;
     let owner = owner(&mut transaction).await;
     let key = HostSelectedRepositoryFileEffectKey::new(
@@ -254,12 +254,14 @@ async fn actual_callbacks_refuse_execute_filesystem_mix_in_all_four_orders_befor
         }
     }
 
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let mut transaction = transaction_untracked(&dice, MODULE, DELETE, true).await;
     let owner = owner(&mut transaction).await;
     let identity = crate::bzl_module::BzlModuleIdentity {
         label: slug_identity_v2::CanonicalLabel::parse("@@//:independent.bzl").unwrap(),
-        workspace_path: std::path::PathBuf::from("independent.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(std::path::PathBuf::from(
+            "independent.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let manifest = crate::bzl_module::BzlLoadManifest {

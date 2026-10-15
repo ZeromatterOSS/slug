@@ -7,7 +7,9 @@ use super::*;
 fn owner() -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private:freeze_test.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/freeze_test.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/freeze_test.bzl",
+        )),
         repository_mapping: Arc::from([]),
     }
 }

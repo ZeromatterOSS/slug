@@ -76,7 +76,9 @@ impl AnalysisActionSink for NoopActionSink {
 fn identity(repo: &str, package: &str, mapping: &[(&str, &str)]) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@{repo}//{package}:defs.bzl")).unwrap(),
-        workspace_path: PathBuf::from(format!("/workspace/{package}/defs.bzl")),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
+            "/workspace/{package}/defs.bzl"
+        ))),
         repository_mapping: mapping
             .iter()
             .map(|(apparent, canonical)| {

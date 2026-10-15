@@ -17,7 +17,7 @@ async fn filegroup_data_retains_labels_provenance_and_selectors_in_both_packages
             1201,
         )
         .await;
-        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let dice = host_fixture_dice();
         let root = compute_package(
             &dice,
             EpochBuilder::workspace_sources("", &build, &[("labels.bzl", LABELS)], 1202).build(),

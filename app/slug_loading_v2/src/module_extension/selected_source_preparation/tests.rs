@@ -379,7 +379,7 @@ async fn selected_preparation_owner_innate_repository_rule_is_wrong_family() {
     let (dice, tx, _, r, tracker) = tool_test_fixture(&tool_test_source(true, true, "")).await;
     drop(tx);
     dice.wait_for_idle().await;
-    let module = "module(name='bazel_tools')\nrepo=use_repo_rule('//:repo.bzl','simple_repo')\nrepo(name='proof')\n";
+    let module = "module(name='consumer')\nrepo=use_repo_rule('//:repo.bzl','simple_repo')\nrepo(name='proof')\n";
     let tx =
         repository_rule_sources_transaction(&dice, module, &[], 0, Some(tracker.clone())).await;
     let tx = selected_watch_observations(tx, selected_factor_epoch(module, "")).await;

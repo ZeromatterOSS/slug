@@ -64,7 +64,7 @@ fn cpp_compilation_mode_preserves_strings_errors_and_frozen_ownership() {
         }
         let identity = BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private:cpp_features.bzl").unwrap(),
-            workspace_path: PathBuf::from(FILENAME),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(FILENAME)),
             repository_mapping: Arc::from([]),
         };
         let context = BzlEvaluationContext::macro_runtime_context(
@@ -139,7 +139,7 @@ fn retained_cpp_fragment_preserves_identity_and_uses_current_caller() {
                 "@@//ordinary:consumer.bzl"
             })
             .unwrap(),
-            workspace_path: PathBuf::from(FILENAME),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(FILENAME)),
             repository_mapping: Arc::from([]),
         };
         let context = BzlEvaluationContext::macro_runtime_context(
@@ -227,7 +227,7 @@ fn evaluate_configuration(
             "@@//ordinary:cpp_features.bzl"
         })
         .unwrap(),
-        workspace_path: PathBuf::from(FILENAME),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(FILENAME)),
         repository_mapping: Arc::from([]),
     };
     let callers = Arc::from([(

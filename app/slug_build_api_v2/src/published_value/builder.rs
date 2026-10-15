@@ -14,8 +14,11 @@ pub struct PublishedValueArenaBuilder {
     // Classified subset of local construction bytes; never a live-budget refund.
     producer_scratch_bytes: usize,
     failed_budget: bool,
-    // Legacy shape total: producer work plus admitted private owner-body facts.
+    // Legacy total includes producer work and full certified owner/shared facts.
     visits: usize,
+    // Subset of shared_payload.visits whose replay was certified by Owner::new.
+    certified_shared_visits: usize,
+    strict_shared_audit: bool,
     pub(super) owner_audit: bool,
     inline_edges: usize,
     owner_edges: usize,
@@ -26,6 +29,9 @@ pub struct PublishedValueArenaBuilder {
     owner_payload: PublicationShape,
     shared_payload: PublicationShape,
     shared_seen: fxhash::FxHashMap<usize, SharedPublicationInput>,
+    // Addresses remain guarded by the exact borrowed root/parent until the
+    // postorder owning memo commits. Never a semantic identity or certificate.
+    shared_active: fxhash::FxHashSet<usize>,
     owner_roots: Vec<FunctionEvaluationOwner>,
     owner_root_seen: fxhash::FxHashSet<usize>,
     owner_active: fxhash::FxHashSet<usize>,
@@ -52,14 +58,32 @@ impl PublishedValueArenaBuilder {
     pub fn charged_bytes(&self) -> usize {
         self.bytes
     }
-    /// Producer work, excluding successfully admitted private owner-body facts.
+    /// Producer work, excluding successfully certified owner/shared body facts.
     pub fn charged_visits(&self) -> usize {
+        self.checked_producer_work()
+            .expect("certified body visits are included in the legacy total")
+    }
+    fn checked_producer_work(&self) -> Option<usize> {
+        if self.certified_shared_visits > self.shared_payload.visits {
+            return None;
+        }
         self.visits
             .checked_sub(self.owner_payload.visits)
-            .expect("owner payload visits are included in the legacy total")
+            .and_then(|work| work.checked_sub(self.certified_shared_visits))
+    }
+    fn checked_cached_visits(&self) -> Option<usize> {
+        self.import_visits
+            .checked_add(self.owner_payload.visits)
+            .and_then(|facts| facts.checked_add(self.certified_shared_visits))
     }
     pub fn new() -> Self {
         Self::default()
+    }
+    pub(in crate::published_value) fn new_strict_shared_audit() -> Self {
+        Self {
+            strict_shared_audit: true,
+            ..Self::default()
+        }
     }
     pub fn node(&self, id: PublishedNodeId) -> Result<&PublishedNode, PublishedValueError> {
         self.rows
@@ -106,15 +130,15 @@ impl PublishedValueArenaBuilder {
                 Ok(())
             }
             _ => {
+                let prior_poisoned = self.failed_budget;
                 self.failed_budget = true;
-                Err(PublishedValueError::Limit("owner edges"))
+                Err(self.edge_refusal(count, prior_poisoned))
             }
         }
     }
     pub fn charge_visit(&mut self) -> Result<(), PublishedValueError> {
         let next = self
-            .visits
-            .checked_sub(self.owner_payload.visits)
+            .checked_producer_work()
             .and_then(|work| work.checked_add(1))
             .filter(|work| *work <= NODE_LIMIT)
             .and_then(|_| self.visits.checked_add(1));
@@ -261,14 +285,19 @@ impl PublishedValueArenaBuilder {
         };
         if let Some(code) = code {
             if !self.source_seen.contains(&code.source.storage_identity()) {
-                if self.prepaid_source_bytes(&code.source)?.is_none() {
+                let prepared = self.prepared_source_audit(&code.source)?.is_some();
+                if !prepared {
                     self.charge_bytes(code.source.byte_cost())?;
                 }
                 self.charge_bytes(
                     std::mem::size_of::<CallableSourceAuthority>().saturating_mul(4),
                 )?;
-                for _ in 0..code.source.fact_count() {
-                    self.charge_visit()?;
+                // Only an exact same-builder completed native audit replaces
+                // this logical-fact replay. Seal still retains the FULL facts.
+                if !prepared {
+                    for _ in 0..code.source.fact_count() {
+                        self.charge_visit()?;
+                    }
                 }
                 self.source_seen.insert(code.source.storage_identity());
                 self.sources.push(code.source.clone());
@@ -312,6 +341,28 @@ impl PublishedValueArenaBuilder {
         depth: usize,
     ) -> Result<(), PublishedValueError> {
         let result = native::audit_package_specification(self, value, depth);
+        if result.is_err() {
+            self.failed_budget = true;
+        }
+        result
+    }
+    /// Audit an actual immutable shared-input graph before retaining its guard.
+    /// This raw entry pays full body work and never supplies an owner certificate.
+    /// Depth, memo hits, resource refusal and poisoning use the existing walker.
+    pub fn audit_shared_input_at_depth(
+        &mut self,
+        input: &SharedPublicationInput,
+        depth: usize,
+    ) -> Result<(), PublishedValueError> {
+        self.audit_shared_input(input, depth)
+    }
+    /// Admit the complete immutable version before the VM bridge clones it.
+    pub fn audit_dotted_version_at_depth(
+        &mut self,
+        value: &crate::DottedVersion,
+        depth: usize,
+    ) -> Result<(), PublishedValueError> {
+        let result = native::audit_dotted_version(self, value, depth);
         if result.is_err() {
             self.failed_budget = true;
         }
@@ -464,24 +515,19 @@ impl PublishedValueArenaBuilder {
         if self.complete_shape()?.depth > DEPTH_LIMIT {
             return Err(PublishedValueError::Limit("sealed closure depth"));
         }
-        let mut work = self
-            .visits
-            .checked_sub(self.owner_payload.visits)
-            .ok_or_else(|| {
-                self.failed_budget = true;
-                PublishedValueError::Limit("producer visits")
-            })?;
-        let cached = self
-            .import_visits
-            .checked_add(self.owner_payload.visits)
-            .ok_or_else(|| {
-                self.failed_budget = true;
-                PublishedValueError::Limit("cached visits")
-            })?;
+        let mut work = self.checked_producer_work().ok_or_else(|| {
+            self.failed_budget = true;
+            PublishedValueError::Limit("producer visits")
+        })?;
+        let cached = self.checked_cached_visits().ok_or_else(|| {
+            self.failed_budget = true;
+            PublishedValueError::Limit("cached visits")
+        })?;
         if self.failed_budget
             || self.bytes > BYTE_LIMIT
             || work > NODE_LIMIT
             || cached > RETAINED_FACT_LIMIT
+            || self.shared_payload.visits > NODE_LIMIT
             || self
                 .rows
                 .len()
@@ -515,38 +561,32 @@ impl PublishedValueArenaBuilder {
         // Inspect the borrowed, fully assembled draft before any final row/edge
         // conversion. Loan only producer work; cached owner facts remain paid
         // on the separate retained dimension. This consumes the builder on Err.
-        let (retained_visits, sources) = retained_facts::local_visits(
-            &self.rows,
-            &self.edges,
-            &self.slots,
-            &self.imports,
-            self.owner_roots.len(),
-            originals.root_count(),
-            &mut work,
-            &mut self.bytes,
-            &mut self.producer_scratch_bytes,
-            &mut self.failed_budget,
-        )?;
+        let (local_facts, sources) = self.certify_local(originals.as_ref(), &mut work)?;
         // Restore the legacy total before any shape/certificate is observed.
-        self.visits = work.checked_add(self.owner_payload.visits).ok_or_else(|| {
-            self.failed_budget = true;
-            PublishedValueError::Limit("complete visits")
-        })?;
+        self.visits = work
+            .checked_add(self.owner_payload.visits)
+            .and_then(|visits| visits.checked_add(self.certified_shared_visits))
+            .ok_or_else(|| {
+                self.failed_budget = true;
+                PublishedValueError::Limit("complete visits")
+            })?;
         let mut intrinsic_shape = self.intrinsic_shape();
         let mut complete_shape = self.complete_shape()?;
         // Canonical local facts replace producer history. Prior sealed bodies
         // and opaque owner/shared payloads still contribute their FULL counts.
-        complete_shape.visits = self
-            .import_visits
-            .checked_add(self.owner_payload.visits)
-            .and_then(|visits| visits.checked_add(self.shared_payload.visits))
-            .and_then(|visits| visits.checked_add(retained_visits))
+        let checked_total = retained_fact_refusal::checked_total(
+            self.import_visits,
+            self.owner_payload.visits,
+            self.shared_payload.visits,
+            local_facts.total,
+        );
+        complete_shape.visits = checked_total
             .filter(|visits| *visits <= RETAINED_FACT_LIMIT)
             .ok_or_else(|| {
                 self.failed_budget = true;
-                PublishedValueError::Limit("retained closure visits")
+                self.retained_fact_refusal(local_facts, work, checked_total)
             })?;
-        intrinsic_shape.visits = retained_visits;
+        intrinsic_shape.visits = local_facts.total;
         let rows = self
             .rows
             .into_iter()
@@ -634,6 +674,36 @@ mod byte_refusal;
 pub use byte_refusal::PublicationByteContext;
 pub use byte_refusal::PublicationByteRefusal;
 
+#[path = "retained_work_refusal.rs"]
+mod retained_work_refusal;
+pub use retained_work_refusal::PublicationRetainedCertificateWorkRefusal;
+
+#[path = "retained_fact_refusal.rs"]
+mod retained_fact_refusal;
+pub use retained_fact_refusal::PublicationRetainedFactRefusal;
+
+#[path = "owner_retained_visit_refusal.rs"]
+mod owner_retained_visit_refusal;
+pub use owner_retained_visit_refusal::PublicationClosureCensus;
+pub use owner_retained_visit_refusal::PublicationNativeChannel;
+pub use owner_retained_visit_refusal::PublicationNativeRetentionCensus;
+pub use owner_retained_visit_refusal::PublicationNativeRootFamily;
+pub use owner_retained_visit_refusal::PublicationNativeStatistics;
+pub use owner_retained_visit_refusal::PublicationOwnerDomainCensus;
+pub use owner_retained_visit_refusal::PublicationOwnerRetainedVisitRefusal;
+pub use owner_retained_visit_refusal::PublicationRowKind;
+
+#[path = "edge_refusal.rs"]
+mod edge_refusal;
+pub use edge_refusal::PublicationEdgeContext;
+pub use edge_refusal::PublicationEdgeRefusal;
+
 #[path = "source_preparation.rs"]
 mod source_preparation;
 pub use source_preparation::PublicationSourcePreparation;
+
+#[path = "builder/checked_draft.rs"]
+pub(in crate::published_value) mod checked_draft;
+
+#[path = "builder/local_certification.rs"]
+mod local_certification;

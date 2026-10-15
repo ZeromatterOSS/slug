@@ -45,7 +45,7 @@ third = module_extension(implementation=third_impl, tag_classes={'path':path_tag
         dice::DiceTransaction,
         HostSelectedExtensionOwnerPureObservationKey,
     ) {
-        let base = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:ext.bzl','other')\nuse_repo(f, other='other')\ng=use_extension('@dep_alias//:ext.bzl','third')\nuse_repo(g, third='third')\n";
+        let base = "module(name='consumer')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:ext.bzl','other')\nuse_repo(f, other='other')\ng=use_extension('@dep_alias//:ext.bzl','third')\nuse_repo(g, third='third')\n";
         let (mut bootstrap, _) = selected_path_case(dice, base, EXTENSION, tracker.clone()).await;
         let mapping = bootstrap
             .compute(&HostRootRepositoryMappingKey::new(

@@ -45,7 +45,7 @@ impl LocalSources {
         // the FULL count still contributes to canonical retained visits.
         meter.work()?;
         meter.bytes(std::mem::size_of::<usize>())?;
-        meter.add(source.fact_count())?;
+        meter.source(source.fact_count())?;
         self.values.push(source.clone());
         Ok(())
     }

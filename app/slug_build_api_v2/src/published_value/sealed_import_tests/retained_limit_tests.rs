@@ -32,8 +32,8 @@ fn local_facts_above_work_limit_survive_import_reseal_owner_and_guard_release() 
     .unwrap();
     assert_eq!(
         owner.retained_shape().visits,
-        consumer.shape().visits + 4,
-        "two part records plus two actual closure visits"
+        consumer.shape().visits + 3,
+        "original D2 plus full imported arena facts and declaration reference R1"
     );
     drop((original, consumer));
     assert!(weak.upgrade().is_some());
@@ -60,14 +60,18 @@ fn full_fact_limit_seals_exactly_and_refuses_the_next_real_stored_reference() {
             assert!(
                 matches!(
                     finish(next),
-                    Err(PublishedValueError::Limit("retained closure visits"))
+                    Err(PublishedValueError::RetainedFactBudget(ref report))
+                    if report.checked_total_facts() == Some(RETAINED_FACT_LIMIT + 1)
+                        && report.limit_facts() == RETAINED_FACT_LIMIT
                 ),
                 "one newly stored import reference still needs fact headroom"
             );
         } else {
             assert!(matches!(
                 result,
-                Err(PublishedValueError::Limit("retained closure visits"))
+                Err(PublishedValueError::RetainedFactBudget(ref report))
+                    if report.checked_total_facts() == Some(RETAINED_FACT_LIMIT + 1)
+                        && report.limit_facts() == RETAINED_FACT_LIMIT
             ));
         }
     }
@@ -79,11 +83,17 @@ fn owner_full_fact_boundary_is_checked_before_arc_with_same_small_work_prefix() 
         // Actual repeated references stay paid, even though one immutable
         // shared allocation is retained. This differs from the simple constructor fixture.
         let shared = SharedPublicationInput::new(Arc::new(Leaf));
-        let constructor_work = 2 + 128 + 1 + 3; // parts, references, body, arena visits
-        let prior = pair(RETAINED_FACT_LIMIT - constructor_work + extra);
+        // New counting work29: setup8 +two capacity scan units per3
+        // buckets +scan controls2 +one shared read +root6 +finish6.
+        let constructor_work = 2 + 2 * 128 + 1 + 3 + 29;
+        let declaration_references = 128 + 1;
+        let canonical_body_and_references = 2 + 1 + declaration_references;
+        let prior = pair(RETAINED_FACT_LIMIT - canonical_body_and_references + extra);
+        let prior_weak = Arc::downgrade(&prior.0);
         let a = part(31, vec![], vec![]);
         let b = part(32, vec![prior], vec![shared; 128]);
         let before = (Arc::strong_count(&a), Arc::strong_count(&b));
+        let parts_weak = (Arc::downgrade(&a), Arc::downgrade(&b));
         let result =
             FunctionEvaluationOwner::new(FunctionOwnerDomain::ConfiguredRule, a.clone(), b.clone());
         if extra == 0 {
@@ -93,18 +103,60 @@ fn owner_full_fact_boundary_is_checked_before_arc_with_same_small_work_prefix() 
             );
             assert_eq!(Arc::strong_count(&a), before.0 + 1);
         } else {
-            assert!(matches!(
-                result,
-                Err(PublishedValueError::Limit("owner retained visits"))
-            ));
+            let Err(PublishedValueError::OwnerRetainedVisitBudget(report)) = result else {
+                panic!("expected final owner refusal, got {result:?}");
+            };
+            assert_eq!(
+                (
+                    report.domain(),
+                    report.stable_key_visits(),
+                    report.input_validity_visits(),
+                    report.intrinsic_visits(),
+                    report.legacy_local_visits(),
+                    report.owner_visits(),
+                    report.imported_visits(),
+                    report.shared_visits(),
+                    report.certified_shared_visits(),
+                    report.producer_work(),
+                    report.complete_visits(),
+                    report.limit_visits()
+                ),
+                (
+                    FunctionOwnerDomain::ConfiguredRule,
+                    1,
+                    1,
+                    2,
+                    constructor_work,
+                    0,
+                    RETAINED_FACT_LIMIT - canonical_body_and_references + 1,
+                    1,
+                    0,
+                    Some(constructor_work),
+                    RETAINED_FACT_LIMIT + 1,
+                    RETAINED_FACT_LIMIT
+                )
+            );
+            assert_eq!(
+                report.declaration_reference_visits(),
+                declaration_references
+            );
             assert_eq!((Arc::strong_count(&a), Arc::strong_count(&b)), before);
+            drop((a, b));
+            let cloned = report.clone();
+            assert_eq!(report, cloned);
+            assert!(parts_weak.0.upgrade().is_none() && parts_weak.1.upgrade().is_none());
+            assert!(
+                prior_weak.upgrade().is_none(),
+                "numeric report retains no imported arena"
+            );
         }
     }
 }
 
 #[test]
 fn larger_canonical_facts_do_not_expand_real_work_or_original_root_limits() {
-    for (remaining, succeeds) in [(5, true), (4, false)] {
+    // Original five non-backing operations + view setup8 + empty backing1.
+    for (remaining, succeeds) in [(14, true), (13, false)] {
         let mut b = PublishedValueArenaBuilder::new();
         let id = b.reserve().unwrap();
         let atom = b.native_atom(AnalysisValue::none()).unwrap();

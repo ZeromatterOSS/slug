@@ -1,5 +1,136 @@
 # Stage 9: V1 Extraction Ledger
 
+Owner construction separately certifies full retained facts as original native
+bodies plus the actual-unique owner/shared/arena body union and an explicit
+positive declaration-reference count. Both root parts, every completed prior
+owner's original parts and every completed shared node contribute their complete
+immutable declaration lengths; all aliases and equal foreign guards remain.
+Full canonical arena facts retain their own stored references. Every constructor
+recounts the guarded union; original owner intrinsic shapes stay unchanged.
+This constructor-only Slug-native policy replaces the previous history-bearing
+final predicate. Strict raw C0 audits, actual work and early cached/body/resource
+checks remain. Capacity scans, length reads and stack/control storage are prepaid
+on the original ledgers. Existing Fx/Arc/Allocative storage is reused without a
+new map, retained proof, donor, cache, semantic identity or cap change. Error
+reports distinguish the positive retained total from legacy audit history.
+Component proof remains separate from completed-command memory acceptance.
+
+General publication sealing borrows the exact builder rows, copied edge backing
+and immutable import domains. The sole edge writer validates before copying;
+monotone domains preserve validity through consuming seal. A private temporary
+view removes only the repeated backing-index validation. Full stored-edge facts
+remain positively counted, including unused and duplicate entries; the raw
+validator and all row, metadata, slot, source/native and final validators remain.
+Existing append validation is performed work, not a paid certificate or refund.
+New view, control and length operations are prepaid on the same work/byte
+ledgers, with temporary storage classified as producer scratch. Closed scalar
+failure phases add no success allocation, retained field or semantic selection.
+No donor import, collection, cache, global pool, cap or lifetime change is
+introduced. Component proof does not establish completed-command memory fit.
+
+Private consuming seal counts the full immutable root-slot array with a
+positively paid length read and retains every slot fact. It omits only the
+duplicate local-certification range scan; the final range/missing-slot validator
+stays unchanged at its existing location before projection and publication.
+Raw arbitrary drafts keep their full per-slot validation and error order. Local
+facts and source guards are private temporaries, not a detached validity proof.
+An invalid consuming slot may now encounter resource refusal or the existing
+precharged row conversion before final rejection. This explicit error-order
+change adds no cap, success credit, caller profile or invented prior work payment.
+
+
+Native row/key physical composition reuses a private stack-borrowed coverage
+carrier and the existing positive reference-table certificate. The same admitted
+rows/base cover exact descriptor-local bodies; a positive table/whole-payload
+complement is used through physical pre-copy and final transfer, while complete
+standalone caches/caps and full logical checks remain. No new collection, donor
+import, pool, global cache, retained state, guard clone or semantic identity is
+introduced. Added carrier/strategy/read costs are prepaid on the original work
+ledger. Whole foreign proof/catalog bodies, opaque intrinsic groups and all
+record/byte/depth/strict-publication gates stay complete; no refund or cap change.
+
+
+Immutable input accounting supports bounded native DAGs through exact owned
+child guards and positive intrinsic shapes. Existing leaves retain their full
+shape by default. A composite's independent full conservative shape bounds
+containment depth on every occurrence, including memo hits; intrinsic bodies
+and the actually admitted guard union retain the existing resource caps.
+Raw and strict audits traverse the same children. Prepaid active and completed
+actual-guard memos reject cycles, prevent address reuse and admit completed
+bodies only after descendants succeed. Certified authority flows solely from
+the existing completed owner witness, with recursive strict C0 and no raw-work
+refund. Row/key/environment/proof sharing reuses Arc/Dupe/Allocative and Fx
+utilities. New arrays, headers, reads, clones and transfer peaks are admitted on
+the original producer ledgers before copying; expanded conservative shapes do
+not replace semantic or physical forecasts. Own catalog and foreign proof
+catalog guards remain independent even when equal. No donor import, global
+pool or semantic identity change is introduced. Component proof remains
+separate from completed-command memory acceptance.
+
+
+Loading source publication preserves a private complete table and its exact
+immutable raw source rows. Typed table and shared declaration handles clone the
+same root allocation; that root owns its raw backing, unique sealed mapping-pair
+bank and ordered per-row child declarations. Pure mapping leaves retain only the
+exact ordered mapping Arc and a complete capacity/header/body certificate.
+Parent producers borrow completed child/environment pairs, reuse only exact raw
+allocation matches and retain only selected leaves. Equal foreign allocations
+and independent raw factories remain complete independent guards. First-seen
+selection never merges already retained wrappers. Source equality, fingerprints
+and field comparisons remain complete and allocation-independent.
+
+A privately completed exact mapping pair may lend a positive COPY-volume cache:
+full entry count and original pair/name bytes, accumulated during its first full
+preparation. Only an inherited pair for that actual raw Arc omits the redundant
+COPY forecast scan. New, incomplete and unmatched mappings retain the full scan;
+equal contents never authorize a hit. Fixed lookup/read/control work is prepaid
+on the same cumulative producer, all cached bytes remain charged to work, and
+full cached records and bytes remain admitted to the retained ledger. Aggregate
+refusal reports that actual ledger and checked partial state, without a fictitious
+former entry ordinal. Added pair facts, bytes, scratch and transfer costs stay
+positive. Every native/capacity pass and fingerprint preflight/hash stream stays
+complete; no cap, audit, source dependency or semantic behavior is weakened.
+
+Table intrinsic and full shapes are positive typed folds. Intrinsic covers all
+own nonmapping fields, handles, caches, arrays and declaration cells; expanded
+full shape includes every mapping containment and new metadata. Complete depth
+includes mapping edges even on repeated memo hits; empty tables use the same
+conservative bound. Full/nested metadata remains whole and complete. Mandatory
+Analysis raw admission supplies its explicit root depth; a charge-only metadata
+consumer must admit complete depth independently. New context/iterator/pair/index,
+capacity/growth/control and clone/transfer work is prepaid on the actual cumulative
+producer ledger before reads, allocation or copying. No source-count shortcut
+covers empty contexts. Existing raw strict C0, full foreign closure and all caps
+remain. Arc/Allocative and bounded SmallMap/Fx reuse introduce no donor import,
+semantic cache, global pool, owner/context backedge or memory-fit claim.
+
+Immutable name arrays lend their authoritative lengths to canonical retained
+accounting. Four counting-only loops become positively paid scalar operations;
+full name facts and all semantic validation remain. No new cache, donor import,
+retained certificate or global pool is introduced. A bounded seal-failure box
+owns scalars only and cannot extend source, owner or evaluator lifetime. Changed
+work admission is separate from workload performance or memory-fit acceptance.
+
+
+Bzl validity's direct shared-input array retains its ordered actual row guards.
+The complete row/key/environment/proof/catalog DAG recursively retains every
+original foreign body, including an own catalog distinct from an equal proof
+catalog. Redundant direct payload/nested/environment/own-catalog handles are
+physically absent; semantic rows, reference plans and environment owners remain.
+For L rows, K payload/nested handles, E environment occurrences and C own-catalog
+occurrences, the direct array changes from L+K+E+C to L. Positive intrinsic omits
+only the removed E+C handle component; canonical declaration-reference count R
+omits the actual K+E+C cells. The old K bulk allowance stays one conservative
+fact with its bytes, edges and depth, rather than K facts. Complete guarded body
+union, raw/strict C0 audits and deepest-path bounds remain unchanged. Original
+key/row, standalone planner physical/logical/comparison and full pre-copy forecasts
+remain conservative; all old construction work and positive new controls stay
+paid on the same ledgers before reads or copies. The prepaid temporary SmallSet
+still admits full own-catalog storage by actual guarded identity. No body refund,
+cap change, caller profile, new pool or semantic cache is introduced. Component
+proof remains separate from completed-command memory acceptance.
+
+
 ## Executable environment retained representation
 
 V2-owned RunEnvironmentInfo reuses SmallMap, CompactString and Arc/Dupe/Allocative
@@ -78,13 +209,43 @@ facts. Existing guarded owner/import traversal and structural equality remain.
 This uses the same native owners and Fx scratch utilities, adds no independent
 semantic cache, and makes no workload fit claim.
 
-Same-builder source preparation reuses these bounded Fx maps and actual Arc
-guards. A borrowed capability preserves full output/transfer payment and omits
-only its duplicate first-binding payload charge for that exact allocation.
-Its private proof table and consumed output-array backings are prepaid producer
-scratch; full final source storage, facts/equality and foreign-allocation charges
-remain. Proof guards drop before publication.
-No donor import, global cache or new semantic identity is introduced.
+Completed immutable FunctionEvaluationOwner constructors also lend private
+borrowed shared-audit witnesses for their exact declared guards. The witness
+adds no retained allocation, table or guard array; OwnerData headers and semantic
+Eq/hash remain unchanged. Strict construction still pays full shared-body work,
+including recursive owners/imports. Consumers omit only that certified empty
+replay, retaining full shared facts and all storage/canonical limits. Raw-first
+work stays paid; equal foreign allocations need independent admission. Existing
+Arc/Allocative owners, actual encounter checks and last-guard release remain;
+no donor import, public proof factory, global pool or semantic cache is added.
+
+A private native stable-owner part reuses the existing root-row Arc and shared
+publication guard. Its inline declaration adds no array allocation; header, both
+handle fields and Arc/transfer peaks are forecast before copies. The unchanged
+row certificate retains full key, child and source data. Stable identity writes
+the complete key; actual guard sharing never selects semantics. No donor, table,
+cache, global pool or source/retained-fact policy change is introduced.
+
+Environment-descriptor collision comparison meters each visited typed field on
+the same cumulative constructor-work ledger before comparison. Full label,
+source-origin and ordered defining-mapping semantics remain independent of
+retained wrapper/facade forecasts; foreign payloads and original owner guards
+keep their complete retention admission. The private borrowed walk adds no
+retained field, cache, allocation or donor dependency. Resource caps, complete
+semantic writers and release boundaries remain; component work bounds do not
+establish whole-workload memory fit.
+
+Same-builder source preparation reuses bounded Fx maps and borrowed actual Arc
+guards. An explicit identity-count bound prepays the complete constructor-local
+memo before output clones; native validation pays real operations and preserves
+the full fact-before-byte checks. Complete mapping volumes contribute to every
+identity, while the immutable authority caches full validated bytes including its
+actual private header. Only its exact same-builder completed-work/payment proof
+omits duplicate payload payment and empty fact replay. Ordinary and foreign
+allocations retain full fallback admission; source facts/equality, sealed counts
+and all limits remain. Proof/memo tables and consumed output-array backings are
+fully paid producer scratch and end before publication. No donor import, global
+cache or new semantic identity is introduced.
 
 ## Goal
 

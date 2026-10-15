@@ -130,6 +130,7 @@ impl<'a> MappingPlan<'a> {
         builder: &'b mut PublishedValueArenaBuilder,
         remaining: &mut usize,
         output_transfer: usize,
+        identity_bound: usize,
     ) -> Result<(usize, PublicationSourcePreparation<'b>), String> {
         audits.check()?;
         let total = count(audits.committed.len(), self.pending.len())?;
@@ -158,7 +159,7 @@ impl<'a> MappingPlan<'a> {
                 "Args source transfer byte underflow".to_owned()
             })?;
         let mut preparation = builder
-            .begin_source_authority(retained_output, output_transfer, scratch)
+            .begin_source_authority(retained_output, output_transfer, scratch, identity_bound)
             .map_err(|e| e.to_string())?;
         for _ in 0..self.pending.len() {
             if let Err(error) = preparation_step(&mut preparation, remaining) {

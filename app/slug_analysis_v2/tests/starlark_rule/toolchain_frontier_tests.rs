@@ -105,19 +105,28 @@ async fn required_toolchain_declaration_need_repairs_with_strict_closure_without
             .map(|(demand, result)| (demand.dupe(), result.dupe())),
     )
     .unwrap();
-    let data = || UserComputationData {
-        activation_tracker: Some(tracker.dupe()),
-        cycle_detector: Some(analysis_cycle_detector()),
-        ..Default::default()
+    let request_data = || {
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            cycle_detector: Some(analysis_cycle_detector()),
+            ..Default::default()
+        };
+        let host = builtin_fixture::RepositoryHostInputs::prepare(&workspace, &mut data);
+        (data, host)
     };
-    let mut updater = dice.updater_with_data(data());
-    inject_root_target_inputs(
+    let (data, host) = request_data();
+    let mut updater = dice.updater_with_data(data);
+    host.inject(&mut updater);
+    let entries = inject_root_target_inputs_with_entries(
         &mut updater,
         &workspace,
         cold_epoch,
         &[("speculative+", "speculative")],
     );
-    let mut cold = updater.commit().await;
+    let cold = updater.commit().await;
+    let mut cold = builtin_fixture::prepare_generated_registrations(cold, &workspace, entries)
+        .await
+        .unwrap();
     let outcome = cold.compute(&key).await.unwrap();
     assert!(!ConfiguredToolchainResolutionObservationKey::validity(
         &outcome
@@ -137,14 +146,20 @@ async fn required_toolchain_declaration_need_repairs_with_strict_closure_without
     assert_eq!(completed[0].0.version(), cold.version());
     drop(cold);
 
-    let mut updater = dice.updater_with_data(data());
-    inject_root_target_inputs(
+    let (data, host) = request_data();
+    let mut updater = dice.updater_with_data(data);
+    host.inject(&mut updater);
+    let entries = inject_root_target_inputs_with_entries(
         &mut updater,
         &workspace,
         root_epoch(&workspace),
         &[("speculative+", "speculative")],
     );
-    let mut repaired = updater.commit().await;
+    let repaired = updater.commit().await;
+    let mut repaired =
+        builtin_fixture::prepare_generated_registrations(repaired, &workspace, entries)
+            .await
+            .unwrap();
     let outcome = repaired.compute(&key).await.unwrap();
     assert!(ConfiguredToolchainResolutionObservationKey::validity(
         &outcome

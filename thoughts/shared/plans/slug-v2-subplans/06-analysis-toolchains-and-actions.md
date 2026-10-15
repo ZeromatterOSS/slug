@@ -1,5 +1,15 @@
 # Stage 6: Analysis, Toolchains, and Actions
 
+Canonical certification counts immutable capture names, provider-schema names,
+struct names and provider field names through one paid length read per group,
+including empty groups. Each full length still contributes to retained facts;
+name/edge/range validation and complete equality remain independent. The read
+prepays one work operation and a scalar byte allowance before accessing length.
+Work, byte and retained-fact failures poison normally. A fixed scalar-only
+failure report at seal distinguishes entry producer work from certification
+work without retaining sources or changing successful publication storage.
+
+
 ## Executable environment publication
 
 Only a declared executable rule or actual Test capability may return top-level
@@ -68,18 +78,19 @@ Mapping-byte proofs share one private publisher lifetime, using guarded actual
 Arcs without changing full per-occurrence forecasts or source equality. Pending
 borrowed proofs require joint growth/output/work admission before commit; failed
 source attempts poison the session and builder before further cache shortcuts.
-Sealed retained-fact certificates remain distinct from bounded producer work;
-imports do not replay producer Engine/proof history. Private sealed local
-certificates and private constructor-validated owner bodies keep full fact counts
-in one cached-retained ledger. Actual DAG/source/owner lookup work remains paid.
-Producer work is checked combined admissions minus owner-body facts and stays
-capped at65536. Full retained facts use one131072 bound for joint owner/import
-admission, local canonical counts, final sealed closure and constructor-combined
-owners. This explicitly increases the former full-fact limit; counts and semantic
-comparisons remain complete. One bound preserves local-to-import role changes
-across generations; added references still need fact headroom. Seal loans only
-producer work to the existing meter, then restores full shape totals. Actual
-shared/public/native work, node/root IDs and edge/depth caps remain.
+Sealed retained facts remain separate from producer work. Completed immutable
+owners lend a private, zero-retained-storage shared-audit witness over their
+exact guarded inputs; raw wrappers cannot certify them. Strict owner construction
+pays full shared work recursively through owners/imports. Consumer encounters,
+depth and memo checks remain paid, with raw-first work never refunded or promoted
+and distinct foreign allocations independently admitted. With legacy total V,
+owner facts O, full shared facts S, imported facts I and certified subset C,
+producer W=checked(V-O-C)<=65536, 0<=C<=S<=65536 and cached R=I+O+C<=131072.
+Local V, intrinsic V-O-S and complete V+I retain full counts; final canonical
+I+O+S+local-facts stays within131072. Seal loans only W and restores V with O+C;
+C is already part of S and never counted twice. Full byte/node/edge/depth and
+constructor closure limits, structural Eq/hash, original guard lifetimes and
+Host min(host-remaining, native-remaining) clipping stay unchanged.
 All construction byte forecasts remain fully paid under one fixed 128 MiB joint
 publication policy, shared by retained closure and post-seal projection. This
 explicitly doubles the former aggregate resource envelope; it does not reduce
@@ -93,13 +104,18 @@ certificates, after validation returns; live charges are never refunded.
 Root vectors, source output, native/owner/shared bodies and unclassified mixed
 forecasts remain retained. This changes import exhaustion boundaries without
 claiming exact allocator bytes or completed-command memory fit.
-Source conversion prepays complete final output and temporary Vec transfer
-backing. A borrowed preparation requires the retained payment to cover the full
-validated authority; only the two consumed array backings join producer scratch.
-Its first same-builder source binding omits only the duplicate payload charge
-for that actual allocation. Foreign and distinct-equal allocations pay fully.
-Full facts, handles and verification remain; bounded proof storage/work is
-prepaid, abandonment poisons, and proof guards drop before outward publication.
+Source conversion prepays complete final output, temporary Vec transfer backing
+and a constructor-local memo peak bounded by an explicit identity count before
+output clones. Native validation checks that count, pays the full fact pass before
+the byte pass, and borrows actual immutable mapping Arcs to reuse completed mapping
+volumes. Every identity still contributes its full facts and bytes. The authority
+caches complete validated bytes, including its actual private allocation header.
+Only successful same-builder native work and byte payment, guarded by the exact
+authority allocation, omit the duplicate first-binding payload charge and empty
+fact replay. Ordinary, foreign and distinct-equal allocations retain full fallback
+admission. Full handles, source equality, verification and sealed facts remain;
+construction, source and retained limits are unchanged. Temporary memo/proof
+storage stays fully paid, abandonment poisons, and guards drop before publication.
 Private feature-proof overhead and compiled dependency queues are temporary;
 event buffers prepay the complete vector-growth peak before each push. This
 strengthens their former per-element construction admission under the same cap.

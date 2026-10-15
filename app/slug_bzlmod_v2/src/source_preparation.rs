@@ -477,19 +477,23 @@ impl SourcePreparationNeeds {
             }
             Arc::new(repository_executes)
         };
-        let repository_filesystem_operations = if let Some(shared) =
-            shared_no_op_need_map(&self.repository_filesystem_operations, &other.repository_filesystem_operations)
-        {
+        let repository_filesystem_operations = if let Some(shared) = shared_no_op_need_map(
+            &self.repository_filesystem_operations,
+            &other.repository_filesystem_operations,
+        ) {
             shared
         } else {
-            let mut repository_filesystem_operations = (*self.repository_filesystem_operations).clone();
+            let mut repository_filesystem_operations =
+                (*self.repository_filesystem_operations).clone();
             for (id, request) in other.repository_filesystem_operations.iter() {
                 match repository_filesystem_operations.get(id) {
                     Some(existing) if existing == request => {}
                     Some(_) => {
-                        return Err(SourcePreparationNeedsError::ConflictingRepositoryFilesystem {
-                            id: id.clone(),
-                        });
+                        return Err(
+                            SourcePreparationNeedsError::ConflictingRepositoryFilesystem {
+                                id: id.clone(),
+                            },
+                        );
                     }
                     None => {
                         repository_filesystem_operations.insert(id.clone(), request.dupe());
@@ -593,6 +597,7 @@ pub struct RepositoryMaterializationEpochEntry {
 pub struct RepositoryMaterializationResultEpoch {
     workspace: NormalizedAbsolutePath,
     entries: Arc<SmallMap<CanonicalRepoName, RepositoryMaterializationEpochEntry>>,
+    retained_generated: Option<Arc<[Arc<RepositoryMaterializationEpochEntry>]>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -601,6 +606,9 @@ pub enum RepositoryMaterializationResultEpochError {
     DuplicateRepository { canonical_repo: CanonicalRepoName },
     ConflictingRepositoryRequest { canonical_repo: CanonicalRepoName },
     SuccessKindMismatch { canonical_repo: CanonicalRepoName },
+    RetainedOutputLimit,
+    InvalidRetainedOutput,
+    ConflictingRetainedOutput,
 }
 
 /// A bounded borrowed namespace lookup refuses uncertainty instead of
@@ -632,6 +640,9 @@ impl<'a> RepositoryMaterializationInstanceView<'a> {
         self.generation_root
     }
 }
+
+#[path = "source_preparation/materialization_inventory.rs"]
+mod materialization_inventory;
 
 impl RepositoryMaterializationResultEpoch {
     pub fn new(
@@ -677,6 +688,7 @@ impl RepositoryMaterializationResultEpoch {
         Ok(Self {
             workspace,
             entries: Arc::new(result),
+            retained_generated: None,
         })
     }
 

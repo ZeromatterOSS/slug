@@ -14,7 +14,6 @@ use slug_loading_v2::attrs::TransitionDefinition;
 use slug_loading_v2::attrs::TransitionSetting;
 use slug_loading_v2::package::BuildSettingDeclaration;
 use slug_loading_v2::package::resolve_rule_definition_label;
-use slug_loading_v2::provider::TransitionEvaluationContext;
 use slug_loading_v2::provider::alloc_starlark_label;
 use slug_loading_v2::provider::starlark_label;
 use starlark::environment::Module;
@@ -266,10 +265,7 @@ pub(crate) fn evaluate(
         return Err("label-valued build-setting transitions are unsupported".into());
     }
     let module = Module::new();
-    let context = TransitionEvaluationContext::new(
-        transition.definition_source().as_ref().clone(),
-        transition.source_identities_by_filename().clone(),
-    );
+    let context = transition.evaluation_context()?;
     let mut evaluator = Evaluator::new(&module);
     evaluator.extra = Some(&context);
     let settings = transition

@@ -6,7 +6,7 @@ use super::*;
 fn identity(raw: &str, path: &str) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(raw).unwrap(),
-        workspace_path: path.into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(path.into()),
         repository_mapping: Arc::from([]),
     }
 }
@@ -26,7 +26,11 @@ fn frozen(
     FrozenBzlModule {
         semantic_inputs: None,
         module: module.freeze().unwrap(),
-        path: identity.workspace_path.clone(),
+        path: identity
+            .source
+            .workspace_path()
+            .expect("workspace fixture source")
+            .to_path_buf(),
         loads: children.iter().map(|(name, _)| name.clone()).collect(),
         manifest: BzlLoadManifest::new(identity, digest(marker), children.iter().map(|(_, m)| m)),
         bzl_load_visibility: BzlLoadVisibility::Public,
@@ -128,7 +132,13 @@ fn manifest_helpers_preserve_first_seen_diamonds_and_owned_results() {
     for (source, provenance) in sources.iter() {
         assert_eq!(
             source.as_str(),
-            provenance.identity.workspace_path.to_str().unwrap()
+            provenance
+                .identity
+                .source
+                .workspace_path()
+                .expect("workspace fixture source")
+                .to_str()
+                .unwrap()
         );
     }
     let lifetimes = flattened_lifetime_closure(&loaded);
@@ -200,6 +210,14 @@ fn mapping_identity_and_existing_fingerprint_projection_stay_distinct() {
         package_load_fingerprint(&singles(&a)),
         package_load_fingerprint(&singles(&b))
     );
+    // Pinned pre-origin Workspace encoding at aaac0fc70.
+    assert_eq!(
+        package_load_fingerprint(&singles(&a)),
+        [
+            171, 221, 150, 96, 211, 109, 235, 124, 231, 216, 208, 45, 241, 58, 49, 67, 145, 182,
+            210, 5, 27, 171, 242, 209, 209, 203, 246, 253, 221, 116, 14, 199
+        ]
+    );
     let loaded = vec![("a".to_owned(), a.clone()), ("b".to_owned(), b.clone())];
     assert_eq!(first_seen_direct_roots(&loaded), [first.clone(), second]);
     assert_eq!(package_bzl_call_sources(&loaded).unwrap().len(), 2);
@@ -218,7 +236,8 @@ fn mapping_identity_and_existing_fingerprint_projection_stay_distinct() {
     for change in 0..4 {
         let mut changed = first.clone();
         if change == 0 {
-            changed.workspace_path = "/manifest/other.bzl".into();
+            changed.source =
+                slug_build_api_v2::ModuleSourceOrigin::Workspace("/manifest/other.bzl".into());
         }
         if change == 1 {
             changed.repository_mapping = Arc::from([(

@@ -1,0 +1,172 @@
+{
+  "packet": "WP-7-422-m7a-general-builtin-apple-exports",
+  "status": "ACCEPTED_SCOPED_PENDING_ATOMIC_INTEGRATION",
+  "record_date": "2026-10-15",
+  "baseline": "aaac0fc707780a810da947c8e74fbbe6b2cb9337",
+  "accepted_scope": "Original pinned six-file Apple export/version family through general Build/Bzlmod source injection, real initialized providers/callbacks and supporting generic retained/source/mapping/owner representation corrections, at current owned374 source tree. Ready for root scoped acceptance and atomic owned integration; no new code/test/public gate identified.",
+  "classifications": {
+    "exact": "Pinned Bazel9.2 source APIs, DottedVersion grammar/order, original source-defined selected Apple provider/function behavior and admitted semantic equality/invalidation relations",
+    "Slug-native": "Native retained representation/accounting, structural configuration/output identity; diagnostic hybrid sampled/GNU-time RSS observation",
+    "unsupported_deferred": [
+      "Full root exports",
+      "Injection overrides/autoloads",
+      "Meaningful Apple MODULE/bootstrap globals",
+      "Discovery/macOS execution"
+    ]
+  },
+  "source_integrity": {
+    "bazel_revision": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "verbatim_source_sha256": {
+      "common/xcode/providers.bzl": "67c02e7c2ae4793ce74f8e29e10058096439edda4f0aa32585296f4cc38f5827",
+      "common/objc/apple_env.bzl": "f1b2c27562c47d4220022c633c67c7d756d45c22a57480832bc460ae25986ffe",
+      "common/objc/apple_platform.bzl": "c7ba7537915222ddab538ab3bd0baf23fcdd6357e0ed4baafee15aa2bf5fa5cc",
+      "common/objc/apple_common.bzl": "dcbf8f2cbb1c87e711c44800737b2611a42116fdb9f0acbe25b35af668a75c86",
+      "common/objc/objc_info.bzl": "7f645d2c92b8d22011ad0da7b8675638964ff8a460e0498594bc4363d05b4a84",
+      "common/objc/apple_toolchain.bzl": "772c5ec41f885d720646fd3472af04d2f95dd59bd7f71f656197fdf565d43ba5"
+    },
+    "retired_files_absent": [
+      "app/slug_loading_v2/src/apple_common.rs",
+      "app/slug_loading_v2/src/xcode_version_info.rs",
+      "app/slug_build_api_v2/tests/xcode_version_info.rs"
+    ],
+    "integrity_is_not_implementation_selection": true,
+    "actual_callback_consumption": "Original Xcode user-provider identity/Objc merge, native full spelling and alias slot, bound original callback in separate configured consumer, actual6source environment authority and sourceA-B-A all execute.",
+    "public_output_qualification": "14byte label/count output alone is not Apple callback evidence; actual normal/owned integration fixtures supply that proof."
+  },
+  "current_owned_source": {
+    "final_source_path": "target/wp1222/row-only-declarations-final-source.json",
+    "final_source_sha256": "7e54ba0fbb4c4f50faa2c61ff6c79de4c7b5c4425ddc05dc1c320e681779e61a",
+    "source_count": 2484,
+    "owned_paths": 374,
+    "owned_tree": "8b20e4e17f0261499639c1efefa579bdf28b8835",
+    "owned_index_sha256": "0cb3dce34cfdf7189e437d0a697b4b006219dae39213d1062dc94b4f6e88c1a3",
+    "owned_patch_sha256": "d57bca14f553d7370553761408b74b771ff3e625d2a2e437e785dc3e6e254897",
+    "workspace_sha256": "554f83ef5a71654f8dabd308727edbbe12fd3f41d29ce0abbe034f740026185f",
+    "whole_index_entries": 4985,
+    "owned_blobs": 371,
+    "deletions": 3,
+    "inherited_dispositions": 113,
+    "overrides": 8,
+    "growth": {
+      "baseline": "9a478b835bcb62e99d4e0c33cd75098cbe6e6c49",
+      "paths": 59,
+      "added": 5173,
+      "removed": 230,
+      "below_threshold": true
+    }
+  },
+  "validation": {
+    "fresh_changed_focused_normal_owned": 202,
+    "fresh_affected_loading_broad": 87,
+    "per_lane": {
+      "Loading": 94,
+      "AnalysisLIB": 3,
+      "AnalysisIntegration": 4
+    },
+    "runtime_review_sha256": "7ae4e3c361076678dbede52d5415c2daedc44f050590b119fce243617618d9fe",
+    "fresh_cli_review_sha256": "82a957966a44e8614592a7e415d8c9d423c811f1a85f8a7aac563f7b2d067095",
+    "source_finalizer_qualification": {
+      "review_pins": {
+        "target/wp1222/bzl-request-source-origin-candidate/source-review.json": "bd21bc71864561b499eee3e2a69e42f5960fbff7b44d1d2f97bac91b7fb8580f",
+        "target/wp1222/bzl-request-source-origin-candidate/normal-library-execution-review.json": "2e4e3db84ede12d4a66914afd42095d609bdcd11da227d54ef6721cb2a1bcda7",
+        "target/wp1222/bzl-request-source-origin-candidate/integration-execution-review.json": "0377189fea0d4e4ad3e81a329ec714cb9105159fded0fd573b39bde1539ab212",
+        "target/wp1222/bzl-request-source-origin-candidate/owned-execution-review.json": "ed15f38c52c38957b478bfb284efbba844ea583556d1f30691dca59d7075e71d"
+      },
+      "literal_current_source_pins": {
+        "app/slug_loading_v2/src/bzl_module/external_bzl_source.rs": "56d30db02cdc40b355ad22801cecf52208b91268a0e781024701ba6259333b58",
+        "app/slug_loading_v2/src/bzl_module/external_bzl_source/tests.rs": "4988c1b53763d34aab67f3a2b9143b1a55cca0d0bd2ccf7eadd7866f4bc67ee2",
+        "app/slug_loading_v2/src/canonical_repository_load_route_tests.rs": "6f3d3f1343f01f70444ac7cf4092636091ca895027ec704d93a822652a35f2ad",
+        "app/slug_loading_v2/src/canonical_repository_load_route_tests/tests/request_source_origin_tests.rs": "8c5d03424a83ac3e5816c5c2ed7d1b85f7bc38f1eb93af87866dcfc6f99b1d23"
+      },
+      "parent": "Only bzl_module.rs forecast_clone signature and4delegate context calls differ from acceptedff33 after. Actual source finalizer/driver code and four other selected files are unchanged; previously reviewed diagnostic context wrappers preserve amounts/order.",
+      "historical_scope": "Normal Loading31, AnalysisLIB17+153broad, integration28, ownedLoading31/integration28/CLIcheck and causal4red\u2192green remain source/API-qualified historical evidence, not new executions. Changed owner/source-table paths receive currentfocused+affectedbroad gates.",
+      "no_new_finalizer_execution_gap": true
+    },
+    "historical_broad_qualification": {
+      "analysis": "Historical300passes and2 exact prepacket baseline failures (directory_args literalpath, output_group_info configuredpath); neither waived nor called all-pass.",
+      "loading": "Historical1057passes/4 exact WP1220 failure signatures/3ignored; not all-pass. Current changed-family87 allpass is separate.",
+      "generic": "BuildAPI183/Core262/DICE131 are unchanged source file counts, not fresh tests. Qualified prior actualBuildAPI86/86+311/Core/DICE only."
+    }
+  },
+  "actual_public": {
+    "operation_sha256": "aad3c9ecc00825214fd9d14b695228737a1ee02adbe017e167525807e749ade6",
+    "release_sha256": "b347f394c5dd0f9b4939614451f4d1063901892a4463c725fafbc13f7be5d858",
+    "exit_code": 0,
+    "elapsed_seconds": 67.42512514791451,
+    "hybrid_peak_rss_kib": 340924,
+    "output_equivalent": true,
+    "owned_group_empty": true,
+    "helper_ratio": null,
+    "diagnostic_memory_gate": {
+      "eligible": true,
+      "passed": true,
+      "baseline_peak_rss_kib": 892132,
+      "threshold_kib": 1115165.0,
+      "diagnostic_ratio": 0.38214524308062037
+    },
+    "both_FULL_result_hashes": [
+      "77a86f84a9aabfcda5d5ba01bdb52d47e962aed01b8d30c1091cf71f745acac6",
+      "e59daf58414ca9cc8b6c876b6af7d3b11706f3edd1b986f03fcaff1e2c7de993"
+    ],
+    "actual_preservation_manifest_sha256": "cd67626c595ac720d120e257c3e92305f03eef1ada3e7edb2f970f26e32292ca",
+    "actual_preserved_files": 74,
+    "preservation_counts": {
+      "binary": 1,
+      "public": 18,
+      "root": 55
+    },
+    "all74_actual_original_copy_pairs_rehashed": true,
+    "explicit_pin_release_sha256": "1cf1579d4851786c6b3def6dda30e5bf08a42582725e0a30a187e24a852a7051",
+    "destination": "normal-host-row-only-declarations USED_NEVER_RERUN"
+  },
+  "evidence_references": {
+    "target/wp1222/packet-integration-review.json": "f16c190cc1563856fc740cb31fe50a706cca4c5eefd5be5c0de540151795f011",
+    "target/wp1222/packet-integration-ledger.json": "bce69d2949300165268051f25d247b41ee8f311879c3b21ee5cd771a679dedb4",
+    "target/wp1222/row-only-declarations-final-source.json": "7e54ba0fbb4c4f50faa2c61ff6c79de4c7b5c4425ddc05dc1c320e681779e61a",
+    "target/wp1222/normal-host-row-only-declarations/operation.json": "aad3c9ecc00825214fd9d14b695228737a1ee02adbe017e167525807e749ade6",
+    "target/wp1222/row-only-declarations-design-review.json": "efa90757a6ee84249a969dd10854347d0cfd953ced2308ef1a8ed7f3d0a7f3d4",
+    "target/wp1222/row-only-declarations-candidate/joint-source-review.json": "3cf7ecc5343f31fe9b7d856f88240be5f30889eb954aecacd119f1e9664951ab",
+    "target/wp1222/row-only-declarations-runtime-projection-review.json": "7ae4e3c361076678dbede52d5415c2daedc44f050590b119fce243617618d9fe",
+    "target/wp1222/row-only-declarations-cli-review.json": "82a957966a44e8614592a7e415d8c9d423c811f1a85f8a7aac563f7b2d067095",
+    "target/wp1222/row-only-declarations-runtime-config-review.json": "3dc6d9b51aba068ddf953bf2c85291c4997e50652a8196542de7517831561383",
+    "target/wp1222/root-row-only-declarations-release.json": "b347f394c5dd0f9b4939614451f4d1063901892a4463c725fafbc13f7be5d858",
+    "target/wp1222/root-row-only-declarations-result-full.json": "e59daf58414ca9cc8b6c876b6af7d3b11706f3edd1b986f03fcaff1e2c7de993",
+    "target/wp1222/row-only-declarations-result-review-history/77a86f84a9aabfcda5d5ba01bdb52d47e962aed01b8d30c1091cf71f745acac6/row-only-declarations-public-review.json": "77a86f84a9aabfcda5d5ba01bdb52d47e962aed01b8d30c1091cf71f745acac6",
+    "target/wp1222/independent-row-only-declarations-result-review.json": "af86a636e0f9a119e94a57fafc4fbb400e27520d820dcfb4927715662946559c",
+    "target/wp1222/row-only-declarations-pin-release.json": "1cf1579d4851786c6b3def6dda30e5bf08a42582725e0a30a187e24a852a7051",
+    "target/wp1222/release-history/b347f394c5dd0f9b4939614451f4d1063901892a4463c725fafbc13f7be5d858/manifest.json": "cd67626c595ac720d120e257c3e92305f03eef1ada3e7edb2f970f26e32292ca",
+    "target/wp1222/row-only-declarations-preserver-correction-review.json": "c3df90eaac564b7fe5fb75b047fa038e9e2b8743fb15d574fb716ccd9e869546",
+    "target/wp1222/analysis-broad-baseline-comparison.json": "e0dfb649419f0472245cf348690f234e69081555026f903c1931fc316710cfa1",
+    "target/wp1222/loading-broad-current-baseline-review.json": "c79c00f3d937015d82b91d9e1a862feed558a15b3146c58bf1bc7689a8ad418a",
+    "target/wp1222/bzl-request-source-origin-candidate/source-review.json": "bd21bc71864561b499eee3e2a69e42f5960fbff7b44d1d2f97bac91b7fb8580f",
+    "target/wp1222/bzl-request-source-origin-candidate/normal-library-execution-review.json": "2e4e3db84ede12d4a66914afd42095d609bdcd11da227d54ef6721cb2a1bcda7",
+    "target/wp1222/bzl-request-source-origin-candidate/integration-execution-review.json": "0377189fea0d4e4ad3e81a329ec714cb9105159fded0fd573b39bde1539ab212",
+    "target/wp1222/bzl-request-source-origin-candidate/owned-execution-review.json": "ed15f38c52c38957b478bfb284efbba844ea583556d1f30691dca59d7075e71d"
+  },
+  "integration": {
+    "state": "SOURCE_AND_REVIEWED_DOCUMENT_ATOMIC_INTEGRATION_PENDING",
+    "pending": [
+      "Root actual four subsystem owned-document plus four scheduling/acceptance document projection",
+      "Independent exact document/owned integration review",
+      "Atomic selected source+document integration and actual tree/index/inherited113/eight-overrides verification"
+    ],
+    "canonical_and_history_basis": "Actual HEAD; only canonical current-packet block and one appended history scope paragraph differ. Inherited LIVE cleanup/policy text excluded.",
+    "new_current_packet_basis": "New bounded WP1222 owned text; not wholesale inherited LIVE current-packet text.",
+    "four_subsystem_owner_documents": "Separate reviewed owned views retained; this proposal does not mutate them.",
+    "future_commit_prediction": null
+  },
+  "remaining_open": [
+    "Repository/resource/build-info semantic adapters are replacement-required",
+    "Authentic Rust/M7A/M8 acceptance",
+    "Action/REAPI and full Slug closure",
+    "Stage10/selfhosting",
+    "Whole-goal memory fit"
+  ],
+  "next": "General resource_set design/validation pending independent DESIGN review; no successor implementation authorized by this record.",
+  "scope_limits": [
+    "Remaining repository/resource/build-info adapters are replacement-required and cannot support authentic Rust/parity/M7A/M8 closure.",
+    "Full root exports, override/autoload injection, meaningful Apple MODULE/bootstrap globals, discovery/macOS execution, action/Rust REAPI, Stage10/selfhosting remain deferred/open.",
+    "No owner-identity continuity, savings/speed/allocator effect claim from census or query comparisons.",
+    "Proposed next resource_set contract is not reviewed/approved here; no successor implementation authority."
+  ]
+}

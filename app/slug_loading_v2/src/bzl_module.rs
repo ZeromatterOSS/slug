@@ -33,6 +33,7 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_build_api_v2::RunfilesRepositoryMapping;
+use slug_bzlmod_v2::HostModuleExtensionUsageScope;
 use slug_bzlmod_v2::HostRepositorySourceFileValue;
 use slug_bzlmod_v2::HostRepositorySourceObservation;
 use slug_bzlmod_v2::HostRepositorySourceObservationError;
@@ -208,15 +209,14 @@ impl PrintHandler for LoadingPrintCapture {
 
 /// Stable identity for one `.bzl` module evaluated through a logical source path.
 ///
-/// `label` is the canonical repository label and `workspace_path` is the
-/// normalized absolute path DICE evaluated. `repository_mapping` is the
+/// `label` is the canonical repository label and `source` distinguishes observed workspace paths from private bundled catalogs. `repository_mapping` is the
 /// defining module's already-selected apparent-to-canonical mapping. The value
 /// intentionally carries no evaluator handle, so it can be used at semantic
 /// equality boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct BzlModuleIdentity {
     pub label: CanonicalLabel,
-    pub workspace_path: PathBuf,
+    pub source: slug_build_api_v2::ModuleSourceOrigin,
     pub repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
 }
 
@@ -598,6 +598,33 @@ impl PartialEq for FrozenBzlModule {
 }
 
 impl Eq for FrozenBzlModule {}
+impl FrozenBzlModule {
+    pub(crate) fn forecast_clone(
+        &self,
+        budget: &mut semantic_evaluation::budget::Budget,
+        context: semantic_evaluation::budget::peak_context::PeakContext,
+    ) -> Result<(), String> {
+        budget.charge_with_context(
+            context,
+            1,
+            self.path
+                .as_os_str()
+                .len()
+                .saturating_add(std::mem::size_of::<Self>()),
+        )?;
+        budget.identity_with_context(context, &self.manifest.root)?;
+        budget.array_with_context::<String>(context, self.loads.len().saturating_mul(2))?;
+        for load in &self.loads {
+            budget.charge_with_context(context, 1, load.len())?;
+        }
+        Ok(())
+    }
+    pub(crate) fn semantic_input_facts(
+        &self,
+    ) -> Option<&Arc<semantic_evaluation::PreparedSemanticBzlEvaluation>> {
+        self.semantic_inputs.as_ref()
+    }
+}
 
 impl FrozenBzlModule {
     fn lifetime_modules(&self) -> impl Iterator<Item = (&BzlModuleIdentity, FrozenModule)> {
@@ -1507,7 +1534,7 @@ pub(crate) fn manifest_starlark_sources(
         .reachable
         .iter()
         .map(|identity| {
-            let source = starlark_source_name(&identity.identity.workspace_path)
+            let source = starlark_source_name(identity.identity.source.diagnostic_path().as_ref())
                 .expect("manifest paths were accepted as Starlark source names");
             (source.into(), identity.clone())
         })
@@ -1599,7 +1626,7 @@ impl HostBzlModuleError {
 }
 
 #[derive(Debug, Clone, Copy, Dupe, PartialEq, Eq, Hash, Allocative)]
-enum BzlModuleContext {
+pub(crate) enum BzlModuleContext {
     Build,
     Bzlmod,
 }
@@ -1921,6 +1948,10 @@ pub(crate) enum ExternalBzlModuleError {
         load: Arc<str>,
         error: ExternalBzlRouteError,
     },
+    RepositoryMapping {
+        source: CanonicalLabel,
+        error: ExternalBzlRouteError,
+    },
     Absent {
         label: CanonicalLabel,
     },
@@ -1961,6 +1992,18 @@ pub(crate) enum ExternalBzlRouteError {
     Compute(Arc<str>),
     Observation(Arc<str>),
     Load(Box<HostCanonicalRepositoryLoadRouteError>),
+    Admission(Arc<str>),
+}
+
+impl fmt::Display for ExternalBzlRouteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Compute(message) => write!(f, "route computation failed: {message}"),
+            Self::Observation(message) => write!(f, "route observation failed: {message}"),
+            Self::Load(error) => error.fmt(f),
+            Self::Admission(message) => write!(f, "complete mapping admission failed: {message}"),
+        }
+    }
 }
 
 impl fmt::Display for ExternalBzlModuleError {
@@ -1976,16 +2019,10 @@ impl fmt::Display for ExternalBzlModuleError {
                 load,
                 error,
             } => {
-                write!(f, "resolving `{load}` from {source}: ")?;
-                match error {
-                    ExternalBzlRouteError::Compute(message) => {
-                        write!(f, "route computation failed: {message}")
-                    }
-                    ExternalBzlRouteError::Observation(message) => {
-                        write!(f, "route observation failed: {message}")
-                    }
-                    ExternalBzlRouteError::Load(error) => error.fmt(f),
-                }
+                write!(f, "resolving `{load}` from {source}: {error}")
+            }
+            Self::RepositoryMapping { source, error } => {
+                write!(f, "preparing repository mapping for {source}: {error}")
             }
             Self::Absent { label } => write!(f, "cannot load '{label}': no such file"),
             Self::Encoding { label } => {
@@ -2027,6 +2064,7 @@ impl ExternalBzlModuleError {
             | Self::Source { .. }
             | Self::SourceObservation { .. }
             | Self::Route { .. }
+            | Self::RepositoryMapping { .. }
             | Self::Absent { .. }
             | Self::Encoding { .. }
             | Self::Parse { .. }
@@ -2046,6 +2084,7 @@ impl ExternalBzlModuleError {
             | Self::Source { .. }
             | Self::SourceObservation { .. }
             | Self::Route { .. }
+            | Self::RepositoryMapping { .. }
             | Self::Encoding { .. }
             | Self::Parse { .. }
             | Self::LoadLabel { .. }
@@ -2970,7 +3009,7 @@ fn successful_host_bzl_module(carrier: &HostBzlModuleCarrier) -> &FrozenBzlModul
 }
 
 mod root_bzl_mapping;
-mod semantic_evaluation;
+pub(crate) mod semantic_evaluation;
 
 async fn compute_host_bzl_module(
     ctx: &mut DiceComputations<'_>,
@@ -3185,7 +3224,9 @@ async fn compute_host_bzl_module(
     drop(ast);
     let identity = BzlModuleIdentity {
         label: label.canonical_label(),
-        workspace_path: source.logical_path().as_path().to_path_buf(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(
+            source.logical_path().as_path().to_path_buf(),
+        ),
         repository_mapping,
     };
     if let Err(error) = validate_module_bzl_load_visibilities(
@@ -3201,11 +3242,37 @@ async fn compute_host_bzl_module(
             observations,
         );
     }
+    let environment = match semantic_evaluation::environment::load(
+        ctx,
+        workspace,
+        context,
+        matches!(mode, HostBzlModuleMode::Observed),
+        &mut observations,
+    )
+    .await
+    {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+        SourcePreparationOutcome::Complete(Err(
+            semantic_evaluation::environment::EnvironmentFailure::Path(error),
+        )) => return SourcePreparationOutcome::Complete(Err(error)),
+        SourcePreparationOutcome::Complete(Err(
+            semantic_evaluation::environment::EnvironmentFailure::Message(error),
+        )) => {
+            // Preparation can fail on caller-dependent physical/work admission.
+            let _ = ctx.compute(&BzlLoadCyclePoisonKey).await;
+            return host_bzl_complete(
+                Err(HostBzlModuleError::Evaluation(LoadingError::new(error))),
+                observations,
+            );
+        }
+    };
     let key = match semantic_evaluation::prepare(
         &identity,
         &source_name,
         source.bytes(),
         context,
+        &environment,
         loaded_modules
             .iter()
             .map(|(raw, child)| (*raw, successful_host_bzl_module(child))),
@@ -3434,12 +3501,20 @@ impl std::error::Error for HostLoadedModuleExtensionDefinitionsError {}
 #[allow(dead_code)] // Callerless owner; activated only by a future extension evaluator.
 pub(crate) struct HostLoadedModuleExtensionDefinitionsKey {
     workspace: NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
 }
 
 impl HostLoadedModuleExtensionDefinitionsKey {
     #[allow(dead_code)]
     pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self { workspace }
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub(crate) fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self { workspace, scope }
     }
 }
 
@@ -3447,8 +3522,8 @@ impl fmt::Display for HostLoadedModuleExtensionDefinitionsKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "host-loaded-module-extension-definitions:{}",
-            self.workspace
+            "host-loaded-module-extension-definitions:{}{}",
+            self.workspace, self.scope
         )
     }
 }
@@ -3487,7 +3562,16 @@ struct HostLoadedModuleExtensionDefinitionsObservationKey(HostLoadedModuleExtens
 
 impl HostLoadedModuleExtensionDefinitionsObservationKey {
     fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self(HostLoadedModuleExtensionDefinitionsKey::new(workspace))
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self(HostLoadedModuleExtensionDefinitionsKey::new_with_scope(
+            workspace, scope,
+        ))
     }
 }
 
@@ -3563,6 +3647,7 @@ fn loaded_extension_definitions_driver_complete(
 async fn loaded_extension_definition_requests(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
     mode: LoadedModuleExtensionDefinitionsMode,
 ) -> Result<
     (
@@ -3578,9 +3663,12 @@ async fn loaded_extension_definition_requests(
 > {
     match mode {
         LoadedModuleExtensionDefinitionsMode::Legacy => match ctx
-            .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
-                workspace.dupe(),
-            ))
+            .compute(
+                &HostSelectedExtensionDefinitionLoadRequestsKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                ),
+            )
             .await
         {
             Err(error) => Err(loaded_extension_definitions_driver_complete(
@@ -3596,7 +3684,10 @@ async fn loaded_extension_definition_requests(
         },
         LoadedModuleExtensionDefinitionsMode::Observed => match ctx
             .compute(
-                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe()),
+                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                ),
             )
             .await
         {
@@ -3790,7 +3881,7 @@ async fn drive_loaded_extension_definitions(
     mode: LoadedModuleExtensionDefinitionsMode,
 ) -> LoadedModuleExtensionDefinitionsDriverOutcome {
     let (requests_result, mut observations) =
-        match loaded_extension_definition_requests(ctx, &key.workspace, mode).await {
+        match loaded_extension_definition_requests(ctx, &key.workspace, key.scope, mode).await {
             Ok(value) => value,
             Err(terminal) => return terminal,
         };
@@ -4164,12 +4255,20 @@ fn prepare_module_extension_inputs(
 #[allow(dead_code)]
 pub(crate) struct HostPreparedModuleExtensionInputsKey {
     workspace: NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
 }
 
 impl HostPreparedModuleExtensionInputsKey {
     #[allow(dead_code)]
     pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self { workspace }
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub(crate) fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self { workspace, scope }
     }
 }
 
@@ -4177,8 +4276,8 @@ impl fmt::Display for HostPreparedModuleExtensionInputsKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "host-prepared-module-extension-inputs:{}",
-            self.workspace
+            "host-prepared-module-extension-inputs:{}{}",
+            self.workspace, self.scope
         )
     }
 }
@@ -4196,7 +4295,16 @@ pub(crate) struct HostPreparedModuleExtensionInputsObservationKey(
 #[allow(dead_code)]
 impl HostPreparedModuleExtensionInputsObservationKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self(HostPreparedModuleExtensionInputsKey::new(workspace))
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub(crate) fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self(HostPreparedModuleExtensionInputsKey::new_with_scope(
+            workspace, scope,
+        ))
     }
 }
 
@@ -4305,6 +4413,7 @@ fn finish_prepared_module_extension_raw(
 async fn prepared_module_extension_raw(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
     mode: PreparedModuleExtensionInputsMode,
 ) -> Result<
     (
@@ -4315,9 +4424,12 @@ async fn prepared_module_extension_raw(
 > {
     let child = match mode {
         PreparedModuleExtensionInputsMode::Legacy => match ctx
-            .compute(&HostSelectedExtensionEvaluationInputRequestsKey::new(
-                workspace.dupe(),
-            ))
+            .compute(
+                &HostSelectedExtensionEvaluationInputRequestsKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                ),
+            )
             .await
         {
             Err(error) => {
@@ -4335,7 +4447,10 @@ async fn prepared_module_extension_raw(
         },
         PreparedModuleExtensionInputsMode::Observed => match ctx
             .compute(
-                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                ),
             )
             .await
         {
@@ -4414,6 +4529,7 @@ fn finish_prepared_module_extension_definitions(
 async fn prepared_module_extension_definitions(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
     raw: &Arc<HostSelectedExtensionEvaluationInputRequests>,
     observations: PathObservationEpoch,
     mode: PreparedModuleExtensionInputsMode,
@@ -4426,8 +4542,9 @@ async fn prepared_module_extension_definitions(
 > {
     let child = match mode {
         PreparedModuleExtensionInputsMode::Legacy => match ctx
-            .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+            .compute(&HostLoadedModuleExtensionDefinitionsKey::new_with_scope(
                 workspace.dupe(),
+                scope,
             ))
             .await
         {
@@ -4446,9 +4563,12 @@ async fn prepared_module_extension_definitions(
             }
         },
         PreparedModuleExtensionInputsMode::Observed => match ctx
-            .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
-                workspace.dupe(),
-            ))
+            .compute(
+                &HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                ),
+            )
             .await
         {
             Err(error) => {
@@ -4480,17 +4600,24 @@ async fn drive_prepared_module_extension_inputs(
     key: &HostPreparedModuleExtensionInputsKey,
     mode: PreparedModuleExtensionInputsMode,
 ) -> PreparedModuleExtensionInputsDriverOutcome {
-    let (raw, observations) = match prepared_module_extension_raw(ctx, &key.workspace, mode).await {
-        Ok(value) => value,
-        Err(terminal) => return terminal,
-    };
-    let (definitions, observations) =
-        match prepared_module_extension_definitions(ctx, &key.workspace, &raw, observations, mode)
-            .await
-        {
+    let (raw, observations) =
+        match prepared_module_extension_raw(ctx, &key.workspace, key.scope, mode).await {
             Ok(value) => value,
             Err(terminal) => return terminal,
         };
+    let (definitions, observations) = match prepared_module_extension_definitions(
+        ctx,
+        &key.workspace,
+        key.scope,
+        &raw,
+        observations,
+        mode,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(terminal) => return terminal,
+    };
     prepared_module_extension_inputs_complete(
         prepare_module_extension_inputs(raw, definitions),
         observations,
@@ -4568,6 +4695,9 @@ impl Key for HostPreparedModuleExtensionInputsObservationKey {
     }
 }
 
+mod external_bzl_route;
+use external_bzl_route::compute_canonical_external_child_input;
+use external_bzl_route::compute_external_bzl_effective_route;
 mod external_bzl_syntax;
 use external_bzl_syntax::ExternalBzlSyntaxKey;
 use external_bzl_syntax::parse_external_bzl;
@@ -4616,97 +4746,9 @@ fn external_bzl_complete(
 ) -> ExternalBzlDriverOutcome {
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
-#[derive(Debug)]
-struct ExternalBzlSourceValue {
-    bytes: Arc<[u8]>,
-    source_name: String,
-    presentation_path: PathBuf,
-    observations: PathObservationEpoch,
-}
-
-fn finish_external_bzl_source(
-    child: ExternalBzlSourceChild,
-    label: CanonicalLabel,
-) -> Result<ExternalBzlSourceValue, ExternalBzlDriverOutcome> {
-    match child {
-        ExternalBzlSourceChild::Root(result, observations) => {
-            finish_root_external_bzl_source(result, label, observations)
-        }
-        ExternalBzlSourceChild::Observation(result, observations) => {
-            let source_name = label.to_string();
-            let presentation_path = PathBuf::from(&source_name);
-            match result.as_ref() {
-                Ok(HostRepositorySourceObservation::Builtin(value)) => Ok(ExternalBzlSourceValue {
-                    bytes: value.bytes_arc().dupe(),
-                    source_name,
-                    presentation_path,
-                    observations,
-                }),
-                Ok(HostRepositorySourceObservation::Request(
-                    HostRepositorySourceFileValue::Present { bytes, .. },
-                )) => Ok(ExternalBzlSourceValue {
-                    bytes: bytes.dupe(),
-                    source_name,
-                    presentation_path,
-                    observations,
-                }),
-                Ok(HostRepositorySourceObservation::Request(
-                    HostRepositorySourceFileValue::Absent,
-                )) => Err(external_bzl_complete(
-                    Err(ExternalBzlModuleError::Absent { label }),
-                    observations,
-                )),
-                Err(error) => Err(external_bzl_complete(
-                    Err(ExternalBzlModuleError::SourceObservation {
-                        label,
-                        error: error.clone(),
-                    }),
-                    observations,
-                )),
-            }
-        }
-        ExternalBzlSourceChild::DependencyCycle(cycle) => Err(external_bzl_complete(
-            Err(ExternalBzlModuleError::DependencyCycle(cycle)),
-            PathObservationEpoch::empty(),
-        )),
-        ExternalBzlSourceChild::Compute(message) => Err(external_bzl_complete(
-            Err(ExternalBzlModuleError::SourceCompute { label, message }),
-            PathObservationEpoch::empty(),
-        )),
-    }
-}
-
-fn finish_root_external_bzl_source(
-    result: Result<HostRepositorySourceFileValue, RepositorySourceFileError>,
-    label: CanonicalLabel,
-    observations: PathObservationEpoch,
-) -> Result<ExternalBzlSourceValue, ExternalBzlDriverOutcome> {
-    match result {
-        Ok(HostRepositorySourceFileValue::Present {
-            bytes,
-            logical_path,
-        }) => match external_source_name(&logical_path) {
-            Ok(source_name) => Ok(ExternalBzlSourceValue {
-                bytes,
-                source_name,
-                presentation_path: logical_path.as_path().to_path_buf(),
-                observations,
-            }),
-            Err(()) => Err(external_bzl_complete(
-                Err(ExternalBzlModuleError::Encoding { label }),
-                observations,
-            )),
-        },
-        Ok(HostRepositorySourceFileValue::Absent) => Err(external_bzl_complete(
-            Err(ExternalBzlModuleError::Absent { label }),
-            observations,
-        )),
-        Err(error) => Err(external_bzl_complete(
-            Err(ExternalBzlModuleError::Source { label, error }),
-            observations,
-        )),
-    }
-}
+mod external_bzl_source;
+use external_bzl_source::ExternalBzlSourceValue;
+use external_bzl_source::finish_external_bzl_source;
 
 async fn compute_external_guarded<K: Key>(
     ctx: &mut DiceComputations<'_>,
@@ -5032,168 +5074,6 @@ fn try_accumulate_external_bzl_need(
         },
     };
     Ok(())
-}
-
-fn external_load_resolution_error(
-    source: CanonicalLabel,
-    load: &str,
-    error: ExternalBzlRouteError,
-    observations: PathObservationEpoch,
-) -> ExternalBzlDriverOutcome {
-    external_bzl_complete(
-        Err(ExternalBzlModuleError::Route {
-            source,
-            load: Arc::from(load),
-            error,
-        }),
-        observations,
-    )
-}
-
-async fn compute_canonical_external_child_input(
-    ctx: &mut DiceComputations<'_>,
-    workspace: NormalizedAbsolutePath,
-    child_repo: CanonicalRepoName,
-    source: CanonicalLabel,
-    load: &str,
-    mode: ExternalBzlModuleMode,
-    observations: PathObservationEpoch,
-) -> ControlFlow<
-    ExternalBzlDriverOutcome,
-    (
-        slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
-        PathObservationEpoch,
-    ),
-> {
-    match mode {
-        ExternalBzlModuleMode::Legacy => match compute_external_guarded(
-            ctx,
-            &HostCanonicalRepositoryLoadRouteKey::new(workspace, child_repo),
-        )
-        .await
-        {
-            Err(DependencyComputeError::Cycle(cycle)) => ControlFlow::Break(external_bzl_complete(
-                Err(ExternalBzlModuleError::DependencyCycle(cycle)),
-                observations,
-            )),
-            Err(error) => ControlFlow::Break(external_load_resolution_error(
-                source,
-                load,
-                ExternalBzlRouteError::Compute(Arc::from(format!("{error:?}"))),
-                observations,
-            )),
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                ControlFlow::Break(SourcePreparationOutcome::Need(need))
-            }
-            Ok(SourcePreparationOutcome::Complete(result)) => match result.as_ref() {
-                Ok(route) => ControlFlow::Continue((route.input().clone(), observations)),
-                Err(error) => ControlFlow::Break(external_load_resolution_error(
-                    source,
-                    load,
-                    ExternalBzlRouteError::Load(Box::new(error.clone())),
-                    observations,
-                )),
-            },
-        },
-        ExternalBzlModuleMode::Observed => match compute_external_guarded(
-            ctx,
-            &HostCanonicalRepositoryLoadRouteObservationKey::new(workspace, child_repo),
-        )
-        .await
-        {
-            Err(DependencyComputeError::Cycle(cycle)) => ControlFlow::Break(external_bzl_complete(
-                Err(ExternalBzlModuleError::DependencyCycle(cycle)),
-                observations,
-            )),
-            Err(error) => ControlFlow::Break(external_load_resolution_error(
-                source,
-                load,
-                ExternalBzlRouteError::Compute(Arc::from(format!("{error:?}"))),
-                observations,
-            )),
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                ControlFlow::Break(SourcePreparationOutcome::Need(need))
-            }
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                ControlFlow::Break(external_load_resolution_error(
-                    source,
-                    load,
-                    ExternalBzlRouteError::Observation(Arc::from(format!("{error:?}"))),
-                    observations,
-                ))
-            }
-            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
-                let observations =
-                    match union_host_observations(&observations, observed.observations()) {
-                        Ok(observations) => observations,
-                        Err(error) => {
-                            return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
-                                error,
-                            )));
-                        }
-                    };
-                match observed.result().as_ref() {
-                    Ok(route) => ControlFlow::Continue((route.input().clone(), observations)),
-                    Err(error) => ControlFlow::Break(external_load_resolution_error(
-                        source,
-                        load,
-                        ExternalBzlRouteError::Load(Box::new(error.clone())),
-                        observations,
-                    )),
-                }
-            }
-        },
-    }
-}
-
-fn admitted_builtin_external_repository_load(loads: &[String]) -> Option<&str> {
-    let [load] = loads else {
-        return None;
-    };
-    let apparent = load.strip_prefix('@')?;
-    if apparent.starts_with('@') {
-        return None;
-    }
-    let (repository, _) = apparent.split_once("//")?;
-    (!repository.is_empty() && ApparentRepoName::new(repository).is_ok()).then_some(load.as_str())
-}
-
-async fn compute_external_bzl_effective_route(
-    ctx: &mut DiceComputations<'_>,
-    key: &ExternalBzlModuleEvalKey,
-    loads: &[String],
-    source: CanonicalLabel,
-    mode: ExternalBzlModuleMode,
-    observations: PathObservationEpoch,
-) -> ControlFlow<ExternalBzlDriverOutcome, (HostRepositorySourceRoute, PathObservationEpoch)> {
-    let HostRepositorySourceRoute::Root(route) = &key.route else {
-        return ControlFlow::Continue((key.route.clone(), observations));
-    };
-    if !route.is_builtin_bazel_tools() {
-        return ControlFlow::Continue((key.route.clone(), observations));
-    }
-    let load = match admitted_builtin_external_repository_load(loads) {
-        Some(load) => load,
-        None if crate::build_info_transform::needs_builtin_mapping(&source, loads) => {
-            slug_build_api_v2::BuildInfoCallbackRecipe::SOURCE_LABEL
-        }
-        None => return ControlFlow::Continue((key.route.clone(), observations)),
-    };
-    let (input, observations) = match compute_canonical_external_child_input(
-        ctx,
-        route.workspace().dupe(),
-        route.canonical_repo().clone(),
-        source,
-        load,
-        mode,
-        observations,
-    )
-    .await
-    {
-        ControlFlow::Continue(value) => value,
-        ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
-    };
-    ControlFlow::Continue((HostRepositorySourceRoute::canonical(input), observations))
 }
 
 async fn resolve_external_bzl_child_route(
@@ -5605,7 +5485,6 @@ async fn compute_external_bzl_module(
     let (effective_route, observations) = match compute_external_bzl_effective_route(
         ctx,
         key,
-        &loads,
         canonical_label.clone(),
         mode,
         source.observations.dupe(),
@@ -5639,10 +5518,23 @@ async fn compute_external_bzl_module(
         ControlFlow::Break(value) => return value,
     };
 
+    let repository_mapping = match external_bzl_route::defining_repository_mapping(&effective_route)
+    {
+        Ok(mapping) => mapping,
+        Err(error) => {
+            return external_bzl_complete(
+                Err(ExternalBzlModuleError::RepositoryMapping {
+                    source: canonical_label,
+                    error: ExternalBzlRouteError::Admission(error.into()),
+                }),
+                observations,
+            );
+        }
+    };
     let identity = BzlModuleIdentity {
         label: canonical_label.clone(),
-        workspace_path: source.presentation_path,
-        repository_mapping: external_repository_mapping(&effective_route),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(source.presentation_path),
+        repository_mapping,
     };
     if let Err(error) = validate_module_bzl_load_visibilities(
         identity.label.package(),
@@ -5658,11 +5550,41 @@ async fn compute_external_bzl_module(
             observations,
         );
     }
+    let mut observations = observations;
+    let environment = match semantic_evaluation::environment::load(
+        ctx,
+        key.route.workspace(),
+        key.context,
+        matches!(mode, ExternalBzlModuleMode::Observed),
+        &mut observations,
+    )
+    .await
+    {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+        SourcePreparationOutcome::Complete(Err(
+            semantic_evaluation::environment::EnvironmentFailure::Path(error),
+        )) => return SourcePreparationOutcome::Complete(Err(error)),
+        SourcePreparationOutcome::Complete(Err(
+            semantic_evaluation::environment::EnvironmentFailure::Message(error),
+        )) => {
+            // Preparation can fail on caller-dependent physical/work admission.
+            let _ = ctx.compute(&BzlLoadCyclePoisonKey).await;
+            return external_bzl_complete(
+                Err(ExternalBzlModuleError::Evaluation {
+                    label: canonical_label,
+                    message: error.into(),
+                }),
+                observations,
+            );
+        }
+    };
     let key = match semantic_evaluation::prepare(
         &identity,
         &source.source_name,
         &source.bytes,
         key.context,
+        &environment,
         loaded_modules
             .iter()
             .map(|(raw, child)| (*raw, successful_external_bzl_module(child))),
@@ -7564,7 +7486,15 @@ impl BzlModuleEvaluator {
             .as_ref()
             .map_err(|error| anyhow::anyhow!(load_error(&load_label, error).to_string()))?;
         Ok(EvaluatedBzlModule {
-            path: module.path.clone(),
+            path: module
+                .manifest
+                .root
+                .source
+                .workspace_path()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("legacy filesystem module has a non-workspace origin")
+                })?
+                .to_path_buf(),
             loads: module.loads.clone(),
             manifest: module.manifest.clone(),
         })
@@ -7856,10 +7786,20 @@ impl Key for BzlModuleEvalKey {
                         .map(|(load, module)| (load.as_str(), module.module.dupe()))
                         .collect(),
                 };
+                let environment = crate::bzl_environment::PreparedBzlEnvironment::uninjected(
+                    crate::bzl_environment::BzlEnvironmentMode::BzlmodBootstrap,
+                ).map_err(LoadingError::new)?;
+                let source_context = crate::bzl_environment::BzlModuleSourceContext::new(
+                    &manifest, &environment, std::iter::empty(),
+                ).map_err(LoadingError::new)?;
+                let metadata = crate::starlark_label::PreparedDefiningModuleMetadata::RawManifest {
+                    manifest: &manifest,
+                    transient_context: &source_context,
+                };
                 let function_owner = crate::function_owner::bzl_evaluation_owner(
-                    &manifest,
+                    metadata,
                     ast.file_span(ast.statement().span).file,
-                    false,
+                    &environment,
                     false,
                     loaded_modules.iter().map(|(_, child)| {
                         child
@@ -7875,11 +7815,7 @@ impl Key for BzlModuleEvalKey {
                     }),
                 )
                 .map_err(|error| LoadingError::new(error.to_string()))?;
-                crate::starlark_label::attach_defining_module_owner(
-                    &module,
-                    &manifest,
-                    function_owner.clone(),
-                )
+                metadata.attach(&module, function_owner.clone())
                 .expect("a new .bzl module has no defining client data");
                 let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
                 let print_capture = capture_events.then(LoadingPrintCapture::default);
@@ -8203,7 +8139,7 @@ fn build_source_label(workspace: &Path, path: &Path) -> Result<String, LoadingEr
 fn bzl_module_identity(workspace: &Path, path: &Path) -> Result<BzlModuleIdentity, LoadingError> {
     Ok(BzlModuleIdentity {
         label: canonical_root_label(&bzl_source_label(workspace, path)?)?,
-        workspace_path: path.to_path_buf(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(path.to_path_buf()),
         repository_mapping: Arc::from([]),
     })
 }
@@ -8297,12 +8233,53 @@ fn package_load_fingerprint<'a>(direct_loads: &'a [(String, FrozenBzlModule)]) -
     hasher.finalize().into()
 }
 
-fn fingerprint_identity(hasher: &mut Sha256, identity: &BzlModuleIdentity) {
+/// Preserve the raw workspace manifest's existing label/path/mapping projection.
+/// Complete source authorities use the separately framed writer below.
+pub(crate) fn fingerprint_identity(hasher: &mut Sha256, identity: &BzlModuleIdentity) {
+    if let Some(path) = identity.source.workspace_path() {
+        let label = identity.label.to_string();
+        let path = path.as_os_str().as_encoded_bytes();
+        hasher.update((label.len() as u64).to_be_bytes());
+        hasher.update(label.as_bytes());
+        hasher.update((path.len() as u64).to_be_bytes());
+        hasher.update(path);
+        hasher.update((identity.repository_mapping.len() as u64).to_be_bytes());
+        for (apparent, canonical) in identity.repository_mapping.iter() {
+            let apparent = apparent.as_str().as_bytes();
+            let canonical = canonical.as_str().as_bytes();
+            hasher.update((apparent.len() as u64).to_be_bytes());
+            hasher.update(apparent);
+            hasher.update((canonical.len() as u64).to_be_bytes());
+            hasher.update(canonical);
+        }
+    } else {
+        fingerprint_complete_identity(hasher, identity);
+    }
+}
+
+pub(crate) fn fingerprint_complete_identity(hasher: &mut Sha256, identity: &BzlModuleIdentity) {
     let label = identity.label.to_string();
     let label = label.as_bytes();
-    let path = identity.workspace_path.as_os_str().as_encoded_bytes();
+    let path = identity.source.diagnostic_path();
+    let path = path.as_os_str().as_encoded_bytes();
+    match identity.source.builtin_catalog() {
+        Some(catalog) => {
+            hasher.update([1]);
+            hasher.update((catalog.len() as u64).to_be_bytes());
+            hasher.update(catalog.as_bytes());
+        }
+        None => hasher.update([0]),
+    }
     hasher.update((label.len() as u64).to_be_bytes());
     hasher.update(label);
+    match identity.label.mapping_id() {
+        Some(id) => {
+            hasher.update([1]);
+            hasher.update((id.as_str().len() as u64).to_be_bytes());
+            hasher.update(id.as_str().as_bytes());
+        }
+        None => hasher.update([0]),
+    }
     hasher.update((path.len() as u64).to_be_bytes());
     hasher.update(path);
     hasher.update((identity.repository_mapping.len() as u64).to_be_bytes());
@@ -8337,7 +8314,7 @@ fn package_bzl_call_sources(
         .flat_map(|(_, module)| module.manifest.reachable.iter())
         .filter(|identity| seen_labels.insert(&identity.identity.label))
         .map(|identity| {
-            let source = starlark_source_name(&identity.identity.workspace_path)
+            let source = starlark_source_name(identity.identity.source.diagnostic_path().as_ref())
                 .expect("manifest paths were accepted as Starlark source names");
             (source.into(), identity.clone())
         })
@@ -8461,28 +8438,10 @@ mod module_extension_definition_loading_tests {
 
     const WORKSPACE: &str = "/extension-definition-loading";
 
-    #[test]
-    fn builtin_external_repository_promotion_gate_is_exactly_one_apparent_load() {
-        let loads = |values: &[&str]| {
-            values
-                .iter()
-                .map(|value| (*value).to_owned())
-                .collect::<Vec<_>>()
-        };
-        for excluded in [
-            loads(&[]),
-            loads(&[":local.bzl"]),
-            loads(&["@@rules_cc+//:defs.bzl"]),
-            loads(&["@//:defs.bzl"]),
-            loads(&["@rules_cc//:defs.bzl", ":other.bzl"]),
-        ] {
-            assert_eq!(admitted_builtin_external_repository_load(&excluded), None);
-        }
-        let admitted = loads(&["@rules_cc//cc/toolchains:toolchain_config_utils.bzl"]);
-        assert_eq!(
-            admitted_builtin_external_repository_load(&admitted),
-            Some("@rules_cc//cc/toolchains:toolchain_config_utils.bzl")
-        );
+    // Build-context probes require the genuine implicit builtin source graph;
+    // RegistryIo supplies actual MODULE text through ordinary discovery.
+    fn builtin_environment_dice() -> Arc<Dice> {
+        crate::canonical_repository_route_tests::tests::builtin_graph_dice()
     }
 
     #[test]
@@ -8606,7 +8565,7 @@ mod module_extension_definition_loading_tests {
                 ("child.bzl", &before.child, &after.child),
                 ("other.bzl", &before.other, &after.other),
             ] {
-                let key = HostBzlModuleObservationKey::new(
+                let key = HostBzlModuleObservationKey::new_bzlmod(
                     NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
                     observed_test_label(name),
                 )
@@ -8735,7 +8694,7 @@ mod module_extension_definition_loading_tests {
     ) -> HostLoadedModuleExtensionDefinitionsOutcome {
         compute_case(
             dice,
-            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n",
+            "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n",
             extension_source,
             "def implementation(ctx):\n    pass\n",
             true,
@@ -8761,8 +8720,9 @@ mod module_extension_definition_loading_tests {
             tracker,
         )
         .await
-        .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+        .compute(&HostLoadedModuleExtensionDefinitionsKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         ))
         .await
         .unwrap()
@@ -8776,8 +8736,9 @@ mod module_extension_definition_loading_tests {
     ) -> HostPreparedModuleExtensionInputsOutcome {
         case_transaction(dice, module_source, extension_source, "", true, tracker)
             .await
-            .compute(&HostPreparedModuleExtensionInputsKey::new(
+            .compute(&HostPreparedModuleExtensionInputsKey::new_with_scope(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
             ))
             .await
             .unwrap()
@@ -8791,8 +8752,9 @@ mod module_extension_definition_loading_tests {
     ) -> crate::module_extension::HostPureModuleExtensionInvocationsOutcome {
         case_transaction(dice, module_source, extension_source, "", true, tracker)
             .await
-            .compute(&HostPureModuleExtensionInvocationsKey::new(
+            .compute(&HostPureModuleExtensionInvocationsKey::new_with_scope(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
             ))
             .await
             .unwrap()
@@ -8820,7 +8782,7 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn host_bzl_context_is_recursive_and_structural_for_legacy_and_observed_keys() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let label = HostRootBzlLabel::new(
             PackagePath::root(),
@@ -8828,7 +8790,7 @@ mod module_extension_definition_loading_tests {
         );
         let mut transaction = case_transaction(
             &dice,
-            "module(name='bazel_tools')\n",
+            "module(name='consumer')\n",
             "load('//:child.bzl', 'version')\ncaptured = version\n",
             "version = native.bazel_version\n",
             true,
@@ -8888,11 +8850,11 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn external_bzl_context_is_recursive_for_root_and_mapped_canonical_children() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let mut transaction = case_transaction(
             &dice,
-            "# external context proof\nmodule(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\n",
+            "# external context proof\nmodule(name='consumer')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\n",
             "",
             "",
             true,
@@ -9288,7 +9250,7 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn real_definition_loading_changes_reuses_restores_and_types_errors() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let a = compute(&dice, &source("A", 1)).await;
         let warm = compute(&dice, &source("A", 1)).await;
         assert!(
@@ -9325,7 +9287,7 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn module_extension_selection_uses_assigned_globals_at_either_visibility() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let implementation = "def implementation(ctx):\n    pass\n";
         for (requested, extension) in [
             (
@@ -9343,9 +9305,7 @@ mod module_extension_definition_loading_tests {
         ] {
             let outcome = compute_case(
                 &dice,
-                &format!(
-                    "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','{requested}')\n"
-                ),
+                &format!("module(name='consumer')\ne=use_extension('//:ext.bzl','{requested}')\n"),
                 &extension,
                 "",
                 true,
@@ -9360,7 +9320,7 @@ mod module_extension_definition_loading_tests {
 
         let reexported = compute_case(
             &dice,
-            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','reexported')\n",
+            "module(name='consumer')\ne=use_extension('//:ext.bzl','reexported')\n",
             "load('//:child.bzl','child')\nreexported=child\n",
             &format!("{implementation}child=module_extension(implementation=implementation)\n"),
             true,
@@ -9380,9 +9340,7 @@ mod module_extension_definition_loading_tests {
             };
             let outcome = compute_case(
                 &dice,
-                &format!(
-                    "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','{requested}')\n"
-                ),
+                &format!("module(name='consumer')\ne=use_extension('//:ext.bzl','{requested}')\n"),
                 load,
                 &format!("{implementation}child=module_extension(implementation=implementation)\n"),
                 true,
@@ -9408,11 +9366,11 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn real_aggregate_orders_requests_and_stops_before_bzl_on_predecessor_terminal() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let absent = compute_case(
             &dice,
-            "module(name='bazel_tools')\n",
+            "module(name='consumer')\n",
             &source("A", 1),
             "",
             true,
@@ -9428,7 +9386,7 @@ mod module_extension_definition_loading_tests {
                 || activation.kind == ActivationKind::Reused && activation.batch.is_none()
         }));
 
-        let module = "module(name='bazel_tools')\n\
+        let module = "module(name='consumer')\n\
             b=use_extension('//:other.bzl','other')\n\
             a=use_extension('//:ext.bzl','ext')\n";
         let ordered = compute_case(
@@ -9455,7 +9413,7 @@ mod module_extension_definition_loading_tests {
 
         let need = compute_case(
             &dice,
-            "module(name='bazel_tools')\n\
+            "module(name='consumer')\n\
              bazel_dep(name='dep',version='1.0')\n\
              local_path_override(module_name='dep',path='dep')\n\
              e=use_extension('//:ext.bzl','ext')\n",
@@ -9493,10 +9451,10 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn real_aggregate_retains_error_context_child_identity_and_event_replay() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let wrong = |repo: &str| {
             format!(
-                "module(name='bazel_tools',repo_name='{repo}')\n\
+                "module(name='consumer',repo_name='{repo}')\n\
                  e=use_extension('//:ext.bzl','ext')\n"
             )
         };
@@ -9511,7 +9469,7 @@ mod module_extension_definition_loading_tests {
             &wrong_restored
         ));
 
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
         let child_a = "print('child')\ndef implementation(ctx):\n    pass\n";
         let child_b = "print('child')\nx=1\ndef implementation(ctx):\n    pass\n";
         let tracker = Arc::new(BzlEventTracker::default());
@@ -9527,7 +9485,7 @@ mod module_extension_definition_loading_tests {
         let first_events = tracker.take();
         let context_changed = compute_case(
             &dice,
-            "module(name='bazel_tools',repo_name='replay')\n\
+            "module(name='consumer',repo_name='replay')\n\
              e=use_extension('//:ext.bzl','ext')\n",
             &source("A", 1),
             child_a,
@@ -9591,11 +9549,15 @@ mod module_extension_definition_loading_tests {
     }
 
     fn prepared_module(text: Option<&str>) -> String {
+        prepared_module_for_root("consumer", text)
+    }
+
+    fn prepared_module_for_root(root: &str, text: Option<&str>) -> String {
         let text = text
             .map(|text| format!(",text='{text}'"))
             .unwrap_or_default();
         format!(
-            "module(name='bazel_tools')\n\
+            "module(name='{root}')\n\
              e=use_extension('//:ext.bzl','ext')\n\
              e.tag(flag=True,count=7,target='//:item'{text})\n\
              e.tag(flag=False,count=8,target='//:second',text='second')\n"
@@ -9604,7 +9566,7 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn real_prepared_inputs_order_type_default_restore_and_event_boundary() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let a = compute_prepared_case(
             &dice,
@@ -9733,7 +9695,7 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn real_prepared_inputs_preserve_raw_first_and_contextual_errors() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let raw_error = compute_prepared_case(
             &dice,
@@ -9751,7 +9713,7 @@ mod module_extension_definition_loading_tests {
 
         let raw_need = compute_prepared_case(
             &dice,
-            "module(name='bazel_tools')\n\
+            "module(name='consumer')\n\
              bazel_dep(name='dep',version='1.0')\n\
              local_path_override(module_name='dep',path='dep')\n\
              e=use_extension('//:ext.bzl','ext')\n",
@@ -9797,7 +9759,7 @@ mod module_extension_definition_loading_tests {
         ));
         let unused_collection_schema = compute_prepared_case(
             &dice,
-            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n",
+            "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n",
             "def implementation(ctx):\n    pass\n\
              tag=tag_class(attrs={'values':attr.string_list()})\n\
              ext=module_extension(implementation=implementation,tag_classes={'tag':tag})\n",
@@ -10036,11 +9998,15 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn observed_prepared_identity_and_finisher_algebra() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let key = HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe());
-        let other = HostPreparedModuleExtensionInputsObservationKey::new(
+        let key = HostPreparedModuleExtensionInputsObservationKey::new_with_scope(
+            workspace.dupe(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
+        let other = HostPreparedModuleExtensionInputsObservationKey::new_with_scope(
             NormalizedAbsolutePath::new("/other").unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let mut left_hash = DefaultHasher::new();
         let mut right_hash = DefaultHasher::new();
@@ -10048,7 +10014,7 @@ mod module_extension_definition_loading_tests {
         other.hash(&mut right_hash);
         assert_eq!(
             key.to_string(),
-            "observed-host-prepared-module-extension-inputs:\"/extension-definition-loading\""
+            "observed-host-prepared-module-extension-inputs:\"/extension-definition-loading\":root-usages"
         );
         assert_ne!(key, other);
         assert_ne!(left_hash.finish(), right_hash.finish());
@@ -10058,7 +10024,10 @@ mod module_extension_definition_loading_tests {
         let mut transaction = case_transaction(&dice, &module, &extension, "", true, None).await;
         let raw_child = transaction
             .compute(
-                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
             )
             .await
             .unwrap();
@@ -10067,9 +10036,12 @@ mod module_extension_definition_loading_tests {
         };
         let raw = Arc::new(raw_child.result().as_ref().as_ref().unwrap().clone());
         let definitions_child = transaction
-            .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
-                workspace.dupe(),
-            ))
+            .compute(
+                &HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap();
         let SourcePreparationOutcome::Complete(Ok(definitions_child)) = definitions_child else {
@@ -10180,7 +10152,7 @@ mod module_extension_definition_loading_tests {
                 "local",
             ),
         ] {
-            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let case_dice = builtin_environment_dice();
             let legacy = compute_prepared_case(
                 &case_dice,
                 &case_module,
@@ -10214,12 +10186,15 @@ mod module_extension_definition_loading_tests {
     async fn observed_prepared_real_order_terminals_events_and_parity() {
         let module = prepared_module(Some("A"));
         let extension = prepared_source("default");
-        let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let legacy_dice = builtin_environment_dice();
         let legacy = compute_prepared_case(&legacy_dice, &module, &extension, None).await;
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let key = HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe());
+        let key = HostPreparedModuleExtensionInputsObservationKey::new_with_scope(
+            workspace.dupe(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
         let mut transaction =
             case_transaction(&dice, &module, &extension, "", true, Some(tracker.clone())).await;
         let observed = transaction.compute(&key).await.unwrap();
@@ -10232,7 +10207,10 @@ mod module_extension_definition_loading_tests {
         assert_eq!(legacy.as_ref(), observed_value.result().as_ref());
         let raw = transaction
             .compute(
-                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
             )
             .await
             .unwrap();
@@ -10240,9 +10218,12 @@ mod module_extension_definition_loading_tests {
             panic!("raw carrier must complete")
         };
         let definitions = transaction
-            .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
-                workspace.dupe(),
-            ))
+            .compute(
+                &HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap();
         let SourcePreparationOutcome::Complete(Ok(definitions)) = definitions else {
@@ -10264,10 +10245,16 @@ mod module_extension_definition_loading_tests {
         assert_eq!(
             parent.dependencies,
             [
-                HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe())
-                    .to_string(),
-                HostLoadedModuleExtensionDefinitionsObservationKey::new(workspace.dupe())
-                    .to_string(),
+                HostSelectedExtensionEvaluationInputRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
+                )
+                .to_string(),
+                HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
+                )
+                .to_string(),
             ]
         );
         assert!(rows.iter().any(|row| {
@@ -10278,6 +10265,72 @@ mod module_extension_definition_loading_tests {
         let batches = rows
             .iter()
             .filter(|row| row.batch.is_some())
+            .collect::<Vec<_>>();
+        // Genuine source preparation owns the graph/module metadata batches
+        // and six original builtin semantic evaluations independently of this
+        // fixture's original MODULE/REPO/extension event boundary.
+        let builtin_prefix = "semantic-bzl-evaluation:@@_builtins//:";
+        let builtins = batches
+            .iter()
+            .filter(|row| row.key.starts_with(builtin_prefix))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            builtins
+                .iter()
+                .map(|row| row.key.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "common/objc/apple_env.bzl",
+                "common/objc/apple_platform.bzl",
+                "common/objc/apple_toolchain.bzl",
+                "common/objc/objc_info.bzl",
+                "common/xcode/providers.bzl",
+                "common/objc/apple_common.bzl",
+            ]
+            .map(|path| format!("{builtin_prefix}{path}"))
+        );
+        assert!(
+            builtins
+                .iter()
+                .all(|row| row.kind == ActivationKind::Evaluated
+                    && matches!(row.batch.as_ref().map(EventBatch::events), Some([])))
+        );
+        let discovery_prefix = "observed-host-discovered-module:";
+        let discovery = batches
+            .iter()
+            .filter(|row| row.key.starts_with(discovery_prefix))
+            .collect::<Vec<_>>();
+        let mut discovered_keys = discovery
+            .iter()
+            .map(|row| row.key.clone())
+            .collect::<Vec<_>>();
+        discovered_keys.sort();
+        let mut expected_discovered_keys = [
+            "rules_license@1.0.0",
+            "buildozer@8.5.1",
+            "platforms@1.0.0",
+            "zlib@1.3.1.bcr.5",
+            "protobuf@33.4",
+            "rules_java@9.1.0",
+            "rules_cc@0.2.17",
+            "rules_python@1.7.0",
+            "rules_shell@0.6.1",
+            "apple_support@1.24.2",
+        ]
+        .map(|module| format!("{discovery_prefix}{workspace}:{module}"));
+        expected_discovered_keys.sort();
+        assert_eq!(discovered_keys, expected_discovered_keys);
+        assert!(
+            discovery
+                .iter()
+                .all(|row| row.kind == ActivationKind::Evaluated
+                    && matches!(row.batch.as_ref().map(EventBatch::events), Some([])))
+        );
+        let batches = batches
+            .into_iter()
+            .filter(|row| {
+                !row.key.starts_with(builtin_prefix) && !row.key.starts_with(discovery_prefix)
+            })
             .collect::<Vec<_>>();
         assert!(
             matches!(batches.as_slice(), [root, repo, bzl]
@@ -10327,7 +10380,10 @@ mod module_extension_definition_loading_tests {
         ));
         let changed_raw = changed_tx
             .compute(
-                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
             )
             .await
             .unwrap();
@@ -10336,14 +10392,48 @@ mod module_extension_definition_loading_tests {
         };
         assert_ne!(raw.result(), changed_raw.result());
         let (changed_rows, _) = tracker.take_rows();
-        let reused = changed_rows
+        // The changed MODULE observation invalidates the observed carrier,
+        // while the unchanged Starlark program reuses its original semantics.
+        let semantic = changed_rows
+            .iter()
+            .filter(|row| row.key == "semantic-bzl-evaluation:@@//:ext.bzl")
+            .collect::<Vec<_>>();
+        assert!(
+            matches!(semantic.as_slice(), [row]
+            if row.kind == ActivationKind::Reused && row.batch.is_none()),
+            "{semantic:?}"
+        );
+        let replayed = changed_rows
             .iter()
             .filter(|row| row.key.starts_with("observed-bzlmod-host-bzl-module:"))
             .collect::<Vec<_>>();
-        assert!(matches!(reused.as_slice(), [row]
-            if row.key.ends_with("//:ext.bzl")
-                && row.kind == ActivationKind::Reused
-                && row.batch.is_none()));
+        assert!(
+            matches!(replayed.as_slice(), [row]
+            if row.key == batches[2].key
+                && row.kind == ActivationKind::Evaluated
+                && row.batch == batches[2].batch),
+            "{replayed:?}"
+        );
+        let builtin_reuse = changed_rows
+            .iter()
+            .filter(|row| row.key.starts_with(builtin_prefix))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            builtin_reuse
+                .iter()
+                .map(|row| row.key.as_str())
+                .collect::<Vec<_>>(),
+            rows
+                .iter()
+                .filter(|row| row.key.starts_with(builtin_prefix) && row.batch.is_some())
+                .map(|row| row.key.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            builtin_reuse
+                .iter()
+                .all(|row| row.kind == ActivationKind::Reused && row.batch.is_none())
+        );
 
         tracker.take();
         tracker.take_rows();
@@ -10369,8 +10459,8 @@ mod module_extension_definition_loading_tests {
             .unwrap();
         assert_eq!(parent.dependencies.len(), 1);
 
-        let need_module = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
-        let need_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let need_module = "module(name='consumer')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
+        let need_dice = builtin_environment_dice();
         let mut need_tx =
             case_transaction(&need_dice, need_module, &extension, "", true, None).await;
         let need = need_tx.compute(&key).await.unwrap();
@@ -10403,18 +10493,18 @@ mod module_extension_definition_loading_tests {
                 let raw = carrier!(
                     $transaction
                         .compute(
-                            &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(
+                            &HostSelectedExtensionEvaluationInputRequestsObservationKey::new_with_scope(
                                 $workspace.dupe(),
-                            ),
+                             slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages),
                         )
                         .await
                         .unwrap()
                 );
                 let definitions = carrier!(
                     $transaction
-                        .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
+                        .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
                             $workspace.dupe()
-                        ),)
+                        , slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages),)
                         .await
                         .unwrap()
                 );
@@ -10430,11 +10520,14 @@ mod module_extension_definition_loading_tests {
                 (parent.dupe(), raw.dupe(), definitions.dupe())
             }};
         }
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let key = HostPreparedModuleExtensionInputsObservationKey::new(workspace.dupe());
-        let root_a = prepared_module(None);
+        let key = HostPreparedModuleExtensionInputsObservationKey::new_with_scope(
+            workspace.dupe(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
+        let root_a = prepared_module_for_root("consumer", None);
         let root_b = root_a.replace("//:item", "//:changed");
         let ext_a = prepared_source("default-a");
         let ext_b = prepared_source("default-b");
@@ -10507,7 +10600,7 @@ mod module_extension_definition_loading_tests {
 
         tracker.take();
         tracker.take_rows();
-        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancel_dice = builtin_environment_dice();
         let mut cancelled = case_transaction(
             &cancel_dice,
             &root_a,
@@ -10561,9 +10654,9 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn real_pure_invocation_publishes_prints_and_reuses_semantics() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='A',target='//:item')\n";
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='A',target='//:item')\n";
         let extension = "def implementation(ctx):\n    m=ctx.modules[0]\n    t=m.tags.tag[0]\n    print('%s|%s|%s|%s|%s|%s' % (m.name,m.version,m.is_root,t.text,t.target,ctx.is_dev_dependency(t)))\ntag=tag_class(attrs={'text':attr.string(),'target':attr.label()})\next=module_extension(implementation=implementation,tag_classes={'tag':tag})\n";
         let first = compute_invocation_case(&dice, module, extension, Some(tracker.clone())).await;
         assert!(matches!(first, SourcePreparationOutcome::Complete(ref value) if value.is_ok()));
@@ -10605,11 +10698,11 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn invocation_preflights_every_request_before_running_user_code() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let prepared_need = compute_invocation_case(
             &dice,
-            "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n",
+            "module(name='consumer')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n",
             "def implementation(ctx):\n    fail('must not run')\next=module_extension(implementation=implementation)\n",
             Some(tracker.clone()),
         )
@@ -10626,13 +10719,14 @@ mod module_extension_definition_loading_tests {
             event.label.target().as_str() == "module_extension_invocation" && event.batch.is_none()
         }));
 
-        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','ext')\nb=use_extension('//:child.bzl','other')\n";
+        let module = "module(name='consumer')\na=use_extension('//:ext.bzl','ext')\nb=use_extension('//:child.bzl','other')\n";
         let extension = "def implementation(ctx):\n    print('first')\next=module_extension(implementation=implementation)\n";
         let child = "def implementation(ctx):\n    print('second')\nother=module_extension(implementation=implementation)\n";
         let mut initial = case_transaction(&dice, module, extension, child, true, None).await;
         let prepared = initial
-            .compute(&HostPreparedModuleExtensionInputsKey::new(
+            .compute(&HostPreparedModuleExtensionInputsKey::new_with_scope(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
             ))
             .await
             .unwrap();
@@ -10680,8 +10774,8 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn invocation_preserves_definition_terminals_and_loaded_callable_abi() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let dice = builtin_environment_dice();
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
         for source in ["ext=1\n", "def broken(\n"] {
             let tracker = Arc::new(BzlEventTracker::default());
             let outcome =
@@ -10708,8 +10802,9 @@ mod module_extension_definition_loading_tests {
         )
         .await;
         let outcome = transaction
-            .compute(&HostPureModuleExtensionInvocationsKey::new(
+            .compute(&HostPureModuleExtensionInvocationsKey::new_with_scope(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
             ))
             .await
             .unwrap();
@@ -10735,8 +10830,8 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn invocation_rejects_factors_results_and_preserves_print_before_throw() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let dice = builtin_environment_dice();
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
         for options in [
             "environ=['X']",
             "os_dependent=True",
@@ -10808,12 +10903,213 @@ mod module_extension_definition_loading_tests {
     }
 
     #[tokio::test]
+    async fn root_usage_aggregate_scope_is_explicit_and_reaches_every_observed_child() {
+        use crate::module_extension::HostPureModuleExtensionInvocationsObservationKey;
+        use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesKey;
+        use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesObservationKey;
+        use crate::module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesKey;
+        use crate::module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesObservationKey;
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let scope = HostModuleExtensionUsageScope::RootUsages;
+        macro_rules! distinct {
+            ($key:ty) => {{
+                let default = <$key>::new(workspace.dupe());
+                let root = <$key>::new_with_scope(workspace.dupe(), scope);
+                assert_ne!(default, root);
+                assert_eq!(
+                    default,
+                    <$key>::new_with_scope(
+                        workspace.dupe(),
+                        HostModuleExtensionUsageScope::AllSelected
+                    )
+                );
+                assert_eq!(root.to_string(), format!("{default}:root-usages"));
+            }};
+        }
+        distinct!(HostSelectedExtensionDefinitionLoadRequestsKey);
+        distinct!(HostSelectedExtensionDefinitionLoadRequestsObservationKey);
+        distinct!(HostSelectedExtensionEvaluationInputRequestsKey);
+        distinct!(HostSelectedExtensionEvaluationInputRequestsObservationKey);
+        distinct!(HostLoadedModuleExtensionDefinitionsKey);
+        distinct!(HostLoadedModuleExtensionDefinitionsObservationKey);
+        distinct!(HostPreparedModuleExtensionInputsKey);
+        distinct!(HostPreparedModuleExtensionInputsObservationKey);
+        distinct!(HostPureModuleExtensionInvocationsKey);
+        distinct!(HostPureModuleExtensionInvocationsObservationKey);
+        distinct!(HostInstantiatedModuleExtensionRepositoriesKey);
+        distinct!(HostInstantiatedModuleExtensionRepositoriesObservationKey);
+        distinct!(HostValidatedModuleExtensionRepositoriesKey);
+        distinct!(HostValidatedModuleExtensionRepositoriesObservationKey);
+
+        let dice = builtin_environment_dice();
+        let tracker = Arc::new(BzlEventTracker::default());
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
+        let source = "def implementation(ctx):\n    print('root-only')\next=module_extension(implementation=implementation)\n";
+        let mut tx = case_transaction(&dice, module, source, "", true, Some(tracker.clone())).await;
+        let SourcePreparationOutcome::Complete(default) = tx
+            .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("default refusal completes")
+        };
+        let Err(HostLoadedModuleExtensionDefinitionsError::Requests(error)) = default.as_ref()
+        else {
+            panic!("default must preserve the nonroot request refusal: {default:?}")
+        };
+        assert_eq!(
+            error.to_string(),
+            "Unsupported { owner: Module { name: \"bazel_tools\", version: BazelModuleVersion { canonical: \"\", release: EmptySentinel, prerelease: None } }, id: HostSelectedExtensionId { bzl_file: CanonicalLabel { package: PackageIdentifier { repo: CanonicalRepoName(\"bazel_tools\"), package: PackagePath(\"tools/osx\") }, target: TargetName(\"xcode_configure.bzl\"), mapping_id: None }, extension_name: \"xcode_configure_extension\", isolation: None, kind: ModuleExtension } }"
+        );
+        let observed_key = HostValidatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+            workspace.dupe(),
+            scope,
+        );
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            tx.compute(&observed_key).await.unwrap()
+        else {
+            panic!("root aggregate completes")
+        };
+        assert!(observed.result().is_ok());
+        let SourcePreparationOutcome::Complete(legacy) = tx
+            .compute(
+                &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                ),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("legacy root aggregate completes")
+        };
+        assert_eq!(&legacy, observed.result());
+        let SourcePreparationOutcome::Complete(prepared) = tx
+            .compute(&HostPreparedModuleExtensionInputsKey::new_with_scope(
+                workspace.dupe(),
+                scope,
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("genuine prepared root aggregate")
+        };
+        assert_eq!(
+            prepared.as_ref().as_ref().unwrap().raw.parts().0.scope(),
+            scope
+        );
+        let (activations, dependencies) = tracker.take_rows();
+        for (parent, child) in [
+            (
+                observed_key.to_string(),
+                HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+            ),
+            (
+                HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+                HostPureModuleExtensionInvocationsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+            ),
+            (
+                HostPureModuleExtensionInvocationsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+                HostPreparedModuleExtensionInputsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+            ),
+            (
+                HostPreparedModuleExtensionInputsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+                HostSelectedExtensionEvaluationInputRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+            ),
+            (
+                HostPreparedModuleExtensionInputsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+                HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+            ),
+            (
+                HostSelectedExtensionEvaluationInputRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+                HostSelectedExtensionDefinitionLoadRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+            ),
+            (
+                HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+                HostSelectedExtensionDefinitionLoadRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                )
+                .to_string(),
+            ),
+        ] {
+            assert!(
+                dependencies
+                    .iter()
+                    .any(|row| row.key == parent && row.dependencies.contains(&child)),
+                "missing scoped edge {parent} -> {child}"
+            );
+        }
+        assert!(
+            dependencies
+                .iter()
+                .all(|row| !row.key.contains("xcode_configure.bzl")),
+            "unselected extension implementation must not load"
+        );
+        let prints = activations.iter().filter_map(|event| event.batch.as_ref()).flat_map(|batch| batch.events()).filter(|event| matches!(event, slug_events_v2::EvaluationEvent::StarlarkPrint { text, .. } if text == "root-only")).count();
+        assert_eq!(
+            prints, 2,
+            "one actual invocation in each explicit legacy/observed owner"
+        );
+    }
+
+    #[tokio::test]
     async fn invocation_identity_and_reacquisition_drift_are_structural() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let module_a =
-            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='A')\n";
+            "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='A')\n";
         let module_b =
-            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='B')\n";
+            "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='B')\n";
         let source_a = "def implementation(ctx):\n    print('A')\ntag=tag_class(attrs={'text':attr.string()})\next=module_extension(implementation=implementation,tag_classes={'tag':tag})\n";
         let source_b = "def implementation(ctx):\n    print('B')\ntag=tag_class(attrs={'text':attr.string()})\next=module_extension(implementation=implementation,tag_classes={'tag':tag})\n";
         let a = compute_invocation_case(&dice, module_a, source_a, None).await;
@@ -10821,6 +11117,18 @@ mod module_extension_definition_loading_tests {
         let tag_restored = compute_invocation_case(&dice, module_a, source_a, None).await;
         let callable_changed = compute_invocation_case(&dice, module_a, source_b, None).await;
         let callable_restored = compute_invocation_case(&dice, module_a, source_a, None).await;
+        for outcome in [
+            &a,
+            &tag_changed,
+            &tag_restored,
+            &callable_changed,
+            &callable_restored,
+        ] {
+            assert!(
+                matches!(outcome, SourcePreparationOutcome::Complete(value) if value.is_ok()),
+                "the identity discriminator must compare successful genuine invocations"
+            );
+        }
         assert!(!HostPureModuleExtensionInvocationsKey::equality(
             &a,
             &tag_changed
@@ -10909,7 +11217,7 @@ mod module_extension_definition_loading_tests {
         let label = request.parts().0;
         let target = RootPackageBzlTarget::parse(label.target().as_str()).unwrap();
         let module = transaction
-            .compute(&HostBzlModuleEvalKey::new(
+            .compute(&HostBzlModuleEvalKey::new_bzlmod(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
                 HostRootBzlLabel::new(label.package().package().clone(), target),
             ))
@@ -10958,6 +11266,19 @@ mod module_extension_definition_loading_tests {
     ) -> <HostBzlModuleObservationKey as Key>::Value {
         transaction
             .compute(&HostBzlModuleObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                observed_test_label(name),
+            ))
+            .await
+            .unwrap()
+    }
+
+    async fn compute_observed_bzlmod_module(
+        transaction: &mut DiceTransaction,
+        name: &str,
+    ) -> <HostBzlModuleObservationKey as Key>::Value {
+        transaction
+            .compute(&HostBzlModuleObservationKey::new_bzlmod(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
                 observed_test_label(name),
             ))
@@ -11018,14 +11339,14 @@ mod module_extension_definition_loading_tests {
 
     #[tokio::test]
     async fn observed_bzl_module_retains_recursive_arcs_events_and_a_b_a_identity() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let parent = "print('parent')\nload('//:child.bzl','child')\nvalue=child\n";
         let child_a = "print('child-a')\nchild=1\n";
         let child_b = "print('child-b')\nchild=2\n";
         let mut first_transaction = case_transaction(
             &dice,
-            "module(name='bazel_tools')\n",
+            "module(name='root')\n",
             parent,
             child_a,
             true,
@@ -11058,7 +11379,7 @@ mod module_extension_definition_loading_tests {
         }));
         let mut warm_transaction = case_transaction(
             &dice,
-            "module(name='bazel_tools')\n",
+            "module(name='root')\n",
             parent,
             child_a,
             true,
@@ -11071,43 +11392,22 @@ mod module_extension_definition_loading_tests {
             !activation.observed
                 || activation.kind == ActivationKind::Reused && activation.batch.is_none()
         }));
-        let mut changed_transaction = case_transaction(
-            &dice,
-            "module(name='bazel_tools')\n",
-            parent,
-            child_b,
-            true,
-            None,
-        )
-        .await;
+        let mut changed_transaction =
+            case_transaction(&dice, "module(name='root')\n", parent, child_b, true, None).await;
         let changed = compute_observed_module(&mut changed_transaction, "ext.bzl").await;
         assert!(!HostBzlModuleObservationKey::equality(&first, &changed));
-        let mut restored_transaction = case_transaction(
-            &dice,
-            "module(name='bazel_tools')\n",
-            parent,
-            child_a,
-            true,
-            None,
-        )
-        .await;
+        let mut restored_transaction =
+            case_transaction(&dice, "module(name='root')\n", parent, child_a, true, None).await;
         let restored = compute_observed_module(&mut restored_transaction, "ext.bzl").await;
         assert!(HostBzlModuleObservationKey::equality(&first, &restored));
     }
 
     #[tokio::test]
     async fn observed_bzl_module_preserves_decisive_terminals_need_and_outer_polarity() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
-        let mut seed = case_transaction(
-            &dice,
-            "module(name='bazel_tools')\n",
-            "x=1\n",
-            "",
-            true,
-            None,
-        )
-        .await;
+        let mut seed =
+            case_transaction(&dice, "module(name='root')\n", "x=1\n", "", true, None).await;
         let epoch = seed.compute(&PathObservationEpochKey).await.unwrap();
 
         let mut need_transaction =
@@ -11141,11 +11441,11 @@ mod module_extension_definition_loading_tests {
             ("evaluation", "print('before')\nfail('boom')\n", "", true),
         ];
         for (name, source, child, child_present) in sources {
-            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let case_dice = builtin_environment_dice();
             let tracker = Arc::new(BzlEventTracker::default());
             let mut transaction = case_transaction(
                 &case_dice,
-                "module(name='bazel_tools')\n",
+                "module(name='root')\n",
                 source,
                 child,
                 child_present,
@@ -11234,16 +11534,9 @@ mod module_extension_definition_loading_tests {
         );
         assert_observed_frontier(freeze, &epoch, &["ext.bzl"], &["child.bzl"]);
         assert!(terminal_tracker.take_empty_observed_batches(Some(&terminal_label)));
-        let source_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut source_tx = case_transaction(
-            &source_dice,
-            "module(name='bazel_tools')\n",
-            "",
-            "",
-            false,
-            None,
-        )
-        .await;
+        let source_dice = builtin_environment_dice();
+        let mut source_tx =
+            case_transaction(&source_dice, "module(name='root')\n", "", "", false, None).await;
         let source_epoch = source_tx.compute(&PathObservationEpochKey).await.unwrap();
         let source = compute_observed_module(&mut source_tx, "child.bzl").await;
         let source = observed_module(&source);
@@ -11416,9 +11709,12 @@ mod module_extension_definition_loading_tests {
             tracker,
         )
         .await
-        .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
-            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-        ))
+        .compute(
+            &HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+            ),
+        )
         .await
         .unwrap()
     }
@@ -11467,27 +11763,33 @@ mod module_extension_definition_loading_tests {
         let global_epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
         let parent = observed_loaded(
             &transaction
-                .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
-                    workspace.dupe(),
-                ))
+                .compute(
+                    &HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                        workspace.dupe(),
+                        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                    ),
+                )
                 .await
                 .unwrap(),
         )
         .dupe();
         let request = transaction
             .compute(
-                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe()),
+                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
             )
             .await
             .unwrap();
         let SourcePreparationOutcome::Complete(Ok(request)) = request else {
             panic!("observed definition requests must complete: {request:?}");
         };
-        let ext = compute_observed_module(&mut transaction, "ext.bzl").await;
+        let ext = compute_observed_bzlmod_module(&mut transaction, "ext.bzl").await;
         let ext_value = observed_module(&ext).dupe();
-        let child = compute_observed_module(&mut transaction, "child.bzl").await;
+        let child = compute_observed_bzlmod_module(&mut transaction, "child.bzl").await;
         let child_value = observed_module(&child).dupe();
-        let other = compute_observed_module(&mut transaction, "other.bzl").await;
+        let other = compute_observed_bzlmod_module(&mut transaction, "other.bzl").await;
         let other_value = observed_module(&other).dupe();
         let projection = Arc::from(
             parent
@@ -11713,7 +12015,7 @@ mod module_extension_definition_loading_tests {
                     loaded_test_source(""),
                 ];
                 inputs[position] = source;
-                let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+                let dice = builtin_environment_dice();
                 let tracker = Arc::new(BzlEventTracker::default());
                 let mut transaction = case_transaction_with_other(
                     &dice,
@@ -11833,9 +12135,12 @@ mod module_extension_definition_loading_tests {
     ) -> <HostLoadedModuleExtensionDefinitionsObservationKey as Key>::Value {
         case_transaction_with_other(dice, module, ext, child, other, true, Some(tracker))
             .await
-            .compute(&HostLoadedModuleExtensionDefinitionsObservationKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap()
     }
@@ -11867,7 +12172,7 @@ mod module_extension_definition_loading_tests {
         let labels = ["ext.bzl", "other.bzl", "child.bzl"];
         let module = |order: &[&str], missing: Option<&str>| {
             format!(
-                "module(name='bazel_tools')\n{}",
+                "module(name='consumer')\n{}",
                 order
                     .iter()
                     .enumerate()
@@ -11888,22 +12193,26 @@ mod module_extension_definition_loading_tests {
             loaded_test_source("C"),
         ];
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(workspace.dupe());
+        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+            workspace.dupe(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
         assert_eq!(
             key.to_string(),
-            "observed-host-loaded-module-extension-definitions:\"/extension-definition-loading\""
+            "observed-host-loaded-module-extension-definitions:\"/extension-definition-loading\":root-usages"
         );
         assert_ne!(
             key,
-            HostLoadedModuleExtensionDefinitionsObservationKey::new(
-                NormalizedAbsolutePath::new("/other").unwrap()
+            HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+                NormalizedAbsolutePath::new("/other").unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
             )
         );
 
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
         let request_module = module(&labels, None);
-        let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let legacy_dice = builtin_environment_dice();
         let legacy_tracker = Arc::new(BzlEventTracker::default());
         let mut legacy_transaction = case_transaction_with_other(
             &legacy_dice,
@@ -11916,8 +12225,9 @@ mod module_extension_definition_loading_tests {
         )
         .await;
         let legacy = legacy_transaction
-            .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+            .compute(&HostLoadedModuleExtensionDefinitionsKey::new_with_scope(
                 workspace.dupe(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
             ))
             .await
             .unwrap();
@@ -12055,15 +12365,17 @@ mod module_extension_definition_loading_tests {
     }
     #[tokio::test]
     async fn observed_loaded_identity_and_finisher_algebra() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
         let extension = source("finisher", 1);
-        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
-        let other = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+        let other = HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
             NormalizedAbsolutePath::new("/other").unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let mut left_hash = DefaultHasher::new();
         let mut right_hash = DefaultHasher::new();
@@ -12071,7 +12383,7 @@ mod module_extension_definition_loading_tests {
         other.hash(&mut right_hash);
         assert_eq!(
             key.to_string(),
-            "observed-host-loaded-module-extension-definitions:\"/extension-definition-loading\""
+            "observed-host-loaded-module-extension-definitions:\"/extension-definition-loading\":root-usages"
         );
         assert_ne!(key, other);
         assert_ne!(left_hash.finish(), right_hash.finish());
@@ -12122,7 +12434,7 @@ mod module_extension_definition_loading_tests {
             None,
         )
         .await;
-        let child = compute_observed_module(&mut transaction, "ext.bzl").await;
+        let child = compute_observed_bzlmod_module(&mut transaction, "ext.bzl").await;
         let child = observed_module(&child);
         let carrier = child.result.dupe();
         let incoming = child.observations().dupe();
@@ -12240,7 +12552,7 @@ mod module_extension_definition_loading_tests {
         ));
         let need = compute_observed_loaded(
             &dice,
-            "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n",
+            "module(name='consumer')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n",
             &extension,
             "",
             true,
@@ -12253,11 +12565,11 @@ mod module_extension_definition_loading_tests {
     #[tokio::test]
     async fn observed_loaded_lifecycle_cancellation_and_nonactivation() {
         assert_loaded_definition_production_slice_has_no_upper_keys();
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = builtin_environment_dice();
         let tracker = Arc::new(BzlEventTracker::default());
-        let root = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\no=use_extension('//:other.bzl','other')\n";
-        let reordered = "module(name='bazel_tools')\no=use_extension('//:other.bzl','other')\ne=use_extension('//:ext.bzl','ext')\n";
-        let alternate = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','alternate')\no=use_extension('//:other.bzl','other')\n";
+        let root = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\no=use_extension('//:other.bzl','other')\n";
+        let reordered = "module(name='consumer')\no=use_extension('//:other.bzl','other')\ne=use_extension('//:ext.bzl','ext')\n";
+        let alternate = "module(name='consumer')\ne=use_extension('//:ext.bzl','alternate')\no=use_extension('//:other.bzl','other')\n";
         let ext_a = "load('//:child.bzl','child')\ndef implementation(ctx):\n    pass\next=module_extension(implementation=implementation,environ=[child])\nalternate=module_extension(implementation=implementation,environ=['alternate'])\n";
         let ext_b = "load('//:child.bzl','child')\ndef implementation(ctx):\n    pass\next=module_extension(implementation=implementation,environ=['direct'])\nalternate=module_extension(implementation=implementation,environ=['alternate'])\n";
         let child_a = "child='child-a'\n";
@@ -12349,8 +12661,9 @@ mod module_extension_definition_loading_tests {
         assert_held_observed_loaded_handles(&first, &retained);
 
         let (activations, dependencies) = tracker.take_rows();
-        let parent = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+        let parent = HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         )
         .to_string();
         let parent_row = dependencies.iter().find(|row| row.key == parent).unwrap();
@@ -12358,8 +12671,11 @@ mod module_extension_definition_loading_tests {
         assert_eq!(
             parent_row.dependencies,
             [
-                HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe())
-                    .to_string(),
+                HostSelectedExtensionDefinitionLoadRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
+                )
+                .to_string(),
                 HostBzlModuleObservationKey::new_bzlmod(
                     workspace.dupe(),
                     observed_test_label("ext.bzl"),
@@ -12401,8 +12717,9 @@ mod module_extension_definition_loading_tests {
             );
         }
         tracker.take();
-        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(
+        let key = HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let mut cancelled = case_transaction_with_other(
             &dice,
@@ -12427,7 +12744,7 @@ mod module_extension_definition_loading_tests {
         let recovered =
             observed_loaded_handles(&dice, root, ext_a, child_a, other, Some(tracker.clone()))
                 .await;
-        let clean_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let clean_dice = builtin_environment_dice();
         let clean = observed_loaded_handles(&clean_dice, root, ext_a, child_a, other, None).await;
         assert_eq!(recovered.parent, clean.parent);
         assert_eq!(recovered.request, clean.request);

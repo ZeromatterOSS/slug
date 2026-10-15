@@ -16,6 +16,7 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_bzlmod_v2::HostModuleExtensionUsageScope;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionImport;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionOverride;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
@@ -443,6 +444,7 @@ impl std::error::Error for HostValidatedGeneratedRepositorySpecsError {}
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct HostValidatedModuleExtensionRepositoriesKey {
     workspace: NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
 }
 
 #[doc(hidden)]
@@ -454,7 +456,16 @@ pub struct HostValidatedModuleExtensionRepositoriesObservationKey(
 #[allow(dead_code)]
 impl HostValidatedModuleExtensionRepositoriesObservationKey {
     pub fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self(HostValidatedModuleExtensionRepositoriesKey::new(workspace))
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self(HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+            workspace, scope,
+        ))
     }
 }
 
@@ -465,7 +476,14 @@ impl fmt::Display for HostValidatedModuleExtensionRepositoriesObservationKey {
 
 impl HostValidatedModuleExtensionRepositoriesKey {
     pub fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self { workspace }
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self { workspace, scope }
     }
 }
 
@@ -473,8 +491,8 @@ impl fmt::Display for HostValidatedModuleExtensionRepositoriesKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "host-validated-module-extension-repositories:{}",
-            self.workspace
+            "host-validated-module-extension-repositories:{}{}",
+            self.workspace, self.scope
         )
     }
 }
@@ -546,12 +564,12 @@ fn complete_driver(
 #[rustfmt::skip]
 async fn compute_validated_repositories(ctx: &mut DiceComputations<'_>, key: &HostValidatedModuleExtensionRepositoriesKey, mode: ValidatedRepositoriesMode) -> ValidatedRepositoriesDriverOutcome {
     let child = match mode {
-        ValidatedRepositoriesMode::Legacy => match ctx.compute(&HostInstantiatedModuleExtensionRepositoriesKey::new(key.workspace.clone())).await {
+        ValidatedRepositoriesMode::Legacy => match ctx.compute(&HostInstantiatedModuleExtensionRepositoriesKey::new_with_scope(key.workspace.clone(), key.scope)).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
             Err(error) => return complete_driver(Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::InstantiationCompute(error.to_string().into()) }), PathObservationEpoch::empty()),
         },
-        ValidatedRepositoriesMode::Observed => match ctx.compute(&HostInstantiatedModuleExtensionRepositoriesObservationKey::new(key.workspace.clone())).await {
+        ValidatedRepositoriesMode::Observed => match ctx.compute(&HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(key.workspace.clone(), key.scope)).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(ValidatedModuleExtensionRepositoriesObservationError::Instantiation(error))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().dupe(), observed.observations().dupe()),
@@ -994,9 +1012,12 @@ ext=module_extension(implementation=impl)
     ) -> HostValidatedGeneratedRepositorySpecsOutcome {
         transaction_untracked(dice, module, EXTENSION, true)
             .await
-            .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap()
     }
@@ -1007,9 +1028,12 @@ ext=module_extension(implementation=impl)
     ) -> HostValidatedGeneratedRepositorySpecsOutcome {
         transaction_untracked(dice, module, extension, true)
             .await
-            .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap()
     }
@@ -1029,8 +1053,9 @@ ext=module_extension(implementation=impl)
         };
         transaction
             .compute(
-                &HostValidatedModuleExtensionRepositoriesObservationKey::new(
+                &HostValidatedModuleExtensionRepositoriesObservationKey::new_with_scope(
                     NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
                 ),
             )
             .await
@@ -1039,7 +1064,7 @@ ext=module_extension(implementation=impl)
 
     #[tokio::test]
     async fn extension_metadata_capture_accepts_reproducible_and_fails_nonempty_facts() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let root_module = module("use_repo(e, first='first')", "");
         let reproducible = r#"
 repo=repository_rule(lambda ctx: None)
@@ -1104,8 +1129,15 @@ ext=module_extension(implementation=impl)
     }
 
     fn module(imports: &str, directive: &str) -> String {
+        // This positive validation fixture uses its ordinary main-self alias.
         format!(
-            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n{imports}\n{directive}\n"
+            "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n{imports}\n{directive}\n"
+        )
+    }
+
+    fn module_for_root(root: &str, imports: &str, directive: &str) -> String {
+        format!(
+            "module(name='{root}')\ne=use_extension('//:ext.bzl','ext')\n{imports}\n{directive}\n"
         )
     }
     fn external_style_view(
@@ -1121,7 +1153,7 @@ ext=module_extension(implementation=impl)
 
     #[tokio::test]
     async fn real_validation_orders_imports_before_polarity_and_restores() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let valid = module("use_repo(e, one='first', two='second')", "");
         let a = compute(&dice, &valid).await;
         let warm = compute(&dice, &valid).await;
@@ -1143,7 +1175,7 @@ ext=module_extension(implementation=impl)
             &dice,
             &module(
                 "use_repo(e, bad='missing')",
-                "override_repo(e, absent='bazel_tools')",
+                "override_repo(e, absent='consumer')",
             ),
         )
         .await;
@@ -1163,7 +1195,7 @@ ext=module_extension(implementation=impl)
             &dice,
             &module(
                 "use_repo(e, virtual_alias='virtual')",
-                "override_repo(e, virtual='bazel_tools')",
+                "override_repo(e, virtual='consumer')",
             ),
         )
         .await;
@@ -1180,7 +1212,7 @@ ext=module_extension(implementation=impl)
         ));
 
         let missing_override =
-            compute(&dice, &module("", "override_repo(e, absent='bazel_tools')")).await;
+            compute(&dice, &module("", "override_repo(e, absent='consumer')")).await;
         assert!(matches!(
             missing_override,
             SourcePreparationOutcome::Complete(value)
@@ -1194,7 +1226,7 @@ ext=module_extension(implementation=impl)
         ));
 
         let inject_collision =
-            compute(&dice, &module("", "inject_repo(e, first='bazel_tools')")).await;
+            compute(&dice, &module("", "inject_repo(e, first='consumer')")).await;
         assert!(matches!(
             inject_collision,
             SourcePreparationOutcome::Complete(value)
@@ -1215,7 +1247,7 @@ ext=module_extension(implementation=impl)
 
     #[tokio::test]
     async fn public_view_retains_overridden_rows_full_specs_and_request_order() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let module = |swap: bool, generated: &str, injected: &str, target: &str, swap_ops: bool| {
             let alpha = format!(
                 "a=use_extension('//:ext.bzl','alpha')\nuse_repo(a, first_alias='first')\noverride_repo(a, {generated}='root_alias')\n{}{}",
@@ -1232,7 +1264,7 @@ ext=module_extension(implementation=impl)
             );
             let beta = "b=use_extension('//:ext.bzl','beta')\n";
             format!(
-                "module(name='bazel_tools', repo_name='root_alias')\n{}{}",
+                "module(name='consumer', repo_name='root_alias')\n{}{}",
                 if swap { beta } else { &alpha },
                 if swap { &alpha } else { beta },
             )
@@ -1433,7 +1465,7 @@ beta=module_extension(implementation=beta_impl)
     }
     #[tokio::test]
     async fn success_boundaries_and_structural_identity_restore() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
 
         let alias_a = compute(&dice, &module("use_repo(e, local='first')", "")).await;
         let alias_b = compute(&dice, &module("use_repo(e, renamed='first')", "")).await;
@@ -1451,9 +1483,8 @@ beta=module_extension(implementation=beta_impl)
         ));
 
         let override_present =
-            compute(&dice, &module("", "override_repo(e, first='bazel_tools')")).await;
-        let inject_absent =
-            compute(&dice, &module("", "inject_repo(e, absent='bazel_tools')")).await;
+            compute(&dice, &module("", "override_repo(e, first='consumer')")).await;
+        let inject_absent = compute(&dice, &module("", "inject_repo(e, absent='consumer')")).await;
         assert!(matches!(
             override_present,
             SourcePreparationOutcome::Complete(ref value) if value.is_ok()
@@ -1500,13 +1531,13 @@ beta=module_extension(implementation=beta_impl)
             &missing_restored
         ));
 
-        let target_a = compute(&dice, &module("", "override_repo(e, absent='bazel_tools')")).await;
+        let target_a = compute(&dice, &module("", "override_repo(e, absent='consumer')")).await;
         let target_b = compute(&dice, &module("", "override_repo(e, absent='platforms')")).await;
         assert!(!HostValidatedModuleExtensionRepositoriesKey::equality(
             &target_a, &target_b
         ));
         let target_restored =
-            compute(&dice, &module("", "override_repo(e, absent='bazel_tools')")).await;
+            compute(&dice, &module("", "override_repo(e, absent='consumer')")).await;
         assert!(HostValidatedModuleExtensionRepositoriesKey::equality(
             &target_a,
             &target_restored
@@ -1537,13 +1568,13 @@ beta=module_extension(implementation=beta_impl)
     }
     #[tokio::test]
     async fn offender_fields_locations_order_and_polarity_restore() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
 
         let import_a = compute(&dice, &module("use_repo(e, local='missing_a')", "")).await;
         let import_b = compute(&dice, &module("use_repo(e, local='missing_b')", "")).await;
         let import_location = compute(
             &dice,
-            "module(name='bazel_tools')\ne = use_extension('//:ext.bzl','ext')\nuse_repo(e, local='missing_a')\n",
+            "module(name='consumer')\ne = use_extension('//:ext.bzl','ext')\nuse_repo(e, local='missing_a')\n",
         )
         .await;
         for (value, exported, column) in [
@@ -1580,14 +1611,13 @@ beta=module_extension(implementation=beta_impl)
             &import_restored
         ));
 
-        let override_a =
-            compute(&dice, &module("", "override_repo(e, absent='bazel_tools')")).await;
-        let override_b = compute(&dice, &module("", "override_repo(e, other='bazel_tools')")).await;
+        let override_a = compute(&dice, &module("", "override_repo(e, absent='consumer')")).await;
+        let override_b = compute(&dice, &module("", "override_repo(e, other='consumer')")).await;
         let order_a = compute(
             &dice,
             &module(
                 "",
-                "override_repo(e, other='bazel_tools')\noverride_repo(e, absent='bazel_tools')",
+                "override_repo(e, other='consumer')\noverride_repo(e, absent='consumer')",
             ),
         )
         .await;
@@ -1595,15 +1625,12 @@ beta=module_extension(implementation=beta_impl)
             &dice,
             &module(
                 "",
-                "override_repo(e, absent='bazel_tools')\noverride_repo(e, other='bazel_tools')",
+                "override_repo(e, absent='consumer')\noverride_repo(e, other='consumer')",
             ),
         )
         .await;
-        let override_location = compute(
-            &dice,
-            &module("", "\noverride_repo(e, absent='bazel_tools')"),
-        )
-        .await;
+        let override_location =
+            compute(&dice, &module("", "\noverride_repo(e, absent='consumer')")).await;
         for (value, name, line) in [
             (&override_a, "absent", 4),
             (&override_b, "other", 4),
@@ -1639,8 +1666,8 @@ beta=module_extension(implementation=beta_impl)
             &override_location
         ));
 
-        let polarity_a = compute(&dice, &module("", "override_repo(e, first='bazel_tools')")).await;
-        let polarity_b = compute(&dice, &module("", "inject_repo(e, first='bazel_tools')")).await;
+        let polarity_a = compute(&dice, &module("", "override_repo(e, first='consumer')")).await;
+        let polarity_b = compute(&dice, &module("", "inject_repo(e, first='consumer')")).await;
         assert!(matches!(
             polarity_a,
             SourcePreparationOutcome::Complete(ref value) if value.is_ok()
@@ -1662,13 +1689,13 @@ beta=module_extension(implementation=beta_impl)
             &polarity_b
         ));
         let polarity_restored =
-            compute(&dice, &module("", "override_repo(e, first='bazel_tools')")).await;
+            compute(&dice, &module("", "override_repo(e, first='consumer')")).await;
         assert!(HostValidatedModuleExtensionRepositoriesKey::equality(
             &polarity_a,
             &polarity_restored
         ));
         let override_restored =
-            compute(&dice, &module("", "override_repo(e, absent='bazel_tools')")).await;
+            compute(&dice, &module("", "override_repo(e, absent='consumer')")).await;
         assert!(HostValidatedModuleExtensionRepositoriesKey::equality(
             &override_a,
             &override_restored
@@ -1677,7 +1704,7 @@ beta=module_extension(implementation=beta_impl)
             &dice,
             &module(
                 "",
-                "override_repo(e, other='bazel_tools')\noverride_repo(e, absent='bazel_tools')",
+                "override_repo(e, other='consumer')\noverride_repo(e, absent='consumer')",
             ),
         )
         .await;
@@ -1688,7 +1715,7 @@ beta=module_extension(implementation=beta_impl)
     }
     #[tokio::test]
     async fn real_validation_reuses_without_events_and_retains_prefix_context() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let tracker = Arc::new(ValidationTracker::default());
         let extension = r#"
 repo=repository_rule(lambda ctx: None)
@@ -1697,11 +1724,30 @@ def impl(ctx):
 first=module_extension(implementation=impl)
 second=module_extension(implementation=impl)
 "#;
-        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, ok='generated')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, bad='missing')\n";
-        let mut transaction =
-            transaction_with_tracker(&dice, module, extension, true, tracker.clone()).await;
-        let key = HostValidatedModuleExtensionRepositoriesKey::new(
+        let module = "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, ok='generated')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, bad='missing')\n";
+        // Source discovery and the real builtin environment are an explicit
+        // prerequisite. The tracker below guards invocation/instantiation/
+        // validation from speculative registry or materialization work.
+        let mut source_transaction = transaction_untracked(&dice, module, extension, true).await;
+        let prepared_key = crate::bzl_module::HostPreparedModuleExtensionInputsKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
+        let prepared = source_transaction.compute(&prepared_key).await.unwrap();
+        assert!(matches!(prepared, SourcePreparationOutcome::Complete(value) if value.is_ok()));
+        let mut user_data = UserComputationData {
+            cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
+            activation_tracker: Some(tracker.clone()),
+            ..Default::default()
+        };
+        user_data.data.set(slug_events_v2::CaptureEvaluationEvents);
+        let mut transaction = source_transaction
+            .into_updater()
+            .commit_with_data(user_data)
+            .await;
+        let key = HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let error = transaction.compute(&key).await.unwrap();
         let SourcePreparationOutcome::Complete(value) = &error else {
@@ -1732,7 +1778,7 @@ second=module_extension(implementation=impl)
 
     #[tokio::test]
     async fn corrupted_count_and_full_request_joins_fail_closed() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let extension = r#"
 repo=repository_rule(lambda ctx: None)
 def impl(ctx):
@@ -1740,12 +1786,15 @@ def impl(ctx):
 first=module_extension(implementation=impl)
 second=module_extension(implementation=impl)
 "#;
-        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, one='generated')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, two='generated')\n";
+        let module = "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, one='generated')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, two='generated')\n";
         let mut transaction = transaction_untracked(&dice, module, extension, true).await;
         let value = transaction
-            .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap();
         let SourcePreparationOutcome::Complete(value) = value else {
@@ -1790,9 +1839,12 @@ second=module_extension(implementation=impl)
             .unwrap();
         let mut transaction = updater.commit().await;
         let value = transaction
-            .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap();
         assert!(!HostValidatedModuleExtensionRepositoriesKey::validity(
@@ -1815,9 +1867,12 @@ second=module_extension(implementation=impl)
         )
         .await;
         let value = transaction
-            .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap();
         assert!(HostValidatedModuleExtensionRepositoriesKey::validity(
@@ -1836,10 +1891,17 @@ second=module_extension(implementation=impl)
     #[tokio::test]
     async fn observed_validation_identity_finisher_and_terminal_algebra() {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let key = HostValidatedModuleExtensionRepositoriesObservationKey::new(workspace.clone());
-        let same = HostValidatedModuleExtensionRepositoriesObservationKey::new(workspace.clone());
-        let other = HostValidatedModuleExtensionRepositoriesObservationKey::new(
+        let key = HostValidatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+            workspace.clone(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
+        let same = HostValidatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+            workspace.clone(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
+        let other = HostValidatedModuleExtensionRepositoriesObservationKey::new_with_scope(
             NormalizedAbsolutePath::new("/other").unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let hash = |key: &HostValidatedModuleExtensionRepositoriesObservationKey| {
             let mut hasher = DefaultHasher::new();
@@ -1848,14 +1910,14 @@ second=module_extension(implementation=impl)
         };
         assert_eq!(
             key.to_string(),
-            "observed-host-validated-module-extension-repositories:\"/module-extension-repository-instantiation\""
+            "observed-host-validated-module-extension-repositories:\"/module-extension-repository-instantiation\":root-usages"
         );
         assert_eq!(key, same);
         assert_ne!(key, other);
         assert_eq!(hash(&key), hash(&same));
         assert_ne!(hash(&key), hash(&other));
 
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let success_module = module("use_repo(e, one='first', two='second')", "");
         let success = compute_observed(&dice, &success_module, EXTENSION, true, None).await;
         let carrier = observed_carrier(&success);
@@ -1870,24 +1932,27 @@ second=module_extension(implementation=impl)
             (success_module.clone(), EXTENSION, true),
             (module("use_repo(e, bad='missing')", ""), EXTENSION, true),
             (
-                module("", "override_repo(e, absent='bazel_tools')"),
+                module("", "override_repo(e, absent='consumer')"),
                 EXTENSION,
                 true,
             ),
             (
-                module("", "inject_repo(e, first='bazel_tools')"),
+                module("", "inject_repo(e, first='consumer')"),
                 EXTENSION,
                 true,
             ),
             (success_module.clone(), EXTENSION, false),
         ] {
-            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let case_dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
             let mut legacy_tx =
                 transaction_untracked(&case_dice, &module, extension, present).await;
             let legacy = legacy_tx
-                .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                    workspace.clone(),
-                ))
+                .compute(
+                    &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                        workspace.clone(),
+                        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                    ),
+                )
                 .await
                 .unwrap();
             let observed = compute_observed(&case_dice, &module, extension, present, None).await;
@@ -1922,7 +1987,7 @@ second=module_extension(implementation=impl)
             })
         ));
 
-        let join_module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nb=use_extension('//:ext.bzl','second')\n";
+        let join_module = "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nb=use_extension('//:ext.bzl','second')\n";
         let join_source = r#"repo=repository_rule(lambda ctx: None)
 def impl(ctx):
     repo(name='generated')
@@ -1949,9 +2014,9 @@ second=module_extension(implementation=impl)
         ));
 
         let tracker = Arc::new(ValidationTracker::default());
-        let need_module = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
+        let need_module = "module(name='consumer')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
         let need = compute_observed(
-            &Dice::builder().build(DetectCycles::Enabled),
+            &crate::canonical_repository_route_tests::tests::builtin_graph_dice(),
             need_module,
             EXTENSION,
             true,
@@ -1971,8 +2036,11 @@ second=module_extension(implementation=impl)
                 .unwrap()
                 .1,
             [
-                HostInstantiatedModuleExtensionRepositoriesObservationKey::new(workspace)
-                    .to_string()
+                HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+                    workspace,
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
+                )
+                .to_string()
             ]
         );
         assert!(
@@ -2014,8 +2082,8 @@ def second_impl(ctx):
 first=module_extension(implementation=first_impl)
 second=module_extension(implementation=second_impl)
 "#;
-        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, ok='generated')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, bad='missing')\noverride_repo(b, absent='bazel_tools')\n";
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = "module(name='consumer')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, ok='generated')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, bad='missing')\noverride_repo(b, absent='consumer')\n";
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let tracker = Arc::new(ValidationTracker::default());
         let observed =
             compute_observed(&dice, module, extension, true, Some(tracker.clone())).await;
@@ -2038,8 +2106,9 @@ second=module_extension(implementation=second_impl)
 
         let mut legacy_tx =
             transaction_with_tracker(&dice, module, extension, true, tracker.clone()).await;
-        let legacy_key = HostValidatedModuleExtensionRepositoriesKey::new(
+        let legacy_key = HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let legacy = legacy_tx.compute(&legacy_key).await.unwrap();
         let SourcePreparationOutcome::Complete(legacy) = legacy else {
@@ -2047,8 +2116,9 @@ second=module_extension(implementation=second_impl)
         };
         assert_eq!(legacy.as_ref(), validation_carrier.result().as_ref());
 
-        let observed_key = HostValidatedModuleExtensionRepositoriesObservationKey::new(
+        let observed_key = HostValidatedModuleExtensionRepositoriesObservationKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let dependencies = tracker.dependencies.lock().unwrap();
         assert_eq!(
@@ -2058,8 +2128,9 @@ second=module_extension(implementation=second_impl)
                 .unwrap()
                 .1,
             [
-                HostInstantiatedModuleExtensionRepositoriesObservationKey::new(
-                    NormalizedAbsolutePath::new(WORKSPACE).unwrap()
+                HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
                 )
                 .to_string()
             ]
@@ -2070,10 +2141,13 @@ second=module_extension(implementation=second_impl)
                 .find(|(name, _)| name == &legacy_key.to_string())
                 .unwrap()
                 .1,
-            [HostInstantiatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap()
-            )
-            .to_string()]
+            [
+                HostInstantiatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
+                )
+                .to_string()
+            ]
         );
         drop(dependencies);
         let activations = tracker.activations.lock().unwrap();
@@ -2137,14 +2211,17 @@ second=module_extension(implementation=second_impl)
 
     #[tokio::test]
     async fn observed_validation_lifecycle_cancellation_and_nonactivation() {
-        let base_module = module("use_repo(e, local='first')", "");
-        let import_b = module("use_repo(e, local='missing')", "");
-        let override_b = module("", "inject_repo(e, first='bazel_tools')");
+        let base_module = module_for_root("consumer", "use_repo(e, local='first')", "");
+        let import_b = module_for_root("consumer", "use_repo(e, local='missing')", "");
+        let override_b = module_for_root("consumer", "", "inject_repo(e, first='consumer')");
         let generated_b = EXTENSION.replace("name='first'", "name='renamed'");
         let same_semantic = format!("{base_module}\n");
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let key = HostValidatedModuleExtensionRepositoriesObservationKey::new(workspace.clone());
+        let key = HostValidatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+            workspace.clone(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
         let mut held = Vec::new();
         for (module, extension) in [
             (base_module.as_str(), EXTENSION),
@@ -2162,8 +2239,9 @@ second=module_extension(implementation=second_impl)
             let carrier = observed_carrier(&value).dupe();
             let child = transaction
                 .compute(
-                    &HostInstantiatedModuleExtensionRepositoriesObservationKey::new(
+                    &HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
                         workspace.clone(),
+                        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
                     ),
                 )
                 .await
@@ -2208,6 +2286,7 @@ second=module_extension(implementation=second_impl)
             }) if current.parts().0 == &predecessor.parts().0.invoked[0].request
                 && current.parts().0.validation_parts().1[0] == *row
                 && row.parts().0 == "first"
+                && row.parts().1.as_str().is_empty()
         ));
         assert!(matches!(
             held[5].result().as_ref(),
@@ -2241,7 +2320,7 @@ second=module_extension(implementation=second_impl)
                     && batch.is_none())
         );
 
-        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancel_dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let cancel_tracker = Arc::new(ValidationTracker::default());
         let mut cancelled = transaction_with_tracker(
             &cancel_dice,
@@ -2289,7 +2368,11 @@ second=module_extension(implementation=second_impl)
         for (demand, result) in recovered.observations().observations() {
             assert_eq!(result.as_ref(), global.get(demand).unwrap().as_ref());
         }
-        let legacy = HostValidatedModuleExtensionRepositoriesKey::new(workspace).to_string();
+        let legacy = HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+            workspace,
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        )
+        .to_string();
         let activations = cancel_tracker.activations.lock().unwrap();
         let dependencies = cancel_tracker.dependencies.lock().unwrap();
         assert!(activations.iter().all(|(name, _, _)| name != &legacy));

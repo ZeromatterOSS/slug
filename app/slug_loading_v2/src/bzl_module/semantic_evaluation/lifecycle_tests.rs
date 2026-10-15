@@ -56,17 +56,9 @@ async fn capture_transitions_share_semantic_evaluation_and_outer_reuse_stays_eve
     let source =
         "print('one actual evaluation')\nBox=provider(fields=['value'])\nEMPTY=Box(value=1)\n";
     for first_capture in [false, true] {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let seed = case_transaction_with_other(
-            &dice,
-            "module(name='bazel_tools')\n",
-            source,
-            "",
-            "",
-            true,
-            None,
-        )
-        .await;
+        let dice = cohort_dice();
+        let seed =
+            case_transaction_with_other(&dice, COHORT_MODULE, source, "", "", true, None).await;
         drop(seed);
         let tracker = Arc::new(BzlEventTracker::default());
         // The two outer families are distinct attempts, while their complete
@@ -92,17 +84,18 @@ async fn capture_transitions_share_semantic_evaluation_and_outer_reuse_stays_eve
 
 #[test]
 fn closed_engine_releases_semantic_keys_while_retained_originals_remain_callable() {
-    // A private runtime gives a deterministic close boundary for DICE's state
-    // actor. No new heap/drop instrumentation or production weak API is needed.
+    // A private runtime closes evaluation tasks. DICE's state processor is a
+    // detached OS thread (core/processor.rs), so additionally observe actual
+    // key/result release before invoking the independently retained originals.
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
     let (retained, inputs, engine) = runtime.block_on(async {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = cohort_dice();
         let mut transaction = case_transaction_with_other(
             &dice,
-            "module(name='bazel_tools')\n",
+            COHORT_MODULE,
             PARENT,
             &child_source(1),
             OTHER,
@@ -122,7 +115,18 @@ fn closed_engine_releases_semantic_keys_while_retained_originals_remain_callable
     });
     drop(runtime);
     assert!(engine.upgrade().is_none());
-    assert!(inputs.upgrade().is_some());
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    // CoreStateHandle owns only its channel sender, not a join handle. Engine
+    // drop disconnects that channel; its OS thread must finish dropping cached
+    // keys/results. Exactly one handle proves only `retained` still owns these
+    // inputs. A real cycle continues to fail rather than being grandfathered.
+    while inputs.strong_count() != 1 {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "cached semantic inputs must release before retained original calls"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
     assert_coherent(&retained, 1);
     drop(retained);
     assert!(

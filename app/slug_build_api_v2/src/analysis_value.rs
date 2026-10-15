@@ -51,6 +51,7 @@ pub enum AnalysisValueType {
     CcToolchainFeatures,
     CcFeatureConfiguration,
     CcToolchainVariables,
+    DottedVersion,
     Empty,
     None,
     Boolean,
@@ -85,6 +86,7 @@ impl AnalysisValueType {
             Self::CcToolchainFeatures => "CcToolchainFeatures",
             Self::CcFeatureConfiguration => "FeatureConfiguration",
             Self::CcToolchainVariables => "Variables",
+            Self::DottedVersion => "DottedVersion",
             Self::Empty => "empty",
             Self::None => "NoneType",
             Self::Boolean => "bool",
@@ -1265,6 +1267,7 @@ enum AnalysisValueData {
     CcToolchainFeatures(crate::cc_features::CcToolchainFeatures),
     CcFeatureConfiguration(crate::cc_features::CcFeatureConfiguration),
     CcToolchainVariables(crate::cc_variables::CcToolchainVariables),
+    DottedVersion(crate::DottedVersion),
     None,
     Boolean(bool),
     Number(AnalysisNumber),
@@ -1295,6 +1298,7 @@ pub enum AnalysisValueKind<'a> {
     CcToolchainFeatures(&'a crate::cc_features::CcToolchainFeatures),
     CcFeatureConfiguration(&'a crate::cc_features::CcFeatureConfiguration),
     CcToolchainVariables(&'a crate::cc_variables::CcToolchainVariables),
+    DottedVersion(&'a crate::DottedVersion),
     None,
     Boolean(bool),
     Number(&'a AnalysisNumber),
@@ -1400,6 +1404,10 @@ impl AnalysisValue {
 
     pub fn cc_toolchain_variables(value: crate::cc_variables::CcToolchainVariables) -> Self {
         Self::new(AnalysisValueData::CcToolchainVariables(value))
+    }
+
+    pub fn dotted_version(value: crate::DottedVersion) -> Self {
+        Self::new(AnalysisValueData::DottedVersion(value))
     }
 
     pub fn none() -> Self {
@@ -1519,6 +1527,7 @@ impl AnalysisValue {
             AnalysisValueData::CcToolchainVariables(value) => {
                 AnalysisValueKind::CcToolchainVariables(value)
             }
+            AnalysisValueData::DottedVersion(value) => AnalysisValueKind::DottedVersion(value),
             AnalysisValueData::None => AnalysisValueKind::None,
             AnalysisValueData::Boolean(value) => AnalysisValueKind::Boolean(*value),
             AnalysisValueData::Number(value) => AnalysisValueKind::Number(value),
@@ -1559,6 +1568,7 @@ impl AnalysisValue {
                 AnalysisValueType::CcFeatureConfiguration
             }
             AnalysisValueData::CcToolchainVariables(_) => AnalysisValueType::CcToolchainVariables,
+            AnalysisValueData::DottedVersion(_) => AnalysisValueType::DottedVersion,
             AnalysisValueData::None => AnalysisValueType::None,
             AnalysisValueData::Boolean(_) => AnalysisValueType::Boolean,
             AnalysisValueData::Number(AnalysisNumber::Integer(_)) => AnalysisValueType::Integer,
@@ -1697,6 +1707,7 @@ impl AnalysisValue {
             }
         }
         match (self.0.as_ref(), other.0.as_ref()) {
+            (AnalysisValueData::DottedVersion(a), AnalysisValueData::DottedVersion(b)) => a == b,
             (AnalysisValueData::Runfiles(a), AnalysisValueData::Runfiles(b)) => {
                 a.publication_eq_with(b, state)
             }
@@ -1829,6 +1840,9 @@ fn publication_fields_eq(
 impl PartialEq for AnalysisValue {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            (AnalysisValueData::DottedVersion(a), AnalysisValueData::DottedVersion(b)) => {
+                a.normalized_cmp(b) == std::cmp::Ordering::Equal
+            }
             (AnalysisValueData::Runfiles(a), AnalysisValueData::Runfiles(b)) => a == b,
             (AnalysisValueData::Published { projected, .. }, _) => projected == other.projected(),
             (_, AnalysisValueData::Published { projected, .. }) => self.projected() == projected,
@@ -1915,6 +1929,10 @@ impl Eq for AnalysisValue {}
 impl Hash for AnalysisValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.0.as_ref() {
+            AnalysisValueData::DottedVersion(value) => {
+                28u8.hash(state);
+                value.hash_normalized(state);
+            }
             AnalysisValueData::Runfiles(_) => 27u8.hash(state),
             AnalysisValueData::Published { projected, .. } => projected.hash(state),
             AnalysisValueData::Function(value) => {
@@ -2242,6 +2260,10 @@ impl From<DepsetError> for AnalysisValueError {
 #[cfg(test)]
 #[path = "analysis_value/container_identity_tests.rs"]
 mod container_identity_tests;
+
+#[cfg(test)]
+#[path = "analysis_value/dotted_version_tests.rs"]
+mod dotted_version_tests;
 
 /// Conservative per-row base: projected payload, outward wrapper, two Arc
 /// allocation headers and provider projection header. Variable child arrays and

@@ -66,7 +66,7 @@ impl FileLoader for HelperLoader {
 fn identity(label: &str, path: &str, mapping: &[(&str, &str)]) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: mapping
             .iter()
             .map(|(apparent, canonical)| {
@@ -98,7 +98,13 @@ fn freeze(
     context: &BzlLoadManifest,
     loader: Option<&dyn FileLoader>,
 ) -> FrozenModule {
-    let path = context.root.workspace_path.to_str().unwrap();
+    let path = context
+        .root
+        .source
+        .workspace_path()
+        .expect("workspace fixture source")
+        .to_str()
+        .unwrap();
     let ast = AstModule::parse(path, source.to_owned(), &Dialect::Bazel).unwrap();
     let module = Module::new();
     crate::starlark_label::attach_defining_module_context(&module, &context.root).unwrap();

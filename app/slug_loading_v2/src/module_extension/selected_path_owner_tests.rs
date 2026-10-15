@@ -3,7 +3,7 @@ async fn budget_exhaustion_is_not_cached_after_reopening_same_owner() {
     use slug_bzlmod_v2::install_registry_io;
     use slug_workspace_v2::ImageDescriptorBudget;
 
-    const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='//:missing')\nuse_repo(e, proof='proof')\n";
+    const MODULE: &str = "module(name='consumer')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='//:missing')\nuse_repo(e, proof='proof')\n";
     const EXTENSION: &str = r#"
 repo=repository_rule(lambda ctx: None)
 path_tag=tag_class(attrs={'file':attr.label()})

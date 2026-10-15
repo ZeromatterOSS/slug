@@ -53,10 +53,32 @@ fn evaluate_module(
         digest(std::str::from_utf8(&root.source).expect("prepared UTF-8 source")),
         inputs.children.iter().map(|child| &child.module),
     );
-    let owner = crate::function_owner::bzl_evaluation_owner(
+    // Actual child contexts include their own environment closures, which raw
+    // load manifests deliberately do not flatten into raw source loads.
+    let child_contexts = || {
+        inputs.children.iter().map(|child| {
+            child.module.module.client_data().and_then(|data| {
+                crate::starlark_label::defining_module_source_context(data.to_value())
+            })
+        })
+    };
+    if child_contexts().any(|context| context.is_none()) {
+        return Err(Error::Resource(
+            "original child has no effective source context".into(),
+        ));
+    }
+    let source_context = crate::bzl_environment::BzlModuleSourceContext::new(
         &manifest,
+        &inputs.environment,
+        child_contexts().map(Option::unwrap),
+    )
+    .map_err(|e| Error::Resource(format!("effective source context: {e}").into()))?;
+    let metadata =
+        crate::starlark_label::PreparedDefiningModuleMetadata::EffectiveContext(&source_context);
+    let owner = crate::function_owner::bzl_evaluation_owner(
+        metadata,
         ast.file_span(ast.statement().span).file,
-        matches!(root.key.context, BzlModuleContext::Bzlmod),
+        &inputs.environment,
         true,
         inputs.children.iter().map(|child| {
             child
@@ -76,10 +98,12 @@ fn evaluate_module(
     )
     .map_err(|error| Error::Resource(error.to_string().into()))?;
     let module = Module::new();
-    crate::starlark_label::attach_defining_module_owner(&module, &manifest, owner.clone())
+    metadata
+        .attach(&module, owner.clone())
         .expect("a new .bzl module has no defining client data");
-    let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
-    let globals = root.key.context.globals(&manifest.root.label);
+    let evaluation_context = BzlEvaluationContext::from_source_context(&source_context)
+        .map_err(|e| Error::Resource(e.into()))?;
+    let globals = inputs.environment.globals(&manifest.root.label);
     let loader = LocalBzlLoader {
         modules: inputs
             .children
@@ -105,11 +129,17 @@ fn evaluate_module(
     let frozen = module
         .freeze()
         .map_err(|error| Error::Freeze(format!("{error:?}").into()))?;
-    let retained_bzl_modules =
-        flattened_module_lifetime_closure(inputs.children.iter().map(|child| &child.module)).into();
+    let retained_bzl_modules = flattened_module_lifetime_closure(
+        inputs
+            .children
+            .iter()
+            .map(|child| &child.module)
+            .chain(inputs.environment.modules()),
+    )
+    .into();
     Ok(FrozenBzlModule {
         module: frozen,
-        path: manifest.root.workspace_path.clone(),
+        path: manifest.root.source.diagnostic_path().into_owned(),
         loads: inputs
             .children
             .iter()

@@ -21,7 +21,56 @@ use crate::BzlModuleIdentity;
 pub(super) struct DefiningBzlModuleContext {
     identity: BzlModuleIdentity,
     source_manifest: Option<Arc<BzlLoadManifest>>,
+    source_context: Option<crate::BzlModuleSourceContext>,
     function_owner: Option<slug_build_api_v2::published_value::FunctionEvaluationOwner>,
+}
+
+/// Closed description of the client data this original module will retain.
+/// The same borrowed selection supplies the owner certificate and attachment.
+#[derive(Clone, Copy)]
+pub(crate) enum PreparedDefiningModuleMetadata<'a> {
+    RawManifest {
+        manifest: &'a BzlLoadManifest,
+        // The legacy producer still constructs and holds this context while
+        // building its owner. Its joint peak is work-only, never attached data.
+        transient_context: &'a crate::BzlModuleSourceContext,
+    },
+    EffectiveContext(&'a crate::BzlModuleSourceContext),
+}
+impl<'a> PreparedDefiningModuleMetadata<'a> {
+    pub(crate) fn raw_manifest(self) -> &'a BzlLoadManifest {
+        match self {
+            Self::RawManifest { manifest, .. } => manifest,
+            Self::EffectiveContext(context) => context.raw_load_manifest(),
+        }
+    }
+    pub(crate) fn transient_context(self) -> Option<&'a crate::BzlModuleSourceContext> {
+        match self {
+            Self::RawManifest {
+                transient_context, ..
+            } => Some(transient_context),
+            Self::EffectiveContext(_) => None,
+        }
+    }
+    pub(crate) fn header_bytes() -> usize {
+        // Includes ALL inline Option layouts even when their value is None.
+        // Existing conservative heap/control credit is retained independently.
+        std::mem::size_of::<DefiningBzlModuleContext>() + 8 * std::mem::size_of::<usize>()
+    }
+    pub(crate) fn attach(
+        self,
+        module: &Module,
+        owner: slug_build_api_v2::published_value::FunctionEvaluationOwner,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::RawManifest { manifest, .. } => {
+                attach_defining_module_owner(module, manifest, owner)
+            }
+            Self::EffectiveContext(context) => {
+                attach_defining_module_environment(module, context, owner)
+            }
+        }
+    }
 }
 
 impl DefiningBzlModuleContext {
@@ -53,6 +102,7 @@ pub(crate) fn attach_defining_module_context(
     module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
         identity: identity.clone(),
         source_manifest: None,
+        source_context: None,
         function_owner: None,
     }))
 }
@@ -66,6 +116,7 @@ pub(crate) fn attach_defining_module_manifest(
     module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
         identity: manifest.root.clone(),
         source_manifest: Some(Arc::new(manifest.clone())),
+        source_context: None,
         function_owner: None,
     }))
 }
@@ -78,9 +129,19 @@ pub(crate) fn attach_defining_module_manifest(
 pub fn defining_module_source_manifest(
     original_module_client_data: Value<'_>,
 ) -> Option<&BzlLoadManifest> {
-    DefiningBzlModuleContext::from_value(original_module_client_data)?
-        .source_manifest
-        .as_deref()
+    let data = DefiningBzlModuleContext::from_value(original_module_client_data)?;
+    data.source_context
+        .as_ref()
+        .map(|context| context.raw_load_manifest())
+        .or(data.source_manifest.as_deref())
+}
+
+/// Borrow distinct raw-load and effective-environment provenance from the
+/// actual module owner; filenames never manufacture this source authority.
+pub fn defining_module_source_context(data: Value<'_>) -> Option<&crate::BzlModuleSourceContext> {
+    DefiningBzlModuleContext::from_value(data)?
+        .source_context
+        .as_ref()
 }
 
 /// Borrow actual lexical source identity; no filename lookup is performed.
@@ -96,6 +157,20 @@ pub(crate) fn attach_defining_module_owner(
     module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
         identity: manifest.root.clone(),
         source_manifest: Some(Arc::new(manifest.clone())),
+        source_context: None,
+        function_owner: Some(owner),
+    }))
+}
+
+pub(crate) fn attach_defining_module_environment(
+    module: &Module,
+    context: &crate::BzlModuleSourceContext,
+    owner: slug_build_api_v2::published_value::FunctionEvaluationOwner,
+) -> anyhow::Result<()> {
+    module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
+        identity: context.raw_load_manifest().root.clone(),
+        source_manifest: None,
+        source_context: Some(context.clone()),
         function_owner: Some(owner),
     }))
 }

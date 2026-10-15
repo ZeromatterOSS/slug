@@ -1,5 +1,15 @@
 # Stage 5: Bzlmod and Repository Graph
 
+## Scoped module-extension aggregates
+
+Aggregate extension keys expose an explicit Slug-native `RootUsages` scope.
+It selects usages by their declaring graph owner, retains the complete selected
+graph and mappings as predecessor, and carries scope through every aggregate
+key, result and observed child. Selection, validation and output use the same
+ordered iterator. Default `AllSelected` remains unchanged, including refusal of
+unsupported nonroot usages; this scope does not establish all-module parity.
+Selected per-owner demand and evaluation remain independent of that aggregate.
+
 ## Ordered repository filesystem mutations
 
 Loading replays real repository-rule Starlark through one typed Archive/Delete
@@ -831,6 +841,28 @@ not independent semantic authorities. Before adding another bzl source/load
 key family, audit whether the existing evaluated-module key and narrow
 projection can own the fact without merging Host and external compatibility
 classes incorrectly.
+
+The existing materialization-result input may retain a bounded inventory of
+actual immutable file-generated incarnations, including retired roots. Its
+default constructor keeps that inventory empty. Complete request, result,
+source identity, root and instance fields participate structurally in equality;
+current active lookup still requires the full current request. Retired records
+prove physical output ownership only and cannot satisfy a request or replace
+current source preparation. Native declarations retain their existing trust
+boundary; paths, markers and instance spelling alone confer no authority.
+
+Source-preparation fixtures compose current explicit declarations and prior
+actual inputs in one initial commit. Explicit canonical entries and supplied
+Missing observations win; absent Host observations are never filled from old
+state. Automatic source views exclude only exact validated active/retired output
+roots and their direct parent entries, while explicit views remain unfiltered
+and retain the supplied observation epoch. One cumulative fixture budget prepays
+full foreign comparison, retained history, discovery, output and transfer peaks
+before copies or writer I/O; historical instances reserve their identifiers.
+Unchanged ancestors are reused through their actual closed directory set, and
+explicit mode does not construct an unused Host epoch. Prior transactions drop
+before consumer tracking. This Slug-native input composition adds no global
+cache, consumer retry or change to repository-rule Starlark semantics.
 
 #### Deferred sparse remote repository-output cache
 

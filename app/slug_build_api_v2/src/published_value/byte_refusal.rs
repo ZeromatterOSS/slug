@@ -83,14 +83,22 @@ impl PublishedValueArenaBuilder {
             import_bytes: self.import_bytes,
             owner_bytes: self.owner_payload.bytes,
             shared_bytes: self.shared_payload.bytes,
-            producer_work: self.visits.checked_sub(self.owner_payload.visits),
+            producer_work: self.checked_producer_work(),
         }))
     }
 }
 
 impl PublishedValueError {
     pub(super) fn is_limit(&self) -> bool {
-        matches!(self, Self::Limit(_) | Self::ByteBudget(_))
+        matches!(
+            self,
+            Self::Limit(_)
+                | Self::ByteBudget(_)
+                | Self::EdgeBudget(_)
+                | Self::RetainedFactBudget(_)
+                | Self::RetainedCertificateWork(_)
+                | Self::OwnerRetainedVisitBudget(_)
+        )
     }
 
     // Decorate only the directly refused body; never overwrite an inner context.

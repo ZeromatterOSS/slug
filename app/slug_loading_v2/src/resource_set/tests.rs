@@ -73,7 +73,7 @@ fn provenance(label: &str, digest: [u8; 32]) -> (CompactString, BzlModuleSourceP
         BzlModuleSourceProvenance::new(
             BzlModuleIdentity {
                 label: slug_identity_v2::CanonicalLabel::parse(label).unwrap(),
-                workspace_path: PathBuf::from(FILE),
+                source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(FILE)),
                 repository_mapping: Arc::from([]),
             },
             digest,

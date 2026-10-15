@@ -4,16 +4,17 @@ use std::hash::Hasher;
 
 use super::*;
 
-mod budget;
+pub(crate) mod budget;
+pub(super) mod environment;
 mod evaluate;
 mod events;
-mod facts;
+pub(crate) mod facts;
 mod inputs;
-pub(super) use inputs::PreparedSemanticBzlEvaluation;
-pub(super) use inputs::prepare;
+pub(crate) use inputs::PreparedSemanticBzlEvaluation;
+pub(crate) use inputs::prepare;
 
 #[derive(Debug, Clone, Allocative)]
-pub(super) struct SemanticBzlEvaluationKey(Arc<PreparedSemanticBzlEvaluation>);
+pub(crate) struct SemanticBzlEvaluationKey(Arc<PreparedSemanticBzlEvaluation>);
 impl PartialEq for SemanticBzlEvaluationKey {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
@@ -35,23 +36,23 @@ impl fmt::Display for SemanticBzlEvaluationKey {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(super) enum SemanticBzlEvaluationError {
+pub(crate) enum SemanticBzlEvaluationError {
     Parse(Arc<str>),
     Evaluation(Arc<str>),
     Freeze(Arc<str>),
     Resource(Arc<str>),
 }
 #[derive(Debug, Allocative)]
-pub(super) struct SemanticBzlEvaluationResult {
+pub(crate) struct SemanticBzlEvaluationResult {
     inputs: Arc<PreparedSemanticBzlEvaluation>,
     result: Result<FrozenBzlModule, SemanticBzlEvaluationError>,
     events: Arc<EventBatch>,
 }
 impl SemanticBzlEvaluationResult {
-    pub(super) fn result(&self) -> Result<&FrozenBzlModule, &SemanticBzlEvaluationError> {
+    pub(crate) fn result(&self) -> Result<&FrozenBzlModule, &SemanticBzlEvaluationError> {
         self.result.as_ref()
     }
-    pub(super) fn events(&self) -> &Arc<EventBatch> {
+    pub(crate) fn events(&self) -> &Arc<EventBatch> {
         &self.events
     }
 }
@@ -74,7 +75,16 @@ impl Key for SemanticBzlEvaluationKey {
             .data
             .get::<CaptureEvaluationEvents>()
             .is_err();
-        Arc::new(evaluate::evaluate(self.0.clone(), direct))
+        let result = Arc::new(evaluate::evaluate(self.0.clone(), direct));
+        // Builtins have no Host/external outer wrapper. Their actual semantic
+        // producer activation owns only its own local events; reuse has none.
+        if !direct
+            && self.0.environment.mode() == crate::bzl_environment::BzlEnvironmentMode::Builtin
+        {
+            ctx.store_evaluation_data(result.events().as_ref().clone())
+                .expect("builtin semantic producer stores one local event batch");
+        }
+        result
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -91,3 +101,11 @@ mod inputs_tests;
 
 #[cfg(test)]
 mod parser_copy_tests;
+
+#[cfg(test)]
+fn test_environment() -> crate::bzl_environment::PreparedBzlEnvironment {
+    crate::bzl_environment::PreparedBzlEnvironment::uninjected(
+        crate::bzl_environment::BzlEnvironmentMode::BzlmodBootstrap,
+    )
+    .unwrap()
+}

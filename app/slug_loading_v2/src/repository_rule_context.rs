@@ -1395,7 +1395,13 @@ mod tests {
         loader: Option<&dyn starlark::eval::FileLoader>,
     ) -> starlark::environment::FrozenModule {
         let ast = AstModule::parse(
-            manifest.root.workspace_path.to_str().unwrap(),
+            manifest
+                .root
+                .source
+                .workspace_path()
+                .expect("workspace fixture source")
+                .to_str()
+                .unwrap(),
             source.to_owned(),
             &Dialect::Bazel,
         )
@@ -1416,7 +1422,9 @@ mod tests {
     fn invocation_manifest() -> BzlLoadManifest {
         let root = BzlModuleIdentity {
             label: CanonicalLabel::parse("@@//:repository_rule.bzl").unwrap(),
-            workspace_path: PathBuf::from("repository_rule.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "repository_rule.bzl",
+            )),
             repository_mapping: Arc::from([]),
         };
         BzlLoadManifest {
@@ -1433,7 +1441,7 @@ mod tests {
     fn mapped_identity(label: &str, path: &str, mapped: &str) -> BzlModuleIdentity {
         BzlModuleIdentity {
             label: CanonicalLabel::parse(label).unwrap(),
-            workspace_path: PathBuf::from(path),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
             repository_mapping: Arc::from([(
                 slug_identity_v2::ApparentRepoName::new("alias").unwrap(),
                 slug_identity_v2::CanonicalRepoName::new(mapped).unwrap(),

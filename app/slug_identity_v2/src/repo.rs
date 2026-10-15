@@ -43,6 +43,11 @@ impl CanonicalRepoName {
         &self.0
     }
 
+    /// Retained allocation capacity; semantic identity uses the string contents.
+    pub fn retained_capacity_bytes(&self) -> usize {
+        self.0.capacity()
+    }
+
     pub fn is_root(&self) -> bool {
         self.0.is_empty()
     }
@@ -96,6 +101,11 @@ impl ApparentRepoName {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Retained allocation capacity; semantic identity uses the string contents.
+    pub fn retained_capacity_bytes(&self) -> usize {
+        self.0.capacity()
     }
 
     pub fn is_root(&self) -> bool {

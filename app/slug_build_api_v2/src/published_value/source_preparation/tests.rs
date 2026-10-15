@@ -10,7 +10,7 @@ use crate::CallableSourceAuthorityData;
 fn data() -> CallableSourceAuthorityData {
     let identity = CallableModuleIdentity {
         label: CanonicalLabel::parse("@@//pkg:source.bzl").unwrap(),
-        workspace_path: "/workspace/pkg/source.bzl".into(),
+        source: crate::ModuleSourceOrigin::Workspace("/workspace/pkg/source.bzl".into()),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("alias").unwrap(),
             CanonicalRepoName::new("selected+").unwrap(),
@@ -19,6 +19,7 @@ fn data() -> CallableSourceAuthorityData {
     CallableSourceAuthorityData {
         root: identity.clone(),
         direct_children: Arc::from([identity.clone()]),
+        environment_bindings: Arc::from([]),
         reachable: Arc::from([CallableModuleSource {
             identity,
             digest: [3; 32],
@@ -39,9 +40,12 @@ fn transfer(data: &CallableSourceAuthorityData) -> usize {
     std::mem::size_of_val(data.direct_children.as_ref())
         + std::mem::size_of_val(data.reachable.as_ref())
 }
+fn bound(data: &CallableSourceAuthorityData) -> usize {
+    1 + data.direct_children.len() + data.environment_bindings.len() + data.reachable.len()
+}
 fn prepared(b: &mut PublishedValueArenaBuilder) -> CallableSourceAuthority {
     let data = data();
-    b.begin_source_authority(peak(&data) - transfer(&data), transfer(&data), 0)
+    b.begin_source_authority(peak(&data) - transfer(&data), transfer(&data), 0, 3)
         .unwrap()
         .finish(data)
         .unwrap()
@@ -81,7 +85,7 @@ fn seal(b: PublishedValueArenaBuilder) -> PublishedValueArena {
 }
 
 #[test]
-fn same_allocation_skips_only_q_while_equal_foreign_and_other_builders_pay_in_full() {
+fn completed_native_audit_skips_only_same_builder_replay_while_foreign_sources_pay_in_full() {
     let mut b = PublishedValueArenaBuilder::new();
     let authority = prepared(&mut b);
     let q = authority.byte_cost();
@@ -95,7 +99,7 @@ fn same_allocation_skips_only_q_while_equal_foreign_and_other_builders_pay_in_fu
     bind(&mut b, authority.clone());
     let second = (b.bytes - before.0, b.visits - before.1);
     assert_eq!(first.0 - second.0, 4 * size_of::<CallableSourceAuthority>());
-    assert_eq!(first.1 - second.1, authority.fact_count() + 2);
+    assert_eq!(first.1 - second.1, 2);
     for other in [
         authority.clone(),
         CallableSourceAuthority::new(authority.data().clone()).unwrap(),
@@ -104,16 +108,20 @@ fn same_allocation_skips_only_q_while_equal_foreign_and_other_builders_pay_in_fu
         let before = (unprepared.bytes, unprepared.visits);
         bind(&mut unprepared, other);
         assert_eq!(unprepared.bytes - before.0, first.0 + q);
-        assert_eq!(unprepared.visits - before.1, first.1);
+        assert_eq!(
+            unprepared.visits - before.1,
+            first.1 + authority.fact_count()
+        );
         assert_eq!(unprepared.sources[0], authority);
         assert!(unprepared.source_preparations.paid.is_empty());
     }
     let separate = CallableSourceAuthority::new(authority.data().clone()).unwrap();
     assert_eq!(separate, authority);
     assert!(!separate.shares_storage_with(&authority));
-    let before = b.bytes;
+    let before = (b.bytes, b.visits);
     bind(&mut b, separate);
-    assert_eq!(b.bytes - before, first.0 + q);
+    assert_eq!(b.bytes - before.0, first.0 + q);
+    assert_eq!(b.visits - before.1, first.1 + authority.fact_count());
     assert_eq!(b.sources.len(), 2);
 }
 
@@ -151,7 +159,7 @@ fn retained_source_and_transfer_scratch_preserve_full_facts_seal_import_and_rese
         );
         let mut paid = PublishedValueArenaBuilder::new();
         let authority = paid
-            .begin_source_authority(p - a, a, 19)
+            .begin_source_authority(p - a, a, 19, bound(&data))
             .unwrap()
             .finish(data)
             .unwrap();
@@ -213,11 +221,11 @@ fn proof_growth_refuses_before_guard_clones_or_credit_and_capacity_mutation() {
         let a = transfer(&d);
         let mut probe = warm();
         let before = probe.bytes;
-        drop(probe.begin_source_authority(p - a, a, 7).unwrap());
+        drop(probe.begin_source_authority(p - a, a, 7, 3).unwrap());
         let required = probe.bytes - before;
         let mut conservative = warm();
         let before = conservative.bytes;
-        drop(conservative.begin_source_authority(p, 0, 7).unwrap());
+        drop(conservative.begin_source_authority(p, 0, 7, 3).unwrap());
         assert_eq!(
             required,
             conservative.bytes - before,
@@ -237,7 +245,7 @@ fn proof_growth_refuses_before_guard_clones_or_credit_and_capacity_mutation() {
             let refs = Arc::strong_count(&d.direct_children);
             b.charge_bytes(BYTE_LIMIT - b.bytes - required + extra)
                 .unwrap();
-            let result = b.begin_source_authority(p - a, a, 7);
+            let result = b.begin_source_authority(p - a, a, 7, 3);
             if extra == 0 {
                 let authority = result.unwrap().finish(d.clone()).unwrap();
                 assert_eq!(b.bytes, BYTE_LIMIT);
@@ -258,7 +266,7 @@ fn proof_growth_refuses_before_guard_clones_or_credit_and_capacity_mutation() {
                 );
                 assert_eq!(Arc::strong_count(&d.direct_children), refs);
                 assert!(b.failed_budget);
-                assert!(b.begin_source_authority(p - a, a, 0).is_err());
+                assert!(b.begin_source_authority(p - a, a, 0, 3).is_err());
             }
         }
     }
@@ -271,7 +279,7 @@ fn underpayment_invalid_data_pending_work_and_abandonment_poison_without_success
     let mut underpaid = PublishedValueArenaBuilder::new();
     assert!(matches!(
         underpaid
-            .begin_source_authority(q - 1, a + 1, 0)
+            .begin_source_authority(q - 1, a + 1, 0, 3)
             .unwrap()
             .finish(data()),
         Err(PublishedValueError::Invalid(
@@ -300,7 +308,7 @@ fn underpayment_invalid_data_pending_work_and_abandonment_poison_without_success
     let mapping = invalid.root.repository_mapping.clone();
     let mut b = PublishedValueArenaBuilder::new();
     assert!(matches!(
-        b.begin_source_authority(BYTE_LIMIT / 2, 0, 0)
+        b.begin_source_authority(BYTE_LIMIT / 2, 0, 0, bound(&invalid))
             .unwrap()
             .finish(invalid),
         Err(PublishedValueError::Limit("source facts"))
@@ -317,6 +325,7 @@ fn underpayment_invalid_data_pending_work_and_abandonment_poison_without_success
                 peak(authority.data()) - transfer(authority.data()),
                 transfer(authority.data()),
                 0,
+                3,
             )
             .unwrap();
         if abort {
@@ -325,14 +334,14 @@ fn underpayment_invalid_data_pending_work_and_abandonment_poison_without_success
             drop(preparation);
         }
         assert_eq!(b.source_preparations.paid.len(), 1);
-        assert!(b.prepaid_source_bytes(&authority).is_err());
+        assert!(b.prepared_source_audit(&authority).is_err());
     }
     let mut b = PublishedValueArenaBuilder::new();
     for _ in 0..NODE_LIMIT - 2 {
         b.charge_visit().unwrap();
     }
     let mut preparation = b
-        .begin_source_authority(peak(&data()) - transfer(&data()), transfer(&data()), 0)
+        .begin_source_authority(peak(&data()) - transfer(&data()), transfer(&data()), 0, 3)
         .unwrap();
     assert!(preparation.charge_visit().is_err());
     assert!(preparation.finish(data()).is_err());
@@ -347,7 +356,7 @@ fn unused_paid_guard_drops_with_the_builder_and_forecasts_overflow_before_copy()
     let weak = Arc::downgrade(&d.direct_children);
     let mut b = PublishedValueArenaBuilder::new();
     let authority = b
-        .begin_source_authority(peak(&d) - transfer(&d), transfer(&d), 0)
+        .begin_source_authority(peak(&d) - transfer(&d), transfer(&d), 0, 3)
         .unwrap()
         .finish(d)
         .unwrap();
@@ -367,12 +376,83 @@ fn unused_paid_guard_drops_with_the_builder_and_forecasts_overflow_before_copy()
     ] {
         let mut b = PublishedValueArenaBuilder::new();
         assert_eq!(
-            b.begin_source_authority(r, a, m).err().unwrap(),
+            b.begin_source_authority(r, a, m, 3).err().unwrap(),
             PublishedValueError::Limit(reason)
         );
         assert_eq!((b.bytes, b.producer_scratch_bytes), (0, 0));
         assert!(!b.source_preparations.header_admitted);
         assert!(b.source_preparations.paid.is_empty());
         assert!(b.charge_bytes(0).is_err());
+    }
+}
+
+#[test]
+fn native_count_peak_and_work_are_paid_before_successful_proof_commit() {
+    let d = data();
+    let mut credits = Vec::new();
+    for count in [3, 5] {
+        let mut builder = PublishedValueArenaBuilder::new();
+        builder
+            .begin_source_authority(peak(&d) - transfer(&d), transfer(&d), 0, count)
+            .unwrap()
+            .abort();
+        credits.push(builder.bytes);
+    }
+    assert_eq!(
+        credits[1] - credits[0],
+        CallableSourceAuthority::publication_audit_scratch_bytes(5).unwrap()
+            - CallableSourceAuthority::publication_audit_scratch_bytes(3).unwrap()
+    );
+    for invalid_bound in [0, NODE_LIMIT + 1, usize::MAX] {
+        let mut builder = PublishedValueArenaBuilder::new();
+        let references = Arc::strong_count(&d.direct_children);
+        assert_eq!(
+            builder
+                .begin_source_authority(peak(&d) - transfer(&d), transfer(&d), 0, invalid_bound)
+                .err()
+                .unwrap(),
+            PublishedValueError::Limit("source audit entries")
+        );
+        assert_eq!((builder.bytes, builder.producer_scratch_bytes), (0, 0));
+        assert_eq!(Arc::strong_count(&d.direct_children), references);
+        assert!(builder.source_preparations.paid.is_empty());
+        assert!(builder.charge_visit().is_err());
+    }
+    let mut builder = PublishedValueArenaBuilder::new();
+    let references = Arc::strong_count(&d.root.repository_mapping);
+    let error = builder
+        .begin_source_authority(peak(&d) - transfer(&d), transfer(&d), 0, 2)
+        .unwrap()
+        .finish(d.clone())
+        .unwrap_err();
+    assert_eq!(
+        error,
+        PublishedValueError::Invalid("source authority identity bound")
+    );
+    assert!(builder.source_preparations.paid.is_empty());
+    assert_eq!(Arc::strong_count(&d.root.repository_mapping), references);
+    assert!(builder.charge_visit().is_err());
+
+    // M=3, one actual mapping row/Arc: C=3+4*3+1+1=17. The two
+    // existing finish operations precede these actual native audit operations.
+    for succeeds in [false, true] {
+        let mut builder = PublishedValueArenaBuilder::new();
+        for _ in 0..NODE_LIMIT - 19 + usize::from(!succeeds) {
+            builder.charge_visit().unwrap();
+        }
+        let result = builder
+            .begin_source_authority(peak(&d) - transfer(&d), transfer(&d), 0, 3)
+            .unwrap()
+            .finish(d.clone());
+        assert_eq!(result.is_ok(), succeeds);
+        assert_eq!(builder.charged_visits(), NODE_LIMIT);
+        assert_eq!(
+            builder.source_preparations.paid.len(),
+            usize::from(succeeds)
+        );
+        if !succeeds {
+            assert!(builder.source_preparations.paid.is_empty());
+            assert!(builder.charge_bytes(0).is_err());
+        }
     }
 }

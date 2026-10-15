@@ -1,5 +1,126 @@
 # Stage 4: Starlark Loading and BUILD Packages
 
+Native Bzl owners bind a private borrowed reference input to the exact finalized
+rows and positively admitted row/key base. Those key shapes already cover their
+same actual environment-local bodies. Covered aggregate physical admission adds
+a positive table/reference prefix and whole first-actual payload bodies; general
+inputs retain full admission. Standalone plan caches/caps and full legacy logical
+checks remain. Final temporary native retention adds the same positive table
+prefix, then all original whole payload/foreign own-catalog, handle and transfer
+forecasts. Added carrier/control/read costs are prepaid on the same work ledger.
+No subtraction, refund, source/caller profile or public audit authority is used.
+Source identity, canonical events, raw/strict closures and all caps remain.
+
+
+Immutable publication rows declare the exact root and ordered direct-child key
+guards they retain. Keys declare their environment, which declares its own
+catalog and source proof; each proof declares all actual physical catalogs in
+its closed Builtin reference plan. Raw extraction therefore retains the same
+complete native closure as strict owner construction and certified consumption.
+Positive intrinsic metadata and actual guarded sharing remain separate from
+full typed equality, semantic/event budgets and original constructor forecasts.
+All new metadata and transfer storage is admitted before copying, including the
+proof precursor in the borrowed semantic-input producer.
+
+
+Bzl input validity declares the exact immutable environment guards encountered
+in its root and ordered child keys, including distinct equal foreign guards.
+A positive reference-plan table certificate excludes those separately declared
+bodies; the existing shared-input audit admits each actual body once. Existing
+row and key forecasts remain conservative and complete. The full standalone reference-plan physical and semantic budgets remain complete
+for general preparation and source proofs; all original construction work stays
+paid alongside any new operation cost. Additional declaration handles and transfer peaks are admitted
+before clones; original payload and nested source/catalog guards remain visible.
+Each environment also declares its own actual catalog, including when its
+source proof retains an equal foreign catalog. A prepaid constructor-local memo
+admits complete own-catalog storage once per actual allocation; every declared
+reference and lookup stays paid. Original row guards cover the borrowed memo's
+lifetime, and it drops before publication. No owner, heap, semantic identity,
+comparison, event credit or cap is replaced.
+
+
+## Original builtin exports and source environments
+
+Loading prepares the original bundled export before ordinary semantic lookup.
+Build, Bzlmod, bootstrap and Builtin environments are explicit modes. The private
+Builtin catalog contains verbatim pinned source; its integrity hashes never
+select replacement semantics. Builtin evaluation uses uninjected fixed globals
+and the native version constructor, then imports the actual frozen source export.
+Catalog bytes, full identities/mappings, ordered loads, export selection and
+native modes determine both module and function owners before Def creation.
+
+Ordinary Build and repository Bzlmod loading inject the same actual export while
+retaining distinct native globals. Explicit bootstrap stays uninjected. The
+export uses the canonical tools repository's tracked mapping, independent of the
+main repository's apparent aliases. Borrow the producer's complete mapping for
+admission before name copies, including Vec/Arc transfer peak and constructor
+work; no main-root fallback supplies builtin provenance.
+
+Ordinary builtin .bzl sources also obtain the complete canonical defining
+repository mapping after source parsing and before child resolution. Import
+count, source name and main apparent aliases do not select this route. The
+shared guarded canonical driver retains actual Need/cycle/error causes and
+observations; defining-map failures name their source without fabricating a
+load. A changed mapping observation may reevaluate an outer observed carrier
+while the unchanged semantic module reuses its original value and event batch.
+
+Workspace paths and private catalog origins are distinct typed identities.
+The source context keeps raw load bindings unchanged and environment bindings
+separate, while retaining the complete effective closure of actual children and
+selected exports. Original heaps and declared executable owners remain separate
+from source-only accounting certificates. Builtin computations own their local
+event batches; ordinary outer reuse keeps its existing event behavior.
+
+Immutable source proofs and a deterministic reference plan preserve all complete
+facts while comparing canonical environment payloads once per enclosing key.
+Private cached hashes accelerate lookup; foreign equality still checks complete
+fields. Every reference, distinct physical allocation, foreign comparison and
+construction peak is admitted before growth or copies. Logical/event credit is
+independent of allocation history. Standalone comparison bounds remain separate
+from retained reference shapes. A constructor-local SmallMap reuses a successful
+canonical ordinal for repeated references to the same actual environment Arc.
+Borrowed strong owners cover its entire lifetime; lookup and insertion work and
+complete entry/hash/index allocation peaks are prepaid. Distinct foreign inputs
+still receive complete comparison and physical retention checks. The map drops
+before publication and changes no persistent semantic identity or event credit. The existing record, byte and depth limits stay
+fixed; source digests, manifest fingerprints and REAPI hashes are unchanged.
+
+Source-context construction similarly plans a borrowed, first-seen union before
+owning output. Complete label equality includes mapping identity; matching labels
+require full origin, digest and ordered mapping equality. Constructor-local row
+memoization skips only work already proved for the same guarded immutable row.
+One cumulative construction ledger admits temporary indexes, output and transfer
+peaks before allocation. Persistent accounting retains complete raw bindings and
+unique effective source views; it does not replay temporary comparison work as
+retained storage. The complete fingerprint stream and resource limits stay fixed.
+
+Original-module metadata uses one typed attachment choice for validation,
+retention admission and attachment. Both layouts retain the complete private
+client-data header and defining identity; raw manifests retain their complete
+ordered payload, while effective contexts retain their complete producer
+certificate once. A legacy transient context still contributes its full joint
+constructor peak before copies. Retained storage and constructor work remain
+separate, with full provenance, foreign equality and unchanged resource caps.
+
+The private Bzl stable-owner part declares its existing root row as shared native
+payload. Stable equality and hashing still inspect only the complete key; input
+validity keeps the whole source and child closure. Row certificates retain full
+key and child payloads. Wrapper headers, both root references and construction
+peaks are admitted before clones. Actual guarded sharing admits that row once;
+foreign allocations and every encounter keep their full checks. Semantic keys
+and quotas are unchanged.
+
+
+Repository Request sources preserve the immutable reader's normalized requested
+logical path for both workspace source origin and Starlark filename. Root and
+canonical route finalizers consume that same returned field alongside the actual
+bytes and observations; they do not infer alias equivalence from labels or
+content. Builtin catalog presentation keeps its separate route. Typed canonical
+error labels remain canonical, while Request source-bearing filenames follow
+this Slug-native logical-path convention. Full origin, digest and mapping
+conflicts still refuse; resolver real paths and namespaces remain below the
+source-reader boundary.
+
 ## General executable environment provider
 
 RunEnvironmentInfo is a phase-independent native constructor with immutable

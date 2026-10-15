@@ -29,7 +29,7 @@ fn evaluate(
             &ast,
             BzlModuleIdentity {
                 label: CanonicalLabel::parse("@@dep+//:metadata.bzl").unwrap(),
-                workspace_path: filename.into(),
+                source: slug_build_api_v2::ModuleSourceOrigin::Workspace(filename.into()),
                 repository_mapping: Arc::from([]),
             },
             &[],

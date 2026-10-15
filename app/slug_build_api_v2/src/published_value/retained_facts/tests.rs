@@ -38,7 +38,7 @@ impl PublishedOriginalBinding for Originals {
         &self.imports
     }
 }
-fn seal(builder: PublishedValueArenaBuilder, count: usize) -> PublishedValueArena {
+pub(in crate::published_value) fn seal(builder: PublishedValueArenaBuilder, count: usize) -> PublishedValueArena {
     let imports = builder.imports().to_vec();
     builder
         .seal(Arc::new(Originals { count, imports }))
@@ -53,11 +53,11 @@ fn atom(builder: &mut PublishedValueArenaBuilder, value: AnalysisValue) -> Publi
         .unwrap();
     id
 }
-fn source(entries: usize) -> CallableSourceAuthority {
+pub(in crate::published_value) fn source(entries: usize) -> CallableSourceAuthority {
     use crate::callable_graph::*;
     let identity = CallableModuleIdentity {
         label: slug_identity_v2::CanonicalLabel::parse("@@//pkg:source.bzl").unwrap(),
-        workspace_path: "/workspace/pkg/source.bzl".into(),
+        source: crate::ModuleSourceOrigin::Workspace("/workspace/pkg/source.bzl".into()),
         repository_mapping: (0..entries)
             .map(|i| {
                 (
@@ -71,6 +71,7 @@ fn source(entries: usize) -> CallableSourceAuthority {
     CallableSourceAuthority::new(CallableSourceAuthorityData {
         root: identity.clone(),
         direct_children: Arc::from([]),
+        environment_bindings: Arc::from([]),
         reachable: Arc::from([CallableModuleSource {
             identity,
             digest: [0; 32],
@@ -79,7 +80,7 @@ fn source(entries: usize) -> CallableSourceAuthority {
     })
     .unwrap()
 }
-fn code(
+pub(in crate::published_value) fn code(
     builder: &mut PublishedValueArenaBuilder,
     source: CallableSourceAuthority,
 ) -> PublishedNodeId {
@@ -116,7 +117,7 @@ fn count(
         &mut 0,
         &mut false,
     )
-    .map(|r| r.0)
+    .map(|r| r.0.total)
 }
 
 #[test]
@@ -236,6 +237,9 @@ mod source_tests;
 
 #[path = "source_certificate_tests.rs"]
 mod source_certificate_tests;
+
+#[path = "name_count_tests.rs"]
+mod name_count_tests;
 
 #[path = "reference_count_tests.rs"]
 mod reference_count_tests;

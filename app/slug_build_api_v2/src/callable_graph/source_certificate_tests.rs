@@ -3,7 +3,7 @@ use super::*;
 fn data() -> CallableSourceAuthorityData {
     let identity = CallableModuleIdentity {
         label: CanonicalLabel::parse("@@//pkg:source.bzl").unwrap(),
-        workspace_path: "/workspace/pkg/source.bzl".into(),
+        source: crate::ModuleSourceOrigin::Workspace("/workspace/pkg/source.bzl".into()),
         repository_mapping: Arc::from([
             (
                 ApparentRepoName::new("first").unwrap(),
@@ -18,6 +18,7 @@ fn data() -> CallableSourceAuthorityData {
     CallableSourceAuthorityData {
         root: identity.clone(),
         direct_children: Arc::from([identity.clone(), identity.clone()]),
+        environment_bindings: Arc::from([]),
         reachable: Arc::from([CallableModuleSource {
             identity,
             digest: [3; 32],
@@ -29,6 +30,11 @@ fn reference_count(data: &CallableSourceAuthorityData) -> usize {
     let mut count = 0;
     for identity in std::iter::once(&data.root)
         .chain(data.direct_children.iter())
+        .chain(
+            data.environment_bindings
+                .iter()
+                .map(|binding| &binding.module),
+        )
         .chain(data.reachable.iter().map(|row| &row.identity))
     {
         count += 1;
@@ -36,7 +42,7 @@ fn reference_count(data: &CallableSourceAuthorityData) -> usize {
             count += 1;
         }
     }
-    count
+    count + 2 * data.environment_bindings.len()
 }
 
 #[test]
@@ -51,6 +57,7 @@ fn constructor_certifies_complete_count_and_full_data_equality() {
     let forged = CallableSourceAuthority(Arc::new(CallableSourceAuthorityStorage {
         data: original.data().clone(),
         fact_count: original.fact_count() + 1,
+        byte_cost: original.byte_cost(),
     }));
     assert_eq!(original, forged);
     assert_eq!(forged.fact_count(), original.fact_count() + 1);
@@ -58,7 +65,10 @@ fn constructor_certifies_complete_count_and_full_data_equality() {
         let mut changed = original.data().clone();
         match field {
             0 => changed.root.label = CanonicalLabel::parse("@@//other:source.bzl").unwrap(),
-            1 => changed.root.workspace_path = "/other/source.bzl".into(),
+            1 => {
+                changed.root.source =
+                    crate::ModuleSourceOrigin::Workspace("/other/source.bzl".into())
+            }
             2 => {
                 let mut pairs = changed.root.repository_mapping.to_vec();
                 pairs.reverse();
@@ -136,11 +146,12 @@ fn native_retention_covers_full_envelope_and_nested_arc_allocations() {
         + root.label.package().package().as_str().len()
         + root.label.target().as_str().len()
         + root.label.mapping_id().map_or(0, |id| id.as_str().len())
-        + root.workspace_path.as_os_str().len();
+        + root.source.retained_text_bytes().unwrap();
     let allocation = std::mem::size_of::<CallableSourceAuthorityData>()
         + CallableSourceAuthority::storage_overhead_bytes();
-    let arrays = 4 * std::mem::size_of::<usize>()
+    let arrays = 6 * std::mem::size_of::<usize>()
         + std::mem::size_of_val(value.direct_children.as_ref())
+        + std::mem::size_of_val(value.environment_bindings.as_ref())
         + std::mem::size_of_val(value.reachable.as_ref());
     let authority = CallableSourceAuthority::new(value).unwrap();
     // Four identity occurrences, one actual shared map; recounting complete
@@ -157,8 +168,80 @@ fn native_retention_covers_full_envelope_and_nested_arc_allocations() {
     let empty = CallableSourceAuthority::new(empty).unwrap();
     assert_eq!(
         empty.byte_cost(),
-        allocation + 6 * std::mem::size_of::<usize>() + prefix_bytes
+        allocation + 8 * std::mem::size_of::<usize>() + prefix_bytes
     );
+}
+
+#[test]
+fn builtin_environment_bindings_preserve_full_facts_without_becoming_loads() {
+    let mut value = data();
+    let direct = value.direct_children.clone();
+    let mut module = value.root.clone();
+    module.source = ModuleSourceOrigin::builtin("bazel9.2", "common/exports.bzl").unwrap();
+    value.environment_bindings = Arc::from([CallableEnvironmentBinding {
+        global: "apple_common".into(),
+        export: "apple_common_bazel".into(),
+        module: module.clone(),
+    }]);
+    let mut sources = value.reachable.to_vec();
+    sources.push(CallableModuleSource {
+        identity: module,
+        digest: [9; 32],
+    });
+    value.reachable = sources.into();
+    let original = CallableSourceAuthority::new(value.clone()).unwrap();
+    assert_eq!(original.data().direct_children, direct);
+    assert_eq!(original.fact_count(), reference_count(&value));
+    assert_eq!(original.fact_count(), 20);
+    assert!(original.byte_cost() > CallableSourceAuthority::new(data()).unwrap().byte_cost());
+    for change in 0..4 {
+        let mut changed = value.clone();
+        let mut bindings = changed.environment_bindings.to_vec();
+        match change {
+            0 => bindings[0].global = "other_global".into(),
+            1 => bindings[0].export = "other_export".into(),
+            2 => {
+                bindings[0].module.source =
+                    ModuleSourceOrigin::builtin("other", "common/exports.bzl").unwrap()
+            }
+            3 => {
+                bindings[0].module.source =
+                    ModuleSourceOrigin::Workspace("common/exports.bzl".into())
+            }
+            _ => unreachable!(),
+        }
+        changed.environment_bindings = bindings.into();
+        assert_ne!(original, CallableSourceAuthority::new(changed).unwrap());
+    }
+    assert_eq!(original, CallableSourceAuthority::new(value).unwrap());
+}
+
+#[test]
+fn new_builtin_and_environment_text_accounts_for_retained_capacity() {
+    let mut value = data();
+    let mut module = value.root.clone();
+    module.source =
+        ModuleSourceOrigin::builtin(&"c".repeat(25), "common/heap_sized_source.bzl").unwrap();
+    let origin_bytes = module.source.retained_text_bytes().unwrap();
+    assert!(origin_bytes > 25 + "common/heap_sized_source.bzl".len());
+    let mut global = CompactString::with_capacity(4096);
+    global.push_str("global");
+    let mut export = CompactString::with_capacity(8192);
+    export.push_str("export");
+    let name_capacity = global.capacity() + export.capacity();
+    assert!(name_capacity >= 12288);
+    value.environment_bindings = Arc::from([CallableEnvironmentBinding {
+        global,
+        export,
+        module,
+    }]);
+    let authority = CallableSourceAuthority::new(value).unwrap();
+    assert!(
+        authority.byte_cost()
+            >= name_capacity + origin_bytes + std::mem::size_of::<CallableSourceAuthorityData>()
+    );
+    // The short logical names cannot stand in for their retained buffers.
+    assert!(authority.byte_cost() > 12288);
 }
 
 #[test]

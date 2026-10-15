@@ -3,37 +3,105 @@ use slug_identity_v2::CanonicalLabel;
 
 use super::*;
 
-/// Original module client data owns both an identity and an Arc manifest. The
-/// expanded arrays remain in the original heap even though native semantic
-/// rows no longer retain another full manifest. Preserve ALL bytes/edges here;
-/// only their semantic traversal is replaced by validated local facts.
+/// Positively forecast the actual attachment, not the sum of two alternatives.
+/// Fixed inline overlap is conservative; every original typed payload stays full.
 pub(super) fn original_storage(
-    manifest: &BzlLoadManifest,
+    metadata: crate::starlark_label::PreparedDefiningModuleMetadata<'_>,
 ) -> anyhow::Result<(PublicationShape, PublicationShape)> {
-    let mut shape = fact(
-        std::mem::size_of::<BzlLoadManifest>()
-            + std::mem::size_of::<Option<Arc<BzlLoadManifest>>>()
-            + std::mem::size_of::<Option<FunctionEvaluationOwner>>()
-            + 8 * std::mem::size_of::<usize>(),
-        4,
-        1,
-    );
+    use crate::starlark_label::PreparedDefiningModuleMetadata;
+    let manifest = metadata.raw_manifest();
+    let mut shape = fact(PreparedDefiningModuleMetadata::header_bytes(), 4, 1);
+    // Actual defining identity exists separately in both client-data layouts.
     add_shape(&mut shape, identity_shape(&manifest.root)?, 1)?;
-    // DefiningBzlModuleContext.identity is separate from source_manifest.root.
-    add_shape(&mut shape, identity_shape(&manifest.root)?, 1)?;
-    for child in &*manifest.direct_children {
-        add_shape(&mut shape, fact(0, 1, 0), 0)?;
-        add_shape(&mut shape, identity_shape(child)?, 2)?;
+    let mut work = shape;
+    match metadata {
+        PreparedDefiningModuleMetadata::RawManifest { .. } => {
+            // One Arc manifest and BOTH Arc array control headers. Identity
+            // records conservatively include inline element storage as before.
+            let mut raw = fact(
+                std::mem::size_of::<BzlLoadManifest>() + 6 * std::mem::size_of::<usize>(),
+                0,
+                1,
+            );
+            add_shape(&mut raw, identity_shape(&manifest.root)?, 1)?;
+            for child in &*manifest.direct_children {
+                add_shape(&mut raw, fact(0, 1, 0), 0)?;
+                add_shape(&mut raw, identity_shape(child)?, 2)?;
+            }
+            for source in &*manifest.reachable {
+                add_shape(&mut raw, fact(32, 1, 0), 0)?;
+                add_shape(&mut raw, identity_shape(&source.identity)?, 2)?;
+            }
+            add_shape(&mut shape, raw, 0)?;
+            add_shape(&mut work, raw, 0)?;
+        }
+        PreparedDefiningModuleMetadata::EffectiveContext(context) => {
+            // The successful private producer certified the COMPLETE context,
+            // including raw manifest, bindings, effective rows and source array.
+            // Read that scalar certificate once; do not replay a raw tree walk.
+            let context = context.retention();
+            add_shape(
+                &mut shape,
+                PublicationShape {
+                    nodes: 0,
+                    edges: context.records,
+                    bytes: context.bytes,
+                    visits: 0,
+                    depth: context.depth,
+                },
+                1,
+            )?;
+            add_shape(&mut work, fact(0, 0, 0), 0)?;
+            prepay_effective_attachment_copy(&mut work)?;
+        }
     }
-    for source in &*manifest.reachable {
-        add_shape(&mut shape, fact(32, 1, 0), 0)?;
-        add_shape(&mut shape, identity_shape(&source.identity)?, 2)?;
-    }
-    // This is one cached scalar retention certificate, not an expanded native
-    // semantic value. Full producer validation work is independently bounded.
-    let work = shape;
     shape.visits = 0;
     Ok((shape, work))
+}
+
+/// One additional effective attachment clones the complete sealed source pair
+/// and copies its producer Budget. Pay on the original owner ledger, before the
+/// later metadata.attach/context.clone; the producer's finish/capture pays other
+/// operations. No payload is read or guard cloned here.
+pub(super) fn prepay_effective_attachment_copy(work: &mut PublicationShape) -> anyhow::Result<()> {
+    // Two Arc increments, two inline handle transfers, three Budget scalar
+    // copies and one enclosing Option/control transfer. Paying the whole pair
+    // conservatively includes its already-existing raw-table handle too.
+    add_shape(
+        work,
+        PublicationShape {
+            visits: 8,
+            bytes: std::mem::size_of::<crate::source_table::CertifiedSourceTable>()
+                + std::mem::size_of::<crate::bzl_module::semantic_evaluation::budget::Budget>()
+                + 2 * std::mem::size_of::<usize>(),
+            ..zero_shape()
+        },
+        0,
+    )
+}
+
+/// A legacy Context remains simultaneously live during owner construction even
+/// though its payload is absent from the actual attached client data. Carry its
+/// existing record/byte peak on the SAME constructor ledger before any clones.
+pub(super) fn transient_peak(
+    metadata: crate::starlark_label::PreparedDefiningModuleMetadata<'_>,
+    work: &mut PublicationShape,
+) -> anyhow::Result<()> {
+    if let Some(context) = metadata.transient_context() {
+        let context = context.retention();
+        add_shape(
+            work,
+            PublicationShape {
+                nodes: 0,
+                edges: context.records,
+                bytes: context.bytes,
+                visits: 0,
+                depth: context.depth,
+            },
+            1,
+        )?;
+    }
+    Ok(())
 }
 
 /// Conservative insertion credit for the fixed BTree node types in this

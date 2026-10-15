@@ -39,7 +39,7 @@ def call(value):
 fn context(label: &str, source: &str) -> BzlEvaluationContext {
     let identity = BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(FILENAME),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(FILENAME)),
         repository_mapping: Arc::from([]),
     };
     BzlEvaluationContext::macro_runtime_context(

@@ -1,5 +1,4 @@
 //! Genuine selected command Local definition dispatch over existing test owners.
-use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceTransaction;
 use slug_bzlmod_v2 as bv;
@@ -16,7 +15,7 @@ use slug_workspace_v2::path_observation_shards;
 use super::*;
 
 pub(crate) const WORKSPACE: &str = crate::canonical_repository_route_tests::tests::WORKSPACE;
-pub(crate) const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='local',version='1',repo_name='local_alias')\ne=use_extension('@local_alias//:ext.bzl','ext')\nuse_repo(e,'proof')\n";
+pub(crate) const MODULE: &str = "module(name='consumer')\nbazel_dep(name='local',version='1',repo_name='local_alias')\ne=use_extension('@local_alias//:ext.bzl','ext')\nuse_repo(e,'proof')\n";
 
 pub(crate) fn extension(marker: &str) -> String {
     format!(
@@ -174,7 +173,7 @@ pub(crate) fn assert_epoch(actual: &PathObservationEpoch, expected: &PathObserva
 
 #[tokio::test]
 async fn selected_command_local_definition_dispatch_is_external_and_fails_closed() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let root = format!("{WORKSPACE}/local");
     let a = extension("local_a");
     let (mut tx, epoch) = transaction(
@@ -186,7 +185,10 @@ async fn selected_command_local_definition_dispatch_is_external_and_fails_closed
     )
     .await;
     let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-    let key = HostLoadedModuleExtensionDefinitionsObservationKey::new(workspace.dupe());
+    let key = HostLoadedModuleExtensionDefinitionsObservationKey::new_with_scope(
+        workspace.dupe(),
+        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+    );
     let SourcePreparationOutcome::Complete(Ok(first)) = tx.compute(&key).await.unwrap() else {
         panic!("observed definitions must complete")
     };
@@ -222,8 +224,9 @@ async fn selected_command_local_definition_dispatch_is_external_and_fails_closed
     );
     assert_epoch(first.observations(), &epoch);
     let SourcePreparationOutcome::Complete(warm) = tx
-        .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+        .compute(&HostLoadedModuleExtensionDefinitionsKey::new_with_scope(
             workspace.dupe(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         ))
         .await
         .unwrap()

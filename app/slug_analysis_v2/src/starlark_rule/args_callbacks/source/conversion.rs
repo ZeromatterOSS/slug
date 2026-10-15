@@ -33,6 +33,15 @@ fn output_transfer_bytes(direct: usize, reachable: usize) -> Result<usize, Strin
         .ok_or_else(|| "Args source transfer byte overflow".into())
 }
 
+fn identity_bound(manifest: SourceManifest<'_>) -> Result<usize, String> {
+    1usize
+        .checked_add(manifest.direct_children().len())
+        .and_then(|n| n.checked_add(manifest.environment_bindings().len()))
+        .and_then(|n| n.checked_add(manifest.reachable().len()))
+        .filter(|n| *n <= slug_build_api_v2::callable_graph::CALLABLE_GRAPH_NODE_LIMIT)
+        .ok_or_else(|| "Args source identity bound".to_owned())
+}
+
 fn identity_bytes<'a>(
     identity: &'a BzlModuleIdentity,
     audits: &MappingAudits,
@@ -42,7 +51,10 @@ fn identity_bytes<'a>(
 ) -> Result<usize, String> {
     step(builder, remaining)?;
     let label = &identity.label;
-    let mut bytes = identity.workspace_path.as_os_str().len();
+    let mut bytes = identity
+        .source
+        .retained_text_bytes()
+        .ok_or("Args source origin byte overflow")?;
     for length in [
         label.package().repo().as_str().len(),
         label.package().package().as_str().len(),
@@ -59,8 +71,8 @@ fn identity_bytes<'a>(
     Ok(bytes)
 }
 
-fn forecast<'a>(
-    manifest: &'a BzlLoadManifest,
+fn forecast_manifest<'a>(
+    manifest: SourceManifest<'a>,
     audits: &MappingAudits,
     builder: &mut PublishedValueArenaBuilder,
     remaining: &mut usize,
@@ -68,33 +80,50 @@ fn forecast<'a>(
     use slug_build_api_v2::callable_graph::CALLABLE_GRAPH_NODE_LIMIT;
     audits.check()?;
     let mut plan = MappingPlan::new(builder)?;
-    if manifest.reachable.len() > CALLABLE_GRAPH_NODE_LIMIT
-        || manifest.direct_children.len() > CALLABLE_GRAPH_NODE_LIMIT
+    if manifest.reachable().len() > CALLABLE_GRAPH_NODE_LIMIT
+        || manifest.direct_children().len() > CALLABLE_GRAPH_NODE_LIMIT
     {
         return Err("Args source closure fact limit".into());
     }
-    // Includes the inline root and both Arc handle fields, plus Arc counters.
+    if manifest.environment_bindings().len() > CALLABLE_GRAPH_NODE_LIMIT {
+        return Err("Args environment source fact limit".into());
+    }
+    // The inline root and all three arrays/Arc controls are forecast in full.
     let mut bytes = size_of::<CallableSourceAuthorityData>()
         + CallableSourceAuthority::storage_overhead_bytes();
     add(
         &mut bytes,
-        array::<CallableModuleIdentity>(manifest.direct_children.len())?,
+        array::<CallableModuleIdentity>(manifest.direct_children().len())?,
     )?;
     add(
         &mut bytes,
-        array::<CallableModuleSource>(manifest.reachable.len())?,
+        array::<CallableModuleSource>(manifest.reachable().len())?,
     )?;
     add(
         &mut bytes,
-        identity_bytes(&manifest.root, audits, &mut plan, builder, remaining)?,
+        array::<CallableEnvironmentBinding>(manifest.environment_bindings().len())?,
     )?;
-    for child in &*manifest.direct_children {
+    add(
+        &mut bytes,
+        identity_bytes(manifest.root(), audits, &mut plan, builder, remaining)?,
+    )?;
+    for child in manifest.direct_children() {
         add(
             &mut bytes,
             identity_bytes(child, audits, &mut plan, builder, remaining)?,
         )?;
     }
-    for source in &*manifest.reachable {
+    for binding in manifest.environment_bindings() {
+        step(builder, remaining)?;
+        step(builder, remaining)?;
+        add(&mut bytes, binding.global.capacity())?;
+        add(&mut bytes, binding.export.capacity())?;
+        add(
+            &mut bytes,
+            identity_bytes(&binding.module, audits, &mut plan, builder, remaining)?,
+        )?;
+    }
+    for source in manifest.reachable() {
         add(
             &mut bytes,
             identity_bytes(&source.identity, audits, &mut plan, builder, remaining)?,
@@ -104,8 +133,26 @@ fn forecast<'a>(
     Ok(plan)
 }
 
+#[cfg(test)]
 pub(super) fn convert(
     manifest: &BzlLoadManifest,
+    audits: &mut MappingAudits,
+    builder: &mut PublishedValueArenaBuilder,
+    remaining: &mut usize,
+) -> Result<CallableSourceAuthority, String> {
+    convert_manifest(SourceManifest::Raw(manifest), audits, builder, remaining)
+}
+#[cfg(test)]
+fn forecast<'a>(
+    manifest: &'a BzlLoadManifest,
+    audits: &MappingAudits,
+    builder: &mut PublishedValueArenaBuilder,
+    remaining: &mut usize,
+) -> Result<MappingPlan<'a>, String> {
+    forecast_manifest(SourceManifest::Raw(manifest), audits, builder, remaining)
+}
+pub(super) fn convert_manifest(
+    manifest: SourceManifest<'_>,
     audits: &mut MappingAudits,
     builder: &mut PublishedValueArenaBuilder,
     remaining: &mut usize,
@@ -119,22 +166,32 @@ pub(super) fn convert(
 }
 
 fn convert_inner(
-    manifest: &BzlLoadManifest,
+    manifest: SourceManifest<'_>,
     audits: &mut MappingAudits,
     builder: &mut PublishedValueArenaBuilder,
     remaining: &mut usize,
 ) -> Result<CallableSourceAuthority, String> {
     audits.admit_header(builder)?;
-    let plan = forecast(manifest, audits, builder, remaining)?;
-    let transfer = output_transfer_bytes(manifest.direct_children.len(), manifest.reachable.len())?;
-    let (credit, preparation) = plan.admit(audits, builder, remaining, transfer)?;
+    let plan = forecast_manifest(manifest, audits, builder, remaining)?;
+    let transfer =
+        output_transfer_bytes(manifest.direct_children().len(), manifest.reachable().len())?;
+    let bound = identity_bound(manifest)?;
+    let (credit, preparation) = plan.admit(audits, builder, remaining, transfer, bound)?;
     plan.commit(audits, credit);
-    let mut direct_children = Vec::with_capacity(manifest.direct_children.len());
-    let mut reachable = Vec::with_capacity(manifest.reachable.len());
-    for child in &*manifest.direct_children {
+    let mut direct_children = Vec::with_capacity(manifest.direct_children().len());
+    let mut reachable = Vec::with_capacity(manifest.reachable().len());
+    let mut environment_bindings = Vec::with_capacity(manifest.environment_bindings().len());
+    for child in manifest.direct_children() {
         direct_children.push(identity(child));
     }
-    for source in &*manifest.reachable {
+    for binding in manifest.environment_bindings() {
+        environment_bindings.push(CallableEnvironmentBinding {
+            global: binding.global.clone(),
+            export: binding.export.clone(),
+            module: identity(&binding.module),
+        });
+    }
+    for source in manifest.reachable() {
         reachable.push(CallableModuleSource {
             identity: identity(&source.identity),
             digest: source.source_digest,
@@ -142,10 +199,11 @@ fn convert_inner(
     }
     preparation
         .finish(CallableSourceAuthorityData {
-            root: identity(&manifest.root),
+            root: identity(manifest.root()),
             direct_children: direct_children.into(),
+            environment_bindings: environment_bindings.into(),
             reachable: reachable.into(),
-            fingerprint: manifest.fingerprint,
+            fingerprint: *manifest.fingerprint(),
         })
         .map_err(|error| error.to_string())
 }

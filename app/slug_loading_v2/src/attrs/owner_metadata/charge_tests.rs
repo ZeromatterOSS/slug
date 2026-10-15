@@ -7,7 +7,9 @@ use super::*;
 fn identity() -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse("@@repo+//pkg:defs.bzl").unwrap(),
-        workspace_path: std::path::PathBuf::from("/actual/source/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(std::path::PathBuf::from(
+            "/actual/source/defs.bzl",
+        )),
         repository_mapping: Arc::from([
             (
                 slug_identity_v2::ApparentRepoName::new("first").unwrap(),
@@ -40,7 +42,7 @@ fn old_raw_rows(value: &BzlModuleIdentity) -> Vec<usize> {
     if let Some(mapping) = value.label.mapping_id() {
         rows.push(mapping.as_str().len());
     }
-    rows.push(value.workspace_path.as_os_str().len());
+    rows.push(value.source.retained_text_bytes().unwrap());
     for (apparent, canonical) in &*value.repository_mapping {
         rows.extend([
             std::mem::size_of::<(slug_identity_v2::ApparentRepoName, CanonicalRepoName)>(),
@@ -139,14 +141,21 @@ fn transition_source_rows_and_repeated_mapping_entries_keep_full_order_and_forec
             CompactString::new("actual-source-name"),
             BzlModuleSourceProvenance::new(value, [7; 32]),
         )]),
-    );
+    )
+    .unwrap();
     let mut actual = Vec::new();
     super::transition(&transition, &mut |c| {
         actual.push(c);
         Ok(())
     })
     .unwrap();
-    assert_eq!(actual.len(), 1 + direct.len() * 2 + 2);
+    assert_eq!(actual.len(), 1 + direct.len() * 2 + 2 + 3);
+    let full = transition.source_identities_by_filename.declarations()[0].retained_shape();
+    let last = actual.last().unwrap();
+    assert_eq!(
+        (last.nodes, last.edges, last.bytes, last.visits),
+        (full.nodes, full.edges, full.bytes, full.visits)
+    );
     for (got, expected) in actual[1..1 + direct.len()].iter().zip(&direct) {
         assert_eq!(
             (got.bytes, got.edges, got.visits),

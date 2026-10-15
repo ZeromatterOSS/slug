@@ -165,14 +165,21 @@ fn root_repository_load_route_keys_preserve_admission_identity_and_reject_root()
 
 #[tokio::test]
 async fn shared_route_publishes_generated_canonical_input_and_observed_epoch() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::generated_graph_dice();
     let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
     let apparent = ApparentRepoName::new("first").unwrap();
     let key = HostRootRepositoryLoadRouteKey::new(workspace.clone(), apparent.clone()).unwrap();
     let observed_key =
         HostRootRepositoryLoadRouteObservationKey::new(workspace.clone(), apparent.clone())
             .unwrap();
-    let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+    let mut tx = transaction(
+        &dice,
+        crate::canonical_repository_route_tests::tests::CONSUMER_MODULE,
+        EXTENSION_A,
+        true,
+        None,
+    )
+    .await;
 
     let SourcePreparationOutcome::Complete(legacy) = tx.compute(&key).await.unwrap() else {
         panic!("generated shared route must complete")
@@ -697,11 +704,11 @@ async fn observed_route_need_warm_cancellation_and_generated_missing_generated_a
         ApparentRepoName::new("first").unwrap(),
     )
     .unwrap();
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::generated_graph_dice();
     let trace = Arc::new(RouteTrace::default());
     let mut cancelled = transaction(
         &dice,
-        MODULE,
+        crate::canonical_repository_route_tests::tests::CONSUMER_MODULE,
         EXTENSION_A,
         true,
         Some(trace.clone() as Arc<dyn ActivationTracker>),
@@ -719,7 +726,7 @@ async fn observed_route_need_warm_cancellation_and_generated_missing_generated_a
 
     let mut recovered = transaction(
         &dice,
-        MODULE,
+        crate::canonical_repository_route_tests::tests::CONSUMER_MODULE,
         EXTENSION_A,
         true,
         Some(trace.clone() as Arc<dyn ActivationTracker>),
@@ -764,7 +771,14 @@ async fn observed_route_need_warm_cancellation_and_generated_missing_generated_a
         })
     ));
 
-    let mut restored_tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+    let mut restored_tx = transaction(
+        &dice,
+        crate::canonical_repository_route_tests::tests::CONSUMER_MODULE,
+        EXTENSION_A,
+        true,
+        None,
+    )
+    .await;
     let restored_value = restored_tx.compute(&key).await.unwrap();
     let restored = observed_route(&restored_value);
     assert_ne!(first.result(), missing.result());

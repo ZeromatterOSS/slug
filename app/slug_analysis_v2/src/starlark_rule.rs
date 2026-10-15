@@ -2507,14 +2507,7 @@ pub(crate) fn evaluate_loaded_rule(
     let mut provider_values = Vec::with_capacity(returned.len());
     let mut original_providers = Vec::new();
     for (index, value) in returned.into_iter().enumerate() {
-        if slug_loading_v2::provider::is_default_xcode_version_info(value) {
-            // The pinned default Xcode provider has callable fields. Retain its
-            // validated semantic variant instead of asking the generic value
-            // lowerer to serialize evaluator-local Starlark functions.
-            provider_values.push(Some(ProviderValue::XcodeVersionInfo(
-                slug_build_api_v2::XcodeVersionInfo::default_empty_version(),
-            )));
-        } else if let Some(info) = slug_loading_v2::provider::run_environment_info(value) {
+        if let Some(info) = slug_loading_v2::provider::run_environment_info(value) {
             run_environment_info::validate_declaration(rule_capability.as_ref())?;
             provider_values.push(Some(ProviderValue::RunEnvironmentInfo(info)));
         } else if let Some(info) = slug_loading_v2::provider::feature_flag_info(value) {

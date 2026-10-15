@@ -71,6 +71,8 @@ impl NativeApis {
             "CppFragment"
         } else if crate::package_specification::from_value_ref(receiver).is_some() {
             "PackageSpecificationInfo"
+        } else if slug_loading_v2::dotted_version_ref(receiver).is_some() {
+            "DottedVersion"
         } else {
             return Err(
                 "bound native method receiver class has no complete typed certificate".into(),
@@ -156,6 +158,12 @@ pub(super) fn pure_candidate<'v>(
             if let Some(specification) = crate::package_specification::from_value_ref(value) {
                 self.graph
                     .audit_package_specification_at_depth(specification, depth)
+                    .map_err(|error| error.to_string())?;
+                return Ok(true);
+            }
+            if let Some(version) = slug_loading_v2::dotted_version_ref(value) {
+                self.graph
+                    .audit_dotted_version_at_depth(version, depth)
                     .map_err(|error| error.to_string())?;
                 return Ok(true);
             }

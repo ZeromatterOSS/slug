@@ -1,5 +1,8 @@
 //! Cached local owner counts share the arena budget; scratch keys retain owners.
 use super::*;
+
+#[path = "owner_completion.rs"]
+pub(in crate::published_value) mod owner_completion;
 impl PublishedValueArenaBuilder {
     pub fn charge_storage(
         &mut self,
@@ -57,6 +60,10 @@ impl PublishedValueArenaBuilder {
     pub(in crate::published_value) fn complete_shape(
         &mut self,
     ) -> Result<PublicationShape, PublishedValueError> {
+        if self.strict_shared_audit && self.certified_shared_visits != 0 {
+            self.failed_budget = true;
+            return Err(PublishedValueError::Invalid("strict shared audit"));
+        }
         let visits = self.visits.checked_add(self.import_visits).ok_or_else(|| {
             self.failed_budget = true;
             PublishedValueError::Limit("complete visits")
@@ -142,6 +149,7 @@ impl PublishedValueArenaBuilder {
             .filter(|(owner_visits, _)| {
                 self.import_visits
                     .checked_add(*owner_visits)
+                    .and_then(|facts| facts.checked_add(self.certified_shared_visits))
                     .is_some_and(|cached| cached <= RETAINED_FACT_LIMIT)
             })
             .ok_or_else(|| {
@@ -158,7 +166,11 @@ impl PublishedValueArenaBuilder {
             bytes: shape.bytes,
             visits: 0,
         })
-        .map_err(|error| error.with_byte_context(PublicationByteContext::OwnerBody))?;
+        .map_err(|error| {
+            error
+                .with_byte_context(PublicationByteContext::OwnerBody)
+                .with_edge_context(PublicationEdgeContext::OwnerBody)
+        })?;
         self.owner_payload.nodes += shape.nodes;
         self.owner_payload.edges += shape.edges;
         self.owner_payload.bytes += shape.bytes;
@@ -166,8 +178,8 @@ impl PublishedValueArenaBuilder {
         // Later descendant errors retain these charges only in a failed builder.
         self.owner_payload.visits = next.0;
         self.visits = next.1;
-        for input in owner.shared_inputs() {
-            self.audit_shared_input(input, depth.saturating_add(1))?;
+        for input in owner.certified_shared_inputs() {
+            self.audit_owner_shared_input(input, depth.saturating_add(1))?;
         }
         for dependency in owner.retained_owners() {
             self.walk_owner(dependency, depth.saturating_add(1))?;

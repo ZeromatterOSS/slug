@@ -60,6 +60,7 @@ impl PublishedValueArenaBuilder {
             .filter(|visits| {
                 visits
                     .checked_add(self.owner_payload.visits)
+                    .and_then(|facts| facts.checked_add(self.certified_shared_visits))
                     .is_some_and(|cached| cached <= RETAINED_FACT_LIMIT)
             })
             .ok_or_else(|| {
@@ -74,7 +75,11 @@ impl PublishedValueArenaBuilder {
             bytes: shape.bytes,
             visits: 0,
         })
-        .map_err(|error| error.with_byte_context(PublicationByteContext::ImportBody))?;
+        .map_err(|error| {
+            error
+                .with_byte_context(PublicationByteContext::ImportBody)
+                .with_edge_context(PublicationEdgeContext::ImportBody)
+        })?;
         self.owner_nodes -= shape.nodes;
         self.owner_edges -= shape.edges;
         self.imported_nodes += shape.nodes;

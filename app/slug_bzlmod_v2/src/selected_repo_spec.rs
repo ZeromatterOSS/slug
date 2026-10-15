@@ -1668,9 +1668,8 @@ impl HostBuiltinBazelToolsRepositoryMapping {
             .into()
     }
 
-    pub(crate) fn iter(
-        &self,
-    ) -> impl ExactSizeIterator<Item = (&ApparentRepoName, &CanonicalRepoName)> {
+    #[doc(hidden)]
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&ApparentRepoName, &CanonicalRepoName)> {
         self.mapping.order.iter().map(|apparent| {
             (
                 apparent,
@@ -4525,15 +4524,44 @@ fn selected_extension_definition_source(
     })
 }
 
+/// Explicit Slug-native demand scope for the legacy extension aggregates.
+/// Complete selected mappings remain the predecessor for both selections.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
+pub enum HostModuleExtensionUsageScope {
+    AllSelected,
+    RootUsages,
+}
+
+impl HostModuleExtensionUsageScope {
+    fn includes(self, owner: &HostGraphModuleKey) -> bool {
+        self == Self::AllSelected || matches!(owner, HostGraphModuleKey::Root)
+    }
+}
+
+impl fmt::Display for HostModuleExtensionUsageScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::AllSelected => "",
+            Self::RootUsages => ":root-usages",
+        })
+    }
+}
+
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct HostSelectedExtensionDefinitionLoadRequests {
     workspace: NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
     predecessor: Arc<HostSelectedExtensionMappings>,
     requests: Arc<[HostSelectedExtensionDefinitionLoadRequest]>,
 }
 
 impl HostSelectedExtensionDefinitionLoadRequests {
+    pub fn scope(&self) -> HostModuleExtensionUsageScope {
+        self.scope
+    }
+
     pub fn parts(
         &self,
     ) -> (
@@ -4574,6 +4602,7 @@ impl fmt::Display for HostSelectedExtensionDefinitionLoadRequestsError {
 impl std::error::Error for HostSelectedExtensionDefinitionLoadRequestsError {}
 
 fn selected_extension_definition_load_requests(
+    scope: HostModuleExtensionUsageScope,
     workspace: NormalizedAbsolutePath,
     predecessor: Arc<HostSelectedExtensionMappings>,
 ) -> Result<
@@ -4606,7 +4635,13 @@ fn selected_extension_definition_load_requests(
             ),
         )
     })?;
-    let unsupported = predecessor.usages.iter().find(|usage| {
+    let usages = || {
+        predecessor
+            .usages
+            .iter()
+            .filter(|usage| scope.includes(&usage.owner))
+    };
+    let unsupported = usages().find(|usage| {
         !matches!(usage.owner, HostGraphModuleKey::Root)
             || usage.id.isolation.is_some()
             || usage.id.extension_name.split_ascii_whitespace().count() != 1
@@ -4622,7 +4657,7 @@ fn selected_extension_definition_load_requests(
     let mut seen = SmallMap::new();
     let mut namespace_owners = SmallMap::new();
     let mut requests = Vec::new();
-    for usage in predecessor.usages.iter() {
+    for usage in usages() {
         if let Some(owner) = namespace_owners.get(&usage.unique_name) {
             if owner != &usage.id {
                 return Err(HostSelectedExtensionDefinitionLoadRequestsError(
@@ -4657,9 +4692,7 @@ fn selected_extension_definition_load_requests(
                         },
                     )
                 })?;
-        let imports = predecessor
-            .usages
-            .iter()
+        let imports = usages()
             .filter(|candidate| candidate.id == usage.id)
             .flat_map(|candidate| candidate.validation_imports.iter().cloned())
             .collect::<Arc<_>>();
@@ -4687,6 +4720,7 @@ fn selected_extension_definition_load_requests(
     }
     Ok(HostSelectedExtensionDefinitionLoadRequests {
         workspace,
+        scope,
         predecessor,
         requests: requests.into(),
     })
@@ -4696,11 +4730,19 @@ fn selected_extension_definition_load_requests(
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct HostSelectedExtensionDefinitionLoadRequestsKey {
     workspace: NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
 }
 
 impl HostSelectedExtensionDefinitionLoadRequestsKey {
     pub fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self { workspace }
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self { workspace, scope }
     }
 }
 
@@ -4708,8 +4750,8 @@ impl fmt::Display for HostSelectedExtensionDefinitionLoadRequestsKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "host-selected-extension-definition-load-requests:{}",
-            self.workspace
+            "host-selected-extension-definition-load-requests:{}{}",
+            self.workspace, self.scope
         )
     }
 }
@@ -4730,9 +4772,14 @@ pub struct HostSelectedExtensionDefinitionLoadRequestsObservationKey(
 
 impl HostSelectedExtensionDefinitionLoadRequestsObservationKey {
     pub fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self(HostSelectedExtensionDefinitionLoadRequestsKey::new(
-            workspace,
-        ))
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self(HostSelectedExtensionDefinitionLoadRequestsKey::new_with_scope(workspace, scope))
     }
 }
 
@@ -4891,7 +4938,7 @@ async fn drive_definition_load_requests(
             Err(terminal) => return terminal,
         };
     definition_load_requests_complete(
-        selected_extension_definition_load_requests(key.workspace.dupe(), predecessor),
+        selected_extension_definition_load_requests(key.scope, key.workspace.dupe(), predecessor),
         observations,
     )
 }
@@ -5134,11 +5181,19 @@ fn selected_extension_evaluation_input_requests(
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct HostSelectedExtensionEvaluationInputRequestsKey {
     workspace: NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
 }
 
 impl HostSelectedExtensionEvaluationInputRequestsKey {
     pub fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self { workspace }
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self { workspace, scope }
     }
 }
 
@@ -5146,8 +5201,8 @@ impl fmt::Display for HostSelectedExtensionEvaluationInputRequestsKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "host-selected-extension-evaluation-inputs:{}",
-            self.workspace
+            "host-selected-extension-evaluation-inputs:{}{}",
+            self.workspace, self.scope
         )
     }
 }
@@ -5196,9 +5251,14 @@ pub struct HostSelectedExtensionEvaluationInputRequestsObservationKey(
 
 impl HostSelectedExtensionEvaluationInputRequestsObservationKey {
     pub fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self(HostSelectedExtensionEvaluationInputRequestsKey::new(
-            workspace,
-        ))
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self(HostSelectedExtensionEvaluationInputRequestsKey::new_with_scope(workspace, scope))
     }
 }
 
@@ -5245,6 +5305,7 @@ fn evaluation_input_requests_complete(
 async fn evaluation_input_requests_request_child(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
     mode: RoutesMode,
 ) -> RepoSpecChild<
     HostSelectedExtensionDefinitionLoadRequests,
@@ -5253,9 +5314,12 @@ async fn evaluation_input_requests_request_child(
 > {
     match mode {
         RoutesMode::Legacy => match ctx
-            .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
-                workspace.dupe(),
-            ))
+            .compute(
+                &HostSelectedExtensionDefinitionLoadRequestsKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                ),
+            )
             .await
         {
             Err(error) => RepoSpecChild::Compute(error.to_string().into()),
@@ -5267,7 +5331,10 @@ async fn evaluation_input_requests_request_child(
         },
         RoutesMode::Observed => match ctx
             .compute(
-                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe()),
+                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new_with_scope(
+                    workspace.dupe(),
+                    scope,
+                ),
             )
             .await
         {
@@ -5445,7 +5512,7 @@ async fn drive_evaluation_input_requests(
     mode: RoutesMode,
 ) -> EvaluationInputRequestsDriverOutcome {
     let (requests, observations) = match finish_evaluation_input_requests_request_child(
-        evaluation_input_requests_request_child(ctx, &key.workspace, mode).await,
+        evaluation_input_requests_request_child(ctx, &key.workspace, key.scope, mode).await,
     ) {
         Ok(value) => value,
         Err(terminal) => return terminal,
@@ -9131,6 +9198,7 @@ mod tests {
         )
         .unwrap();
         let requests = selected_extension_definition_load_requests(
+            HostModuleExtensionUsageScope::AllSelected,
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
             Arc::new(mappings),
         )
@@ -9519,6 +9587,107 @@ mod tests {
     }
 
     #[test]
+    fn root_usage_scope_preserves_full_predecessor_and_exact_default_refusal() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let routes = Arc::new(
+            selected_routes(
+                &route_graph([route_root([], Some("root_self"))]),
+                &HostSelectedRegistryRepoSpecs {
+                    entries: Arc::from([]),
+                },
+            )
+            .unwrap(),
+        );
+        let mappings = Arc::new(
+            selected_extension_mappings(
+                routes,
+                Arc::from([
+                    root_usage(
+                        "//:second.bzl",
+                        "second",
+                        test_proxy("second", [("two", "two")]),
+                        false,
+                        [],
+                    ),
+                    root_usage(
+                        "//:first.bzl",
+                        "first",
+                        test_proxy("first", [("one", "one")]),
+                        false,
+                        [],
+                    ),
+                ]),
+            )
+            .unwrap(),
+        );
+        let make = |scope, mappings| {
+            selected_extension_definition_load_requests(scope, workspace.dupe(), mappings)
+        };
+        let all = make(HostModuleExtensionUsageScope::AllSelected, mappings.clone()).unwrap();
+        let root = make(HostModuleExtensionUsageScope::RootUsages, mappings.clone()).unwrap();
+        assert_ne!(
+            all, root,
+            "scope remains semantic even when both outputs agree"
+        );
+        assert_eq!(all.requests, root.requests);
+        assert!(Arc::ptr_eq(&root.predecessor, &mappings));
+        assert_eq!(
+            root.requests
+                .iter()
+                .map(|request| request.extension_name.as_str())
+                .collect::<Vec<_>>(),
+            ["second", "first"]
+        );
+
+        // Deliberately share the exact extension ID with a foreign declaring
+        // owner: selection is by owner, never by label spelling or shared ID.
+        let foreign = route_key("dep", "1");
+        let mut mixed = (*mappings).clone();
+        let mut usage = mixed.usages[0].clone();
+        usage.owner = foreign.clone();
+        usage.validation_imports = Arc::from([HostSelectedExtensionDefinitionImport {
+            local_name: "foreign".into(),
+            generated_name: "foreign".into(),
+            location: test_span(),
+        }]);
+        let mut usages = mixed.usages.to_vec();
+        usages.insert(0, usage);
+        mixed.usages = usages.into();
+        let mixed = Arc::new(mixed);
+        assert!(
+            matches!(make(HostModuleExtensionUsageScope::AllSelected, mixed.clone()),
+            Err(HostSelectedExtensionDefinitionLoadRequestsError(HostSelectedExtensionDefinitionLoadRequestsErrorInner::Unsupported { owner, .. })) if owner == foreign)
+        );
+        let selected = make(HostModuleExtensionUsageScope::RootUsages, mixed.clone()).unwrap();
+        assert_eq!(
+            selected.requests, root.requests,
+            "foreign imports must not leak into root declarations"
+        );
+        assert_ne!(
+            selected, root,
+            "the FULL predecessor remains part of result equality"
+        );
+        assert!(Arc::ptr_eq(&selected.predecessor, &mixed));
+        let weak = Arc::downgrade(&mixed);
+        drop(mixed);
+        assert!(weak.upgrade().is_some());
+        drop(selected);
+        assert!(weak.upgrade().is_none());
+
+        let mut empty = (*mappings).clone();
+        empty.usages = Arc::from([]);
+        let empty = Arc::new(empty);
+        let all_empty = make(HostModuleExtensionUsageScope::AllSelected, empty.clone()).unwrap();
+        let root_empty = make(HostModuleExtensionUsageScope::RootUsages, empty).unwrap();
+        assert!(all_empty.requests.is_empty() && root_empty.requests.is_empty());
+        assert_ne!(all_empty, root_empty, "empty outputs retain scope");
+        assert_eq!(
+            root_empty.scope(),
+            HostModuleExtensionUsageScope::RootUsages
+        );
+    }
+
+    #[test]
     fn pure_definition_requests_deduplicate_and_fail_closed() {
         let routes = Arc::new(
             selected_routes(
@@ -9555,6 +9724,7 @@ mod tests {
         )
         .unwrap();
         let value = selected_extension_definition_load_requests(
+            HostModuleExtensionUsageScope::AllSelected,
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
             Arc::new(ordinary),
         )
@@ -9614,6 +9784,7 @@ mod tests {
         )
         .unwrap();
         let namespaced = selected_extension_definition_load_requests(
+            HostModuleExtensionUsageScope::AllSelected,
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
             Arc::new(namespaced),
         )
@@ -9672,7 +9843,7 @@ mod tests {
         invalid.usages = invalid_usages.into();
         assert!(matches!(
             associate_definition_request_result(
-                selected_extension_definition_load_requests(
+                selected_extension_definition_load_requests(HostModuleExtensionUsageScope::AllSelected,
                     NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
                     Arc::new(invalid),
                 ),
@@ -9692,7 +9863,7 @@ mod tests {
         duplicate.usages = duplicate_usages.into();
         assert!(matches!(
             associate_definition_request_result(
-                selected_extension_definition_load_requests(
+                selected_extension_definition_load_requests(HostModuleExtensionUsageScope::AllSelected,
                     NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
                     Arc::new(duplicate),
                 ),
@@ -9710,7 +9881,7 @@ mod tests {
         missing.base_mappings = Arc::from([]);
         assert!(matches!(
             associate_definition_request_result(
-                selected_extension_definition_load_requests(
+                selected_extension_definition_load_requests(HostModuleExtensionUsageScope::AllSelected,
                     NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
                     Arc::new(missing),
                 ),
@@ -9738,6 +9909,7 @@ mod tests {
         assert!(matches!(
             associate_definition_request_result(
                 selected_extension_definition_load_requests(
+                    HostModuleExtensionUsageScope::AllSelected,
                     NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
                     Arc::new(unsupported),
                 ),

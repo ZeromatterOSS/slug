@@ -506,48 +506,74 @@ fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnaps
     })
 }
 
+fn local_repository_materialization_entries(
+    workspace: &NormalizedAbsolutePath,
+    repositories: &[(&str, &str)],
+) -> Vec<RepositoryMaterializationEpochEntry> {
+    repositories
+        .iter()
+        .map(|(canonical_repo, path)| {
+            let mut attributes = SmallMap::new();
+            let materialization_path = if *canonical_repo == "bazel_tools+" {
+                workspace.as_path().join(path).display().to_string().into()
+            } else {
+                (*path).into()
+            };
+            attributes.insert(
+                "path".into(),
+                OverrideAttributeValue::String(materialization_path),
+            );
+            RepositoryMaterializationEpochEntry {
+                request: Arc::new(RepositoryMaterializationRequest {
+                    id: RepositoryMaterializationRequestId {
+                        workspace: workspace.dupe(),
+                        canonical_repo: CanonicalRepoName::new(*canonical_repo).unwrap(),
+                    },
+                    repo_spec: RepoSpec {
+                        rule_id: RepoRuleId {
+                            bzl_file: CanonicalLabel::parse(
+                                "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                            )
+                            .unwrap(),
+                            rule_name: "local_repository".into(),
+                        },
+                        attributes: Arc::new(attributes),
+                    },
+                    kind: RepositoryMaterializationKind::Local {
+                        logical_root: NormalizedAbsolutePath::new(workspace.as_path().join(path))
+                            .unwrap(),
+                    },
+                }),
+                result: RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Local,
+                ),
+            }
+        })
+        .collect()
+}
+
 fn local_repository_materializations(
     workspace: &NormalizedAbsolutePath,
     repositories: &[(&str, &str)],
 ) -> RepositoryMaterializationResultEpoch {
-    let entries = repositories.iter().map(|(canonical_repo, path)| {
-        let mut attributes = SmallMap::new();
-        let materialization_path = if *canonical_repo == "bazel_tools+" {
-            workspace.as_path().join(path).display().to_string().into()
-        } else {
-            (*path).into()
-        };
-        attributes.insert(
-            "path".into(),
-            OverrideAttributeValue::String(materialization_path),
-        );
-        RepositoryMaterializationEpochEntry {
-            request: Arc::new(RepositoryMaterializationRequest {
-                id: RepositoryMaterializationRequestId {
-                    workspace: workspace.dupe(),
-                    canonical_repo: CanonicalRepoName::new(*canonical_repo).unwrap(),
-                },
-                repo_spec: RepoSpec {
-                    rule_id: RepoRuleId {
-                        bzl_file: CanonicalLabel::parse(
-                            "@@bazel_tools//tools/build_defs/repo:local.bzl",
-                        )
-                        .unwrap(),
-                        rule_name: "local_repository".into(),
-                    },
-                    attributes: Arc::new(attributes),
-                },
-                kind: RepositoryMaterializationKind::Local {
-                    logical_root: NormalizedAbsolutePath::new(workspace.as_path().join(path))
-                        .unwrap(),
-                },
-            }),
-            result: RepositoryMaterializationResult::Success(
-                RepositoryMaterializationSuccess::Local,
-            ),
+    RepositoryMaterializationResultEpoch::new(
+        workspace.dupe(),
+        local_repository_materialization_entries(workspace, repositories),
+    )
+    .unwrap()
+}
+
+fn fixture_materialization_entries(
+    workspace: &NormalizedAbsolutePath,
+    repositories: &[(&str, &str)],
+) -> Vec<RepositoryMaterializationEpochEntry> {
+    let mut complete = repositories.to_vec();
+    for repository in HOST_PLATFORM_REPOSITORIES {
+        if !complete.iter().any(|(name, _)| name == &repository.0) {
+            complete.push(*repository);
         }
-    });
-    RepositoryMaterializationResultEpoch::new(workspace.dupe(), entries).unwrap()
+    }
+    local_repository_materialization_entries(workspace, &complete)
 }
 
 const HOST_PLATFORM_REPOSITORIES: &[(&str, &str)] =
@@ -614,9 +640,42 @@ fn root_epoch_with_missing(
     root: &std::path::Path,
     missing: impl IntoIterator<Item = PathBuf>,
 ) -> PathObservationEpoch {
+    builtin_fixture::prepare_if_ordinary(root);
+    observation_epoch_with_missing(root, missing)
+}
+
+// Explicit fixture owners prepare their complete MODULE/source inputs first.
+// Observing those inputs must not change their registry/local selection policy.
+fn observation_epoch(root: &std::path::Path) -> PathObservationEpoch {
+    observation_epoch_with_missing(root, std::iter::empty::<PathBuf>())
+}
+
+fn observation_epoch_with_missing(
+    root: &std::path::Path,
+    missing: impl IntoIterator<Item = PathBuf>,
+) -> PathObservationEpoch {
     ensure_host_platform_fixture(root);
-    let mut entries = SmallMap::new();
     let snapshot = workspace_snapshot(root);
+    observation_epoch_from_snapshot(root, &snapshot, missing)
+}
+
+fn observation_epoch_from_snapshot(
+    root: &std::path::Path,
+    snapshot: &WorkspaceSnapshot,
+    missing: impl IntoIterator<Item = PathBuf>,
+) -> PathObservationEpoch {
+    observation_epoch_from_snapshot_inner(root, snapshot, missing, true)
+}
+
+// The false branch is used only by the bounded full-output differential test.
+// It retains the original repeated-ancestor algorithm, not another policy.
+fn observation_epoch_from_snapshot_inner(
+    root: &std::path::Path,
+    snapshot: &WorkspaceSnapshot,
+    missing: impl IntoIterator<Item = PathBuf>,
+    deduplicate_ancestors: bool,
+) -> PathObservationEpoch {
+    let mut entries = std::collections::BTreeMap::new();
     let mut directories = BTreeSet::from([root.to_path_buf()]);
     for (path, value) in snapshot.files.iter() {
         let demand = |operation| {
@@ -647,6 +706,11 @@ fn root_epoch_with_missing(
         }
         let mut parent = path.parent();
         while let Some(directory) = parent.filter(|directory| directory.starts_with(root)) {
+            // Every previously inserted parent already brought its complete
+            // ancestor chain. Stop before copying/re-emitting shared parents.
+            if deduplicate_ancestors && directories.contains(directory) {
+                break;
+            }
             directories.insert(directory.to_path_buf());
             entries.insert(
                 PathObservationDemand::new(
@@ -739,6 +803,12 @@ fn root_epoch_with_missing(
             ),
             PathObservationResult::Lstat(PathOperationResult::Missing),
         );
+    }
+    for (demand, result) in builtin_fixture::platform_constraint_observations(root)
+        .into_iter()
+        .flatten()
+    {
+        entries.insert(demand, result);
     }
     PathObservationEpoch::new(entries).unwrap()
 }
@@ -921,11 +991,14 @@ async fn configured_condition_request_with_inputs(
     repositories: &[(&str, &str)],
     tracker: Arc<RootActivationTracker>,
 ) -> Result<ConfiguredConditionMatch, String> {
-    let mut updater = dice.updater_with_data(UserComputationData {
+    let mut data = UserComputationData {
         activation_tracker: Some(tracker),
         cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
-    });
+    };
+    let host_inputs = builtin_fixture::RepositoryHostInputs::prepare(workspace, &mut data);
+    let mut updater = dice.updater_with_data(data);
+    host_inputs.inject(&mut updater);
     inject_root_target_inputs(&mut updater, workspace, epoch, repositories);
     let key = ConfiguredConditionKey::new(
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
@@ -1122,12 +1195,90 @@ async fn command_configuration_request_result_with_inputs(
     tracker: Arc<RootActivationTracker>,
     repositories: &[(&str, &str)],
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
-    let mut updater = dice.updater_with_data(UserComputationData {
-        activation_tracker: Some(tracker),
-        ..Default::default()
-    });
-    inject_root_target_inputs(&mut updater, workspace, root_epoch(workspace), repositories);
+    command_configuration_request_result_with_generated_inputs(
+        dice,
+        workspace,
+        target,
+        overlay,
+        tracker,
+        repositories,
+        true,
+    )
+    .await
+}
+
+async fn command_configuration_request_with_generated_sources(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    overlay: CommandConfigurationOverlay,
+    tracker: Arc<RootActivationTracker>,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    command_configuration_request_result_with_generated_inputs(
+        dice,
+        workspace,
+        target,
+        overlay,
+        tracker,
+        &[],
+        true,
+    )
+    .await
+}
+
+// Explicit false retains the raw owner: no prefix preparation or tracker phase change.
+async fn command_configuration_request_result_with_generated_inputs(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    overlay: CommandConfigurationOverlay,
+    tracker: Arc<RootActivationTracker>,
+    repositories: &[(&str, &str)],
+    prepare_generated: bool,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    let (data, host_inputs) = builtin_fixture::request_data(
+        workspace,
+        (!prepare_generated).then(|| tracker.clone() as Arc<dyn ActivationTracker>),
+        false,
+    );
+    let mut updater = dice.updater_with_data(data);
+    if prepare_generated {
+        ensure_host_platform_fixture(workspace);
+    }
+    let mut saved = if prepare_generated {
+        Some(builtin_fixture::capture_generated_inputs(&updater, workspace).await?)
+    } else {
+        None
+    };
+    host_inputs.inject(&mut updater);
+    let entries = if let Some(saved) = saved.as_mut() {
+        inject_ready_root_target_inputs(
+            &mut updater,
+            workspace,
+            builtin_fixture::FixtureObservations::Automatic,
+            repositories,
+            saved,
+        )
+    } else {
+        inject_root_target_inputs_with_entries(
+            &mut updater,
+            workspace,
+            root_epoch(workspace),
+            repositories,
+        )
+    };
     let mut transaction = updater.commit().await;
+    if prepare_generated {
+        transaction = builtin_fixture::ready_transaction(
+            transaction,
+            workspace,
+            entries,
+            Some(tracker),
+            false,
+            saved.expect("ready source inputs captured"),
+        )
+        .await?;
+    }
     let preparation = CommandConfigurationPreparationKey::new(
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
         test_configuration(),
@@ -1202,14 +1353,16 @@ async fn root_target_request_with_configuration(
     configuration: ConfigurationKey,
     tracker: Arc<RootActivationTracker>,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
-    root_target_request_with_inputs(
+    root_target_request_with_explicit_inputs_and_prefix(
         dice,
         workspace,
         target,
         configuration,
+        None,
         tracker,
-        root_epoch(workspace),
+        builtin_fixture::FixtureObservations::Automatic,
         &[],
+        true,
     )
     .await
 }
@@ -1220,7 +1373,23 @@ fn inject_root_target_inputs(
     epoch: PathObservationEpoch,
     repositories: &[(&str, &str)],
 ) {
-    inject_root_target_inputs_with_policy(updater, workspace, epoch, repositories, true);
+    inject_root_target_inputs_with_entries(updater, workspace, epoch, repositories);
+}
+
+fn inject_root_target_inputs_with_entries(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &std::path::Path,
+    epoch: PathObservationEpoch,
+    repositories: &[(&str, &str)],
+) -> Vec<RepositoryMaterializationEpochEntry> {
+    let prepared = builtin_fixture::prepare_if_ordinary(workspace);
+    let mut complete = repositories.to_vec();
+    for (name, path) in &prepared {
+        if !complete.iter().any(|(existing, _)| existing == name) {
+            complete.push((name.as_str(), path.as_str()));
+        }
+    }
+    inject_root_target_inputs_with_policy(updater, workspace, epoch, &complete, false)
 }
 
 fn inject_root_target_inputs_with_policy(
@@ -1229,7 +1398,7 @@ fn inject_root_target_inputs_with_policy(
     epoch: PathObservationEpoch,
     repositories: &[(&str, &str)],
     override_bazel_tools: bool,
-) {
+) -> Vec<RepositoryMaterializationEpochEntry> {
     let text = Arc::new(workspace_snapshot(workspace));
     let raw = raw_snapshot_from_text(&text);
     updater
@@ -1260,7 +1429,7 @@ fn inject_root_target_inputs_with_policy(
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
-    inject_test_bzlmod_inputs(updater, workspace, repositories, override_bazel_tools);
+    inject_test_bzlmod_inputs(updater, workspace, repositories, override_bazel_tools)
 }
 
 fn inject_test_bzlmod_inputs(
@@ -1268,25 +1437,29 @@ fn inject_test_bzlmod_inputs(
     workspace: &std::path::Path,
     repositories: &[(&str, &str)],
     override_bazel_tools: bool,
-) {
+) -> Vec<RepositoryMaterializationEpochEntry> {
+    inject_test_bzlmod_declarations(updater, workspace, repositories, override_bazel_tools, true)
+}
+
+fn inject_test_bzlmod_declarations(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &std::path::Path,
+    repositories: &[(&str, &str)],
+    override_bazel_tools: bool,
+    inject_materializations: bool,
+) -> Vec<RepositoryMaterializationEpochEntry> {
     let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
-    let mut all_repositories = repositories.to_vec();
-    for repository in HOST_PLATFORM_REPOSITORIES {
-        if !all_repositories
-            .iter()
-            .any(|(canonical, _)| canonical == &repository.0)
-        {
-            all_repositories.push(*repository);
-        }
+    let entries = fixture_materialization_entries(&root, repositories);
+    if inject_materializations {
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: root.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(root.dupe(), entries.clone()).unwrap(),
+            )])
+            .unwrap();
     }
-    updater
-        .changed_to(vec![(
-            RepositoryMaterializationResultEpochKey {
-                workspace: root.dupe(),
-            },
-            local_repository_materializations(&root, &all_repositories),
-        )])
-        .unwrap();
     inject_root_package_policy_inputs(
         updater,
         RootPackagePolicyInputs::new(
@@ -1322,6 +1495,27 @@ fn inject_test_bzlmod_inputs(
         LockfileMode::Update,
     )
     .unwrap();
+    entries
+}
+
+fn inject_ready_root_target_inputs(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &std::path::Path,
+    source: impl Into<builtin_fixture::FixtureObservations>,
+    repositories: &[(&str, &str)],
+    saved: &mut builtin_fixture::SavedInputs,
+) -> Vec<RepositoryMaterializationEpochEntry> {
+    let prepared = builtin_fixture::prepare_if_ordinary(workspace);
+    let mut complete = repositories.to_vec();
+    for (name, path) in &prepared {
+        if !complete.iter().any(|(old, _)| old == name) {
+            complete.push((name.as_str(), path.as_str()));
+        }
+    }
+    let entries = inject_test_bzlmod_declarations(updater, workspace, &complete, false, false);
+    saved
+        .inject_initial(updater, workspace, entries, source.into())
+        .expect("bounded actual initial source inputs")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1358,15 +1552,70 @@ async fn root_target_request_with_explicit_inputs(
     epoch: PathObservationEpoch,
     repositories: &[(&str, &str)],
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
-    let mut user_data = UserComputationData {
-        activation_tracker: Some(tracker),
-        cycle_detector: Some(analysis_cycle_detector()),
-        ..Default::default()
-    };
-    user_data.data.set(CaptureEvaluationEvents);
+    root_target_request_with_explicit_inputs_and_prefix(
+        dice,
+        workspace,
+        target,
+        configuration,
+        explicit,
+        tracker,
+        epoch,
+        repositories,
+        true,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+// Explicit false retains the raw owner: no prefix preparation or tracker phase change.
+async fn root_target_request_with_explicit_inputs_and_prefix(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    configuration: ConfigurationKey,
+    explicit: Option<StarlarkOption>,
+    tracker: Arc<RootActivationTracker>,
+    epoch: impl Into<builtin_fixture::FixtureObservations>,
+    repositories: &[(&str, &str)],
+    prepare_prefix: bool,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    let (user_data, host_inputs) = builtin_fixture::request_data(
+        workspace,
+        (!prepare_prefix).then(|| tracker.clone() as Arc<dyn ActivationTracker>),
+        true,
+    );
     let mut updater = dice.updater_with_data(user_data);
-    inject_root_target_inputs(&mut updater, workspace, epoch, repositories);
+    if prepare_prefix {
+        ensure_host_platform_fixture(workspace);
+    }
+    let mut saved = if prepare_prefix {
+        Some(builtin_fixture::capture_generated_inputs(&updater, workspace).await?)
+    } else {
+        None
+    };
+    host_inputs.inject(&mut updater);
+    let source = epoch.into();
+    let entries = if let Some(saved) = saved.as_mut() {
+        inject_ready_root_target_inputs(&mut updater, workspace, source, repositories, saved)
+    } else {
+        let epoch = match source {
+            builtin_fixture::FixtureObservations::Automatic => root_epoch(workspace),
+            builtin_fixture::FixtureObservations::Explicit(epoch) => epoch,
+        };
+        inject_root_target_inputs_with_entries(&mut updater, workspace, epoch, repositories)
+    };
     let mut transaction = updater.commit().await;
+    if prepare_prefix {
+        transaction = builtin_fixture::ready_transaction(
+            transaction,
+            workspace,
+            entries,
+            Some(tracker),
+            true,
+            saved.expect("ready source inputs captured"),
+        )
+        .await?;
+    }
     let analysis_key = prepared_analysis_key(
         &mut transaction,
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
@@ -1399,15 +1648,68 @@ async fn observed_root_target_request_with_inputs(
     epoch: PathObservationEpoch,
     repositories: &[(&str, &str)],
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
-    let mut data = UserComputationData {
-        activation_tracker: Some(tracker),
-        cycle_detector: Some(analysis_cycle_detector()),
-        ..Default::default()
-    };
-    data.data.set(CaptureEvaluationEvents);
+    observed_root_target_request_with_inputs_and_prefix(
+        dice,
+        workspace,
+        target,
+        configuration,
+        tracker,
+        epoch,
+        repositories,
+        true,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+// Explicit false retains the raw owner: no prefix preparation or tracker phase change.
+async fn observed_root_target_request_with_inputs_and_prefix(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    configuration: ConfigurationKey,
+    tracker: Arc<RootActivationTracker>,
+    epoch: impl Into<builtin_fixture::FixtureObservations>,
+    repositories: &[(&str, &str)],
+    prepare_prefix: bool,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    let (data, host_inputs) = builtin_fixture::request_data(
+        workspace,
+        (!prepare_prefix).then(|| tracker.clone() as Arc<dyn ActivationTracker>),
+        true,
+    );
     let mut updater = dice.updater_with_data(data);
-    inject_root_target_inputs(&mut updater, workspace, epoch, repositories);
+    if prepare_prefix {
+        ensure_host_platform_fixture(workspace);
+    }
+    let mut saved = if prepare_prefix {
+        Some(builtin_fixture::capture_generated_inputs(&updater, workspace).await?)
+    } else {
+        None
+    };
+    host_inputs.inject(&mut updater);
+    let source = epoch.into();
+    let entries = if let Some(saved) = saved.as_mut() {
+        inject_ready_root_target_inputs(&mut updater, workspace, source, repositories, saved)
+    } else {
+        let epoch = match source {
+            builtin_fixture::FixtureObservations::Automatic => root_epoch(workspace),
+            builtin_fixture::FixtureObservations::Explicit(epoch) => epoch,
+        };
+        inject_root_target_inputs_with_entries(&mut updater, workspace, epoch, repositories)
+    };
     let mut transaction = updater.commit().await;
+    if prepare_prefix {
+        transaction = builtin_fixture::ready_transaction(
+            transaction,
+            workspace,
+            entries,
+            Some(tracker),
+            true,
+            saved.expect("ready source inputs captured"),
+        )
+        .await?;
+    }
     let key = ConfiguredNodeAnalysisObservationKey::new(
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
         ConfiguredTargetKey::new(CanonicalLabel::parse(target).unwrap(), configuration),
@@ -1522,15 +1824,29 @@ async fn toolchain_case(
     defs: &str,
     build: &str,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
+    toolchain_case_with_prefix(module, defs, build, true).await
+}
+
+async fn toolchain_case_with_prefix(
+    module: &str,
+    defs: &str,
+    build: &str,
+    prepare_prefix: bool,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), module).unwrap();
     fs::write(workspace.join("defs.bzl"), defs).unwrap();
     fs::write(workspace.join("BUILD.bazel"), build).unwrap();
-    root_target_request(
+    root_target_request_with_explicit_inputs_and_prefix(
         &Dice::builder().build(DetectCycles::Enabled),
         &workspace,
         "@@//:request",
+        test_configuration(),
+        None,
         Arc::new(RootActivationTracker::default()),
+        root_epoch(&workspace),
+        &[],
+        prepare_prefix,
     )
     .await
 }
@@ -1803,7 +2119,7 @@ async fn command_registrations_precede_module_and_empty_overlay_restores_module_
         ),
     ]
     .into();
-    let first = command_configuration_request_result(
+    let first = command_configuration_request_with_generated_sources(
         &dice,
         &workspace,
         "@@//:request",
@@ -1826,7 +2142,7 @@ async fn command_registrations_precede_module_and_empty_overlay_restores_module_
         "@@//:first"
     );
 
-    let module_only = command_configuration_request_result(
+    let module_only = command_configuration_request_with_generated_sources(
         &dice,
         &workspace,
         "@@//:request",
@@ -1841,7 +2157,7 @@ async fn command_registrations_precede_module_and_empty_overlay_restores_module_
         ["@@//:platform", "@@//.slug_test_host:host"]
     );
 
-    let restored = command_configuration_request_result(
+    let restored = command_configuration_request_with_generated_sources(
         &dice,
         &workspace,
         "@@//:request",
@@ -3292,12 +3608,30 @@ async fn selected_toolchain_request_observed_need_cancellation_and_error_recover
         key.clone(),
     )
     .unwrap();
-    let mut updater = dice.updater_with_data(UserComputationData {
-        cycle_detector: Some(analysis_cycle_detector()),
-        ..Default::default()
-    });
-    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
-    let mut transaction = updater.commit().await;
+    let (data, host) = builtin_fixture::request_data(&workspace, None, false);
+    let mut updater = dice.updater_with_data(data);
+    ensure_host_platform_fixture(&workspace);
+    let mut saved = builtin_fixture::capture_generated_inputs(&updater, &workspace)
+        .await
+        .unwrap();
+    host.inject(&mut updater);
+    let entries = inject_ready_root_target_inputs(
+        &mut updater,
+        &workspace,
+        root_epoch(&workspace),
+        &[],
+        &mut saved,
+    );
+    let mut transaction = builtin_fixture::ready_transaction(
+        updater.commit().await,
+        &workspace,
+        entries,
+        None,
+        false,
+        saved,
+    )
+    .await
+    .unwrap();
     assert!(
         matches!(
             transaction.compute(&observed).await.unwrap(),
@@ -3313,13 +3647,30 @@ async fn selected_toolchain_request_observed_need_cancellation_and_error_recover
     let tracker = Arc::new(RootActivationTracker::with_loading_gate(
         "//late", reached, release_rx,
     ));
-    let mut updater = dice.updater_with_data(UserComputationData {
-        activation_tracker: Some(tracker.clone()),
-        cycle_detector: Some(analysis_cycle_detector()),
-        ..Default::default()
-    });
-    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
-    let mut transaction = updater.commit().await;
+    let (data, host) = builtin_fixture::request_data(&workspace, None, false);
+    let mut updater = dice.updater_with_data(data);
+    ensure_host_platform_fixture(&workspace);
+    let mut saved = builtin_fixture::capture_generated_inputs(&updater, &workspace)
+        .await
+        .unwrap();
+    host.inject(&mut updater);
+    let entries = inject_ready_root_target_inputs(
+        &mut updater,
+        &workspace,
+        root_epoch(&workspace),
+        &[],
+        &mut saved,
+    );
+    let mut transaction = builtin_fixture::ready_transaction(
+        updater.commit().await,
+        &workspace,
+        entries,
+        Some(tracker.clone()),
+        false,
+        saved,
+    )
+    .await
+    .unwrap();
     let observed_task = observed.clone();
     let task = tokio::spawn(async move { transaction.compute(&observed_task).await });
     tokio::task::spawn_blocking(move || {
@@ -3356,12 +3707,30 @@ async fn selected_toolchain_request_observed_need_cancellation_and_error_recover
             },
         )
         .unwrap();
-        let mut updater = dice.updater_with_data(UserComputationData {
-            cycle_detector: Some(analysis_cycle_detector()),
-            ..Default::default()
-        });
-        inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
-        let mut transaction = updater.commit().await;
+        let (data, host) = builtin_fixture::request_data(&workspace, None, false);
+        let mut updater = dice.updater_with_data(data);
+        ensure_host_platform_fixture(&workspace);
+        let mut saved = builtin_fixture::capture_generated_inputs(&updater, &workspace)
+            .await
+            .unwrap();
+        host.inject(&mut updater);
+        let entries = inject_ready_root_target_inputs(
+            &mut updater,
+            &workspace,
+            root_epoch(&workspace),
+            &[],
+            &mut saved,
+        );
+        let mut transaction = builtin_fixture::ready_transaction(
+            updater.commit().await,
+            &workspace,
+            entries,
+            None,
+            false,
+            saved,
+        )
+        .await
+        .unwrap();
         let AnalysisPreparationOutcome::Complete(Ok(value)) =
             transaction.compute(&observed).await.unwrap()
         else {
@@ -3576,18 +3945,33 @@ async fn selected_platform_terminals_suppress_implementation_and_rule_evaluation
     for (name, value) in cases {
         let case_dice = Dice::builder().build(DetectCycles::Enabled);
         let tracker = Arc::new(RootActivationTracker::with_loading());
-        let mut data = UserComputationData {
-            activation_tracker: Some(tracker.clone()),
-            cycle_detector: Some(analysis_cycle_detector()),
-            ..Default::default()
-        };
-        data.data.set(CaptureEvaluationEvents);
+        let (data, host) = builtin_fixture::request_data(&workspace, None, true);
         let mut updater = case_dice.updater_with_data(data);
-        inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+        ensure_host_platform_fixture(&workspace);
+        let mut saved = builtin_fixture::capture_generated_inputs(&updater, &workspace)
+            .await
+            .unwrap();
+        host.inject(&mut updater);
+        let entries = inject_ready_root_target_inputs(
+            &mut updater,
+            &workspace,
+            root_epoch(&workspace),
+            &[],
+            &mut saved,
+        );
         updater
             .changed_to(vec![(platform_key.clone(), value)])
             .unwrap();
-        let mut transaction = updater.commit().await;
+        let mut transaction = builtin_fixture::ready_transaction(
+            updater.commit().await,
+            &workspace,
+            entries,
+            Some(tracker.clone()),
+            true,
+            saved,
+        )
+        .await
+        .unwrap();
         let outcome = transaction.compute(&root_key).await.unwrap();
         match name {
             "outer" => assert!(
@@ -3807,12 +4191,30 @@ request(name = "request")
     )
     .unwrap();
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let mut updater = dice.updater_with_data(UserComputationData {
-        cycle_detector: Some(analysis_cycle_detector()),
-        ..Default::default()
-    });
-    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
-    let mut transaction = updater.commit().await;
+    let (data, host) = builtin_fixture::request_data(&workspace, None, false);
+    let mut updater = dice.updater_with_data(data);
+    ensure_host_platform_fixture(&workspace);
+    let mut saved = builtin_fixture::capture_generated_inputs(&updater, &workspace)
+        .await
+        .unwrap();
+    host.inject(&mut updater);
+    let entries = inject_ready_root_target_inputs(
+        &mut updater,
+        &workspace,
+        root_epoch(&workspace),
+        &[],
+        &mut saved,
+    );
+    let mut transaction = builtin_fixture::ready_transaction(
+        updater.commit().await,
+        &workspace,
+        entries,
+        None,
+        false,
+        saved,
+    )
+    .await
+    .unwrap();
     let AnalysisPreparationOutcome::Complete(first) = transaction.compute(&key).await.unwrap()
     else {
         panic!("legacy resolution returned Needs")
@@ -4668,9 +5070,10 @@ async fn automatic_exec_group_policy_obeys_attribute_over_flag_aba() {
             execution_group_configuration(native),
         )
     };
-    let attribute_false = analyze_request(&dice, &workspace, &key("request", true), None, false)
-        .await
-        .unwrap();
+    let attribute_false =
+        analyze_registered_request(&dice, &workspace, &key("request", true), None, false)
+            .await
+            .unwrap();
     assert!(
         !attribute_false
             .exec_groups()
@@ -4684,9 +5087,10 @@ async fn automatic_exec_group_policy_obeys_attribute_over_flag_aba() {
         original.replace("attr.bool(default = False)", "attr.bool(default = True)"),
     )
     .unwrap();
-    let attribute_true = analyze_request(&dice, &workspace, &key("request", false), None, false)
-        .await
-        .unwrap();
+    let attribute_true =
+        analyze_registered_request(&dice, &workspace, &key("request", false), None, false)
+            .await
+            .unwrap();
     assert!(attribute_true.exec_groups().unwrap().use_auto_exec_groups());
 
     fs::write(
@@ -4697,15 +5101,16 @@ async fn automatic_exec_group_policy_obeys_attribute_over_flag_aba() {
         ),
     )
     .unwrap();
-    let first = analyze_request(&dice, &workspace, &key("request", false), None, false)
+    let first = analyze_registered_request(&dice, &workspace, &key("request", false), None, false)
         .await
         .unwrap();
-    let enabled = analyze_request(&dice, &workspace, &key("request", true), None, false)
+    let enabled = analyze_registered_request(&dice, &workspace, &key("request", true), None, false)
         .await
         .unwrap();
-    let restored = analyze_request(&dice, &workspace, &key("request", false), None, false)
-        .await
-        .unwrap();
+    let restored =
+        analyze_registered_request(&dice, &workspace, &key("request", false), None, false)
+            .await
+            .unwrap();
     assert!(!first.exec_groups().unwrap().use_auto_exec_groups());
     assert!(enabled.exec_groups().unwrap().use_auto_exec_groups());
     assert_eq!(first, restored);
@@ -5459,12 +5864,12 @@ async fn selected_nonroot_registrations_preserve_canonical_repository_identity()
 #[tokio::test]
 async fn registration_family_need_precedes_earlier_semantic_error() {
     let module = "module(name = \"root\")\nregister_execution_platforms(\"@external//:p\")\nregister_toolchains(\"//missing:tc\")\n";
-    let need = toolchain_case(module, TOOLCHAIN_DEFS, TOOLCHAIN_BUILD)
+    let need = toolchain_case_with_prefix(module, TOOLCHAIN_DEFS, TOOLCHAIN_BUILD, true)
         .await
         .unwrap_err();
     assert!(need.starts_with("root target returned Needs:"), "{need}");
 
-    let semantic = toolchain_case(
+    let semantic = toolchain_case_with_prefix(
         &TOOLCHAIN_MODULE.replacen(
             "register_execution_platforms(",
             "register_execution_platforms(\"@external//:p\", ",
@@ -5472,6 +5877,7 @@ async fn registration_family_need_precedes_earlier_semantic_error() {
         ),
         TOOLCHAIN_DEFS,
         TOOLCHAIN_BUILD,
+        true,
     )
     .await
     .unwrap_err();
@@ -6778,80 +7184,12 @@ request(name = "request")
 #[tokio::test]
 async fn default_host_platform_reaches_bcr_platform_through_exact_builtin_alias() {
     let workspace = scratch();
-    let modules = [
-        ("rules_license", "1.0.0"),
-        ("buildozer", "8.5.1"),
-        ("platforms", "1.0.0"),
-        ("zlib", "1.3.1.bcr.5"),
-        ("bazel_features", "1.42.1"),
-        ("protobuf", "33.4"),
-        ("rules_java", "9.1.0"),
-        ("rules_cc", "0.2.17"),
-        ("rules_python", "1.7.0"),
-        ("rules_shell", "0.6.1"),
-        ("apple_support", "1.24.2"),
-        ("rules_apple", "4.1.0"),
-        ("rules_swift", "3.1.2"),
-        ("abseil-cpp", "20250814.1"),
-    ];
-    let mut root_module = "module(name = 'root')\n".to_owned();
-    for (name, version) in modules {
-        fs::create_dir_all(workspace.join(name)).unwrap();
-        fs::write(
-            workspace.join(name).join("MODULE.bazel"),
-            format!("module(name = '{name}', version = '{version}')\n"),
-        )
-        .unwrap();
-        root_module.push_str(&format!(
-            "local_path_override(module_name = '{name}', path = '{name}')\n"
-        ));
-        if matches!(
-            name,
-            "bazel_features" | "rules_apple" | "rules_swift" | "abseil-cpp"
-        ) {
-            root_module.push_str(&format!(
-                "bazel_dep(name = '{name}', version = '{version}')\n"
-            ));
-        }
-    }
-    fs::write(workspace.join("MODULE.bazel"), root_module).unwrap();
-    fs::write(workspace.join("platforms/REPO.bazel"), "").unwrap();
-    fs::write(workspace.join("platforms/.bazelignore"), "").unwrap();
-    fs::create_dir_all(workspace.join("platforms/host")).unwrap();
-    fs::create_dir_all(workspace.join("platforms/cpu")).unwrap();
-    fs::write(
-        workspace.join("platforms/host/constraints.bzl"),
-        "HOST_CONSTRAINTS = ['@platforms//cpu:x86_64']\n",
-    )
-    .unwrap();
-    fs::write(
-        workspace.join("platforms/host/BUILD.bazel"),
-        "load(':constraints.bzl', 'HOST_CONSTRAINTS')\nplatform(name = 'host', constraint_values = HOST_CONSTRAINTS)\n",
-    )
-    .unwrap();
-    fs::write(
-        workspace.join("platforms/cpu/BUILD.bazel"),
-        "constraint_setting(name = 'cpu')\nconstraint_value(name = 'x86_64', constraint_setting = ':cpu')\n",
-    )
-    .unwrap();
-
-    let repositories = [
-        ("rules_license+", "rules_license"),
-        ("buildozer+", "buildozer"),
-        ("platforms", "platforms"),
-        ("platforms+", "platforms"),
-        ("zlib+", "zlib"),
-        ("bazel_features+", "bazel_features"),
-        ("protobuf+", "protobuf"),
-        ("rules_java+", "rules_java"),
-        ("rules_cc+", "rules_cc"),
-        ("rules_python+", "rules_python"),
-        ("rules_shell+", "rules_shell"),
-        ("apple_support+", "apple_support"),
-        ("rules_apple+", "rules_apple"),
-        ("rules_swift+", "rules_swift"),
-        ("abseil-cpp+", "abseil-cpp"),
-    ];
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    let prepared_repositories = builtin_fixture::prepare(&workspace);
+    let repositories = prepared_repositories
+        .iter()
+        .map(|(name, path)| (name.as_str(), path.as_str()))
+        .collect::<Vec<_>>();
     let workspace_key = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
     let configuration = ConfigurationKey::from_slug(default_test_configuration());
     let key = ConfiguredTargetPlatformKey::new(workspace_key, configuration).unwrap();
@@ -9444,6 +9782,34 @@ async fn analyze_request(
         .map_err(|error| error.to_string())
 }
 
+async fn analyze_registered_request(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    key: &ConfiguredTargetKey,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+) -> Result<ConfiguredNodeResult, String> {
+    let epoch = builtin_fixture::FixtureObservations::Automatic;
+    let prepared = builtin_fixture::prepare_if_ordinary(workspace);
+    let repositories = prepared
+        .iter()
+        .map(|(name, path)| (name.as_str(), path.as_str()))
+        .collect::<Vec<_>>();
+    analyze_node_request_typed_with_epoch_and_inputs_and_generated(
+        dice,
+        workspace,
+        ConfiguredNodeKey::configured(key.clone()),
+        tracker,
+        capture_events,
+        epoch,
+        &repositories,
+        false,
+        true,
+    )
+    .await
+    .map_err(|error| error.to_string())
+}
+
 async fn analyze_request_typed(
     dice: &Arc<Dice>,
     workspace: &std::path::Path,
@@ -9474,7 +9840,7 @@ async fn analyze_node_request_typed(
         node,
         tracker,
         capture_events,
-        root_epoch(workspace),
+        builtin_fixture::FixtureObservations::Automatic,
     )
     .await
 }
@@ -9485,49 +9851,174 @@ async fn analyze_node_request_typed_with_epoch(
     node: ConfiguredNodeKey,
     tracker: Option<Arc<dyn ActivationTracker>>,
     capture_events: bool,
-    epoch: PathObservationEpoch,
+    epoch: impl Into<builtin_fixture::FixtureObservations>,
 ) -> Result<ConfiguredNodeResult, AnalysisError> {
-    let text = Arc::new(workspace_snapshot(workspace));
-    let raw = raw_snapshot_from_text(&text);
-    let mut user_data = UserComputationData {
-        activation_tracker: tracker,
-        cycle_detector: Some(analysis_cycle_detector()),
-        ..Default::default()
-    };
-    if capture_events {
-        user_data.data.set(CaptureEvaluationEvents);
-    }
+    let prepared = builtin_fixture::prepare_if_ordinary(workspace);
+    let repositories = prepared
+        .iter()
+        .map(|(name, path)| (name.as_str(), path.as_str()))
+        .collect::<Vec<_>>();
+    analyze_node_request_typed_with_epoch_and_inputs_and_generated(
+        dice,
+        workspace,
+        node,
+        tracker,
+        capture_events,
+        epoch,
+        &repositories,
+        false,
+        true,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn analyze_request_with_repositories(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    key: &ConfiguredTargetKey,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+    repositories: &[(&str, &str)],
+    override_bazel_tools: bool,
+) -> Result<ConfiguredNodeResult, String> {
+    analyze_node_request_typed_with_epoch_and_inputs(
+        dice,
+        workspace,
+        ConfiguredNodeKey::configured(key.clone()),
+        tracker,
+        capture_events,
+        root_epoch(workspace),
+        repositories,
+        override_bazel_tools,
+    )
+    .await
+    .map_err(|error| error.to_string())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn analyze_node_request_typed_with_epoch_and_inputs(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    node: ConfiguredNodeKey,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+    epoch: PathObservationEpoch,
+    repositories: &[(&str, &str)],
+    override_bazel_tools: bool,
+) -> Result<ConfiguredNodeResult, AnalysisError> {
+    analyze_node_request_typed_with_epoch_and_inputs_and_generated(
+        dice,
+        workspace,
+        node,
+        tracker,
+        capture_events,
+        epoch,
+        repositories,
+        override_bazel_tools,
+        true,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+// Explicit false retains the raw owner: no prefix preparation or tracker phase change.
+async fn analyze_node_request_typed_with_epoch_and_inputs_and_generated(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    node: ConfiguredNodeKey,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+    epoch: impl Into<builtin_fixture::FixtureObservations>,
+    repositories: &[(&str, &str)],
+    override_bazel_tools: bool,
+    prepare_generated: bool,
+) -> Result<ConfiguredNodeResult, AnalysisError> {
+    let (user_data, host_inputs) = builtin_fixture::request_data(
+        workspace,
+        if prepare_generated {
+            None
+        } else {
+            tracker.clone()
+        },
+        capture_events,
+    );
     let mut updater = dice.updater_with_data(user_data);
-    updater
-        .changed_to(vec![(
-            WorkspaceSnapshotKey {
-                workspace: workspace.to_path_buf(),
-            },
-            text,
-        )])
-        .unwrap();
-    updater
-        .changed_to(vec![(
-            WorkspaceRawSnapshotKey {
-                workspace: workspace.to_path_buf(),
-            },
-            raw,
-        )])
-        .unwrap();
-    updater
-        .changed_to(vec![(
-            WorkspaceDirectorySnapshotKey {
-                workspace: workspace.to_path_buf(),
-            },
-            Arc::new(directory_snapshot(workspace)),
-        )])
-        .unwrap();
-    updater.changed_to(path_observation_shards(&epoch)).unwrap();
-    updater
-        .changed_to(vec![(PathObservationEpochKey, epoch)])
-        .unwrap();
-    inject_test_bzlmod_inputs(&mut updater, workspace, &[], true);
+    if prepare_generated {
+        ensure_host_platform_fixture(workspace);
+    }
+    let mut saved = if prepare_generated {
+        Some(
+            builtin_fixture::capture_generated_inputs(&updater, workspace)
+                .await
+                .map_err(AnalysisError::message)?,
+        )
+    } else {
+        None
+    };
+    host_inputs.inject(&mut updater);
+    let source = epoch.into();
+    let entries = if let Some(saved) = saved.as_mut() {
+        let entries = inject_test_bzlmod_declarations(
+            &mut updater,
+            workspace,
+            repositories,
+            override_bazel_tools,
+            false,
+        );
+        saved
+            .inject_initial(&mut updater, workspace, entries, source)
+            .map_err(AnalysisError::message)?
+    } else {
+        let epoch = match source {
+            builtin_fixture::FixtureObservations::Automatic => root_epoch(workspace),
+            builtin_fixture::FixtureObservations::Explicit(epoch) => epoch,
+        };
+        let text = Arc::new(workspace_snapshot(workspace));
+        let raw = raw_snapshot_from_text(&text);
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: workspace.to_path_buf(),
+                },
+                text,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: workspace.to_path_buf(),
+                },
+                raw,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceDirectorySnapshotKey {
+                    workspace: workspace.to_path_buf(),
+                },
+                Arc::new(directory_snapshot(workspace)),
+            )])
+            .unwrap();
+        updater.changed_to(path_observation_shards(&epoch)).unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        inject_test_bzlmod_inputs(&mut updater, workspace, repositories, override_bazel_tools)
+    };
     let mut transaction = updater.commit().await;
+    if prepare_generated {
+        transaction = builtin_fixture::ready_transaction(
+            transaction,
+            workspace,
+            entries,
+            tracker,
+            capture_events,
+            saved.expect("ready source inputs captured"),
+        )
+        .await
+        .map_err(AnalysisError::message)?;
+    }
     let workspace_identity = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
     let analysis_key = match &node {
         ConfiguredNodeKey::Configured(key) => match prepare_configured_node_analysis(
@@ -9614,8 +10105,6 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
     )
     .unwrap();
 
-    let text = Arc::new(workspace_snapshot(&workspace));
-    let raw = raw_snapshot_from_text(&text);
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let key = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//pkg:write_file").unwrap(),
@@ -9628,37 +10117,7 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
                 cycle_detector: Some(analysis_cycle_detector()),
                 ..Default::default()
             });
-            updater
-                .changed_to(vec![(
-                    (WorkspaceSnapshotKey {
-                        workspace: workspace.clone(),
-                    }),
-                    text,
-                )])
-                .unwrap();
-            updater
-                .changed_to(vec![(
-                    WorkspaceRawSnapshotKey {
-                        workspace: workspace.clone(),
-                    },
-                    raw,
-                )])
-                .unwrap();
-            updater
-                .changed_to(vec![(
-                    (WorkspaceDirectorySnapshotKey {
-                        workspace: workspace.clone(),
-                    }),
-                    Arc::new(directory_snapshot(&workspace)),
-                )])
-                .unwrap();
-            updater
-                .changed_to(path_observation_shards(&root_epoch(&workspace)))
-                .unwrap();
-            updater
-                .changed_to(vec![(PathObservationEpochKey, root_epoch(&workspace))])
-                .unwrap();
-            inject_test_bzlmod_inputs(&mut updater, &workspace, &[], true);
+            inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
             let mut transaction = updater.commit().await;
             let outcome = transaction
                 .compute(
@@ -10992,43 +11451,11 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     .unwrap();
 
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    let text = Arc::new(workspace_snapshot(&workspace));
-    let raw = raw_snapshot_from_text(&text);
     let mut updater = dice.updater_with_data(UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     });
-    updater
-        .changed_to(vec![(
-            WorkspaceSnapshotKey {
-                workspace: workspace.clone(),
-            },
-            text,
-        )])
-        .unwrap();
-    updater
-        .changed_to(vec![(
-            WorkspaceRawSnapshotKey {
-                workspace: workspace.clone(),
-            },
-            raw,
-        )])
-        .unwrap();
-    updater
-        .changed_to(vec![(
-            WorkspaceDirectorySnapshotKey {
-                workspace: workspace.clone(),
-            },
-            Arc::new(directory_snapshot(&workspace)),
-        )])
-        .unwrap();
-    updater
-        .changed_to(path_observation_shards(&root_epoch(&workspace)))
-        .unwrap();
-    updater
-        .changed_to(vec![(PathObservationEpochKey, root_epoch(&workspace))])
-        .unwrap();
-    inject_test_bzlmod_inputs(&mut updater, &workspace, &[], true);
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
     let mut transaction = updater.commit().await;
     let configuration = test_configuration();
     let outcome = transaction
@@ -12810,7 +13237,7 @@ def _consumer(ctx):
     if info.xcode_version() != None:
         fail("empty Xcode version changed")
     if info.availability() != "unknown":
-        fail("default Xcode availability changed")
+        fail("default Xcode availability changed: %s" % info.availability())
     if info.execution_info() != {
         "requires-darwin": "",
         "supports-xcode-requirements-set": "",
@@ -12871,6 +13298,11 @@ consumer = rule(
     )
     .unwrap();
 
+    let prepared_repositories = builtin_fixture::prepare(&workspace);
+    let repositories = prepared_repositories
+        .iter()
+        .map(|(name, path)| (name.as_str(), path.as_str()))
+        .collect::<Vec<_>>();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let configuration = test_configuration();
     let key = |target: &str| {
@@ -12879,33 +13311,72 @@ consumer = rule(
             configuration.clone(),
         )
     };
-    let producer = analyze_request(&dice, &workspace, &key("xcode"), None, false)
-        .await
-        .unwrap();
+    let producer = analyze_request_with_repositories(
+        &dice,
+        &workspace,
+        &key("xcode"),
+        None,
+        false,
+        &repositories,
+        false,
+    )
+    .await
+    .unwrap();
     assert!(
-        producer
-            .providers()
-            .contains(&ProviderIdentity::builtin("XcodeVersionInfo"))
+        producer.providers().contains(&ProviderIdentity::user(
+            ProviderId::new(
+                "@@_builtins//:common/xcode/providers.bzl",
+                "XcodeVersionInfo"
+            )
+            .unwrap()
+        ))
     );
     let observed = ProviderId::new("//:defs.bzl", "ObservedInfo").unwrap();
-    let initial = analyze_request(&dice, &workspace, &key("observed"), None, false)
-        .await
-        .unwrap();
+    let initial = analyze_request_with_repositories(
+        &dice,
+        &workspace,
+        &key("observed"),
+        None,
+        false,
+        &repositories,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         provider_value(&initial, &observed),
         "default Xcode methods verified"
     );
 
     fs::write(&source, definitions("LOCAL")).unwrap();
-    let error = analyze_request(&dice, &workspace, &key("observed"), None, false)
-        .await
-        .unwrap_err();
-    assert!(error.contains("LOCAL"), "{error}");
+    let error = analyze_request_with_repositories(
+        &dice,
+        &workspace,
+        &key("observed"),
+        None,
+        false,
+        &repositories,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        error.contains("default Xcode availability changed: local"),
+        "{error}"
+    );
 
     fs::write(&source, definitions("UNKNOWN")).unwrap();
-    let restored = analyze_request(&dice, &workspace, &key("observed"), None, false)
-        .await
-        .unwrap();
+    let restored = analyze_request_with_repositories(
+        &dice,
+        &workspace,
+        &key("observed"),
+        None,
+        false,
+        &repositories,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         provider_value(&restored, &observed),
         "default Xcode methods verified"
@@ -15464,3 +15935,12 @@ mod run_environment_info_tests;
 
 #[path = "provider_callables.rs"]
 mod provider_callables;
+
+#[path = "starlark_rule/apple_builtin_tests.rs"]
+mod apple_builtin_tests;
+
+#[path = "starlark_rule/source_table_sharing_tests.rs"]
+mod source_table_sharing_tests;
+
+#[path = "starlark_rule/builtin_fixture.rs"]
+mod builtin_fixture;

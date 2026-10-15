@@ -27,6 +27,16 @@ impl StarlarkRuleImplementation {
         &self,
         visit: &mut dyn FnMut(slug_build_api_v2::DepsetStorageCharge) -> Result<(), String>,
     ) -> Result<(), String> {
+        self.visit_metadata(visit, true)
+    }
+    #[doc(hidden)]
+    pub fn visit_owner_intrinsic_metadata(
+        &self,
+        visit: &mut dyn FnMut(slug_build_api_v2::DepsetStorageCharge) -> Result<(), String>,
+    ) -> Result<(), String> {
+        self.visit_metadata(visit, false)
+    }
+    fn visit_metadata(&self, visit: &mut Visitor<'_>, full_table: bool) -> Result<(), String> {
         let Self {
             implementation: _,
             definition_source,
@@ -50,7 +60,14 @@ impl StarlarkRuleImplementation {
         } = self;
         row::<Self>(visit)?;
         source(definition_source, visit)?;
-        sources(source_identities_by_filename, visit)?;
+        if full_table {
+            complete_sources(source_identities_by_filename, visit)?;
+        } else {
+            // The exact declared table body is separate; local pair/guard fields
+            // and declaration reference storage remain positive intrinsic data.
+            row::<crate::source_table::CertifiedSourceTable>(visit)?;
+            row::<slug_build_api_v2::published_value::SharedPublicationInput>(visit)?;
+        }
         for value in &**dependencies {
             label(value, visit)?;
         }

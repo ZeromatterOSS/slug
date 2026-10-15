@@ -16,6 +16,7 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_bzlmod_v2::HostModuleExtensionUsageScope;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionOverride;
 use slug_bzlmod_v2::HostSelectedInnateRepositoryOwnerInputs;
@@ -188,6 +189,7 @@ impl std::error::Error for HostInstantiatedModuleExtensionRepositoriesError {}
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) struct HostInstantiatedModuleExtensionRepositoriesKey {
     workspace: NormalizedAbsolutePath,
+    scope: HostModuleExtensionUsageScope,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -199,9 +201,14 @@ pub(crate) struct HostInstantiatedModuleExtensionRepositoriesObservationKey(
 #[allow(dead_code)]
 impl HostInstantiatedModuleExtensionRepositoriesObservationKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self(HostInstantiatedModuleExtensionRepositoriesKey::new(
-            workspace,
-        ))
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub(crate) fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self(HostInstantiatedModuleExtensionRepositoriesKey::new_with_scope(workspace, scope))
     }
 }
 
@@ -212,7 +219,14 @@ impl fmt::Display for HostInstantiatedModuleExtensionRepositoriesObservationKey 
 
 impl HostInstantiatedModuleExtensionRepositoriesKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
-        Self { workspace }
+        Self::new_with_scope(workspace, HostModuleExtensionUsageScope::AllSelected)
+    }
+
+    pub(crate) fn new_with_scope(
+        workspace: NormalizedAbsolutePath,
+        scope: HostModuleExtensionUsageScope,
+    ) -> Self {
+        Self { workspace, scope }
     }
 }
 
@@ -220,8 +234,8 @@ impl fmt::Display for HostInstantiatedModuleExtensionRepositoriesKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "host-instantiated-module-extension-repositories:{}",
-            self.workspace
+            "host-instantiated-module-extension-repositories:{}{}",
+            self.workspace, self.scope
         )
     }
 }
@@ -296,12 +310,12 @@ fn complete(
 #[rustfmt::skip]
 async fn compute_instantiated_repositories(ctx: &mut DiceComputations<'_>, key: &HostInstantiatedModuleExtensionRepositoriesKey, mode: InstantiatedRepositoriesMode) -> InstantiatedRepositoriesDriverOutcome {
     let child = match mode {
-        InstantiatedRepositoriesMode::Legacy => match ctx.compute(&HostPureModuleExtensionInvocationsKey::new(key.workspace.dupe())).await {
+        InstantiatedRepositoriesMode::Legacy => match ctx.compute(&HostPureModuleExtensionInvocationsKey::new_with_scope(key.workspace.dupe(), key.scope)).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
             Err(error) => return complete(Err(HostInstantiatedModuleExtensionRepositoriesError::InvocationsCompute(error.to_string().into())), PathObservationEpoch::empty()),
         },
-        InstantiatedRepositoriesMode::Observed => match ctx.compute(&HostPureModuleExtensionInvocationsObservationKey::new(key.workspace.dupe())).await {
+        InstantiatedRepositoriesMode::Observed => match ctx.compute(&HostPureModuleExtensionInvocationsObservationKey::new_with_scope(key.workspace.dupe(), key.scope)).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(InstantiatedModuleExtensionRepositoriesObservationError::Pure(error))),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().dupe(), observed.observations().dupe()),
@@ -2513,9 +2527,12 @@ pub(crate) mod tests {
             None,
         )
         .await
-        .compute(&HostInstantiatedModuleExtensionRepositoriesKey::new(
-            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-        ))
+        .compute(
+            &HostInstantiatedModuleExtensionRepositoriesKey::new_with_scope(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+            ),
+        )
         .await
         .unwrap()
     }
@@ -2538,8 +2555,9 @@ pub(crate) mod tests {
         )
         .await
         .compute(
-            &HostInstantiatedModuleExtensionRepositoriesObservationKey::new(
+            &HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
             ),
         )
         .await
@@ -2556,10 +2574,10 @@ pub(crate) mod tests {
     }
     #[tokio::test]
     async fn real_key_builds_complete_namespace_and_restores_a_b_a() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let module = |target: &str| {
             format!(
-                "module(name='bazel_tools')\n\
+                "module(name='consumer')\n\
                  e=use_extension('//:ext.bzl','ext')\n\
                  use_repo(e, {target}='{target}')\n\
                  override_repo(e, second='{target}')\n"
@@ -2803,7 +2821,7 @@ ext=module_extension(implementation=impl)
                 && call.name == "second"
                 && message.contains("unknown attribute")
         ));
-        let two_module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first_ext')\nb=use_extension('//:ext.bzl','second_ext')\n";
+        let two_module = "module(name='consumer')\na=use_extension('//:ext.bzl','first_ext')\nb=use_extension('//:ext.bzl','second_ext')\n";
         let two_source = r#"repo=repository_rule(lambda ctx: None, attrs={'text':attr.string(mandatory=True)})
 def first_impl(ctx):
     repo(name='first', text='one')
@@ -2853,7 +2871,7 @@ second_ext=module_extension(implementation=second_impl)
             }) if message.contains("counts differ")
         ));
 
-        let alternate_module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, alias='replacement')\noverride_repo(e, second='alias')\n";
+        let alternate_module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, alias='replacement')\noverride_repo(e, second='alias')\n";
         let alternate = compute(&dice, alternate_module, &source_a, true).await;
         let SourcePreparationOutcome::Complete(alternate_value) = alternate else {
             panic!("alternate request must complete")
@@ -2898,9 +2916,9 @@ second_ext=module_extension(implementation=second_impl)
 
     #[tokio::test]
     async fn real_key_need_reuse_events_and_identity_matrix_are_exact() {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let tracker = Arc::new(InstantiationTracker::default());
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
         let source = "repo=repository_rule(lambda ctx: None, attrs={'value':attr.string()})\ndef impl(ctx):\n    repo(name='generated', value='A')\next=module_extension(implementation=impl)\n";
         let compute_tracked = |module_source: &str, extension_source: &str| {
             let dice = dice.clone();
@@ -2917,9 +2935,12 @@ second_ext=module_extension(implementation=second_impl)
                     Some(tracker),
                 )
                 .await
-                .compute(&HostInstantiatedModuleExtensionRepositoriesKey::new(
-                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-                ))
+                .compute(
+                    &HostInstantiatedModuleExtensionRepositoriesKey::new_with_scope(
+                        NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                    ),
+                )
                 .await
                 .unwrap()
             }
@@ -2961,7 +2982,7 @@ second_ext=module_extension(implementation=second_impl)
             ));
         }
 
-        let mapping_b = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, alias='generated')\n";
+        let mapping_b = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, alias='generated')\n";
         let b = compute_tracked(mapping_b, source).await;
         assert!(!HostInstantiatedModuleExtensionRepositoriesKey::equality(
             &a, &b
@@ -2971,7 +2992,7 @@ second_ext=module_extension(implementation=second_impl)
             &a, &restored
         ));
 
-        let need_module = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
+        let need_module = "module(name='consumer')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
         let need = compute_tracked(need_module, source).await;
         assert!(matches!(need, SourcePreparationOutcome::Need(_)));
         assert!(!HostInstantiatedModuleExtensionRepositoriesKey::validity(
@@ -2989,10 +3010,17 @@ second_ext=module_extension(implementation=second_impl)
     #[tokio::test]
     async fn observed_instantiation_identity_finisher_and_terminal_algebra() {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let key = HostInstantiatedModuleExtensionRepositoriesObservationKey::new(workspace.dupe());
-        let same = HostInstantiatedModuleExtensionRepositoriesObservationKey::new(workspace.dupe());
-        let other = HostInstantiatedModuleExtensionRepositoriesObservationKey::new(
+        let key = HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+            workspace.dupe(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
+        let same = HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+            workspace.dupe(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
+        let other = HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
             NormalizedAbsolutePath::new("/other").unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let hash = |key: &HostInstantiatedModuleExtensionRepositoriesObservationKey| {
             let mut hasher = DefaultHasher::new();
@@ -3001,16 +3029,16 @@ second_ext=module_extension(implementation=second_impl)
         };
         assert_eq!(
             key.to_string(),
-            "observed-host-instantiated-module-extension-repositories:\"/module-extension-repository-instantiation\""
+            "observed-host-instantiated-module-extension-repositories:\"/module-extension-repository-instantiation\":root-usages"
         );
         assert_eq!(key, same);
         assert_ne!(key, other);
         assert_eq!(hash(&key), hash(&same));
         assert_ne!(hash(&key), hash(&other));
 
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
         let success_source = "repo=repository_rule(lambda ctx: None)\ndef impl(ctx):\n    repo(name='generated')\next=module_extension(implementation=impl)\n";
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let success = compute_observed(&dice, module, success_source, true, 0, None).await;
         let carrier = observed_carrier(&success);
         assert!(carrier.result().is_ok());
@@ -3069,7 +3097,7 @@ second_ext=module_extension(implementation=second_impl)
             "repo=repository_rule(lambda ctx: None,attrs={'value':attr.string()})\ndef impl(ctx):\n    repo(name='first',value='ok')\n    repo(name='second',unknown='bad')\next=module_extension(implementation=impl)\n",
             "attribute",
         )] {
-            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let case_dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
             let legacy = compute(&case_dice, module, source, true).await;
             let observed = compute_observed(&case_dice, module, source, true, 0, None).await;
             let SourcePreparationOutcome::Complete(legacy) = legacy else {
@@ -3118,7 +3146,7 @@ second_ext=module_extension(implementation=second_impl)
             );
         }
 
-        let pure_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let pure_dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let legacy = compute(&pure_dice, module, success_source, false).await;
         let observed = compute_observed(&pure_dice, module, success_source, false, 0, None).await;
         let SourcePreparationOutcome::Complete(legacy) = legacy else {
@@ -3133,10 +3161,10 @@ second_ext=module_extension(implementation=second_impl)
             Err(HostInstantiatedModuleExtensionRepositoriesError::Invocations(_))
         ));
 
-        let need_module = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
+        let need_module = "module(name='consumer')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n";
         let tracker = Arc::new(InstantiationTracker::default());
         let need = compute_observed(
-            &Dice::builder().build(DetectCycles::Enabled),
+            &crate::canonical_repository_route_tests::tests::builtin_graph_dice(),
             need_module,
             success_source,
             true,
@@ -3161,10 +3189,13 @@ second_ext=module_extension(implementation=second_impl)
                 .find(|(name, _)| name == &key.to_string())
                 .unwrap()
                 .1,
-            [HostPureModuleExtensionInvocationsObservationKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap()
-            )
-            .to_string()]
+            [
+                HostPureModuleExtensionInvocationsObservationKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
+                )
+                .to_string()
+            ]
         );
 
         let source = include_str!("module_extension_repository_instantiation.rs");
@@ -3187,18 +3218,21 @@ second_ext=module_extension(implementation=second_impl)
 
     #[tokio::test]
     async fn observed_instantiation_real_order_events_and_parity() {
-        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let module = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
         let source = "print('load')\nrepo=repository_rule(lambda ctx: None,attrs={'value':attr.string()})\ndef impl(ctx):\n    print('invoke')\n    repo(name='generated',value='ok')\next=module_extension(implementation=impl)\n";
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let tracker = Arc::new(InstantiationTracker::default());
         let observed =
             compute_observed(&dice, module, source, true, 0, Some(tracker.clone())).await;
         let mut legacy_tx =
             transaction(&dice, module, source, true, 0, Some(tracker.clone())).await;
         let legacy = legacy_tx
-            .compute(&HostInstantiatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostInstantiatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap();
         let SourcePreparationOutcome::Complete(legacy) = legacy else {
@@ -3209,11 +3243,13 @@ second_ext=module_extension(implementation=second_impl)
             observed_carrier(&observed).result().as_ref()
         );
 
-        let key = HostInstantiatedModuleExtensionRepositoriesObservationKey::new(
+        let key = HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
-        let legacy_key = HostInstantiatedModuleExtensionRepositoriesKey::new(
+        let legacy_key = HostInstantiatedModuleExtensionRepositoriesKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let dependencies = tracker.take_dependencies();
         assert_eq!(
@@ -3222,10 +3258,13 @@ second_ext=module_extension(implementation=second_impl)
                 .find(|(name, _)| name == &key.to_string())
                 .unwrap()
                 .1,
-            [HostPureModuleExtensionInvocationsObservationKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap()
-            )
-            .to_string()]
+            [
+                HostPureModuleExtensionInvocationsObservationKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
+                )
+                .to_string()
+            ]
         );
         assert_eq!(
             dependencies
@@ -3233,8 +3272,9 @@ second_ext=module_extension(implementation=second_impl)
                 .find(|(name, _)| name == &legacy_key.to_string())
                 .unwrap()
                 .1,
-            [HostPureModuleExtensionInvocationsKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap()
+            [HostPureModuleExtensionInvocationsKey::new_with_scope(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages
             )
             .to_string()]
         );
@@ -3267,8 +3307,9 @@ second_ext=module_extension(implementation=second_impl)
             observed_carrier(&observed).result(),
             observed_carrier(&warm).result()
         ));
-        let pure_key = HostPureModuleExtensionInvocationsObservationKey::new(
+        let pure_key = HostPureModuleExtensionInvocationsObservationKey::new_with_scope(
             NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
         );
         let _ = warm_tx.compute(&pure_key).await.unwrap();
         let warm_rows = warm_tracker.take();
@@ -3283,7 +3324,7 @@ second_ext=module_extension(implementation=second_impl)
         assert!(warm_rows.iter().all(|row| row.batch.is_none()));
 
         let failing = "repo=repository_rule(lambda ctx: None,attrs={'value':attr.string()})\ndef impl(ctx):\n    repo(name='first',value='ok')\n    repo(name='second',unknown='bad')\n    repo(name='suppressed',value='no')\next=module_extension(implementation=impl)\n";
-        let terminal_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let terminal_dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let terminal_tracker = Arc::new(InstantiationTracker::default());
         let observed = compute_observed(
             &terminal_dice,
@@ -3329,15 +3370,18 @@ second_ext=module_extension(implementation=second_impl)
 
     #[tokio::test]
     async fn observed_instantiation_lifecycle_cancellation_and_nonactivation() {
-        let module_a = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
-        let module_mapping = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e,alias='generated')\n";
+        let module_a = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\n";
+        let module_mapping = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e,alias='generated')\n";
         let source_a = "repo=repository_rule(lambda ctx: None,attrs={'value':attr.string()})\ndef impl(ctx):\n    repo(name='generated',value='A')\next=module_extension(implementation=impl)\n";
         let source_call = source_a.replace("value='A'", "value='B'");
         let source_schema =
             source_a.replace("attr.string()", "attr.string(default='schema-change')");
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let key = HostInstantiatedModuleExtensionRepositoriesObservationKey::new(workspace.dupe());
+        let key = HostInstantiatedModuleExtensionRepositoriesObservationKey::new_with_scope(
+            workspace.dupe(),
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        );
         let mut held = Vec::new();
         for (module, source, bias) in [
             (module_a, source_a, 0),
@@ -3354,9 +3398,12 @@ second_ext=module_extension(implementation=second_impl)
             let value = tx.compute(&key).await.unwrap();
             let carrier = observed_carrier(&value).dupe();
             let pure = tx
-                .compute(&HostPureModuleExtensionInvocationsObservationKey::new(
-                    workspace.dupe(),
-                ))
+                .compute(
+                    &HostPureModuleExtensionInvocationsObservationKey::new_with_scope(
+                        workspace.dupe(),
+                        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                    ),
+                )
                 .await
                 .unwrap();
             let SourcePreparationOutcome::Complete(Ok(pure)) = pure else {
@@ -3387,7 +3434,7 @@ second_ext=module_extension(implementation=second_impl)
             row.key == key.to_string() && row.kind == ActivationKind::Reused && row.batch.is_none()
         }));
 
-        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cancel_dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let cancel_tracker = Arc::new(InstantiationTracker::default());
         let mut cancelled = transaction(
             &cancel_dice,
@@ -3435,7 +3482,11 @@ second_ext=module_extension(implementation=second_impl)
         }
         let rows = cancel_tracker.take();
         let dependencies = cancel_tracker.take_dependencies();
-        let validation = HostValidatedModuleExtensionRepositoriesKey::new(workspace).to_string();
+        let validation = HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+            workspace,
+            slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+        )
+        .to_string();
         assert!(rows.iter().all(|row| row.key != validation));
         assert!(dependencies.iter().all(|(name, children)| {
             name != &validation && children.iter().all(|child| child != &validation)

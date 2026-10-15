@@ -38,9 +38,9 @@ impl Sources {
         }
         let identity = &source.identity;
         let mut bytes = identity
-            .workspace_path
-            .as_os_str()
-            .len()
+            .source
+            .retained_text_bytes()
+            .ok_or("source authority origin byte overflow")?
             .saturating_add(identity.label.package().repo().as_str().len())
             .saturating_add(identity.label.package().package().as_str().len())
             .saturating_add(identity.label.target().as_str().len());
@@ -76,13 +76,23 @@ impl Sources {
                 for source in &*authority.data().reachable {
                     // Bound this temporary native identity conversion before its
                     // owned path is copied; insert separately budgets retention.
-                    self.charge(source.identity.workspace_path.as_os_str().len())?;
+                    self.charge(
+                        source
+                            .identity
+                            .source
+                            .retained_text_bytes()
+                            .ok_or("source authority origin byte overflow")?,
+                    )?;
                     let identity = BzlModuleIdentity {
                         label: source.identity.label.clone(),
-                        workspace_path: source.identity.workspace_path.clone(),
+                        source: source.identity.source.clone(),
                         repository_mapping: source.identity.repository_mapping.clone(),
                     };
-                    let display = identity.workspace_path.to_string_lossy().into_owned();
+                    let display = identity
+                        .source
+                        .diagnostic_path()
+                        .to_string_lossy()
+                        .into_owned();
                     self.insert(
                         &display,
                         &BzlModuleSourceProvenance::new(identity, source.digest),

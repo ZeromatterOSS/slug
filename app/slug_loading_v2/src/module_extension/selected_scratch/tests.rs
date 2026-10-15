@@ -58,7 +58,7 @@ fn scratch_test_resources() -> slug_bzlmod_v2::SelectedScratchResources {
         slug_workspace_v2::ImageDescriptorBudget::new(64 << 20),
     )
 }
-const SCRATCH_TEST_MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.from_cargo(value='final')\nuse_repo(e, proof='proof')\n";
+const SCRATCH_TEST_MODULE: &str = "module(name='consumer')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.from_cargo(value='final')\nuse_repo(e, proof='proof')\n";
 const SCRATCH_TEST_EXTENSION: &str = r#"
 from_cargo = tag_class(attrs={'value':attr.string()})
 def impl(ctx):

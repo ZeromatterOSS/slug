@@ -6,7 +6,7 @@ use super::*;
 pub(super) fn manifest(label: &str, digest: [u8; 32]) -> BzlLoadManifest {
     let root = BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: "same/source.bzl".into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace("same/source.bzl".into()),
         repository_mapping: Arc::from([]),
     };
     BzlLoadManifest {
@@ -38,7 +38,7 @@ fn source_authority_keeps_logical_identity_and_checks_actual_source_bytes() {
     )
     .unwrap();
     assert_ne!(a, b);
-    assert_eq!(a.data().root.workspace_path, b.data().root.workspace_path);
+    assert_eq!(a.data().root.source, b.data().root.source);
     sources
         .verify_source(&a, &code, &mut builder, &mut remaining)
         .unwrap();

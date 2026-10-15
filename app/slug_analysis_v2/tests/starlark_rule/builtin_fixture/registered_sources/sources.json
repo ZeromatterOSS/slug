@@ -1,0 +1,2073 @@
+{
+  "status": "FROZEN_SELECTED_SOURCE_MAPPING_CONTRACT",
+  "topology": "Explicit caller-provided local-source fixture MODULE topology, matching existing rustc-map-each style. Generated source bodies retain exact original bytes; this does NOT execute their generators or claim original generated canonical repository identities. No test with such identity assertions is rewritten.",
+  "archives": {
+    "rules_cc": {
+      "path": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz",
+      "sha256": "283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a"
+    },
+    "protobuf": {
+      "path": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz",
+      "sha256": "687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b"
+    },
+    "bazel_features": {
+      "path": "target/slug-diagnostics/wp1206-distdirs/8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac/bazel_features-v1.42.1.tar.gz",
+      "sha256": "8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac"
+    },
+    "bazel_skylib": {
+      "path": "target/slug-diagnostics/wp1206-distdirs/6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446/bazel-skylib-1.8.2.tar.gz",
+      "sha256": "6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446"
+    },
+    "rules_license": {
+      "path": "target/slug-diagnostics/wp1206-distdirs/26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38/rules_license-1.0.0.tar.gz",
+      "sha256": "26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38"
+    }
+  },
+  "modules": {
+    "rules_cc": {
+      "version": "0.2.17",
+      "dependencies": [
+        [
+          "platforms",
+          "1.0.0",
+          null
+        ],
+        [
+          "bazel_skylib",
+          "1.8.2",
+          null
+        ],
+        [
+          "protobuf",
+          "33.4",
+          "com_google_protobuf"
+        ],
+        [
+          "cc_compatibility_proxy",
+          "1.0",
+          null
+        ]
+      ]
+    },
+    "cc_compatibility_proxy": {
+      "version": "1.0",
+      "dependencies": [
+        [
+          "rules_cc",
+          "0.2.17",
+          null
+        ],
+        [
+          "bazel_skylib",
+          "1.8.2",
+          null
+        ]
+      ]
+    },
+    "protobuf": {
+      "version": "33.4",
+      "dependencies": [
+        [
+          "bazel_features",
+          "1.42.1",
+          "proto_bazel_features"
+        ],
+        [
+          "bazel_skylib",
+          "1.8.2",
+          null
+        ]
+      ]
+    },
+    "bazel_features": {
+      "version": "1.42.1",
+      "dependencies": [
+        [
+          "bazel_features_globals",
+          "1.0",
+          null
+        ],
+        [
+          "bazel_features_version",
+          "1.0",
+          null
+        ],
+        [
+          "bazel_skylib",
+          "1.8.2",
+          null
+        ]
+      ]
+    },
+    "bazel_features_globals": {
+      "version": "1.0",
+      "dependencies": [
+        [
+          "bazel_skylib",
+          "1.8.2",
+          null
+        ]
+      ]
+    },
+    "bazel_features_version": {
+      "version": "1.0",
+      "dependencies": [
+        [
+          "bazel_skylib",
+          "1.8.2",
+          null
+        ]
+      ]
+    },
+    "bazel_skylib": {
+      "version": "1.8.2",
+      "dependencies": [
+        [
+          "rules_license",
+          "1.0.0",
+          null
+        ]
+      ]
+    },
+    "rules_license": {
+      "version": "1.0.0",
+      "dependencies": []
+    }
+  },
+  "captured_builtin_source_roots": [
+    "tools/res/winsdk_configure.bzl (original bazel_tools MODULE use_repo_rule)"
+  ],
+  "builtin_sources_reused_not_copied": [
+    {
+      "path": "src/tools/launcher/BUILD",
+      "sha256": "e1818f24f7603cf65cb8a85f7e41a80c82e5bdd805fe652f71d435c447af0e36",
+      "bytes": 2105
+    },
+    {
+      "path": "src/tools/launcher/launcher_maker_test.bzl",
+      "sha256": "95a2448e9b703697d8dbbd4e22bb6f10961d58def53ff4992f6766f39ef54de2",
+      "bytes": 2185
+    },
+    {
+      "path": "src/tools/launcher/win_rules.bzl",
+      "sha256": "04e42889b0b7a9f12685def9e12bfa182aca513ffcc5707d1da14dd507a9e186",
+      "bytes": 2186
+    },
+    {
+      "path": "tools/build_defs.bzl",
+      "sha256": "d5f935c4e72a365438711f08a2640094cbf0a03392eebb06d8cecdc58b8ab19c",
+      "bytes": 3576
+    },
+    {
+      "path": "tools/cpp/BUILD",
+      "sha256": "0e3fdd3293d39a64f3fbda755d8a3c0bbd3b6ffd5fb0717ab594bc1f1e29a535",
+      "bytes": 4102
+    },
+    {
+      "path": "tools/cpp/cc_configure.bzl",
+      "sha256": "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
+      "bytes": 934
+    },
+    {
+      "path": "tools/cpp/windows_cc_configure.bzl",
+      "sha256": "7d1b13bdc2b1f5b8cbfded820664fa7265087ac58909a7df33dad6878ace0bf3",
+      "bytes": 855
+    },
+    {
+      "path": "tools/launcher/BUILD",
+      "sha256": "aa1b943956b6a7c3044f73583f5bc972bfc658607f7a3b745d51c7e7d016aab7",
+      "bytes": 2773
+    },
+    {
+      "path": "tools/res/BUILD",
+      "sha256": "bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac",
+      "bytes": 845
+    },
+    {
+      "path": "tools/res/win_res.bzl",
+      "sha256": "d78b202e5609bc322f99990897a8e5e01a44e645b0f4e1c19b4677a3ea1bc275",
+      "bytes": 3326
+    },
+    {
+      "path": "tools/res/winsdk_configure.bzl",
+      "sha256": "f6463d7e0a136ffff7e9099532f11f9fe7db91bd93e423b5e7101b104d035375",
+      "bytes": 5209
+    },
+    {
+      "path": "tools/res/winsdk_toolchain.bzl",
+      "sha256": "a19f04238ee0b76dcbaa7aed4d4356fa03db805b6cf7ace179bc358a4cd63938",
+      "bytes": 2210
+    },
+    {
+      "path": "tools/test/BUILD",
+      "sha256": "81db88f41f7a9a07af246a42cfa7a8b6e118012b4f41830aaee9ffe4a4a9ee17",
+      "bytes": 5107
+    },
+    {
+      "path": "tools/test/default_test_toolchain.bzl",
+      "sha256": "c013158dde96f9b4699af24806fab64e4574e398fe94f612e25a16b1fa4f16f6",
+      "bytes": 958
+    }
+  ],
+  "members": [
+    {
+      "repository": "bazel_features",
+      "path": "BUILD.bazel",
+      "bytes": 974,
+      "sha256": "9d7f58994e15b26680f9b44db5bf02b86116b398f060cdef17d9cb9cb6747182",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "bazel_features",
+        "member": "BUILD.bazel"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features/BUILD.bazel"
+    },
+    {
+      "repository": "bazel_features",
+      "path": "LICENSE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "source": {
+        "kind": "archive_license",
+        "archive": "bazel_features",
+        "member": "LICENSE"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features/LICENSE"
+    },
+    {
+      "repository": "bazel_features",
+      "path": "features.bzl",
+      "bytes": 11799,
+      "sha256": "743778a3c3494462144bda60892bcf38ad4d9ceb8f3cc45ee4bea07f1ac3d431",
+      "source": {
+        "kind": "archive",
+        "archive": "bazel_features",
+        "member": "features.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features/features.bzl"
+    },
+    {
+      "repository": "bazel_features",
+      "path": "private/BUILD.bazel",
+      "bytes": 1132,
+      "sha256": "3fd734c687aa99c13eff38edb789876af8d42b2b312dcdef5a883a9fc0535d49",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "bazel_features",
+        "member": "private/BUILD.bazel"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features/private/BUILD.bazel"
+    },
+    {
+      "repository": "bazel_features",
+      "path": "private/docs.bzl",
+      "bytes": 156,
+      "sha256": "e9f13d8c431927f733f4f9386156cd399765919b99053384b0c7dd2df0de1999",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "bazel_features",
+        "member": "private/docs.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features/private/docs.bzl"
+    },
+    {
+      "repository": "bazel_features",
+      "path": "private/parse.bzl",
+      "bytes": 1417,
+      "sha256": "f035959904515aa37a57150a190673929580d78ff0834dbe87f0194dfc08bf3f",
+      "source": {
+        "kind": "archive",
+        "archive": "bazel_features",
+        "member": "private/parse.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features/private/parse.bzl"
+    },
+    {
+      "repository": "bazel_features",
+      "path": "private/util.bzl",
+      "bytes": 621,
+      "sha256": "998a60b3dda6e833ce7a05cb6c03b2ea4f2b53719719808cf990f87df594a2a0",
+      "source": {
+        "kind": "archive",
+        "archive": "bazel_features",
+        "member": "private/util.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features/private/util.bzl"
+    },
+    {
+      "repository": "bazel_features_globals",
+      "path": "BUILD.bazel",
+      "bytes": 266,
+      "sha256": "ab75992eebb5a7565c4529c3508991f3c12f2035e9a935adca1f621d651e3dcc",
+      "source": {
+        "kind": "saved_Bazel_generated_output",
+        "path": "/tmp/slug-wp1210-bazel-cquery-a/f127147ee27d79604fe21e6da8ce0423/external/bazel_features++version_extension+bazel_features_globals/BUILD.bazel",
+        "baseline_operation_sha256": "1b2e44392968577061e95d5b60f6f9e4a96cb3e01d42d399dd4ab1f75a2dfec3",
+        "generator_archive": "bazel_features",
+        "generator_member": "private/globals_repo.bzl",
+        "generator_sha256": "1cf74b0273f8aedd9c33158225c67e143c87f9a9a4316a9a599e2f40cf479353",
+        "native_bazel_version": "9.2.0",
+        "globals_attr_sha256": "33a24f314c1749635664995b6bc0adaedfac620f9f5eea1864735cf7370cbeb7"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features_globals/BUILD.bazel"
+    },
+    {
+      "repository": "bazel_features_globals",
+      "path": "globals.bzl",
+      "bytes": 1585,
+      "sha256": "e3d6780bb1a869ff032e2c2b882ba3eac601b0d21280505559e77ae2773e4a6f",
+      "source": {
+        "kind": "saved_Bazel_generated_output",
+        "path": "/tmp/slug-wp1210-bazel-cquery-a/f127147ee27d79604fe21e6da8ce0423/external/bazel_features++version_extension+bazel_features_globals/globals.bzl",
+        "baseline_operation_sha256": "1b2e44392968577061e95d5b60f6f9e4a96cb3e01d42d399dd4ab1f75a2dfec3",
+        "generator_archive": "bazel_features",
+        "generator_member": "private/globals_repo.bzl",
+        "generator_sha256": "1cf74b0273f8aedd9c33158225c67e143c87f9a9a4316a9a599e2f40cf479353",
+        "native_bazel_version": "9.2.0",
+        "globals_attr_sha256": "33a24f314c1749635664995b6bc0adaedfac620f9f5eea1864735cf7370cbeb7"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features_globals/globals.bzl"
+    },
+    {
+      "repository": "bazel_features_version",
+      "path": "BUILD.bazel",
+      "bytes": 196,
+      "sha256": "c2b2a661255d1ba6a3785f0fc6570d48760daf24972855001997476fe9b1ecc9",
+      "source": {
+        "kind": "saved_Bazel_generated_output",
+        "path": "/tmp/slug-wp1210-bazel-cquery-a/f127147ee27d79604fe21e6da8ce0423/external/bazel_features++version_extension+bazel_features_version/BUILD.bazel",
+        "baseline_operation_sha256": "1b2e44392968577061e95d5b60f6f9e4a96cb3e01d42d399dd4ab1f75a2dfec3",
+        "generator_archive": "bazel_features",
+        "generator_member": "private/version_repo.bzl",
+        "generator_sha256": "af84c51203a6a4086e9c5dbb28e958ea197478170467fa7f5a6a68c105db50ce",
+        "native_bazel_version": "9.2.0",
+        "globals_attr_sha256": null
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features_version/BUILD.bazel"
+    },
+    {
+      "repository": "bazel_features_version",
+      "path": "version.bzl",
+      "bytes": 17,
+      "sha256": "1a7753dd368896d0cbc7cebc84d19502b9952085c25630af579506df109baa86",
+      "source": {
+        "kind": "saved_Bazel_generated_output",
+        "path": "/tmp/slug-wp1210-bazel-cquery-a/f127147ee27d79604fe21e6da8ce0423/external/bazel_features++version_extension+bazel_features_version/version.bzl",
+        "baseline_operation_sha256": "1b2e44392968577061e95d5b60f6f9e4a96cb3e01d42d399dd4ab1f75a2dfec3",
+        "generator_archive": "bazel_features",
+        "generator_member": "private/version_repo.bzl",
+        "generator_sha256": "af84c51203a6a4086e9c5dbb28e958ea197478170467fa7f5a6a68c105db50ce",
+        "native_bazel_version": "9.2.0",
+        "globals_attr_sha256": null
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_features_version/version.bzl"
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "BUILD",
+      "bytes": 2170,
+      "sha256": "5c20cfb7082869d534ec792772ee80b8b6724892857095157bfc57f1e96eaa70",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "bazel_skylib",
+        "member": "BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_skylib/BUILD"
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "bzl_library.bzl",
+      "bytes": 1477,
+      "sha256": "19ad2a02f1b2f7c5568a21d2be1a9e73abc764be87eeb0422ba28922c81e647f",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "bazel_skylib",
+        "member": "bzl_library.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_skylib/bzl_library.bzl"
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "lib/BUILD",
+      "bytes": 1853,
+      "sha256": "efb832e736bc05b4328d06ce1e66d28ac6c9af0c26c20d7faa33274eee56d668",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "bazel_skylib",
+        "member": "lib/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_skylib/lib/BUILD"
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "lib/paths.bzl",
+      "bytes": 10378,
+      "sha256": "96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83",
+      "source": {
+        "kind": "archive",
+        "archive": "bazel_skylib",
+        "member": "lib/paths.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/bazel_skylib/lib/paths.bzl",
+      "asset": null
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "rules/BUILD",
+      "bytes": 1808,
+      "sha256": "8274cce584479da4ea7dfa593a5b30284859e02030a85fc61341fbbb28c70941",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "bazel_skylib",
+        "member": "rules/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_skylib/rules/BUILD"
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "rules/common_settings.bzl",
+      "bytes": 6421,
+      "sha256": "f3bcedef4b2b2cbe9750d61852917954499c4ba5e83d79fb975ec5814eb76d20",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "bazel_skylib",
+        "member": "rules/common_settings.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/bazel_skylib/rules/common_settings.bzl",
+      "asset": null
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "rules/private/BUILD",
+      "bytes": 1422,
+      "sha256": "b74bcdac3b3b9b721613e98e807a1a0e933365fc65e031233a8af09a6eb41046",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "bazel_skylib",
+        "member": "rules/private/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_skylib/rules/private/BUILD"
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "rules/private/bzl_library.bzl",
+      "bytes": 3122,
+      "sha256": "2af90c331cd2fa82080fe5cc23c1165524e50c1f6f6489e81aa5ad7af26120aa",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "bazel_skylib",
+        "member": "rules/private/bzl_library.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_skylib/rules/private/bzl_library.bzl"
+    },
+    {
+      "repository": "bazel_skylib",
+      "path": "rules/private/copy_common.bzl",
+      "bytes": 2865,
+      "sha256": "77992e62e24a93c1b503866cc0cb6be2be9b4d082ac521aad763450e2bf489db",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "bazel_skylib",
+        "member": "rules/private/copy_common.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/bazel_skylib/rules/private/copy_common.bzl"
+    },
+    {
+      "repository": "cc_compatibility_proxy",
+      "path": "BUILD",
+      "bytes": 634,
+      "sha256": "585158f098ddc1bb1ec0217de7ca2cbe08982eb80603d298987af2b0a7393c5e",
+      "source": {
+        "kind": "literal",
+        "archive": "rules_cc",
+        "member": "cc/extensions.bzl",
+        "producer": "_compatibility_proxy_repo_impl Bazel>=9 branch"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/cc_compatibility_proxy/BUILD"
+    },
+    {
+      "repository": "cc_compatibility_proxy",
+      "path": "proxy.bzl",
+      "bytes": 1776,
+      "sha256": "81fb7bb12b7ab4a53a3d11fb8ec9b256fe7dc7652a59b1be413eecf34404b8ea",
+      "source": {
+        "kind": "literal",
+        "archive": "rules_cc",
+        "member": "cc/extensions.bzl",
+        "producer": "_compatibility_proxy_repo_impl Bazel>=9 branch"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/cc_compatibility_proxy/proxy.bzl"
+    },
+    {
+      "repository": "cc_compatibility_proxy",
+      "path": "symbols.bzl",
+      "bytes": 754,
+      "sha256": "2adedeeaaad8c0e664dc35e9bf1480b1d6dc3d7840034f9efe3ee78476fc5902",
+      "source": {
+        "kind": "literal",
+        "archive": "rules_cc",
+        "member": "cc/extensions.bzl",
+        "producer": "_compatibility_proxy_repo_impl Bazel>=9 branch"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/cc_compatibility_proxy/symbols.bzl",
+      "asset": null
+    },
+    {
+      "repository": "protobuf",
+      "path": "LICENSE",
+      "bytes": 1732,
+      "sha256": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+      "source": {
+        "kind": "archive_license",
+        "archive": "protobuf",
+        "member": "LICENSE"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/protobuf/LICENSE"
+    },
+    {
+      "repository": "protobuf",
+      "path": "bazel/common/BUILD",
+      "bytes": 1135,
+      "sha256": "edcb76b9d2a5cbb89dbabeaacd7c5b83b984a3025674ae096cdba6d7d806ac96",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "protobuf",
+        "member": "bazel/common/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/protobuf/bazel/common/BUILD"
+    },
+    {
+      "repository": "protobuf",
+      "path": "bazel/common/proto_info.bzl",
+      "bytes": 316,
+      "sha256": "3f31cc2981ccb6a7601574ee0cbfb41276cf80cf17642c252c21167f62793018",
+      "source": {
+        "kind": "archive",
+        "archive": "protobuf",
+        "member": "bazel/common/proto_info.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/protobuf/bazel/common/proto_info.bzl"
+    },
+    {
+      "repository": "protobuf",
+      "path": "bazel/private/BUILD",
+      "bytes": 5176,
+      "sha256": "f1e729206de1eb9a6966d8513224ccc895c1a6d2196a832c38a3560510a3df6f",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "protobuf",
+        "member": "bazel/private/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/protobuf/bazel/private/BUILD"
+    },
+    {
+      "repository": "protobuf",
+      "path": "bazel/private/native_bool_flag.bzl",
+      "bytes": 1000,
+      "sha256": "2608286d2170708cb7272b1a5a2e325510288ebd6f8745c86beb57c6ecce9519",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "protobuf",
+        "member": "bazel/private/native_bool_flag.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/protobuf/bazel/private/native_bool_flag.bzl"
+    },
+    {
+      "repository": "protobuf",
+      "path": "bazel/private/proto_info.bzl",
+      "bytes": 8682,
+      "sha256": "413a183ff57385b9eafa1c3fa0370efbab78710f7d9e5863daffc732d5c2aa31",
+      "source": {
+        "kind": "archive",
+        "archive": "protobuf",
+        "member": "bazel/private/proto_info.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/protobuf/bazel/private/proto_info.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/BUILD",
+      "bytes": 4028,
+      "sha256": "523ec37d618a6fa9720842049b3608ed9b102677c702991925b777cae71f1a32",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/action_names.bzl",
+      "bytes": 8322,
+      "sha256": "e52d16474bd3ad3a0e0a4cd0cb1ad60b968ac5b0b2bcb0b1cffe85aedf80ed9d",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/action_names.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/action_names.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/cc_binary.bzl",
+      "bytes": 1720,
+      "sha256": "8dcd829755abc3feaaf32bf3c8cda0904b8c1b5d350060e768054eb60c22f523",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/cc_binary.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/cc_binary.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/cc_library.bzl",
+      "bytes": 750,
+      "sha256": "f78cea09a88fff65a5409d7e2b725cf9fcbdbf6d409a2b4b94216565be79b2dc",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/cc_library.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/cc_library.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/cc_postmark.bzl",
+      "bytes": 1150,
+      "sha256": "4e17bd4ba32fd3a3c4c628692014de4e4cc9b8aaf637376975390b1817ce10dd",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/cc_postmark.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/cc_postmark.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/cc_test.bzl",
+      "bytes": 1706,
+      "sha256": "31f464add6b0fa1db2b7e12f67242b7a1b0039a1f1c10882ae9f3edcf800dd29",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/cc_test.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/cc_test.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/cc_toolchain_config_lib.bzl",
+      "bytes": 23684,
+      "sha256": "f8418490663f7e188fa060265b215e80b154a5d190b32ef75fcb6d0254017808",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/cc_toolchain_config_lib.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/cc_toolchain_config_lib.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/BUILD",
+      "bytes": 3217,
+      "sha256": "432c5a383e2ba0ede62f889f3a4673d68eb65ce60649db4afb5dfbeee99fce0a",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/common/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/common/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/cc_common.bzl",
+      "bytes": 722,
+      "sha256": "65e91cf0fa7ebb1c8efc84bbf6b1c4ec4db46f5e5ed4606759aa4a45a23b4063",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/cc_common.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/common/cc_common.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/cc_debug_helper.bzl",
+      "bytes": 9297,
+      "sha256": "71f5938428143f459be794495ee6b66769a3b29b742c2fa238f640c4d0f9a4fe",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/cc_debug_helper.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/common/cc_debug_helper.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/cc_helper.bzl",
+      "bytes": 47885,
+      "sha256": "22b11a7833958f11fb32ddf6406195e02ccef9dc635369a556cbafa4e933fdbe",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/cc_helper.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/common/cc_helper.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/cc_helper_internal.bzl",
+      "bytes": 14711,
+      "sha256": "793ab429f8e397df9c486f4c3c7b5c57fae81c8432ba6d08189d65d75676dae1",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/cc_helper_internal.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/common/cc_helper_internal.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/cc_info.bzl",
+      "bytes": 700,
+      "sha256": "bac2bc3024fb0bacdfa2ca8d7ac3af946f447fe397c76b29fea959a35271f3da",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/cc_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/common/cc_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/cc_shared_library_hint_info.bzl",
+      "bytes": 859,
+      "sha256": "44c2bb0675d74c03216db51309088c72b5e81b789ab0ae2381ad2943c2b1fb57",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/cc_shared_library_hint_info.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/common/cc_shared_library_hint_info.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/cc_shared_library_info.bzl",
+      "bytes": 765,
+      "sha256": "ecf55ca7fd8c0ae10fee4677af275cd851f0238844782ae5cd5e6030e51502ff",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/cc_shared_library_info.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/common/cc_shared_library_info.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/debug_package_info.bzl",
+      "bytes": 750,
+      "sha256": "82bc3939337c0a157656889416c0150258bed547518949269da2f60ac0ad8377",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/debug_package_info.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/common/debug_package_info.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/objc_info.bzl",
+      "bytes": 902,
+      "sha256": "7cf752dd9e0ae9acade941631faac1a4e0de488ffb1ad96d9e589d7ba04c3743",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/objc_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/common/objc_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/semantics.bzl",
+      "bytes": 7634,
+      "sha256": "029254fd58eb8b3bf32a0f772e479b991a51ce21a6f6cc8a5739aadbce3900da",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/semantics.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/common/semantics.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/common/visibility.bzl",
+      "bytes": 74,
+      "sha256": "141a3ee5bcbef22731f26bcbd157af45f36ed8fcffa853c8b930629e8cbee910",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/common/visibility.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/common/visibility.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/find_cc_toolchain.bzl",
+      "bytes": 4812,
+      "sha256": "3f62d3ea99f59674f71dbc669c80dd0dc5ef14637933d727b74f0bd556334655",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/find_cc_toolchain.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/find_cc_toolchain.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/BUILD",
+      "bytes": 3126,
+      "sha256": "5d7d765573afc83013537bcb943ccb6d76944e4fe04c5651e47e7a7e3a1cc538",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/private/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/cc_common.bzl",
+      "bytes": 33860,
+      "sha256": "5e6ab737945b487759c9f039c77a066dc65bbe15cf590b566fe86029cc610762",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/cc_common.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/cc_common.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/cc_info.bzl",
+      "bytes": 29389,
+      "sha256": "4424bb876c3f8234d7cfce20652e7ab1a7b2fc34cc2c637b1cb4313590d9f1bc",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/cc_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/cc_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/cc_internal.bzl",
+      "bytes": 785,
+      "sha256": "8241ced58c265334ac3f0e063d492383f1ff7d223736dc2d6a5aa712165de6bb",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/cc_internal.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/cc_internal.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/cc_launcher_info.bzl",
+      "bytes": 1331,
+      "sha256": "41da54762e854191c0217575d385b37cd9729380d7c78d3efbc19049177250dd",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/cc_launcher_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/cc_launcher_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/cc_shared_library_hint_info.bzl",
+      "bytes": 3599,
+      "sha256": "7d067aad7862af26ee701dfa32c611d608fd606aaba06ca7dc232b6d7291d415",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/cc_shared_library_hint_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/cc_shared_library_hint_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/cc_shared_library_info.bzl",
+      "bytes": 1304,
+      "sha256": "5b7dcd1f20611891bbe14d77c81fb47bf564f982e238d0ed2bc78d316efdb2f1",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/cc_shared_library_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/cc_shared_library_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/compile/BUILD",
+      "bytes": 1258,
+      "sha256": "2077c6af687b9e6bbee1c1a575534a82c423a496e96ab684a2f5d4f817b86bb3",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/private/compile/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/compile/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/compile/cc_compilation_helper.bzl",
+      "bytes": 29387,
+      "sha256": "2c484cade81f0d70efd203612b5492e5578871b2b3e9be7987de42de9c57863f",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/compile/cc_compilation_helper.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/compile/cc_compilation_helper.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/compile/cc_compilation_outputs.bzl",
+      "bytes": 9617,
+      "sha256": "294e3da16da4444122e7dee058ec1e06b30cec93d64a32f217cf9e1e3e4bfb44",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/compile/cc_compilation_outputs.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/compile/cc_compilation_outputs.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/compile/compile.bzl",
+      "bytes": 96625,
+      "sha256": "bec506ffc3be08fffc4842b9daac498773534db9916121648a5527fac84cabea",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/compile/compile.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/compile/compile.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/compile/compile_action_templates.bzl",
+      "bytes": 10604,
+      "sha256": "10a43c512a85458f45a0223a7ddc7c1b56f8072872b765b1744d336ff91ec794",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/compile/compile_action_templates.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/compile/compile_action_templates.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/compile/compile_build_variables.bzl",
+      "bytes": 27896,
+      "sha256": "463ea66c2423cab80153ccbb25193516e00e887d24bd4ba6d7b485a19c8d8b54",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/compile/compile_build_variables.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/compile/compile_build_variables.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/compile/linkstamp_compile.bzl",
+      "bytes": 4535,
+      "sha256": "6f5ceb39f1b6c26b65073867f3435ec01093775edf6129d2b9421bca4c7a70bb",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/compile/linkstamp_compile.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/compile/linkstamp_compile.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/compile/lto_compilation_context.bzl",
+      "bytes": 4495,
+      "sha256": "a17435cd56fa165c71081e99f9af73407f7b4cc1dc086e53771dcf74df81b3f4",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/compile/lto_compilation_context.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/compile/lto_compilation_context.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/debug_package_info.bzl",
+      "bytes": 1281,
+      "sha256": "b22666c62cafcb12b3e1cc01d5d3ecfcd48f530cf5b915fbdcfea4abcf8d19f8",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/debug_package_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/debug_package_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/BUILD",
+      "bytes": 1299,
+      "sha256": "195117da87042d4d2c48fafda8d1448d03996c4a2e7827c0c47f520ec0c05f13",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/private/link/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/link/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/cc_linking_helper.bzl",
+      "bytes": 30696,
+      "sha256": "c45dd243835bd70803a7bb2e0a11167c9ea5ac912b3f02d415841879873b2a03",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/cc_linking_helper.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/cc_linking_helper.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/collect_solib_dirs.bzl",
+      "bytes": 24049,
+      "sha256": "f25b0f978bce3a3cf810b36c6897a85adefce7036ec68ba53613352afa218125",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/collect_solib_dirs.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/collect_solib_dirs.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/cpp_link_action.bzl",
+      "bytes": 11221,
+      "sha256": "0cbe9d6b0ce0f6bea5abe1d9783b79435f495ba93bdaf402ad9539513a82223f",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/cpp_link_action.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/cpp_link_action.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/create_extra_link_time_library.bzl",
+      "bytes": 7334,
+      "sha256": "522312ac48567566725f0768a6961fcaa78577fa24ac8007d5b1b8ca19698e82",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/create_extra_link_time_library.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/create_extra_link_time_library.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/create_libraries_to_link_values.bzl",
+      "bytes": 14854,
+      "sha256": "7d8df512d6b0df2178a2ca9cd30cb36d1a22c96877dd8e69f49bd3cf739a3764",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/create_libraries_to_link_values.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/create_libraries_to_link_values.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/create_library_to_link.bzl",
+      "bytes": 15074,
+      "sha256": "5f57423312f24392f106aeb5959485c4f30c54ee2d8e926a45934de51a2455d1",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/create_library_to_link.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/create_library_to_link.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/create_linker_input.bzl",
+      "bytes": 2418,
+      "sha256": "e4e8a7fc9d7be8edd40a2b95e72a96710c05d5bbd610b2c1cc2f274e3672cbd1",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/create_linker_input.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/create_linker_input.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/create_linking_context_from_compilation_outputs.bzl",
+      "bytes": 6505,
+      "sha256": "664a461564abd348111d791aa03da0207fe158620d276b6da1936f8abb23be59",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/create_linking_context_from_compilation_outputs.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/create_linking_context_from_compilation_outputs.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/create_linkstamp.bzl",
+      "bytes": 1587,
+      "sha256": "8d5fc394e31c5f0eb8a84f5020f35e71f90cdbf89591e44d1c0da8a8899e6000",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/create_linkstamp.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/create_linkstamp.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/finalize_link_action.bzl",
+      "bytes": 19570,
+      "sha256": "adc6ea3b355d0c5e5fbf1b1e9eaa7d7dd7c0c095234a0cff7fdb4fc72eb167c9",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/finalize_link_action.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/finalize_link_action.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/link.bzl",
+      "bytes": 9903,
+      "sha256": "666e819dee4777d0c3d8624e18588a905046532a6668d89d5744419cbee4a0e2",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/link.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/link.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/link_build_variables.bzl",
+      "bytes": 19158,
+      "sha256": "bdf030361c5a199f6c0fd1bbe5e3b1ce68d041141626a6b0242639b13eab33f0",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/link_build_variables.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/link_build_variables.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/lto_backends.bzl",
+      "bytes": 24054,
+      "sha256": "078bfb686e85b584745fcea2d9e5535938f9afc1a0066f80cc88aceb699f4226",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/lto_backends.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/lto_backends.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/lto_indexing_action.bzl",
+      "bytes": 13282,
+      "sha256": "03cb57e972bb7503d665ca56340a34fff3e6289f9c7a168ca87a427e57c66863",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/lto_indexing_action.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/lto_indexing_action.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/link/target_types.bzl",
+      "bytes": 4857,
+      "sha256": "12110c7dce405cd2ba4253d694502f08cc97a95bd0004444054ae8aa689da8fd",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/link/target_types.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/target_types.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/objc_info.bzl",
+      "bytes": 4422,
+      "sha256": "675fffb06e4731d2f0f4b7c9f2d38596fff042321dec5e581f73b5e44f8fde8a",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/objc_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/objc_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/paths.bzl",
+      "bytes": 1293,
+      "sha256": "c982ac685f0bfbd32602d82d1c37f3bf50a2714ca6a13bfd3c08d4e5cc8b8872",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/paths.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/paths.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/BUILD",
+      "bytes": 3346,
+      "sha256": "fe5ef1cf5d4893fa69469ad4319173c0992722967030983a74d28ca6b0c8138d",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/attrs.bzl",
+      "bytes": 19186,
+      "sha256": "2ce75f73e5a7825908335c0f1b18945a87274cbaeb08353c89c8ab5ad4de6967",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/attrs.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/attrs.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_binary.bzl",
+      "bytes": 43976,
+      "sha256": "968d46b51f6219d61444371b61d7aa19bb9504a89028211509beb4438bcf1eba",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_binary.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_binary.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_flags_supplier_lib.bzl",
+      "bytes": 2725,
+      "sha256": "7add1fd4ee24ecb08a3f6ab79f7231a00df4a14ef43c10b17962e78a01f98903",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_flags_supplier_lib.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_flags_supplier_lib.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_import.bzl",
+      "bytes": 17457,
+      "sha256": "8b936ed7a7c3d23fbe6954074ffa6e1a53b18a705fe3b9d97a2cca4fb45718a9",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_import.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_import.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_library.bzl",
+      "bytes": 38692,
+      "sha256": "87b491f10af315c9574f7dd96125b05fb53827da2442fbbe2f10e513167d1f70",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_library.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_library.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_shared_library.bzl",
+      "bytes": 52683,
+      "sha256": "2d41246b77211a3fcaf48b9010858853a537b2c72eecc17142d15e32581abf52",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_shared_library.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_shared_library.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_static_library.bzl",
+      "bytes": 11195,
+      "sha256": "0e156df02b1d9a74db5fdfdb2221704c2fcad24de29d871bdc69dc593c733e89",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_static_library.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_static_library.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_test.bzl",
+      "bytes": 6345,
+      "sha256": "9a910ab4b78e76356dbc63eeff6233ff6f1912bb2ba844dbddfc4791d8e57065",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_test.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_test.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_toolchain.bzl",
+      "bytes": 14231,
+      "sha256": "6a460affdf52e39bcc2ab1d4f7f5f6c135eaae24912a1d1a92f2b5b285321168",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_toolchain.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_toolchain.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_toolchain_alias.bzl",
+      "bytes": 1957,
+      "sha256": "28a3d88355d2ec51366d8278b6490b690e175641773e3e397b0b9471f0ad0b22",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_toolchain_alias.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/cc_toolchain_alias.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_toolchain_info.bzl",
+      "bytes": 12307,
+      "sha256": "f19589572147b7dc8f1b16ab96791b7651923c36821aed70868a74bbfce963f5",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_toolchain_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/cc_toolchain_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/cc_toolchain_provider_helper.bzl",
+      "bytes": 12951,
+      "sha256": "92e52421866fb6fcba103159d17575480439aa0567d362937aca03aebb7372e3",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/cc_toolchain_provider_helper.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/cc_toolchain_provider_helper.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/fdo/BUILD",
+      "bytes": 1106,
+      "sha256": "74db353b60b6d1c76a5fa46778d8c86379b0286ad478a3aaa43e59746479f24e",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/fdo/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/fdo/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/fdo/fdo_context.bzl",
+      "bytes": 19294,
+      "sha256": "91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/fdo/fdo_context.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/fdo_context.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/fdo/fdo_prefetch_hints.bzl",
+      "bytes": 1495,
+      "sha256": "1e91a9c893e5a6c3e79512d867c2c0d1f7c8ea7d6bfb7594ecebaf44c20d8d12",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/fdo/fdo_prefetch_hints.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/fdo_prefetch_hints.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/fdo/fdo_profile.bzl",
+      "bytes": 2312,
+      "sha256": "282e3a3ffe61729d6eb2addca80c268d13e5f61af5b602c97d8cca0b0287b51c",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/fdo/fdo_profile.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/fdo_profile.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/fdo/memprof_profile.bzl",
+      "bytes": 1600,
+      "sha256": "f38b565dc59b0707e0015f5c732cd685b7e81b7387d328887932038b58b4b8e2",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/fdo/memprof_profile.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/memprof_profile.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/fdo/propeller_optimize.bzl",
+      "bytes": 1789,
+      "sha256": "cdd5ccc06650172917ced6e2c88ff1ec86a74d4f1bd0f9a853f8867299a9b1e8",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/fdo/propeller_optimize.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/propeller_optimize.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/native_cc_common.bzl",
+      "bytes": 715,
+      "sha256": "d8e5fedab99534bd1a926dd780e2bfdc66e9a8e70cd29561a591969123084e46",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/native_cc_common.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/native_cc_common.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_attrs.bzl",
+      "bytes": 10351,
+      "sha256": "438a6070da738c5c72cdd0de4e1e224f00de7c42fc3384d9d85a8f030dadd166",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_attrs.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/objc_attrs.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_common.bzl",
+      "bytes": 9176,
+      "sha256": "ea3c91548de06987bcce37f4460f841126def30c21a4893c5198399e4ac85820",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_common.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/objc_common.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_compilation_artifacts_info.bzl",
+      "bytes": 2860,
+      "sha256": "3a050af799832c4e5ed2b961715db904d119c2971e60a840241431128cb41ea9",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_compilation_artifacts_info.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/objc_compilation_artifacts_info.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_compilation_context_info.bzl",
+      "bytes": 2810,
+      "sha256": "c3fbf2b937a709d5baf153b37fc11f4ac70a713c828244513b0615e57208ac47",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_compilation_context_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/objc_compilation_context_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_compilation_support.bzl",
+      "bytes": 19774,
+      "sha256": "1ca98e0bbb98e6c65c90d31bdd7e4001ded96c1a6a2a529425ba357e64c4540c",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_compilation_support.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/objc_compilation_support.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_import.bzl",
+      "bytes": 3504,
+      "sha256": "14088b2b32ac41a7e9d3ba59f2c41063b1856f2066783118e96afeef6603c4e7",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_import.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/objc_import.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_intermediate_artifacts.bzl",
+      "bytes": 3165,
+      "sha256": "6e6d20fba243b98dfd4f26ebedc6ab9d7ff1ba29ba56dac9a992f3df01276a2c",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_intermediate_artifacts.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/objc_intermediate_artifacts.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_library.bzl",
+      "bytes": 5548,
+      "sha256": "82eaf04a9eac7511478fdef45470862d0e35c6f31b887a6569465cfd7aee0bcf",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_library.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/objc_library.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/rules_impl/objc_semantics.bzl",
+      "bytes": 1796,
+      "sha256": "310291355f0280a5d600a3b9b168bd4db1f3ac54b9e5ee82fc278a01655d8253",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/rules_impl/objc_semantics.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/rules_impl/objc_semantics.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain/BUILD",
+      "bytes": 2319,
+      "sha256": "6098c51f31dc5e72b2df065574bca22648be1311c38a97221a2addfb0f61f2e9",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/toolchain/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain/cc_configure.bzl",
+      "bytes": 6123,
+      "sha256": "43ac76e2d2ab1c5f0446661faa66761ab9d9eb913d3728f0bf25a8b976c16fce",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain/cc_configure.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/toolchain/cc_configure.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain/lib_cc_configure.bzl",
+      "bytes": 11479,
+      "sha256": "2153852db0e991a2d9c79ec7e0d3d209de46dd15c616d5ace984cae4d0bc708c",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain/lib_cc_configure.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/toolchain/lib_cc_configure.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain/unix_cc_configure.bzl",
+      "bytes": 29733,
+      "sha256": "a84500ecbdd7eaad6b46218001ac86ee9d4c41419b9dd2016fdf2a3eb0524803",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain/unix_cc_configure.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/toolchain/unix_cc_configure.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain/windows_cc_configure.bzl",
+      "bytes": 44184,
+      "sha256": "433ba1cda9dbbe0cb6d25c05cd511db49cd78042d2ed102083b7c850ecf6ecd0",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain/windows_cc_configure.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/toolchain/windows_cc_configure.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain_config/BUILD",
+      "bytes": 1255,
+      "sha256": "4f58275fce41e27d7a8e24ee2113f77541265eda1b09bc21bb17469eb651742f",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain_config/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/private/toolchain_config/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain_config/cc_toolchain_config_info.bzl",
+      "bytes": 5709,
+      "sha256": "8c522773214e202b426ae43589f59a8bdbf3af19d2e595ba8ec7ac125fef5d39",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain_config/cc_toolchain_config_info.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/toolchain_config/cc_toolchain_config_info.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain_config/configure_features.bzl",
+      "bytes": 9335,
+      "sha256": "d950aa9acda68b999c452178f8ccf49860eac910a8c28551c547c3725198b977",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain_config/configure_features.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/toolchain_config/configure_features.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/private/toolchain_config/legacy_features.bzl",
+      "bytes": 59023,
+      "sha256": "9a6cafe57d4f8564b8eea39a41e66e372471f4d3dcb2cb0e52c970d45f7695dd",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/private/toolchain_config/legacy_features.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/toolchain_config/legacy_features.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/starlark_doc_extract_helper.bzl",
+      "bytes": 360,
+      "sha256": "1665ea7de725aef0eeef88dab283f3e6d426e8218ea03c08e207822e2c8723be",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/starlark_doc_extract_helper.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/starlark_doc_extract_helper.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/toolchains/BUILD",
+      "bytes": 1593,
+      "sha256": "95e7cfc1531bc5bbc2533d28e3aa243d107df7fde65367a80e1ecf30af7d27a0",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_cc",
+        "member": "cc/toolchains/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/toolchains/BUILD"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/toolchains/cc_flags_supplier.bzl",
+      "bytes": 1346,
+      "sha256": "2d36abccdddfa5be070f22a0ce7c2bfecb2479274c36e93d32b857ad7e3ba89d",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/toolchains/cc_flags_supplier.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/toolchains/cc_flags_supplier.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/toolchains/cc_toolchain_alias.bzl",
+      "bytes": 757,
+      "sha256": "302c91a5e725fdcbd46ed071584dd4443823ba5de073a85159c36bf1324ecc29",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/toolchains/cc_toolchain_alias.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/toolchains/cc_toolchain_alias.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/toolchains/cc_toolchain_config_info.bzl",
+      "bytes": 775,
+      "sha256": "36644e5c5ff8560fa1702ccd3c399bc7ec9681107294cddb2f796d7d73d63949",
+      "source": {
+        "kind": "archive",
+        "archive": "rules_cc",
+        "member": "cc/toolchains/cc_toolchain_config_info.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/toolchains/cc_toolchain_config_info.bzl"
+    },
+    {
+      "repository": "rules_cc",
+      "path": "cc/toolchains/toolchain_config_utils.bzl",
+      "bytes": 1161,
+      "sha256": "c0707024e34b2638b7c128a96b623fb0bf3f6d322453bb8c33d028122c43cd96",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_cc",
+        "member": "cc/toolchains/toolchain_config_utils.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_cc/cc/toolchains/toolchain_config_utils.bzl"
+    },
+    {
+      "repository": "rules_license",
+      "path": "rules/BUILD",
+      "bytes": 1582,
+      "sha256": "dd28655f69552b1a0a903f0242de0ab4b16d3155239111d5cfb616a28b842bfc",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_license",
+        "member": "rules/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_license/rules/BUILD"
+    },
+    {
+      "repository": "rules_license",
+      "path": "rules/license.bzl",
+      "bytes": 5263,
+      "sha256": "1cb4a02d91dcdc8cabae47ffdb787a62b309ed720237afcf2f26e21a64023531",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_license",
+        "member": "rules/license.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_license/rules/license.bzl"
+    },
+    {
+      "repository": "rules_license",
+      "path": "rules/license_impl.bzl",
+      "bytes": 1370,
+      "sha256": "7e7d6aa7fd4983db6c5f3889522ff92ce02e28a7e4064b339257d21d5d7d4f7f",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_license",
+        "member": "rules/license_impl.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_license/rules/license_impl.bzl"
+    },
+    {
+      "repository": "rules_license",
+      "path": "rules/providers.bzl",
+      "bytes": 3051,
+      "sha256": "455a7c5aefcd23b87a997ce595a39201024afce72d14b9e051ef03cb9262826d",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_license",
+        "member": "rules/providers.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_license/rules/providers.bzl"
+    },
+    {
+      "repository": "rules_license",
+      "path": "rules_gathering/BUILD",
+      "bytes": 1040,
+      "sha256": "b00ef5c613fb0ea44eccd4dcdfd169f5b9d29cf473f86b0be4c88f31cb5ebfae",
+      "source": {
+        "kind": "archive_package_boundary",
+        "archive": "rules_license",
+        "member": "rules_gathering/BUILD"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_license/rules_gathering/BUILD"
+    },
+    {
+      "repository": "rules_license",
+      "path": "rules_gathering/gathering_providers.bzl",
+      "bytes": 2250,
+      "sha256": "730ebbc1793409a65caf288855112a4dea439ce829cb43e82bfd2016fe00b62f",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_license",
+        "member": "rules_gathering/gathering_providers.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_license/rules_gathering/gathering_providers.bzl"
+    },
+    {
+      "repository": "rules_license",
+      "path": "rules_gathering/trace.bzl",
+      "bytes": 1126,
+      "sha256": "5cbf883312e9eb4d422900321308fe72c540d2161898f166242d2902aba84923",
+      "source": {
+        "kind": "archive_literal_load",
+        "archive": "rules_license",
+        "member": "rules_gathering/trace.bzl"
+      },
+      "existing_reuse": null,
+      "asset": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/assets/rules_license/rules_gathering/trace.bzl"
+    },
+    {
+      "repository": "rules_shell",
+      "path": "shell/BUILD",
+      "bytes": 789,
+      "sha256": "a001666ba1bdcde787470c069cc29ff2e9a2f6abac83dcac5bd37529b82275e5",
+      "source": {
+        "kind": "existing_fixture_boundary",
+        "path": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/BUILD"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/BUILD",
+      "asset": null
+    },
+    {
+      "repository": "rules_shell",
+      "path": "shell/private/BUILD",
+      "bytes": 258,
+      "sha256": "513c2731ecc0c0f4f82dde55cf825187c225778d5ec58cde73a25ff7a5596911",
+      "source": {
+        "kind": "existing_fixture_boundary",
+        "path": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/private/BUILD"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/private/BUILD",
+      "asset": null
+    },
+    {
+      "repository": "rules_shell",
+      "path": "shell/private/sh_binary.bzl",
+      "bytes": 1653,
+      "sha256": "eb9765a5a82092410e843fa6ccc6c7cad13dd3f7094ae22cc7a8313183ac870b",
+      "source": {
+        "kind": "existing_fixture_source",
+        "path": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/private/sh_binary.bzl",
+        "original": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz:rules_shell-0.6.1/shell/private/sh_binary.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/private/sh_binary.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_shell",
+      "path": "shell/private/sh_executable.bzl",
+      "bytes": 8497,
+      "sha256": "73b1fbd8278a7702c012830868293a8cbcf86c274841d16e7a074b200d8be39f",
+      "source": {
+        "kind": "existing_fixture_source",
+        "path": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/private/sh_executable.bzl",
+        "original": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz:rules_shell-0.6.1/shell/private/sh_executable.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/private/sh_executable.bzl",
+      "asset": null
+    },
+    {
+      "repository": "rules_shell",
+      "path": "shell/sh_binary.bzl",
+      "bytes": 777,
+      "sha256": "ab8ff142abbefef817b9cf1c311f3be15dc361b5b4b2a8320c340eb2e9aeeef3",
+      "source": {
+        "kind": "existing_fixture_source",
+        "path": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/sh_binary.bzl",
+        "original": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz:rules_shell-0.6.1/shell/sh_binary.bzl"
+      },
+      "existing_reuse": "app/slug_analysis_v2/tests/starlark_rule/builtin_fixture/rules_shell/shell/sh_binary.bzl",
+      "asset": null
+    }
+  ],
+  "counts": {
+    "members": 139,
+    "reused_members": 62,
+    "new_asset_members": 77,
+    "new_asset_bytes": 471277
+  },
+  "excluded": [
+    "All eleven builtin programs remain in existing builtin catalog; no duplicate/replacement files.",
+    "Existing rules_shell three programs and actual BUILD boundaries reused unchanged.",
+    "Existing platforms fixture caller-authored constraints preserved.",
+    "Actual registration target/BUILD execution can expose cc_libc_top_alias or other unsupported API; no shim/registration suppression.",
+    "Authored MODULE directives/version/local/nonlocal override paths and existing files remain authoritative; missing required authored metadata remains an explicit source-owner boundary."
+  ],
+  "reused_source_owner_pins": {
+    "static_graph": {
+      "path": "target/wp1222/registered-toolchain-static-closure.json",
+      "sha256": "877bec7e22aca8614083f2c2267e7a755ee3d9b84f28ec66ad8fe7ef99d1036d"
+    },
+    "existing_source_index": {
+      "path": "app/slug_analysis_v2/tests/fixtures/rustc-map-each/sources.json",
+      "sha256": "9ddee18038d2a6ab79a2d053ca28117dade35535fce9a5f13a89f61ff5831147"
+    },
+    "existing_helper_baseline_sha256": "d160b207e3341d3a05a45003f7cb14b8b59c317ee9458eec6a7f2cc740c25a0c"
+  },
+  "root_auxiliary_dependencies": [
+    "bazel_skylib",
+    "cc_compatibility_proxy",
+    "bazel_features_globals",
+    "bazel_features_version"
+  ],
+  "scope": "Literal bzl/owning-BUILD load closure PLUS captured builtin MODULE use_repo_rule source prerequisite. These are different edge classes. Token scan handles multiline actual load calls and excludes quoted examples/templates. Target references and executing repository/configuration/action bodies remain separate gates."
+}

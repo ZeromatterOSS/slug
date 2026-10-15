@@ -317,7 +317,9 @@ mod tests {
                 "@@rules_cc+//cc/private/rules_impl:cc_toolchain_info.bzl",
             )
             .unwrap(),
-            workspace_path: "/rules_cc/cc/private/rules_impl/cc_toolchain_info.bzl".into(),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(
+                "/rules_cc/cc/private/rules_impl/cc_toolchain_info.bzl".into(),
+            ),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("dep").unwrap(),
                 CanonicalRepoName::new("dep+").unwrap(),

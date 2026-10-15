@@ -288,9 +288,12 @@ ext=module_extension(implementation=impl)
         transaction: &mut dice::DiceTransaction,
     ) -> HostValidatedGeneratedRepositorySpecsOutcome {
         transaction
-            .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
-                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-            ))
+            .compute(
+                &HostValidatedModuleExtensionRepositoriesKey::new_with_scope(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+                ),
+            )
             .await
             .unwrap()
     }

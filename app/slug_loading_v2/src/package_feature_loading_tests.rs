@@ -16,7 +16,7 @@ fn root_feature_epoch(repo: Option<&str>, build: &str) -> PathObservationEpoch {
 async fn root_repo_feature_only_changes_restore_package_and_leave_bzl_payload_unrelated() {
     use slug_bzlmod_v2::RootPackageBzlTarget;
     use slug_bzlmod_v2::RootPackageSourceObservationKey;
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let key = observed_package_key();
     let bzl_key = RootPackageSourceObservationKey::for_bzl(
         workspace(),
@@ -94,7 +94,7 @@ async fn root_repo_feature_only_changes_restore_package_and_leave_bzl_payload_un
 
 #[tokio::test]
 async fn external_repo_features_follow_selected_route_and_restore_without_build_edits() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut first = None;
     for (repo, expected) in [
         (Some("repo(features=['a'])"), Some("a")),
@@ -233,7 +233,7 @@ async fn canonical_materialized_repo_features_restore_through_complete_observed_
 async fn package_feature_calls_copy_values_and_validate_full_string_list_surface() {
     const BUILD: &str =
         "v=['a']\npackage(features=v)\nv.append('not_captured')\nfilegroup(name='same')\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut tx = transaction(
         &dice,
         root_feature_epoch(Some("repo(features=['repo'])"), BUILD),
@@ -295,7 +295,7 @@ async fn package_feature_calls_copy_values_and_validate_full_string_list_surface
 
 #[tokio::test]
 async fn package_feature_boundary_rejects_second_call_and_no_arguments_for_both_spellings() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     for first in ["package", "native.package"] {
         for second in ["package", "native.package"] {
             for argument in ["default_testonly=True", "features=['a']"] {

@@ -11,7 +11,13 @@ fn prefix(identity: &BzlModuleIdentity) -> anyhow::Result<PublicationShape> {
         .saturating_add(identity.label.package().package().as_str().len())
         .saturating_add(identity.label.target().as_str().len())
         .saturating_add(mapping_id.map_or(0, |mapping| mapping.as_str().len()))
-        .saturating_add(identity.workspace_path.as_os_str().len().saturating_mul(2));
+        .saturating_add(
+            identity
+                .source
+                .retained_text_bytes()
+                .unwrap_or(usize::MAX)
+                .saturating_mul(2),
+        );
     // Preserve every former field's storage/edge/depth forecast. Only the paid
     // work unit changes: the bounded fixed prefix is inspected as one record.
     let shape = fact(bytes, 5 + usize::from(mapping_id.is_some()), 2);

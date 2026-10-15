@@ -1,6 +1,6 @@
 //! Allocation-free forecasts of complete immutable Loading metadata.
 use super::*;
-mod charge;
+pub(crate) mod charge;
 #[cfg(test)]
 mod charge_tests;
 pub(crate) type Visitor<'a> =
@@ -61,6 +61,25 @@ pub(crate) fn sources(
     }
     Ok(())
 }
+/// Keep every original scalar callback, then cover the newly retained pair and
+/// COMPLETE private certificate. Conservative duplicate body coverage is deliberate:
+/// a foreign nested table is not covered by the implementation's top declaration.
+pub(crate) fn complete_sources(
+    value: &crate::source_table::CertifiedSourceTable,
+    visit: &mut Visitor<'_>,
+) -> Result<(), String> {
+    sources(value, visit)?;
+    row::<crate::source_table::CertifiedSourceTable>(visit)?;
+    row::<slug_build_api_v2::published_value::SharedPublicationInput>(visit)?;
+    // The two control rows positively precede all cached reads and transfer.
+    let full = value.declarations()[0].retained_shape();
+    visit(slug_build_api_v2::DepsetStorageCharge {
+        nodes: full.nodes,
+        edges: full.edges,
+        bytes: full.bytes,
+        visits: full.visits,
+    })
+}
 pub(crate) fn files(value: &FileAdmissibility, visit: &mut Visitor<'_>) -> Result<(), String> {
     row::<FileAdmissibility>(visit)?;
     match &value.file_types {
@@ -119,7 +138,7 @@ pub(crate) fn transition(
         text(&setting.declared, visit)?;
     }
     source(&value.definition_source, visit)?;
-    sources(&value.source_identities_by_filename, visit)
+    complete_sources(&value.source_identities_by_filename, visit)
 }
 pub(crate) fn coerced(
     value: &CoercedAttributeValue,

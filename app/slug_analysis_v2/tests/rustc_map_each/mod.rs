@@ -139,22 +139,34 @@ async fn request_configured(
     target: &str,
     configuration: ConfigurationKey,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
-    let mut updater = dice.updater_with_data(UserComputationData {
+    // Read the caller's already prepared local topology. In particular, do
+    // not refresh the supplied epoch: it may deliberately withhold a source.
+    let mut repositories = REPOSITORIES
+        .iter()
+        .map(|(canonical, path)| ((*canonical).to_owned(), (*path).to_owned()))
+        .collect::<Vec<_>>();
+    for (canonical, path) in builtin_fixture::local_repositories(workspace) {
+        if let Some((_, existing)) = repositories.iter().find(|(name, _)| name == &canonical) {
+            if existing != &path {
+                return Err(format!(
+                    "callback fixture local repository {canonical} has conflicting paths: {existing:?} and {path:?}"
+                ));
+            }
+        } else {
+            repositories.push((canonical, path));
+        }
+    }
+    let repositories = repositories
+        .iter()
+        .map(|(canonical, path)| (canonical.as_str(), path.as_str()))
+        .collect::<Vec<_>>();
+    let mut data = UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
-    });
-    let builtin_repositories = BUILTIN_MODULES
-        .iter()
-        .map(|(name, _)| (format!("{name}+"), *name))
-        .collect::<Vec<_>>();
-    let mut repositories = REPOSITORIES.to_vec();
-    repositories.extend(
-        builtin_repositories
-            .iter()
-            .map(|(canonical, name)| (canonical.as_str(), *name)),
-    );
-    // The built-in host-platform route retains the canonical alias without '+'.
-    repositories.push(("platforms", "platforms"));
+    };
+    let host = builtin_fixture::RepositoryHostInputs::prepare(workspace, &mut data);
+    let mut updater = dice.updater_with_data(data);
+    host.inject(&mut updater);
     inject_root_target_inputs_with_policy(&mut updater, workspace, epoch, &repositories, false);
     slug_bzlmod_v2::inject_registry_request_inputs(
         &mut updater,

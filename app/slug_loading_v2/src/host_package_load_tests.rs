@@ -203,12 +203,24 @@ impl RegistryIo for SelectedRegistryIo {
                 Some(br#"{"url":"https://origin.invalid/dep.tgz","integrity":"sha256-test"}"#)
             }
             "https://registry.invalid/bazel_registry.json" => None,
-            _ => None,
+            _ => {
+                return crate::canonical_repository_route_tests::tests::builtin_graph_registry_io()
+                    .read_exact(url)
+                    .await;
+            }
         };
         Ok(bytes.map_or(RegistryIoOutcome::NotFound, |bytes| {
             RegistryIoOutcome::Found(Arc::from(bytes))
         }))
     }
+}
+
+/// Real registry MODULE sources complete the implicit bundled dependency graph.
+/// Explicit selected-dependency answers above keep precedence over that graph.
+fn host_fixture_dice() -> Arc<Dice> {
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, Arc::new(SelectedRegistryIo));
+    builder.build(DetectCycles::Enabled)
 }
 
 #[derive(Default)]
@@ -338,7 +350,7 @@ impl EpochBuilder {
         let module = if module.contains("module(") {
             module.to_owned()
         } else {
-            format!("module(name='bazel_tools')\n{module}")
+            format!("module(name='root')\n{module}")
         };
         let mut builder = Self::default();
         builder.directory("/", variant);
@@ -364,6 +376,7 @@ impl EpochBuilder {
             "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
             variant,
         );
+        builder.missing("/workspace/MODULE.bazel.lock");
         builder.missing("/workspace/REPO.bazel");
         builder.missing("/workspace/.bazelignore");
         builder.directory("/workspace/dep", variant);
@@ -731,6 +744,46 @@ fn observed_external_bzl_key(
     ExternalBzlModuleObservationKey::new(route, label)
 }
 
+const BUILTIN_LABELS: &[&str] = &[
+    "@@_builtins//:common/objc/apple_common.bzl",
+    "@@_builtins//:common/objc/apple_env.bzl",
+    "@@_builtins//:common/objc/apple_platform.bzl",
+    "@@_builtins//:common/objc/apple_toolchain.bzl",
+    "@@_builtins//:common/objc/objc_info.bzl",
+    "@@_builtins//:common/xcode/providers.bzl",
+];
+fn assert_complete_module_identities<'a>(
+    identities: impl IntoIterator<Item = &'a BzlModuleIdentity>,
+    raw: &[&str],
+    builtin_after: usize,
+) {
+    let identities = identities.into_iter().collect::<Vec<_>>();
+    assert_eq!(
+        identities
+            .iter()
+            .map(|id| id.label.to_string())
+            .collect::<Vec<_>>(),
+        raw[..builtin_after]
+            .iter()
+            .chain(BUILTIN_LABELS.iter())
+            .chain(raw[builtin_after..].iter())
+            .copied()
+            .collect::<Vec<_>>(),
+        "complete closure preserves first-seen DFS order including the builtin closure",
+    );
+    for (index, identity) in identities.iter().enumerate() {
+        if (builtin_after..builtin_after + BUILTIN_LABELS.len()).contains(&index) {
+            assert!(identity.source.builtin_catalog().is_some());
+            assert_eq!(
+                identity.source.catalog_relative_path(),
+                BUILTIN_LABELS[index - builtin_after].strip_prefix("@@_builtins//:")
+            );
+        } else {
+            assert!(identity.source.workspace_path().is_some());
+        }
+    }
+}
+
 fn event_texts(batch: &EventBatch) -> Vec<&str> {
     batch
         .events()
@@ -931,7 +984,7 @@ fn root_package_direct_load_keeps_root_and_apparent_external_dispatch_distinct()
 #[tokio::test]
 async fn host_bzl_visibility_rejects_cross_package_load_before_importer_evaluation() {
     let mut epoch = EpochBuilder::workspace_sources(
-        "module(name = 'bazel_tools')\n",
+        "module(name = 'root')\n",
         "",
         &[("private.bzl", "visibility('private')\nEXPORTED = 1\n")],
         900,
@@ -946,7 +999,7 @@ async fn host_bzl_visibility_rejects_cross_package_load_before_importer_evaluati
         ),
         900,
     );
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(&dice, epoch.build(), false, None).await;
     let label =
         resolve_host_load_label(&PackagePath::parse("consumer").unwrap(), ":importer.bzl").unwrap();
@@ -972,8 +1025,7 @@ async fn host_bzl_visibility_rejects_cross_package_load_before_importer_evaluati
 }
 
 fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservationInstanceId) {
-    let root =
-        "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n";
+    let root = "module(name='root')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n";
     let build = concat!(
         "load(':root_defs.bzl', 'ROOT_VALUE')\n",
         "load('@dep_alias//:defs.bzl', 'SELECTED_NAME')\n",
@@ -1356,7 +1408,7 @@ async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
 
 fn extension_mapping_root(imported: &str) -> String {
     format!(
-        "module(name='bazel_tools')\np=use_extension('//:ext.bzl','extension')\nuse_repo(p, generated='{imported}')\n"
+        "module(name='root')\np=use_extension('//:ext.bzl','extension')\nuse_repo(p, generated='{imported}')\n"
     )
 }
 
@@ -1401,7 +1453,7 @@ fn legacy_loaded_package(value: &HostPackageOutcome) -> &crate::LoadedPackage {
 
 #[tokio::test]
 async fn extension_mapping_only_change_invalidates_legacy_and_observed_root_packages_a_b_a() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = host_fixture_dice();
     let (legacy_a, observed_a) = root_mapping_packages(&dice, "plain_a", 910).await;
     let (legacy_b, observed_b) = root_mapping_packages(&dice, "plain_b", 911).await;
     let (legacy_restored, observed_restored) = root_mapping_packages(&dice, "plain_a", 910).await;
@@ -1476,7 +1528,7 @@ async fn observed_root_package_preserves_semantics_arcs_order_events_and_familie
         "exports_files(glob(['*.txt']) + glob(['sub/*.txt'], exclude = ['sub/no.txt']))\n",
         "filegroup(name = 'g', srcs = glob(['*.txt']))\n",
     );
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch = observed_glob_epoch(BUILD, 1);
     let mut transaction = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
@@ -1597,7 +1649,7 @@ async fn observed_root_package_preserves_semantics_arcs_order_events_and_familie
 async fn observed_root_package_reuses_restores_and_preserves_terminal_polarity() {
     const BUILD_A: &str = "exports_files(['a.txt'])\n";
     const BUILD_B: &str = "filegroup(name = 'changed')\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let key = observed_package_key();
 
     let mut cold = transaction(&dice, observed_glob_epoch(BUILD_A, 1), false, None).await;
@@ -1642,7 +1694,7 @@ async fn observed_root_package_reuses_restores_and_preserves_terminal_polarity()
     );
 
     let outer_tracker = Arc::new(EventTracker::default());
-    let outer_dice = Dice::builder().build(DetectCycles::Enabled);
+    let outer_dice = host_fixture_dice();
     let mut outer = transaction_with_policy(
         &outer_dice,
         observed_glob_epoch(BUILD_A, 1),
@@ -1660,7 +1712,7 @@ async fn observed_root_package_reuses_restores_and_preserves_terminal_polarity()
         entry.key.starts_with("observed-host-package-load:") && entry.batch.is_none()
     }));
 
-    let invalid_dice = Dice::builder().build(DetectCycles::Enabled);
+    let invalid_dice = host_fixture_dice();
     let invalid_epoch = EpochBuilder::workspace_sources("", "[", &[], 9).build();
     let mut invalid = transaction(&invalid_dice, invalid_epoch.dupe(), true, None).await;
     let invalid = invalid.compute(&key).await.unwrap();
@@ -1708,7 +1760,7 @@ fn root_package_epoch_union_is_left_stable_and_conflicts_are_outer() {
 
 #[tokio::test]
 async fn observed_root_package_cancellation_publishes_no_parent_and_recovers() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch = observed_glob_epoch("exports_files(['a.txt'])\n", 1);
     let mut cancelled = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
@@ -1730,7 +1782,7 @@ async fn observed_root_package_cancellation_publishes_no_parent_and_recovers() {
 
 #[tokio::test]
 async fn host_package_need_is_transient_and_root_anchor_precedes_source() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(&dice, EpochBuilder::default().build(), false, None).await;
     let key = package_key();
     let outcome = transaction.compute(&key).await.unwrap();
@@ -1764,7 +1816,7 @@ async fn host_package_loads_bzl_and_owns_only_local_complete_events() {
     let build =
         "load(\":defs.bzl\", \"make\")\nprint(\"BUILD\")\nmake()\nfilegroup(name = \"x\")\n";
     let defs = "print(\"BZL\")\ndef make():\n    print(\"MACRO\")\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let mut transaction = transaction(
         &dice,
@@ -1838,7 +1890,7 @@ async fn rule_initializer_reexport_invokes_copies_merges_and_restores() {
         epoch.file("/workspace/rules/defs.bzl", defs, variant);
         epoch.build()
     };
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let mut root_tx = transaction(&dice, epoch(A, 101), true, Some(tracker.clone())).await;
     let first = root_tx.compute(&package_key()).await.unwrap();
@@ -1898,7 +1950,7 @@ async fn rule_initializer_reexport_invokes_copies_merges_and_restores() {
     assert_eq!(terminal_package(&restored), package);
 
     let mut external_epoch = EpochBuilder::workspace_sources(
-        "module(name='bazel_tools')\nbazel_dep(name='dep', version='1.0.0')\nlocal_path_override(module_name='dep', path='dep')\n",
+        "module(name='root')\nbazel_dep(name='dep', version='1.0.0')\nlocal_path_override(module_name='dep', path='dep')\n",
         "load('@dep//rules:reexport.bzl', 'probe')\nprobe(name='external', dep=':input', items=[], keep='x', reset=':x', computed=':explicit')\n",
         &[],
         103,
@@ -1961,7 +2013,7 @@ async fn rule_initializer_reexport_invokes_copies_merges_and_restores() {
 
 #[tokio::test]
 async fn rule_initializer_failures_publish_no_target_or_output() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let cases = [
         ("fail('failure')", "out = 'x'", "failure"),
         ("return []", "", "None or a dictionary"),
@@ -2040,7 +2092,7 @@ async fn java_toolchain_initializer_passes_authentic_labels_and_legacy_lists() {
         "def authentic(name): java_toolchain(name=name, genclass=Label(':genclass'), header_compiler=Label(':header_compiler'), header_compiler_direct=Label(':header_compiler_direct'), ijar=Label(':ijar'), javabuilder=Label(':javabuilder'), singlejar=Label(':singlejar'))\n",
         "legacy = rule(implementation = _impl, initializer = _init, attrs = {'genclass': attr.label(default='//defaults:genclass'), 'deps_checker': attr.label(default='//defaults:deps_checker'), 'strict': attr.label(), '_legacy_any_type_attrs': attr.string_list(default=LEGACY)})\n",
     );
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let names = [
         "genclass",
         "header_compiler",
@@ -2125,7 +2177,7 @@ async fn rule_computed_default_reexport_invokes_labels_bypasses_explicit_and_res
         "probe(name = 'explicit', _def_parser = '//override:parser')\n",
     );
     const MODULE: &str = "print('ROOT')\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let mut transaction = transaction(
         &dice,
@@ -2261,7 +2313,7 @@ async fn rule_computed_default_reexport_invokes_labels_bypasses_explicit_and_res
 
 #[tokio::test]
 async fn rule_computed_default_rejects_unavailable_configurable_and_invalid_results() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let cases = [
         (
             "def _computed(missing): return None\n",
@@ -2413,7 +2465,7 @@ async fn exec_group_reexports_publish_complete_target_semantics_and_restore() {
         assert_eq!(group, expected);
         assert_eq!(rule.declared_exec_groups().len(), group_count);
     };
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     for (source, variant, expected, group_count) in [
         (A, 301, "test", 2),
         (C, 303, "other", 0),
@@ -2493,7 +2545,7 @@ async fn rules_cc_exec_groups_retain_named_and_automatic_policy() {
         ")\n",
     );
     let outcome = compute_package(
-        &Dice::builder().build(DetectCycles::Enabled),
+        &host_fixture_dice(),
         EpochBuilder::workspace_sources(
             "print('ROOT')\n",
             "load(':cc_library.bzl', 'cc_library')\ncc_library(name = 'subject')\n",
@@ -2569,7 +2621,7 @@ async fn host_native_toolchain_targets_preserve_root_load_lifecycle_and_ownershi
         }
         epoch.build()
     };
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let key = package_key();
     let build_a = build("BUILD_A", "first");
     let build_b = build("BUILD_B", "second");
@@ -2689,12 +2741,13 @@ async fn host_native_toolchain_targets_preserve_root_load_lifecycle_and_ownershi
 
 #[tokio::test]
 async fn host_package_retained_graph_replays_all_input_lifecycles() {
-    let module = "module(name='bazel_tools')\n";
+    let module = "module(name='root')\n";
     let package_epoch = |build: Option<(&str, &str)>, bzl: &[(&str, &str)], variant| {
         let mut builder = EpochBuilder::default();
         builder.directory("/", variant);
         builder.directory("/workspace", variant);
         builder.file("/workspace/MODULE.bazel", module, variant);
+        builder.missing("/workspace/MODULE.bazel.lock");
         builder.missing("/workspace/REPO.bazel");
         builder.missing("/workspace/.bazelignore");
         builder.directory("/workspace/pkg", variant);
@@ -2720,7 +2773,7 @@ async fn host_package_retained_graph_replays_all_input_lifecycles() {
 
     let b_cycle = "load(\":a.bzl\", \"x\")\nx = 1\n";
     let b_fixed = "x = 1\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
 
     let missing_marker = compute_package(
         &dice,
@@ -2932,7 +2985,7 @@ async fn load_repository_package_fixture(
     files: &[(&str, &[u8])],
     variant: i64,
 ) -> RepositoryPackageOutcome {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, variant).build(),
@@ -2977,7 +3030,7 @@ async fn load_repository_package_fixture_with_events(
     variant: i64,
     capture_events: bool,
 ) -> (RepositoryPackageOutcome, Vec<TrackedBatch>) {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let mut transaction = transaction(
         &dice,
@@ -3179,7 +3232,7 @@ async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
         ),
         ("helper.bzl", b"print(\"HELPER_BZL\")\nH = 1\n"),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch = EpochBuilder::external_sources(files, 140).build();
     let mut cold = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
@@ -3204,6 +3257,15 @@ async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
             .to_string(),
             observed_external_bzl_key(route.clone(), "", "left.bzl").to_string(),
             observed_external_bzl_key(route.clone(), "", "right.bzl").to_string(),
+            slug_bzlmod_v2::HostBuiltinBazelToolsRepositoryMappingObservationKey::new(workspace())
+                .to_string(),
+            "builtin-source-catalog".to_owned(),
+            "semantic-bzl-evaluation:@@_builtins//:common/objc/apple_env.bzl".to_owned(),
+            "semantic-bzl-evaluation:@@_builtins//:common/objc/apple_platform.bzl".to_owned(),
+            "semantic-bzl-evaluation:@@_builtins//:common/objc/apple_toolchain.bzl".to_owned(),
+            "semantic-bzl-evaluation:@@_builtins//:common/objc/objc_info.bzl".to_owned(),
+            "semantic-bzl-evaluation:@@_builtins//:common/xcode/providers.bzl".to_owned(),
+            "semantic-bzl-evaluation:@@_builtins//:common/objc/apple_common.bzl".to_owned(),
             "semantic-bzl-evaluation:@@dep+//:root.bzl".to_owned(),
         ]
     );
@@ -3259,6 +3321,18 @@ async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
         };
         expected = super::union_host_observations(&expected, source.observations()).unwrap();
     }
+    let builtin_mapping = cold
+        .compute(
+            &slug_bzlmod_v2::HostBuiltinBazelToolsRepositoryMappingObservationKey::new(workspace()),
+        )
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(builtin_mapping)) = builtin_mapping else {
+        panic!("successful Build modules must retain the actual builtin mapping");
+    };
+    let raw_count = expected.observations().len();
+    expected = super::union_host_observations(&expected, builtin_mapping.observations()).unwrap();
+    assert_eq!(expected.observations().len(), raw_count + 5);
     assert_same_epoch_arcs(carrier.observations(), &expected);
     tracker.take();
     let legacy_value = cold
@@ -3325,7 +3399,7 @@ async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
 }
 #[tokio::test]
 async fn observed_external_bzl_terminals_keep_decisive_prefixes_and_stop_children() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut absent_epoch = EpochBuilder::external_sources(&[], 150);
     absent_epoch.missing("/workspace/dep/missing.bzl");
     let mut absent = transaction(&dice, absent_epoch.build(), false, None).await;
@@ -3437,7 +3511,7 @@ async fn observed_external_bzl_child_positions_collect_needs_and_stop_at_first_s
         ("c.bzl", b"C = 1\n"),
     ];
     for position in 0..CHILDREN.len() {
-        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let dice = host_fixture_dice();
         let tracker = Arc::new(EventTracker::default());
         let mut files = vec![("parent.bzl", PARENT)];
         files.extend(
@@ -3505,12 +3579,31 @@ async fn observed_external_bzl_child_positions_collect_needs_and_stop_at_first_s
             };
             expected = super::union_host_observations(&expected, source.observations()).unwrap();
         }
+        if position > 0 {
+            let builtin_route = tx
+                .compute(
+                    &crate::HostRootRepositoryLoadRouteObservationKey::new(
+                        workspace(),
+                        ApparentRepoName::new("bazel_tools").unwrap(),
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            let LoadingPreparationOutcome::Complete(Ok(builtin_route)) = builtin_route else {
+                panic!("successful preceding child must prepare the actual builtin route");
+            };
+            let raw_count = expected.observations().len();
+            expected =
+                super::union_host_observations(&expected, builtin_route.observations()).unwrap();
+            assert_eq!(expected.observations().len(), raw_count + 5);
+        }
         assert_same_epoch_arcs(observed_external(&value).observations(), &expected);
     }
 }
 #[tokio::test]
 async fn observed_external_bzl_poll_drop_publishes_no_parent_and_recovers() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch = EpochBuilder::external_sources(&[("root.bzl", b"VALUE = 1\n")], 190).build();
     let mut cancelled = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
@@ -3588,7 +3681,7 @@ fn external_bzl_module_normalizes_exact_same_package_labels_before_source() {
 }
 #[tokio::test]
 async fn external_bzl_module_full_route_keys_are_unequal_while_canonical_labels_match() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut direct = transaction(
         &dice,
         EpochBuilder::external_sources(&[("defs.bzl", b"VALUE = 1\n")], 39).build(),
@@ -3627,7 +3720,7 @@ async fn external_bzl_module_evaluates_recursive_bazel_keyword_only_structs() {
             b"def _support(*, std = False, host_tools = False):\n    return struct(std = std, host_tools = host_tools)\nRESULT = _support(std = True)\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 392).build(),
@@ -3683,7 +3776,7 @@ async fn external_bzl_module_accepts_bazel_provider_doc_and_freezes_exports() {
             b"DocumentedInfo = provider(\n    doc = \"A documented \" + \"provider.\",\n    fields = {\"value\": \"String value.\"},\n)\nNoneInfo = provider(doc = None, fields = {})\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 393).build(),
@@ -3707,7 +3800,7 @@ async fn external_bzl_module_accepts_bazel_provider_doc_and_freezes_exports() {
 
 #[tokio::test]
 async fn external_bzl_module_rejects_non_string_provider_doc() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(
@@ -3745,7 +3838,7 @@ async fn external_bzl_module_accepts_bazel_rule_doc_and_freezes_exports() {
             b"def _impl(ctx): return []\ndocumented_rule = rule(implementation = _impl, doc = \"A documented rule.\", build_setting = config.string(flag = True))\nnone_rule = rule(implementation = _impl, doc = None)\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 395).build(),
@@ -3766,7 +3859,7 @@ async fn external_bzl_module_accepts_bazel_rule_doc_and_freezes_exports() {
 
 #[tokio::test]
 async fn external_bzl_module_rejects_non_string_rule_doc() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(
@@ -3807,7 +3900,7 @@ async fn external_bzl_module_freezes_typed_bazel_config_definitions() {
             b"def _impl(ctx): fail('build setting implementations must stay lazy')\nbool_flag = rule(implementation = _impl, build_setting = config.bool(flag = True))\nbool_setting = rule(implementation = _impl, build_setting = config.bool())\nbool_false = rule(implementation = _impl, build_setting = config.bool(flag = False))\nlist_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True))\nrepeatable_rule = rule(implementation = _impl, build_setting = config.string_list(flag = True, repeatable = True))\nlist_setting = rule(implementation = _impl, build_setting = config.string_list())\nlist_false = rule(implementation = _impl, build_setting = config.string_list(flag = False, repeatable = False))\nset_rule = rule(implementation = _impl, build_setting = config.string_set(flag = True))\nrepeatable_set_rule = rule(implementation = _impl, build_setting = config.string_set(flag = True, repeatable = True))\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 397).build(),
@@ -3941,7 +4034,7 @@ async fn external_bzl_module_freezes_config_string_definitions() {
             b"def _impl(ctx): fail('string implementation must stay lazy')\nstring_flag=rule(implementation=_impl, build_setting=config.string(flag=True))\nstring_setting=rule(implementation=_impl, build_setting=config.string())\nstring_false=rule(implementation=_impl, build_setting=config.string(flag=False, allow_multiple=False))\nstring_multiple=rule(implementation=_impl, build_setting=config.string(flag=True, allow_multiple=True))\nsetting_multiple=rule(implementation=_impl, build_setting=config.string(allow_multiple=True))\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 3971).build(),
@@ -4013,7 +4106,7 @@ async fn external_bzl_module_freezes_config_int_definitions() {
             b"def _impl(ctx): fail('integer implementation must stay lazy')\nint_flag=rule(implementation=_impl, build_setting=config.int(flag=True))\nint_setting=rule(implementation=_impl, build_setting=config.int())\nint_setting_explicit_false=rule(implementation=_impl, build_setting=config.int(flag=False))\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 3971).build(),
@@ -4071,7 +4164,7 @@ async fn external_bzl_module_freezes_and_imports_fixed_aspect_definition() {
             b"def _impl(target, ctx): return []\nrust_analyzer_aspect = aspect(attr_aspects = [\"srcs\", \"deps\", \"proc_macro_deps\", \"crate\", \"actual\", \"proto\"], implementation = _impl, toolchains = [\"//rust:toolchain_type\"], doc = \"Rust analyzer\")\nUNEXPORTED = [aspect(implementation = _impl)]\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 400).build(),
@@ -4135,7 +4228,9 @@ ASPECT_TUPLE = aspect(implementation = aspect_impl, fragments = ("cpp", "apple",
 "#;
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//:fragments.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/dep/fragments.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/dep/fragments.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
@@ -21834,7 +21929,9 @@ const CLIPPY_TOOLCHAINS: &str = "[str(Label('//rust:toolchain_type')), config_co
 fn clippy_owner() -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:clippy.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/clippy.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_rust/rust/private/clippy.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("bazel_tools").unwrap(),
             CanonicalRepoName::new("bazel_tools+").unwrap(),
@@ -21847,7 +21944,12 @@ fn eval_bzl_with_loaded_children(
     owner: BzlModuleIdentity,
     children: &[(&str, BzlModuleIdentity, FrozenModule)],
 ) -> anyhow::Result<FrozenModule> {
-    let filename = owner.workspace_path.to_string_lossy().into_owned();
+    let filename = owner
+        .source
+        .workspace_path()
+        .expect("workspace fixture source")
+        .to_string_lossy()
+        .into_owned();
     let ast = AstModule::parse(&filename, source.to_owned(), &Dialect::Bazel)
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     let module = Module::new();
@@ -21881,7 +21983,7 @@ fn exact_rules_cc_find_toolchain_child_freezes_eager_constants_and_functions() {
     );
     let identity = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([
             (
                 ApparentRepoName::new("bazel_tools").unwrap(),
@@ -21976,7 +22078,9 @@ fn exact_rules_cc_find_toolchain_freezes_complete_recursive_producer() {
             "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
         )
         .unwrap(),
-        workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc_compatibility_proxy/symbols.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("rules_cc").unwrap(),
             CanonicalRepoName::new("rules_cc+").unwrap(),
@@ -21990,7 +22094,9 @@ fn exact_rules_cc_find_toolchain_freezes_complete_recursive_producer() {
     .unwrap();
     let public_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_common.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/common/cc_common.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/common/cc_common.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("cc_compatibility_proxy").unwrap(),
             CanonicalRepoName::new("rules_cc++compatibility_proxy+cc_compatibility_proxy").unwrap(),
@@ -22010,7 +22116,9 @@ fn exact_rules_cc_find_toolchain_freezes_complete_recursive_producer() {
         FIND_CC_TOOLCHAIN_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc:find_cc_toolchain.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/find_cc_toolchain.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/find_cc_toolchain.bzl",
+            )),
             repository_mapping: Arc::from([
                 (
                     ApparentRepoName::new("bazel_tools").unwrap(),
@@ -22077,7 +22185,7 @@ fn exact_rules_rust_utils_eager_values_freeze_without_invocation() {
     ].join("\n");
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:utils.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/utils.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from("/rules_rust/rust/private/utils.bzl")),
         repository_mapping: Arc::from([]),
     };
     let module = eval_bzl_with_identity(&source, owner).unwrap();
@@ -22133,7 +22241,7 @@ fn exact_rules_rust_utils_find_toolchain_export_retains_parent_import_identity()
     );
     let owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let child_owner = owner(
@@ -22179,7 +22287,7 @@ fn exact_rules_rust_utils_leaf_exports_retain_parent_import_order_and_identity()
     }
     let owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let child_owner = owner("@@rules_rust+//rust/private:utils.bzl", "/rules_rust/rust/private/utils.bzl");
@@ -22232,7 +22340,9 @@ fn exact_rules_rust_utils_can_build_metadata_retains_loaded_provider_and_parent_
     );
     let owner = |name: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@rules_rust+//rust/private:{name}.bzl")).unwrap(),
-        workspace_path: PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl")),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
+            "/rules_rust/rust/private/{name}.bzl"
+        ))),
         repository_mapping: Arc::from([]),
     };
     let providers_owner = owner("providers");
@@ -22309,7 +22419,9 @@ fn exact_rules_rust_utils_output_diagnostics_retains_loaded_provider_and_parent_
     );
     let owner = |name: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@rules_rust+//rust/private:{name}.bzl")).unwrap(),
-        workspace_path: PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl")),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
+            "/rules_rust/rust/private/{name}.bzl"
+        ))),
         repository_mapping: Arc::from([]),
     };
     let providers_owner = owner("providers");
@@ -22385,7 +22497,9 @@ fn exact_rules_rust_utils_transform_sources_retains_paths_helper_and_parent_iden
     );
     let paths_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@bazel_skylib+//lib:paths.bzl").unwrap(),
-        workspace_path: PathBuf::from("/bazel_skylib/lib/paths.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/bazel_skylib/lib/paths.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let paths_module = eval_bzl_with_identity(PATHS_SOURCE, paths_owner.clone()).unwrap();
@@ -22394,7 +22508,9 @@ fn exact_rules_rust_utils_transform_sources_retains_paths_helper_and_parent_iden
     assert_eq!(paths.get_type(), "struct");
     let utils_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:utils.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/utils.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_rust/rust/private/utils.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("bazel_skylib").unwrap(),
             CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -22426,7 +22542,9 @@ fn exact_rules_rust_utils_transform_sources_retains_paths_helper_and_parent_iden
         "load(\":utils.bzl\", \"transform_sources\")\nIMPORTED = transform_sources\n",
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_rust+//rust/private:rust.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_rust/rust/private/rust.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_rust/rust/private/rust.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &[(":utils.bzl", utils_owner, utils.dupe())],
@@ -22495,7 +22613,9 @@ fn exact_rules_rust_utils_compute_crate_name_retains_eager_helpers_and_parent_id
     ].join("\n");
     let utils_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:utils.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/utils.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_rust/rust/private/utils.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let utils = eval_bzl_with_identity(&source, utils_owner.clone()).unwrap();
@@ -22542,7 +22662,9 @@ fn exact_rules_rust_utils_compute_crate_name_retains_eager_helpers_and_parent_id
         "load(\":utils.bzl\", \"compute_crate_name\")\nIMPORTED = compute_crate_name\n",
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_rust+//rust/private:rust.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_rust/rust/private/rust.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_rust/rust/private/rust.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &[(":utils.bzl", utils_owner, utils.dupe())],
@@ -22576,7 +22698,7 @@ fn exact_rules_rust_utils_expand_dict_export_retains_private_helper_and_parent_i
     }
     let owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let child_owner = owner(
@@ -22637,7 +22759,7 @@ fn exact_rules_rust_utils_crate_root_export_retains_private_helper_and_parent_id
     }
     let owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let child_owner = owner(
@@ -22686,7 +22808,9 @@ fn exact_bazel_skylib_paths_child_freezes_exported_function_bindings() {
         PATHS_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@bazel_skylib+//lib:paths.bzl").unwrap(),
-            workspace_path: PathBuf::from("/bazel_skylib/lib/paths.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/bazel_skylib/lib/paths.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
     )
@@ -22750,7 +22874,9 @@ fn exact_rules_cc_proxy_direct_provider_children_retain_reexport_identity() {
     );
     let owner = |name: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@rules_cc+//cc/private:{name}.bzl")).unwrap(),
-        workspace_path: PathBuf::from(format!("/rules_cc/cc/private/{name}.bzl")),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
+            "/rules_cc/cc/private/{name}.bzl"
+        ))),
         repository_mapping: Arc::from([]),
     };
     let shared_owner = owner("cc_shared_library_info");
@@ -22776,7 +22902,9 @@ fn exact_rules_cc_proxy_direct_provider_children_retain_reexport_identity() {
                 "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc_compatibility_proxy/symbols.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("rules_cc").unwrap(),
                 CanonicalRepoName::new("rules_cc+").unwrap(),
@@ -22824,7 +22952,9 @@ fn exact_rules_cc_internal_complete_source_freezes_selected_private_bridge() {
         RULES_CC_INTERNAL_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_internal.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/cc_internal.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/cc_internal.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
     )
@@ -22852,7 +22982,9 @@ fn exact_rules_cc_private_paths_complete_source_freezes_lazy_export() {
         RULES_CC_PRIVATE_PATHS_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private:paths.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/paths.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/paths.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
     )
@@ -22877,7 +23009,7 @@ fn exact_rules_cc_helper_internal_freezes_complete_recursive_producer() {
     );
     let child_owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let skylib_owner = child_owner(
@@ -22903,7 +23035,9 @@ fn exact_rules_cc_helper_internal_freezes_complete_recursive_producer() {
         RULES_CC_HELPER_INTERNAL_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_helper_internal.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/common/cc_helper_internal.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/common/cc_helper_internal.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -22972,7 +23106,7 @@ fn exact_rules_cc_extra_link_library_freezes_complete_recursive_producer() {
     );
     let owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let skylib_owner = owner(
@@ -23084,7 +23218,7 @@ fn exact_rules_cc_extra_link_library_freezes_complete_recursive_producer() {
 fn complete_rules_cc_cc_info_children() -> Vec<(&'static str, BzlModuleIdentity, FrozenModule)> {
     let owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let [
@@ -23284,7 +23418,10 @@ fn assert_cc_info_empty_context_shapes(cc_info: &FrozenModule) {
     let header = field!(&compilation, "_header_info");
     assert_eq!(header.get_type(), "HeaderInfo");
     for name in "modular_public_headers modular_private_headers textual_headers separate_module_headers".split_whitespace() {
-        assert_eq!(FrozenListRef::from_value(header.get_attr(name, scratch.heap()).unwrap().unwrap()).unwrap().len(), 0);
+        let view = header.get_attr(name, scratch.heap()).unwrap().unwrap();
+        assert_eq!(view.get_type(), "list");
+        assert_eq!(starlark::values::list::ListRef::from_value(view).unwrap().len(), 0);
+        assert!(starlark::values::list::ListRef::is_immutable(view), "native HeaderInfo projection remains immutable");
     }
     for name in "header_module pic_header_module separate_module separate_pic_module".split_whitespace() {
         assert_eq!(header.get_attr(name, scratch.heap()).unwrap().unwrap().get_type(), "NoneType");
@@ -23304,7 +23441,9 @@ fn exact_rules_cc_info_freezes_complete_recursive_producer() {
         RULES_CC_CC_INFO_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_info.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/cc_info.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/cc_info.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -23333,7 +23472,9 @@ fn exact_rules_cc_launcher_info_freezes_complete_producer() {
         RULES_CC_LAUNCHER_INFO_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_launcher_info.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/cc_launcher_info.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/cc_launcher_info.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &[(
@@ -23378,7 +23519,9 @@ fn exact_rules_cc_shared_library_hint_info_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_shared_library_hint_info.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/cc_shared_library_hint_info.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/cc_shared_library_hint_info.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
     )
@@ -23413,9 +23556,9 @@ fn exact_rules_cc_lto_compilation_context_freezes_complete_producer() {
                 "@@rules_cc+//cc/private/compile:lto_compilation_context.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/compile/lto_compilation_context.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([]),
         },
         &[
@@ -23512,9 +23655,9 @@ fn complete_rules_cc_compilation_outputs_children()
                 "@@rules_cc+//cc/private/compile:lto_compilation_context.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/compile/lto_compilation_context.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([]),
         },
         &[
@@ -23549,9 +23692,9 @@ fn complete_rules_cc_compilation_outputs_children()
                     "@@rules_cc+//cc/private/compile:lto_compilation_context.bzl",
                 )
                 .unwrap(),
-                workspace_path: PathBuf::from(
+                source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                     "/rules_cc/cc/private/compile/lto_compilation_context.bzl",
-                ),
+                )),
                 repository_mapping: Arc::from([]),
             },
             lto,
@@ -23711,9 +23854,9 @@ fn exact_rules_cc_compilation_outputs_freezes_complete_producer() {
                 "@@rules_cc+//cc/private/compile:cc_compilation_outputs.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/compile/cc_compilation_outputs.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -23728,7 +23871,9 @@ fn complete_rules_cc_compilation_helper_children()
     let cc_info_children = complete_rules_cc_cc_info_children();
     let cc_info_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_info.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/cc_info.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/cc_info.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("bazel_skylib").unwrap(),
             CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -23742,7 +23887,9 @@ fn complete_rules_cc_compilation_helper_children()
     .unwrap();
     let semantics_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/common:semantics.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/common/semantics.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/common/semantics.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("platforms").unwrap(),
             CanonicalRepoName::new("platforms+").unwrap(),
@@ -23907,7 +24054,9 @@ fn exact_rules_cc_compilation_helper_freezes_complete_recursive_producer() {
                 "@@rules_cc+//cc/private/compile:cc_compilation_helper.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/compile/cc_compilation_helper.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/compile/cc_compilation_helper.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -23925,7 +24074,9 @@ fn complete_rules_cc_compile_build_variables_children()
     let native_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private/rules_impl:native_cc_common.bzl")
             .unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/rules_impl/native_cc_common.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/rules_impl/native_cc_common.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let native_globals = loading_globals();
@@ -24110,9 +24261,9 @@ fn exact_rules_cc_compile_build_variables_freezes_complete_recursive_producer() 
                 "@@rules_cc+//cc/private/compile:compile_build_variables.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/compile/compile_build_variables.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -24131,7 +24282,9 @@ fn complete_rules_cc_compile_action_template_children()
                 "@@rules_cc+//cc/private/compile:cc_compilation_helper.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/compile/cc_compilation_helper.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/compile/cc_compilation_helper.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -24148,9 +24301,9 @@ fn complete_rules_cc_compile_action_template_children()
                 "@@rules_cc+//cc/private/compile:compile_build_variables.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/compile/compile_build_variables.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([]),
         },
         &variables_children,
@@ -24184,9 +24337,9 @@ fn complete_rules_cc_compile_action_template_children()
                     "@@rules_cc+//cc/private/compile:cc_compilation_helper.bzl",
                 )
                 .unwrap(),
-                workspace_path: PathBuf::from(
+                source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                     "/rules_cc/cc/private/compile/cc_compilation_helper.bzl",
-                ),
+                )),
                 repository_mapping: Arc::from([(
                     ApparentRepoName::new("bazel_skylib").unwrap(),
                     CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -24201,9 +24354,9 @@ fn complete_rules_cc_compile_action_template_children()
                     "@@rules_cc+//cc/private/compile:compile_build_variables.bzl",
                 )
                 .unwrap(),
-                workspace_path: PathBuf::from(
+                source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                     "/rules_cc/cc/private/compile/compile_build_variables.bzl",
-                ),
+                )),
                 repository_mapping: Arc::from([]),
             },
             variables,
@@ -24325,9 +24478,9 @@ fn exact_rules_cc_compile_action_templates_freezes_complete_recursive_producer()
                 "@@rules_cc+//cc/private/compile:compile_action_templates.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/compile/compile_action_templates.bzl",
-            ),
+            )),
             repository_mapping: mapping,
         },
         &children,
@@ -24407,7 +24560,9 @@ fn exact_rules_cc_lto_backends_freezes_complete_producer() {
         RULES_CC_LTO_BACKENDS_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:lto_backends.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/lto_backends.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/lto_backends.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -24468,7 +24623,9 @@ fn complete_rules_cc_create_library_to_link_children()
     let lto_context_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private/compile:lto_compilation_context.bzl")
             .unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/compile/lto_compilation_context.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/compile/lto_compilation_context.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let lto_context = eval_bzl_with_loaded_children(
@@ -24482,7 +24639,9 @@ fn complete_rules_cc_create_library_to_link_children()
     .unwrap();
     let lto_backends_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:lto_backends.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/link/lto_backends.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/link/lto_backends.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("bazel_skylib").unwrap(),
             CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -24550,7 +24709,9 @@ fn exact_rules_cc_create_library_to_link_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:create_library_to_link.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/create_library_to_link.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/create_library_to_link.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -24658,7 +24819,9 @@ fn exact_rules_cc_create_linker_input_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:create_linker_input.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/create_linker_input.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/create_linker_input.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &[child],
@@ -24708,7 +24871,9 @@ fn complete_rules_cc_target_type_children() -> [(&'static str, BzlModuleIdentity
 {
     let action_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc:action_names.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/action_names.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/action_names.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let action =
@@ -24846,7 +25011,9 @@ fn exact_rules_cc_target_types_freezes_complete_producer() {
         RULES_CC_TARGET_TYPES_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:target_types.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/target_types.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/target_types.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -24860,14 +25027,18 @@ fn complete_rules_cc_collect_solib_dirs_children()
     let cc = complete_rules_cc_cc_info_children();
     let action_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc:action_names.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/action_names.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/action_names.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let action =
         eval_bzl_with_identity(RULES_CC_ACTION_NAMES_SOURCE, action_owner.clone()).unwrap();
     let target_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:target_types.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/link/target_types.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/link/target_types.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let target = eval_bzl_with_loaded_children(
@@ -24918,7 +25089,9 @@ fn exact_rules_cc_collect_solib_dirs_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:collect_solib_dirs.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/collect_solib_dirs.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/collect_solib_dirs.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -25097,9 +25270,9 @@ fn exact_rules_cc_create_libraries_to_link_values_freezes_complete_producer() {
                 "@@rules_cc+//cc/private/link:create_libraries_to_link_values.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/link/create_libraries_to_link_values.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([]),
         },
         &[child],
@@ -25236,7 +25409,9 @@ fn exact_rules_cc_link_build_variables_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:link_build_variables.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/link_build_variables.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/link_build_variables.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -25444,7 +25619,9 @@ fn exact_rules_cc_finalize_link_action_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:finalize_link_action.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/finalize_link_action.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/finalize_link_action.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -25624,7 +25801,9 @@ fn exact_rules_cc_cpp_link_action_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:cpp_link_action.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/cpp_link_action.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/cpp_link_action.bzl",
+            )),
             repository_mapping: skylib_mapping,
         },
         &children,
@@ -25755,7 +25934,9 @@ fn exact_rules_cc_lto_indexing_action_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:lto_indexing_action.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/lto_indexing_action.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/lto_indexing_action.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -25941,7 +26122,9 @@ fn exact_rules_cc_linking_helper_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:cc_linking_helper.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/cc_linking_helper.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/cc_linking_helper.bzl",
+            )),
             repository_mapping: skylib_mapping,
         },
         &children,
@@ -26080,9 +26263,9 @@ fn exact_rules_cc_create_linking_context_freezes_complete_producer() {
                 "@@rules_cc+//cc/private/link:create_linking_context_from_compilation_outputs.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/link/create_linking_context_from_compilation_outputs.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -26120,7 +26303,9 @@ fn exact_rules_cc_create_linkstamp_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:create_linkstamp.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/create_linkstamp.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/create_linkstamp.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &[child],
@@ -26310,7 +26495,9 @@ fn exact_rules_cc_link_freezes_complete_producer() {
         RULES_CC_LINK_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/link:link.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/link/link.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/link/link.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -26373,7 +26560,9 @@ fn exact_rules_cc_linkstamp_compile_freezes_complete_producer() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private/compile:linkstamp_compile.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/compile/linkstamp_compile.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/compile/linkstamp_compile.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -26433,7 +26622,7 @@ fn exact_rules_cc_linkstamp_compile_freezes_complete_producer() {
 fn compile_owner(label: &str, path: &str, mapping: &[(&str, &str)]) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: mapping
             .iter()
             .map(|(apparent, canonical)| {
@@ -26914,7 +27103,9 @@ fn exact_rules_cc_semantics_freezes_complete_dependency_free_producer() {
         RULES_CC_SEMANTICS_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/common:semantics.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/common/semantics.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/common/semantics.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("platforms").unwrap(),
                 CanonicalRepoName::new("platforms+").unwrap(),
@@ -27008,7 +27199,9 @@ fn exact_rules_cc_toolchain_info_freezes_complete_dependency_free_producer() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private/rules_impl:cc_toolchain_info.bzl")
             .unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/rules_impl/cc_toolchain_info.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/rules_impl/cc_toolchain_info.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let loaded_package = owner.label.package().clone();
@@ -27098,7 +27291,9 @@ fn exact_rules_cc_toolchain_config_lib_freezes_complete_dependency_free_producer
         RULES_CC_TOOLCHAIN_CONFIG_LIB_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc:cc_toolchain_config_lib.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/cc_toolchain_config_lib.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/cc_toolchain_config_lib.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
     )
@@ -27119,7 +27314,7 @@ fn exact_rules_cc_legacy_features_freezes_complete_recursive_producer() {
     );
     let owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let action_owner = owner(
@@ -27217,7 +27412,7 @@ fn complete_rules_cc_toolchain_config_info_children()
 -> [(&'static str, BzlModuleIdentity, FrozenModule); 3] {
     let owner = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let paths_owner = owner(
@@ -27391,9 +27586,9 @@ fn exact_rules_cc_toolchain_config_info_freezes_complete_recursive_producer() {
                 "@@rules_cc+//cc/private/toolchain_config:cc_toolchain_config_info.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/toolchain_config/cc_toolchain_config_info.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),
@@ -27537,12 +27732,16 @@ fn exact_rules_cc_configure_features_freezes_complete_recursive_producer() {
     );
     let action_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc:action_names.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/action_names.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/action_names.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let semantics_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/common:semantics.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/common/semantics.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/common/semantics.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("platforms").unwrap(),
             CanonicalRepoName::new("platforms+").unwrap(),
@@ -27559,9 +27758,9 @@ fn exact_rules_cc_configure_features_freezes_complete_recursive_producer() {
                 "@@rules_cc+//cc/private/toolchain_config:configure_features.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from(
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
                 "/rules_cc/cc/private/toolchain_config/configure_features.bzl",
-            ),
+            )),
             repository_mapping: Arc::from([]),
         },
         &[
@@ -27990,7 +28189,11 @@ fn exact_rules_cc_private_cc_common_freezes_complete_recursive_producer() {
             CanonicalLabel::parse(&format!("@@rules_cc+//{suffix}")).unwrap()
         );
         assert_eq!(
-            child.1.workspace_path,
+            child
+                .1
+                .source
+                .workspace_path()
+                .expect("workspace fixture source"),
             PathBuf::from(format!("/rules_cc/{}", suffix.replace(':', "/")))
         );
     }
@@ -28011,7 +28214,9 @@ fn exact_rules_cc_private_cc_common_freezes_complete_recursive_producer() {
         RULES_CC_PRIVATE_CC_COMMON_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_common.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/cc_common.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/cc_common.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &children,
@@ -28382,7 +28587,11 @@ fn exact_rules_cc_compatibility_symbols_freezes_complete_recursive_producer() {
             CanonicalLabel::parse(&format!("@@rules_cc+//{suffix}")).unwrap()
         );
         assert_eq!(
-            child.1.workspace_path,
+            child
+                .1
+                .source
+                .workspace_path()
+                .expect("workspace fixture source"),
             PathBuf::from(format!("/rules_cc/{}", suffix.replace(':', "/")))
         );
         if [1, 5].contains(&index) {
@@ -28404,7 +28613,9 @@ fn exact_rules_cc_compatibility_symbols_freezes_complete_recursive_producer() {
                 "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc_compatibility_proxy/symbols.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("rules_cc").unwrap(),
                 CanonicalRepoName::new("rules_cc+").unwrap(),
@@ -28432,7 +28643,9 @@ fn exact_rules_cc_public_cc_common_freezes_complete_recursive_producer() {
             "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
         )
         .unwrap(),
-        workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc_compatibility_proxy/symbols.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("rules_cc").unwrap(),
             CanonicalRepoName::new("rules_cc+").unwrap(),
@@ -28448,7 +28661,9 @@ fn exact_rules_cc_public_cc_common_freezes_complete_recursive_producer() {
         RULES_CC_PUBLIC_CC_COMMON_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_common.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/common/cc_common.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/common/cc_common.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("cc_compatibility_proxy").unwrap(),
                 CanonicalRepoName::new("rules_cc++compatibility_proxy+cc_compatibility_proxy")
@@ -28496,7 +28711,9 @@ fn exact_rules_cc_public_cc_info_freezes_complete_recursive_producer() {
             "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
         )
         .unwrap(),
-        workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc_compatibility_proxy/symbols.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("rules_cc").unwrap(),
             CanonicalRepoName::new("rules_cc+").unwrap(),
@@ -28512,7 +28729,9 @@ fn exact_rules_cc_public_cc_info_freezes_complete_recursive_producer() {
         RULES_CC_PUBLIC_CC_INFO_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_info.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/common/cc_info.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/common/cc_info.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("cc_compatibility_proxy").unwrap(),
                 CanonicalRepoName::new("rules_cc++compatibility_proxy+cc_compatibility_proxy")
@@ -28553,7 +28772,9 @@ fn exact_rules_rust_common_freezes_complete_provider_facade() {
     );
     let providers_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:providers.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/providers.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_rust/rust/private/providers.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let providers =
@@ -28563,7 +28784,9 @@ fn exact_rules_rust_common_freezes_complete_provider_facade() {
         RULES_RUST_COMMON_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_rust+//rust/private:common.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_rust/rust/private/common.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_rust/rust/private/common.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &[(":providers.bzl", providers_owner, providers.dupe())],
@@ -28680,7 +28903,9 @@ fn exact_rules_rust_providers_freeze_complete_family() {
         RULES_RUST_PROVIDERS_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_rust+//rust/private:providers.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_rust/rust/private/providers.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_rust/rust/private/providers.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &[],
@@ -28808,7 +29033,9 @@ runtime_aspect = aspect(
 "#;
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_java+//java/common/rules:java_runtime.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_java/java/common/rules/java_runtime.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_java/java/common/rules/java_runtime.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let advertised = [
@@ -28867,7 +29094,9 @@ runtime_aspect = aspect(
 fn rules_java_imported_frozen_initialized_advertiser_remains_supported() {
     let child_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_java+//java/private:java_info.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_java/java/private/java_info.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_java/java/private/java_info.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let child = eval_bzl_with_identity(
@@ -28880,7 +29109,7 @@ fn rules_java_imported_frozen_initialized_advertiser_remains_supported() {
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_java+//java/bazel/rules:bazel_java_library.bzl")
                 .unwrap(),
-            workspace_path: PathBuf::from("/rules_java/java/bazel/rules/bazel_java_library.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from("/rules_java/java/bazel/rules/bazel_java_library.bzl")),
             repository_mapping: Arc::from([]),
         },
         &[("//java/private:java_info.bzl", child_owner, child)],
@@ -28946,7 +29175,7 @@ async fn dependency_provider_policy_participates_in_loaded_target_equality_a_b_a
     let q = fixture(
         b"P=provider()\nQ=provider()\ndef _impl(ctx): return []\nr=rule(implementation=_impl,attrs={'dep':attr.label(providers=[Q])})\n",
     );
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let p_first = load_repository_package_fixture_on(&dice, &p, 428).await;
     let q_middle = load_repository_package_fixture_on(&dice, &q, 429).await;
     let p_restored = load_repository_package_fixture_on(&dice, &p, 430).await;
@@ -29074,7 +29303,14 @@ fn exact_rules_rust_allocator_libraries_freezes_complete_recursive_producer() {
     ];
     for (child, (label, path)) in children.iter().zip(expected_children) {
         assert_eq!(child.1.label, CanonicalLabel::parse(label).unwrap());
-        assert_eq!(child.1.workspace_path, PathBuf::from(path));
+        assert_eq!(
+            child
+                .1
+                .source
+                .workspace_path()
+                .expect("workspace fixture source"),
+            PathBuf::from(path)
+        );
     }
     assert_eq!(
         children[0].1.repository_mapping,
@@ -29846,7 +30082,14 @@ fn exact_rules_rust_utils_freezes_complete_recursive_producer() {
             children[child].1.label,
             CanonicalLabel::parse(label).unwrap()
         );
-        assert_eq!(children[child].1.workspace_path, PathBuf::from(path));
+        assert_eq!(
+            children[child]
+                .1
+                .source
+                .workspace_path()
+                .expect("workspace fixture source"),
+            PathBuf::from(path)
+        );
     }
     assert!(children[0].1.repository_mapping.is_empty());
     assert_eq!(
@@ -29877,7 +30120,9 @@ fn exact_rules_rust_utils_freezes_complete_recursive_producer() {
         RULES_RUST_UTILS_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_rust+//rust/private:utils.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_rust/rust/private/utils.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_rust/rust/private/utils.bzl",
+            )),
             repository_mapping: Arc::from([
                 (
                     ApparentRepoName::new("bazel_skylib").unwrap(),
@@ -29911,7 +30156,9 @@ fn exact_rules_rust_platform_triple_freezes_complete_producer() {
         RULES_RUST_PLATFORM_TRIPLE_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_rust+//rust/platform:triple.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_rust/rust/platform/triple.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_rust/rust/platform/triple.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
         &[],
@@ -29958,7 +30205,9 @@ fn exact_rules_cc_action_names_freezes_complete_producer() {
         RULES_CC_ACTION_NAMES_SOURCE,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc:action_names.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/action_names.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/action_names.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
     )
@@ -30040,7 +30289,9 @@ fn exact_rules_cc_objc_info_child_retains_public_proxy_aliases() {
     );
     let child_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private:objc_info.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/objc_info.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/objc_info.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let child = eval_bzl_with_identity(RULES_CC_OBJC_INFO_SOURCE, child_owner.clone()).unwrap();
@@ -30061,7 +30312,9 @@ fn exact_rules_cc_objc_info_child_retains_public_proxy_aliases() {
                 "@@rules_cc++compatibility_proxy+cc_compatibility_proxy//:symbols.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc_compatibility_proxy/symbols.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc_compatibility_proxy/symbols.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("rules_cc").unwrap(),
                 CanonicalRepoName::new("rules_cc+").unwrap(),
@@ -30098,7 +30351,9 @@ fn exact_lints_child_freezes_with_provider_identity_and_ordered_schema() {
     );
     let owner = |name: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@rules_rust+//rust/private:{name}.bzl")).unwrap(),
-        workspace_path: PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl")),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
+            "/rules_rust/rust/private/{name}.bzl"
+        ))),
         repository_mapping: Arc::from([]),
     };
     let providers_owner = owner("providers");
@@ -30176,7 +30431,7 @@ fn clippy_test_tail_freezes_with_recursive_producer_identities() {
     let child_owner = |name: &str| {
         let mut owner = clippy_owner();
         owner.label = CanonicalLabel::parse(&format!("@@rules_rust+//rust/private:{name}.bzl")).unwrap();
-        owner.workspace_path = PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl"));
+        owner.source = slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!("/rules_rust/rust/private/{name}.bzl")));
         owner
     };
     let providers_owner = child_owner("providers");
@@ -30347,7 +30602,9 @@ TEXT = repr(T)
 fn analysis_test_transition_owner() -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//defs:producer.bzl").unwrap(),
-        workspace_path: PathBuf::from("/dep/defs/producer.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/dep/defs/producer.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("mapped").unwrap(),
             CanonicalRepoName::new("mapped+").unwrap(),
@@ -30401,7 +30658,9 @@ fn analysis_test_transition_rejects_invalid_calls_without_narrowing_native_names
 fn analysis_test_transition_descriptors_freeze_import_and_fail_closed() {
     let owner = |package: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@dep+//{package}:defs.bzl")).unwrap(),
-        workspace_path: PathBuf::from(format!("/dep/{package}/defs.bzl")),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
+            "/dep/{package}/defs.bzl"
+        ))),
         repository_mapping: Arc::from([]),
     };
     let producer_owner = owner("producer");
@@ -30487,7 +30746,9 @@ ATTRS={
 fn imported_transition_settings_keep_definition_repository_identity() {
     let producer_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//producer:defs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/dep/producer/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/dep/producer/defs.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("mapped").unwrap(),
             CanonicalRepoName::new("mapped+").unwrap(),
@@ -30506,7 +30767,9 @@ T = transition(
     .unwrap();
     let bridge_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@bridge+//bridge:defs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/bridge/bridge/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/bridge/bridge/defs.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let bridge = eval_bzl_with_loaded_children(
@@ -30523,7 +30786,7 @@ T = transition(
         "load('@bridge//bridge:defs.bzl', 'REEXPORTED')\nIMPORTED = REEXPORTED\ndef rule_impl(ctx): return []\nRULE = rule(implementation = rule_impl, cfg = REEXPORTED)\n",
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@consumer+//consumer:defs.bzl").unwrap(),
-            workspace_path: PathBuf::from("/consumer/consumer/defs.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from("/consumer/consumer/defs.bzl")),
             repository_mapping: Arc::from([]),
         },
         &[("@bridge//bridge:defs.bzl", bridge_owner, bridge)],
@@ -30591,7 +30854,9 @@ T = transition(
 fn imported_rule_attribute_descriptors_preserve_complete_frozen_identity() {
     let owner = |package: &str, file: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@rules_rust+//{package}:{file}")).unwrap(),
-        workspace_path: PathBuf::from(format!("/rules_rust/{package}/{file}")),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
+            "/rules_rust/{package}/{file}"
+        ))),
         repository_mapping: Arc::from([]),
     };
     let producer_owner = owner("producer", "attrs.bzl");
@@ -30734,7 +30999,9 @@ LOCAL = rule(implementation = rule_impl, attrs = DESCRIPTORS)
 fn imported_descriptors_share_one_seam_without_widening_consumer_policies() {
     let producer_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:consumer_attrs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/consumer_attrs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_rust/rust/private/consumer_attrs.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let producer = eval_bzl_with_identity(
@@ -30855,7 +31122,7 @@ async fn imported_descriptor_source_changes_and_restores_through_loaded_module_a
             ("consumer.bzl", CONSUMER),
         ]
     };
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let a = load_repository_package_fixture_on(&dice, &files(PRODUCER_A), 434).await;
     let b = load_repository_package_fixture_on(&dice, &files(PRODUCER_B), 435).await;
     let restored = load_repository_package_fixture_on(&dice, &files(PRODUCER_A), 436).await;
@@ -30898,7 +31165,7 @@ async fn imported_feature_flag_provider_policy_changes_and_restores_on_one_dice(
             ("consumer.bzl", CONSUMER),
         ]
     };
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let a = load_repository_package_fixture_on(&dice, &files(PRODUCER_A), 1450).await;
     let b = load_repository_package_fixture_on(&dice, &files(PRODUCER_B), 1451).await;
     let restored = load_repository_package_fixture_on(&dice, &files(PRODUCER_A), 1452).await;
@@ -30952,7 +31219,7 @@ async fn imported_feature_flag_provider_policy_changes_and_restores_on_one_dice(
 async fn generic_aspect_declaration_inputs_invalidate_and_restore_external_module_a_b_a() {
     const A: &[u8] = b"def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['deps'], fragments=['cpp'])\n";
     const B: &[u8] = b"def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['srcs'], fragments=['apple'])\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
 
     let mut first = transaction(
         &dice,
@@ -31016,7 +31283,9 @@ async fn generic_aspect_declaration_inputs_invalidate_and_restore_external_modul
 fn external_bzl_module_freezes_exact_lint_test_child_without_invocation() {
     let mut child_owner = clippy_owner();
     child_owner.label = CanonicalLabel::parse("@@rules_rust+//rust/private:lint_test.bzl").unwrap();
-    child_owner.workspace_path = PathBuf::from("/rules_rust/rust/private/lint_test.bzl");
+    child_owner.source = slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+        "/rules_rust/rust/private/lint_test.bzl",
+    ));
     let child = eval_bzl_with_identity(LINT_TEST_SOURCE, child_owner.clone()).unwrap();
     let parent_owner = clippy_owner();
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
@@ -31745,7 +32014,7 @@ rustfmt_test = rule(
 "#,
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut epoch = EpochBuilder::external_sources(files, 404);
     epoch.directory("/workspace/dep/rust", 404);
     epoch.directory("/workspace/dep/rust/private", 404);
@@ -31835,7 +32104,9 @@ EMPTY_INNER = aspect(implementation = impl, required_providers = [[]], required_
 fn generic_aspect_requires_retain_multiple_imported_values_and_deduplicate() {
     let producer_owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//producer:aspects.bzl").unwrap(),
-        workspace_path: PathBuf::from("/dep/producer/aspects.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/dep/producer/aspects.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let producer = eval_bzl_with_identity(
@@ -32033,7 +32304,7 @@ async fn repository_package_rejects_provider_or_aspect_dependency_before_recordi
             b"P=provider(fields={})\nQ=provider(fields={})\ndef aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\ndef transition_impl(settings, attr): return {}\nT=transition(implementation=transition_impl, inputs=[], outputs=['//:setting'])\ndef impl(ctx): return []\nprobe=rule(implementation=impl, attrs={'targets': attr.label_list(default=[':dep'], providers=[[P], [Q]], aspects=[A], cfg=T)})\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 405).build(),
@@ -32123,7 +32394,7 @@ CUSTOM_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(cfg = transi
 "#,
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let epoch = EpochBuilder::external_sources(files, 402).build();
     let mut transaction = transaction(&dice, epoch, false, None).await;
     let route = external_route(&mut transaction).await;
@@ -32176,7 +32447,9 @@ CUSTOM_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(cfg = transi
 fn label_file_admissibility_binds_all_five_constructors_and_retains_identity() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:toolchain.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/toolchain.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_rust/rust/private/toolchain.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -32321,7 +32594,7 @@ async fn rust_stdlib_filegroup_projects_file_allowance_into_target_schema() {
             b"def _impl(ctx): fail('must stay lazy')\nrust_stdlib_filegroup=rule(implementation=_impl, attrs={'srcs':attr.label_list(allow_files=True, mandatory=True)})\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 407).build(),
@@ -32380,7 +32653,9 @@ async fn scalar_label_file_allowance_projects_without_single_artifact_identity()
 fn bazel_data_attribute_docs_advance_rust_toolchain_to_values_constraint() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:toolchain.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/toolchain.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_rust/rust/private/toolchain.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -32445,7 +32720,9 @@ SECOND = rule(implementation = _impl, attrs = _attrs("different documentation"))
 fn bazel_integer_allowed_values_freeze_rust_toolchain_prefix() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:toolchain.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_rust/rust/private/toolchain.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_rust/rust/private/toolchain.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("bazel_tools").unwrap(),
             CanonicalRepoName::new("bazel_tools").unwrap(),
@@ -32872,7 +33149,7 @@ def emit(): probe(name = 'frozen', debug = DEBUG, visibility = ['//visibility:pu
 emit()
 probe(name = 'live', debug = select({':trace': ['trace'], '//conditions:default': []}) + select({':timings': ['timings'], '//conditions:default': []}), visibility = ['//visibility:public'])
 "#;
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let outcome = compute_package(
         &dice,
         EpochBuilder::workspace_sources("", BUILD, &[("defs.bzl", DEFS)], 1109).build(),
@@ -32954,7 +33231,7 @@ async fn frozen_bzl_string_list_select_replays_source_a_b_a_on_same_dice() {
     const BUILD: &str = "load(':defs.bzl', 'emit')\nemit()\n";
     const DEFS_A: &str = "def _impl(ctx): fail('lazy')\nprobe=rule(implementation=_impl,attrs={'debug':attr.string_list()})\nDEBUG=select({'//pkg:trace':['trace'],'//conditions:default':[]})\ndef emit(): probe(name='subject',debug=DEBUG,visibility=['//visibility:public'])\n";
     const DEFS_B: &str = "def _impl(ctx): fail('lazy')\nprobe=rule(implementation=_impl,attrs={'debug':attr.string_list()})\nDEBUG=select({'//pkg:trace':['trace-edited'],'//conditions:default':[]})\ndef emit(): probe(name='subject',debug=DEBUG,visibility=['//visibility:public'])\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let a = compute_package(
         &dice,
         EpochBuilder::workspace_sources("", BUILD, &[("defs.bzl", DEFS_A)], 1113).build(),
@@ -33118,7 +33395,7 @@ async fn public_starlark_rule_direct_none_replays_declared_default_a_b_a() {
     const BUILD: &[u8] = b"load(':defs.bzl', 'probe')\nprobe(name='subject', value=None, visibility=['//visibility:public'])\n";
     const DEFS_A: &[u8] = b"def _impl(ctx): fail('implementation must stay lazy')\nprobe=rule(implementation=_impl, attrs={'value': attr.string(default='alpha')})\n";
     const DEFS_B: &[u8] = b"def _impl(ctx): fail('implementation must stay lazy')\nprobe=rule(implementation=_impl, attrs={'value': attr.string(default='beta')})\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let a = load_repository_package_fixture_on(
         &dice,
         &[("BUILD.bazel", BUILD), ("defs.bzl", DEFS_A)],
@@ -33162,7 +33439,7 @@ async fn root_starlark_rule_none_visibility_uses_package_default_and_replays_a_b
         "package(default_visibility = ['//visibility:public'])",
         "package(default_visibility = ['//visibility:private'])",
     );
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = host_fixture_dice();
     let source = |build: &str, variant| {
         EpochBuilder::workspace_sources("", build, &[("defs.bzl", DEFS)], variant).build()
     };
@@ -33302,7 +33579,12 @@ fn eval_bzl_with_identity_and_globals_and_visibility(
     owner: BzlModuleIdentity,
     globals: &Globals,
 ) -> starlark::Result<(FrozenModule, BzlLoadVisibility)> {
-    let path = owner.workspace_path.to_str().unwrap();
+    let path = owner
+        .source
+        .workspace_path()
+        .expect("workspace fixture source")
+        .to_str()
+        .unwrap();
     let ast = AstModule::parse(path, source.to_owned(), &Dialect::Bazel)?;
     let module = Module::new();
     let prepared = super::test_source::prepare(&module, &ast, owner, &[])
@@ -33363,7 +33645,7 @@ const DEFERRED_JAVA_COMMON: [&str; 10] = [
 fn java_common_owner(label: &str) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(label),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(label)),
         repository_mapping: Arc::from([]),
     }
 }
@@ -33479,7 +33761,9 @@ fn rules_java_common_checks_each_call_site_and_rejects_wider_provenance() {
 fn provider_struct_and_toolchain_classes_share_equality_and_hash_domains() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@root//:provider_matrix.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/provider_matrix.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/provider_matrix.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -33494,7 +33778,12 @@ OUTPUT_GROUP_CALLABLE = OutputGroupInfo
 RUN_ENVIRONMENT_CALLABLE = RunEnvironmentInfo
 "#;
     let ast = AstModule::parse(
-        owner.workspace_path.to_str().unwrap(),
+        owner
+            .source
+            .workspace_path()
+            .expect("workspace fixture source")
+            .to_str()
+            .unwrap(),
         source.to_owned(),
         &Dialect::Bazel,
     )
@@ -33641,7 +33930,9 @@ RUN_ENVIRONMENT_CALLABLE = RunEnvironmentInfo
 fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
     let owner = |label: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from("/registry-rules-cc/cc/private/cc_internal.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/registry-rules-cc/cc/private/cc_internal.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let module = eval_bzl_with_identity(
@@ -33708,7 +33999,9 @@ fn bazel_cc_common_private_bridge_is_bzl_only_owner_checked_and_opaque() {
 fn bazel_cc_common_compiler_sentinel_freezes_exported_wrapper() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_common.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/cc_common.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/cc_common.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -33742,7 +34035,9 @@ UNKNOWN_ABSENT = not hasattr(native_cc_common, "unselected_native_field")
 fn bazel_empty_header_info_freezes_rules_cc_compilation_context_row() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_info.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/cc_info.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/cc_info.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -33819,9 +34114,9 @@ fn exported_provider_key_survives_kotlin_shaped_imported_dictionary_lookup() {
             "@@rules_kotlin+//src/main/starlark/core/options:{name}.bzl"
         ))
         .unwrap(),
-        workspace_path: PathBuf::from(format!(
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(format!(
             "/rules_kotlin/src/main/starlark/core/options/{name}.bzl"
-        )),
+        ))),
         repository_mapping: Arc::from([]),
     };
     let derive_owner = owner("derive");
@@ -33884,7 +34179,9 @@ InitializedAlias = Initialized
 "#;
     let owner = |repo: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@{repo}//:keys.bzl")).unwrap(),
-        workspace_path: PathBuf::from("/workspace/keys.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/keys.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let first_owner = owner("first+");
@@ -33973,7 +34270,9 @@ fn bazel_empty_list_freeze_loads_empty_cc_compilation_outputs() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private/compile:cc_compilation_outputs.bzl")
             .unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/compile/cc_compilation_outputs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/compile/cc_compilation_outputs.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -34037,7 +34336,9 @@ EXTRA_EMPTY = POSITIONAL == [] and NAMED == [] and FROM_FROZEN == []
 fn bazel_initialized_provider_loads_rules_cc_artifact_categories_and_stays_separate() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/common:cc_helper_internal.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/common/cc_helper_internal.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/common/cc_helper_internal.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -34144,7 +34445,9 @@ BYPASSED = _new_failing(name = "raw")
 fn bazel_documented_initialized_providers_freeze_cc_info_and_launcher_declarations() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private:cc_info.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/private/cc_info.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/private/cc_info.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -34234,9 +34537,9 @@ fn bazel_provider_schemas_freeze_rules_cc_extra_library_child_and_stay_loading_o
             "@@rules_cc+//cc/private/link:create_extra_link_time_library.bzl",
         )
         .unwrap(),
-        workspace_path: PathBuf::from(
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
             "/rules_cc/cc/private/link/create_extra_link_time_library.bzl",
-        ),
+        )),
         repository_mapping: Arc::from([]),
     };
     let source = r#"
@@ -34333,7 +34636,9 @@ OPTIONAL_OMITS_LIBRARIES = not hasattr(OPTIONAL, "libraries")
 fn label_attribute_defaults_keep_defining_module_identity() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//rust/private:lint_test.bzl").unwrap(),
-        workspace_path: PathBuf::from("/registry-dep/rust/private/lint_test.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/registry-dep/rust/private/lint_test.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("bazel_tools").unwrap(),
             CanonicalRepoName::new("bazel_tools").unwrap(),
@@ -34371,7 +34676,9 @@ fn label_attribute_defaults_keep_defining_module_identity() {
 fn aggregate_label_defaults_use_defining_mapping_and_reject_canonical_key_collisions() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@owner+//defs:attrs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/owner/defs/attrs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/owner/defs/attrs.bzl",
+        )),
         repository_mapping: Arc::from([
             (
                 ApparentRepoName::new("alias").unwrap(),
@@ -34453,7 +34760,9 @@ fn label_attribute_default_rejects_unadmitted_apparent_mapping() {
     let evaluate = |mapping| {
         let owner = BzlModuleIdentity {
             label: CanonicalLabel::parse("@@dep+//:defs.bzl").unwrap(),
-            workspace_path: PathBuf::from("/registry-dep/defs.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/registry-dep/defs.bzl",
+            )),
             repository_mapping: mapping,
         };
         eval_bzl_with_identity(
@@ -34506,7 +34815,7 @@ fn bazel_aspect_definition_validates_complete_abi_and_build_absence() {
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=[str(Label('//rust:toolchain_type'))])",
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
-            workspace_path: PathBuf::from("/workspace/defs.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from("/workspace/defs.bzl")),
             repository_mapping: Arc::from([]),
         },
     )
@@ -34517,7 +34826,9 @@ fn bazel_aspect_definition_validates_complete_abi_and_build_absence() {
 fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//owner:support.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/dep/owner/support.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/dep/owner/support.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
@@ -34548,7 +34859,9 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
 
     let root = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//caller:root.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/dep/caller/root.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/dep/caller/root.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
@@ -34609,7 +34922,9 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
 fn bazel_label_admits_package_context_grammar_and_rejects_invalid_provenance() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@owner+//pkg:defs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/owner/pkg/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/owner/pkg/defs.bzl",
+        )),
         repository_mapping: Arc::from([
             (
                 ApparentRepoName::new("alias").unwrap(),
@@ -34685,7 +35000,9 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
 
     let conflicting = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@owner+//:defs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/owner/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/owner/defs.bzl",
+        )),
         repository_mapping: Arc::from([
             (
                 ApparentRepoName::new("alias").unwrap(),
@@ -34753,7 +35070,9 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
 fn bazel_config_common_toolchain_type_retains_typed_rule_requirements() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@owner+//pkg:defs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/owner/pkg/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/owner/pkg/defs.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("alias").unwrap(),
             CanonicalRepoName::new("mapped+").unwrap(),
@@ -34907,7 +35226,7 @@ async fn repository_package_imported_defs_resolve_labels_and_restore_source() {
         ]
     };
     let valid = b"def labels():\n relative=Label(':local')\n if Label(relative)!=relative: fail('identity')\n return [relative,Label('@@dep+//mapped:canonical')]\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let a = load_repository_package_fixture_on(&dice, &sources(valid), 501).await;
     assert_eq!(
         repository_package_terminal(&a)
@@ -34954,7 +35273,7 @@ async fn repository_package_genrule_preserves_external_identity_and_source_aba()
             ("defs.bzl", definition.as_bytes()),
         ]
     };
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let base = ["c", ":i", ":t", "o", "m"];
     let a = load_repository_package_fixture_on(&dice, &sources(base), 601).await;
     let package = repository_package_terminal(&a);
@@ -34985,7 +35304,7 @@ async fn repository_package_genrule_preserves_external_identity_and_source_aba()
 fn package_label_original_module_context_is_independent_of_runtime_source_lookup() {
     let identity = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from(path),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(path)),
         repository_mapping: Arc::from([]),
     };
     let owner = identity("@@dep+//:defs.bzl", "/workspace/dep/defs.bzl");
@@ -35058,7 +35377,7 @@ async fn repository_package_rejects_bzl_aspect_factory_in_build_context() {
         ("BUILD.bazel", b"load(\":defs.bzl\", \"make_aspect\")\nBLOCKED = make_aspect()\n"),
         ("defs.bzl", b"def _impl(target, ctx): return []\ndef make_aspect(): return aspect(implementation = _impl)\n"),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut transaction = transaction(
         &dice,
         EpochBuilder::external_sources(files, 401).build(),
@@ -35097,7 +35416,9 @@ fn eval_global(source: &str, globals: &Globals) -> Result<FrozenModule, String> 
 fn symbolic_macro_build_attempt(defs: &str, build: &str) -> (Result<(), String>, bool) {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/defs.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let defs = eval_bzl_with_identity(defs, owner).unwrap();
@@ -35201,7 +35522,9 @@ fn bazel_configuration_field_is_bzl_only_and_fails_closed() {
     }
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/common:semantics.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_cc/cc/common/semantics.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_cc/cc/common/semantics.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let frozen = eval_bzl_with_identity(
@@ -35238,7 +35561,9 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
 "#;
     let owner = |label: &str, tools: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: PathBuf::from("/protobuf/bazel/private/probe.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/protobuf/bazel/private/probe.bzl",
+        )),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("bazel_tools").unwrap(),
             CanonicalRepoName::new(tools).unwrap(),
@@ -35376,7 +35701,7 @@ RULE = rule(implementation = _impl, attrs = {
     "_cc": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_cc")),
 })
 "#;
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let outcome = load_repository_package_fixture_on(
         &dice,
         &[("BUILD.bazel", BUILD), ("defs.bzl", DEFS)],
@@ -35418,7 +35743,9 @@ fn bazel_zero_argument_depset_freezes_empty_in_bzl_and_build_globals() {
         source,
         BzlModuleIdentity {
             label: CanonicalLabel::parse("@@rules_cc+//cc/private:objc_info.bzl").unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/objc_info.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/objc_info.bzl",
+            )),
             repository_mapping: Arc::from([]),
         },
     )
@@ -35586,7 +35913,9 @@ fn bazel_category_six_globals_and_provider_key_are_exactly_partitioned() {
 fn config_common_feature_flag_info_is_a_bzl_only_builtin_provider_key() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_python+//python/private/pypi:flags.bzl").unwrap(),
-        workspace_path: PathBuf::from("/rules_python/python/private/pypi/flags.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/rules_python/python/private/pypi/flags.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let module = eval_bzl_with_identity(
@@ -35754,7 +36083,9 @@ outer = macro(implementation = _outer_impl, attrs = {
 "#;
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/defs.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let defs = eval_bzl_with_identity(defs, owner).unwrap();
@@ -36140,7 +36471,7 @@ async fn symbolic_macro_definition_and_build_inputs_invalidate_and_restore_a_b_a
         b"load(':defs.bzl','M')\nM(name='two', visibility=['//visibility:public'])\n";
     const DEFS_A: &[u8] = b"def _rule_impl(ctx): return [DefaultInfo()]\nR=rule(implementation=_rule_impl, attrs={'text': attr.string()})\ndef _impl(name, visibility, text): R(name=name, text=text, visibility=visibility)\nM=macro(implementation=_impl, attrs={'text': attr.string(default='a')})\n";
     const DEFS_B: &[u8] = b"def _rule_impl(ctx): return [DefaultInfo()]\nR=rule(implementation=_rule_impl, attrs={'text': attr.string()})\ndef _impl(name, visibility, text): R(name=name, text=text, visibility=visibility)\nM=macro(implementation=_impl, attrs={'text': attr.string(default='b')})\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let files = |build, defs| [("BUILD.bazel", build), ("defs.bzl", defs)];
 
     let a = load_repository_package_fixture_on(&dice, &files(BUILD_A, DEFS_A), 429).await;
@@ -36171,7 +36502,9 @@ fn symbolic_macro_visibility_separates_call_site_and_definition_packages() {
     );
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@dep+//macros:defs.bzl").unwrap(),
-        workspace_path: PathBuf::from("/workspace/dep/macros/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+            "/workspace/dep/macros/defs.bzl",
+        )),
         repository_mapping: Arc::from([]),
     };
     let defs = eval_bzl_with_identity(
@@ -36373,7 +36706,7 @@ async fn repository_package_retains_all_config_string_rule_shapes() {
             ),
             ("defs.bzl", defs.as_bytes()),
         ];
-        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let dice = host_fixture_dice();
         let mut transaction = transaction(
             &dice,
             EpochBuilder::external_sources(files, facts).build(),
@@ -36419,7 +36752,7 @@ async fn repository_package_retains_config_int_rules() {
             ),
             ("defs.bzl", defs.as_bytes()),
         ];
-        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let dice = host_fixture_dice();
         let mut transaction = transaction(
             &dice,
             EpochBuilder::external_sources(files, facts).build(),
@@ -36462,7 +36795,7 @@ async fn repository_package_retains_config_bool_rules() {
             ),
             ("defs.bzl", defs.as_bytes()),
         ];
-        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let dice = host_fixture_dice();
         let mut transaction = transaction(
             &dice,
             EpochBuilder::external_sources(files, facts).build(),
@@ -36510,7 +36843,7 @@ async fn repository_package_retains_config_string_list_rules() {
             ),
             ("defs.bzl", defs.as_bytes()),
         ];
-        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let dice = host_fixture_dice();
         let mut transaction = transaction(
             &dice,
             EpochBuilder::external_sources(files, facts).build(),
@@ -36554,7 +36887,7 @@ async fn external_bzl_module_retains_canonical_manifest_lifetime_and_local_event
         ),
         ("helper.bzl", b"print(\"HELPER_BZL\")\nH = 1\n"),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch = EpochBuilder::external_sources(files, 40).build();
     let mut cold = transaction(&dice, epoch.clone(), true, Some(tracker.dupe())).await;
@@ -36587,7 +36920,19 @@ async fn external_bzl_module_retains_canonical_manifest_lifetime_and_local_event
             "@@dep+//:right.bzl",
         ]
     );
-    assert_eq!(module.retained_bzl_modules.len(), 3);
+    assert_complete_module_identities(
+        module
+            .retained_bzl_modules
+            .iter()
+            .map(|entry| &entry.identity),
+        &[
+            "@@dep+//:left.bzl",
+            "@@dep+//:helper.bzl",
+            "@@dep+//:right.bzl",
+        ],
+        2,
+    );
+    assert_eq!(module.retained_bzl_modules.len(), 3 + BUILTIN_LABELS.len());
     assert!(ExternalBzlModuleEvalKey::validity(&cold_value));
     assert!(ExternalBzlModuleEvalKey::equality(&cold_value, &cold_value));
 
@@ -36703,7 +37048,7 @@ async fn external_bzl_module_retains_canonical_manifest_lifetime_and_local_event
 
 #[tokio::test]
 async fn external_bzl_module_prevalidates_loads_and_preserves_typed_terminal_equality() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut invalid_epoch = EpochBuilder::external_sources(
         &[(
             "root.bzl",
@@ -36824,7 +37169,7 @@ async fn external_bzl_module_prevalidates_loads_and_preserves_typed_terminal_equ
 
 #[tokio::test]
 async fn external_bzl_module_cycle_releases_and_recovers_with_fresh_detector() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let self_epoch = EpochBuilder::external_sources(
         &[("self.bzl", b"load(\":self.bzl\", \"VALUE\")\nVALUE = 1\n")],
         59,
@@ -36907,7 +37252,7 @@ async fn external_bzl_module_cycle_releases_and_recovers_with_fresh_detector() {
 
 #[tokio::test]
 async fn observed_external_bzl_cycle_retains_all_sources_and_recovers() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let self_epoch = EpochBuilder::external_sources(
         &[("self.bzl", b"load(\":self.bzl\", \"VALUE\")\nVALUE = 1\n")],
         159,
@@ -37049,7 +37394,7 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
             b"print(\"DEFS_TOP\")\ndef make_filegroup(name):\n    print(\"MACRO_BODY\")\n    native.filegroup(name = name)\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut epoch = EpochBuilder::external_sources(files, 70);
     epoch.file("/workspace/dep/REPO.bazel", b"print(\"REPO_TOP\")\n", 70);
     let epoch = epoch.build();
@@ -37075,15 +37420,8 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
             .collect::<Vec<_>>(),
         ["@@dep+//:defs.bzl"]
     );
-    assert_eq!(
-        loaded
-            .reachable_loads
-            .iter()
-            .map(|identity| identity.label.to_string())
-            .collect::<Vec<_>>(),
-        ["@@dep+//:defs.bzl"]
-    );
-    assert_eq!(loaded.retained_bzl_module_count(), 1);
+    assert_complete_module_identities(loaded.reachable_loads.iter(), &["@@dep+//:defs.bzl"], 1);
+    assert_eq!(loaded.retained_bzl_module_count(), 1 + BUILTIN_LABELS.len());
     assert_ne!(loaded.load_fingerprint, [0; 32]);
     assert!(RepositoryPackageLoadKey::validity(&cold_value));
     assert!(RepositoryPackageLoadKey::equality(&cold_value, &cold_value));
@@ -37109,7 +37447,7 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
         event_texts(route_policy.batch.as_ref().unwrap()),
         ["REPO_TOP"]
     );
-    let uncaptured_dice = Dice::builder().build(DetectCycles::Enabled);
+    let uncaptured_dice = host_fixture_dice();
     let uncaptured_tracker = Arc::new(EventTracker::default());
     let mut uncaptured = transaction(
         &uncaptured_dice,
@@ -37162,7 +37500,7 @@ async fn observed_repository_package_load_retains_source_child_arcs_and_local_ba
         ),
         ("defs.bzl", b"print(\"BZL_OBSERVED\")\nVALUE = 1\n"),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let mut epoch = EpochBuilder::external_sources(files, 145);
     epoch.file("/workspace/dep/REPO.bazel", b"", 145);
@@ -37352,7 +37690,7 @@ fn external_repository_glob_root_derivation_checks_build_and_package_suffixes() 
 
 #[tokio::test]
 async fn observed_external_repository_glob_uses_materialized_root_boundaries_and_replays_a_b_a() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch_a = external_recursive_glob_epoch(true, 811);
     let mut cold = transaction(&dice, epoch_a.dupe(), true, Some(tracker.dupe())).await;
@@ -37433,7 +37771,7 @@ async fn observed_external_repository_glob_uses_materialized_root_boundaries_and
 
 #[tokio::test]
 async fn observed_repository_package_load_source_terminals_keep_prefixes() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let package = PackagePath::parse("").unwrap();
     let tracker = Arc::new(EventTracker::default());
     let mut need = transaction(
@@ -37516,7 +37854,7 @@ async fn observed_repository_package_load_source_terminals_keep_prefixes() {
 async fn observed_repository_package_load_child_terminals_keep_prefixes() {
     const BUILD: &[u8] = b"load(\":first.bzl\", \"FIRST\")\nload(\":middle.bzl\", \"MIDDLE\")\nload(\":last.bzl\", \"LAST\")\nfilegroup(name = \"files\")\n";
     const CHILD: &[u8] = b"FIRST = 1\nMIDDLE = 2\nLAST = 3\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let package = PackagePath::parse("").unwrap();
     let tracker = Arc::new(EventTracker::default());
     let children = ["first.bzl", "middle.bzl", "last.bzl"];
@@ -37636,7 +37974,7 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
                 b"def make_suite(name):\n    native.test_suite(name = name, tests = [])\n",
             ));
         }
-        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let dice = host_fixture_dice();
         let tracker = Arc::new(EventTracker::default());
         let mut epoch = EpochBuilder::external_sources(&files, 170 + variant as i64);
         if *name == "glob-empty" {
@@ -37736,7 +38074,7 @@ async fn observed_repository_package_load_replays_a_b_a() {
         b"load(\":defs.bzl\", \"NAME\")\nprint(\"PACKAGE_B\")\nfilegroup(name = NAME)\n";
     const A: &[u8] = b"NAME = \"a\"\n";
     const B: &[u8] = b"NAME = \"b\"\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch_a =
         EpochBuilder::external_sources(&[("BUILD.bazel", BUILD_A), ("defs.bzl", A)], 160).build();
@@ -37827,7 +38165,15 @@ async fn observed_repository_package_load_replays_a_b_a() {
         cold_loaded.direct_load_roots[0].label.to_string(),
         "@@dep+//:defs.bzl"
     );
-    assert_eq!(cold_loaded.retained_bzl_module_count(), 1);
+    assert_complete_module_identities(
+        cold_loaded.reachable_loads.iter(),
+        &["@@dep+//:defs.bzl"],
+        1,
+    );
+    assert_eq!(
+        cold_loaded.retained_bzl_module_count(),
+        1 + BUILTIN_LABELS.len()
+    );
 }
 
 #[tokio::test]
@@ -37835,7 +38181,7 @@ async fn observed_repository_package_load_recovers_after_cancel() {
     const BUILD_A: &[u8] =
         b"load(\":defs.bzl\", \"NAME\")\nprint(\"PACKAGE_A\")\nfilegroup(name = NAME)\n";
     const A: &[u8] = b"NAME = \"a\"\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch_a =
         EpochBuilder::external_sources(&[("BUILD.bazel", BUILD_A), ("defs.bzl", A)], 160).build();
@@ -37882,7 +38228,7 @@ async fn observed_repository_package_load_recovers_after_cancel() {
 }
 #[tokio::test]
 async fn repository_package_load_preserves_selected_source_error_display_and_chain() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut epoch = EpochBuilder::external_sources(&[], 79);
     epoch.missing("/workspace/dep/BUILD.bazel");
     epoch.missing("/workspace/dep/BUILD");
@@ -37951,7 +38297,7 @@ async fn canonical_package_policy_adapter_reuses_inventory_result_and_epoch_arcs
 
 #[tokio::test]
 async fn repository_package_policy_projection_shares_success_and_inventory_events() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let accepted: &[(&str, &[u8])] = &[
         (
@@ -38018,7 +38364,7 @@ async fn repository_package_policy_projection_shares_success_and_inventory_event
 
 #[tokio::test]
 async fn repository_package_inventory_retains_targets_rejected_by_loaded_policy() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     for (variant, files, expected_target, expected_error) in [
         (
             781,
@@ -38098,7 +38444,7 @@ async fn repository_package_load_accepts_dependency_free_public_starlark_rule_sh
             b"print(\"RULE_BZL\")\ndef _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"empty\": attr.label_list()})\n",
         ),
     ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let epoch = EpochBuilder::external_sources(valid, 80).build();
     let mut cold = transaction(&dice, epoch.clone(), true, Some(tracker.dupe())).await;
@@ -38115,7 +38461,8 @@ async fn repository_package_load_accepts_dependency_free_public_starlark_rule_sh
     assert_eq!(capability.rule_class, "probe");
     assert!(!capability.executable);
     assert!(capability.test_kind.is_none());
-    assert_eq!(loaded.retained_bzl_module_count(), 1);
+    assert_complete_module_identities(loaded.reachable_loads.iter(), &["@@dep+//:defs.bzl"], 1);
+    assert_eq!(loaded.retained_bzl_module_count(), 1 + BUILTIN_LABELS.len());
     let batches = tracker.take();
     assert_eq!(
         event_texts(
@@ -38232,7 +38579,7 @@ async fn repository_package_public_starlark_rules_replay_source_need_and_policy_
     const BUILD_PRIVATE: &[u8] = b"load(\":defs.bzl\", \"probe\")\npackage(default_visibility = [\"//visibility:private\"])\nfilegroup(name = \"seed\", srcs = [])\nprobe(name = \"declared\", visibility = [\"//visibility:public\"])\nprobe(name = \"inherited\")\n";
     const DEFS_A: &[u8] = b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"deps\": attr.label_list(default = [])})\n";
     const DEFS_B: &[u8] = b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"deps\": attr.label_list(default = [\":seed\"])})\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let a = load_repository_package_fixture_on(
         &dice,
         &[("BUILD.bazel", BUILD_A), ("defs.bzl", DEFS_A)],
@@ -38327,7 +38674,7 @@ async fn repository_package_load_defers_hidden_configuration_field_but_keeps_lit
     const BUILD: &[u8] = b"load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\", visibility = [\"//visibility:public\"])\n";
     const LITERAL: &[u8] = b"def _sub(ctx, **kwargs): pass\nhelper = subrule(implementation = _sub, attrs = {\"_dep\": attr.label(default = \":hidden.txt\", allow_files = True)})\nprobe = rule(implementation = lambda ctx: [], subrules = [helper])\n";
     const LATE_BOUND: &[u8] = b"def _sub(ctx, **kwargs): pass\nhelper = subrule(implementation = _sub, attrs = {\"_dep\": attr.label(default = configuration_field(fragment = \"cpp\", name = \"fdo_profile\"))})\nprobe = rule(implementation = lambda ctx: [], subrules = [helper])\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let accepted = load_repository_package_fixture_on(
         &dice,
         &[("BUILD.bazel", BUILD), ("defs.bzl", LITERAL)],
@@ -38395,7 +38742,7 @@ async fn repository_package_load_defers_hidden_configuration_field_but_keeps_lit
 
 #[tokio::test]
 async fn repository_package_load_rejects_unadmitted_starlark_rule_attributes() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let cases = [
         (
             "probe(name = \"bad\")",
@@ -38453,7 +38800,7 @@ async fn repository_package_load_rejects_unadmitted_starlark_rule_attributes() {
 
 #[tokio::test]
 async fn repository_package_load_rejects_test_and_executable_starlark_rules() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     for (source, symbol, expected) in [
         (
             b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe_test = rule(implementation = _impl, test = True)\n".as_slice(),
@@ -38495,7 +38842,7 @@ async fn repository_package_load_rejects_test_and_executable_starlark_rules() {
 
 #[tokio::test]
 async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_kinds() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let tracker = Arc::new(EventTracker::default());
     let mut invalid = transaction(
         &dice,
@@ -38859,7 +39206,7 @@ async fn bzl_native_cc_toolchain_suite_preserves_name_conflicts_and_build_native
 
 #[tokio::test]
 async fn repository_package_load_renders_missing_and_cycle_and_recovers_on_same_dice() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut missing_epoch = EpochBuilder::external_sources(
         &[(
             "BUILD.bazel",
@@ -38951,7 +39298,7 @@ async fn observed_external_bzl_source_provenance_tracks_helper_revision() {
     let right = b"load(':helper.bzl', 'H')\nRIGHT = H\n";
     let original = b"H = 1\n";
     let edited = b"H = 2\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut first = None;
     for (variant, helper, restored) in [
         (810, original, true),
@@ -39050,7 +39397,7 @@ async fn guarded_python_internal_export_loads_in_root_build_and_restores_a_b_a()
     const SOURCE_B: &str = "EXPORTED = py_internal\nALIAS = EXPORTED\nMARKER = 'b'\n";
     let epoch = |build: &str, source: &str, variant: i64| {
         let mut epoch = EpochBuilder::workspace_sources(
-            "module(name='bazel_tools')\nbazel_dep(name='rules_python', version='1.0.0')\nlocal_path_override(module_name='rules_python', path='dep')\n",
+            "module(name='root')\nbazel_dep(name='rules_python', version='1.0.0')\nlocal_path_override(module_name='rules_python', path='dep')\n",
             build,
             &[],
             variant,
@@ -39067,7 +39414,7 @@ async fn guarded_python_internal_export_loads_in_root_build_and_restores_a_b_a()
         epoch.file("/workspace/dep/export.bzl", source, variant);
         epoch.build()
     };
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut packages = Vec::new();
     let mut modules = Vec::new();
     for (variant, source, expected) in [
@@ -39163,7 +39510,7 @@ fn package_relative_materialized_epoch(
     variant: i64,
 ) -> (PathObservationEpoch, PathObservationInstanceId) {
     let mut epoch = EpochBuilder::workspace_sources(
-        "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n",
+        "module(name='root')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n",
         "",
         &[],
         variant,
@@ -39317,7 +39664,7 @@ async fn package_relative_label_in_canonical_external_macro_uses_calling_package
 #[tokio::test]
 async fn package_relative_label_selector_source_revision_replays_a_b_a() {
     const DEFS: &[u8] = b"def emit(condition): native.alias(name = 'selected', visibility = ['//visibility:public'], actual = select({native.package_relative_label(condition): ':dbg', '//conditions:default': ':opt'}))\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut outcomes = Vec::new();
     for (variant, condition) in [(803, ":first"), (804, ":second"), (805, ":first")] {
         let build = format!("load(':defs.bzl', 'emit')\nemit('{condition}')\n");
@@ -39417,7 +39764,9 @@ async fn package_relative_label_rejects_bad_inputs_and_does_not_publish_partial_
             &source,
             BzlModuleIdentity {
                 label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
-                workspace_path: PathBuf::from("/workspace/defs.bzl"),
+                source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                    "/workspace/defs.bzl",
+                )),
                 repository_mapping: Arc::from([]),
             },
         )
@@ -39428,7 +39777,7 @@ async fn package_relative_label_rejects_bad_inputs_and_does_not_publish_partial_
             "{input}: {error}"
         );
     }
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut tx = transaction(
         &dice,
         EpochBuilder::external_sources(
@@ -39467,7 +39816,7 @@ fn package_name_materialized_epoch_with(
 ) -> (PathObservationEpoch, PathObservationInstanceId) {
     let variant = 810;
     let mut epoch = EpochBuilder::workspace_sources(
-        "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n",
+        "module(name='root')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n",
         root_build,
         &[],
         variant,
@@ -39558,30 +39907,27 @@ async fn module_metadata_selected_registry_uses_calling_build_for_apparent_canon
         );
     }
     let root = tx.compute(&package_key()).await.unwrap();
-    assert_eq!(
-        target_names(&root),
-        ["root_bazel_tools_", "macro_bazel_tools_"]
-    );
+    assert_eq!(target_names(&root), ["root_root_", "macro_root_"]);
 }
 
 #[tokio::test]
 async fn build_module_metadata_uses_declared_root_and_loaded_macro_caller_a_b_a() {
     const BUILD: &str = "load(':defs.bzl', 'emit')\nfilegroup(name='build_' + module_name() + '_' + module_version())\nemit()\n";
     const DEFS: &str = "def emit(): native.filegroup(name='macro_' + native.module_name() + '_' + native.module_version())\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut outcomes = Vec::new();
     for (module, expected) in [
         (
-            "module(name='bazel_tools', version='1.2.3')\n",
-            ["build_bazel_tools_1.2.3", "macro_bazel_tools_1.2.3"],
+            "module(name='root', version='1.2.3')\n",
+            ["build_root_1.2.3", "macro_root_1.2.3"],
         ),
         (
-            "module(name='bazel_tools', version='2.0')\n",
-            ["build_bazel_tools_2.0", "macro_bazel_tools_2.0"],
+            "module(name='root', version='2.0')\n",
+            ["build_root_2.0", "macro_root_2.0"],
         ),
         (
-            "module(name='bazel_tools', version='1.2.3')\n",
-            ["build_bazel_tools_1.2.3", "macro_bazel_tools_1.2.3"],
+            "module(name='root', version='1.2.3')\n",
+            ["build_root_1.2.3", "macro_root_1.2.3"],
         ),
     ] {
         let outcome = compute_package(
@@ -39598,25 +39944,17 @@ async fn build_module_metadata_uses_declared_root_and_loaded_macro_caller_a_b_a(
 
     let empty_version = compute_package(
         &dice,
-        EpochBuilder::workspace_sources(
-            "module(name='bazel_tools')\n",
-            BUILD,
-            &[("defs.bzl", DEFS)],
-            822,
-        )
-        .build(),
+        EpochBuilder::workspace_sources("module(name='root')\n", BUILD, &[("defs.bzl", DEFS)], 822)
+            .build(),
         package_policy(),
     )
     .await;
-    assert_eq!(
-        target_names(&empty_version),
-        ["build_bazel_tools_", "macro_bazel_tools_"]
-    );
+    assert_eq!(target_names(&empty_version), ["build_root_", "macro_root_"]);
 }
 
 #[tokio::test]
 async fn build_module_metadata_bindings_reject_wrong_context_and_unsupported_route() {
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     for (build, bzl, expected) in [
         ("native.module_version()\n", None, "module_version"),
         ("module_version('extra')\n", None, "module_version"),
@@ -39636,7 +39974,7 @@ async fn build_module_metadata_bindings_reject_wrong_context_and_unsupported_rou
             .unwrap_or_default();
         let outcome = compute_package(
             &dice,
-            EpochBuilder::workspace_sources("module(name='bazel_tools')\n", build, &bzl_files, 823)
+            EpochBuilder::workspace_sources("module(name='root')\n", build, &bzl_files, 823)
                 .build(),
             package_policy(),
         )
@@ -39655,7 +39993,7 @@ async fn build_module_metadata_bindings_reject_wrong_context_and_unsupported_rou
     let module_file = compute_package(
         &dice,
         EpochBuilder::workspace_sources(
-            "module(name='bazel_tools')\nVALUE=module_version()\n",
+            "module(name='root')\nVALUE=module_version()\n",
             "filegroup(name='probe')\n",
             &[],
             825,
@@ -39716,7 +40054,7 @@ async fn native_package_name_source_revision_restores_a_b_a() {
     const BUILD: &[u8] = b"load(':defs.bzl', 'emit')\nemit()\n";
     const DEFS_A: &[u8] = b"def emit(): native.filegroup(name = 'a' + native.package_name())\n";
     const DEFS_B: &[u8] = b"def emit(): native.filegroup(name = 'b' + native.package_name())\n";
-    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let dice = host_fixture_dice();
     let mut outcomes = Vec::new();
     for (variant, defs, expected) in [(811, DEFS_A, "a"), (812, DEFS_B, "b"), (813, DEFS_A, "a")] {
         let mut tx = transaction(

@@ -420,11 +420,18 @@ fn walk_with_mode(out: &mut Buffer, mut node: Node<'_>, strict: bool) -> fmt::Re
                 match error {
                     E::Child { raw_load, error, .. } => { write!(out, "Child {raw_load}: ")?; Node::ExternalBzl(error) }
                     E::SourceCompute { message, .. } => return write!(out, "SourceCompute: {message}"),
-                    E::Route { error, .. } => {
-                        out.write_str("Route: ")?;
+                    mapping @ E::RepositoryMapping { error, .. } | mapping @ E::Route { error, .. } => {
+                        if let E::RepositoryMapping { source, .. } = mapping {
+                            out.write_str("RepositoryMapping ")?;
+                            out.label(source)?;
+                            out.write_str(": ")?;
+                        } else {
+                            out.write_str("Route: ")?;
+                        }
                         match error {
                             ExternalBzlRouteError::Compute(_) => return out.write_str("Compute"),
                             ExternalBzlRouteError::Observation(_) => return out.write_str("Observation"),
+                            ExternalBzlRouteError::Admission(_) => return out.incomplete("Admission"),
                             ExternalBzlRouteError::Load(error) => Node::Load(error),
                         }
                     }

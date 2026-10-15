@@ -142,6 +142,9 @@ impl StructuralFunctionOwnerPart for InputValidity {
     fn retained_shape(&self) -> PublicationShape {
         self.shape
     }
+    fn shared_inputs(&self) -> &[slug_build_api_v2::published_value::SharedPublicationInput] {
+        self.implementation.owner_shared_inputs()
+    }
     fn imported_arenas(&self) -> &[PublishedValueArena] {
         &self.imports
     }
@@ -194,12 +197,18 @@ pub(super) fn prepare(
     let stable_shape = audit.native.intrinsic_shape();
     audit.row::<InputValidity>()?;
     audit.row::<AnalysisValue>()?; // enclosing joint tuple
-    implementation.visit_owner_metadata(&mut |charge| {
+    implementation.visit_owner_intrinsic_metadata(&mut |charge| {
         audit
             .native
             .charge_storage(charge)
             .map_err(|e| e.to_string())
     })?;
+    for input in implementation.owner_shared_inputs() {
+        audit
+            .native
+            .audit_shared_input_at_depth(input, 1)
+            .map_err(|e| e.to_string())?;
+    }
     let rule_function = implementation
         .owner_rule_function()
         .ok_or("configured implementation requires an actual Starlark Def")?;
@@ -334,7 +343,7 @@ pub(super) fn prepare(
         }),
         Arc::new(validity),
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("{e} (configured rule {})", key.label()))?;
     Ok(slug_loading_v2::function_owner::function_symbol_session(
         owner,
     ))

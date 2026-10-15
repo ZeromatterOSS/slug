@@ -84,7 +84,6 @@ pub use label_flag::LabelFlagDeclaration;
 #[path = "package/module_metadata_memory_tests.rs"]
 mod module_metadata_memory_tests;
 
-use crate::apple_common::apple_common_globals;
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
 use crate::attrs::AttributeKind;
@@ -979,7 +978,7 @@ pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
     definition_source: Arc<BzlModuleIdentity>,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    source_identities_by_filename: crate::source_table::CertifiedSourceTable,
     dependencies: Arc<[CanonicalLabel]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     declared_exec_groups: Arc<[(CompactString, DeclaredExecGroup)]>,
@@ -1045,6 +1044,12 @@ impl StarlarkRuleImplementation {
         self.implementation
     }
 
+    #[doc(hidden)]
+    pub fn owner_shared_inputs(
+        &self,
+    ) -> &[slug_build_api_v2::published_value::SharedPublicationInput] {
+        self.source_identities_by_filename.declarations()
+    }
     pub fn definition_source(&self) -> &Arc<BzlModuleIdentity> {
         &self.definition_source
     }
@@ -1053,7 +1058,7 @@ impl StarlarkRuleImplementation {
     pub fn source_identities_by_filename(
         &self,
     ) -> &Arc<[(CompactString, BzlModuleSourceProvenance)]> {
-        &self.source_identities_by_filename
+        self.source_identities_by_filename.raw()
     }
 
     pub fn dependencies(&self) -> &[CanonicalLabel] {
@@ -1897,7 +1902,7 @@ impl PackageRecorder {
         name: String,
         implementation: FrozenValue,
         definition_source: Arc<BzlModuleIdentity>,
-        source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+        source_identities_by_filename: crate::source_table::CertifiedSourceTable,
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
         declared_exec_groups: Arc<[(CompactString, DeclaredExecGroup)]>,
         advertised_providers: Arc<[ProviderIdentity]>,
@@ -4341,7 +4346,7 @@ struct RuleDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    source_identities_by_filename: crate::source_table::CertifiedSourceTable,
     #[trace(unsafe_ignore)]
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
@@ -4375,7 +4380,7 @@ pub(crate) struct FrozenRuleDefinition {
     declared_exec_groups: Option<Arc<[(CompactString, DeclaredExecGroup)]>>,
     named_exec_transition_attributes: Option<Arc<[(u32, CompactString)]>>,
     definition_source: Arc<BzlModuleIdentity>,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    source_identities_by_filename: crate::source_table::CertifiedSourceTable,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
@@ -4528,7 +4533,7 @@ struct SymbolicMacroDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    source_identities_by_filename: crate::source_table::CertifiedSourceTable,
     #[trace(unsafe_ignore)]
     attributes: Arc<[MacroAttributeSchema]>,
     #[trace(unsafe_ignore)]
@@ -4544,7 +4549,7 @@ type SymbolicMacroDefinition<'v> = SymbolicMacroDefinitionGen<Value<'v>>;
 struct FrozenSymbolicMacroDefinition {
     implementation: FrozenValue,
     definition_source: Arc<BzlModuleIdentity>,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    source_identities_by_filename: crate::source_table::CertifiedSourceTable,
     attributes: Arc<[MacroAttributeSchema]>,
     documentation: Option<CompactString>,
     exported_name: CompactString,
@@ -6026,14 +6031,26 @@ pub(crate) struct TransitionDefinitionGen<V> {
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
     #[freeze(identity)]
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    source_identities_by_filename: crate::source_table::CertifiedSourceTable,
 }
 type TransitionDefinition<'v> = TransitionDefinitionGen<Value<'v>>;
 pub(crate) type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
 starlark::starlark_complex_values!(TransitionDefinition);
 
-fn transition_definition_from_value<'v>(value: Value<'v>) -> Option<TransitionDefinition<'v>> {
-    match TransitionDefinition::from_value(value)? {
+fn transition_definition_from_value<'v>(
+    value: Value<'v>,
+) -> anyhow::Result<Option<TransitionDefinition<'v>>> {
+    let Some(value) = TransitionDefinition::from_value(value) else {
+        return Ok(None);
+    };
+    // One conversion invocation prepays its new guarded-pair copy before either branch.
+    let mut work = crate::bzl_module::semantic_evaluation::budget::Budget::default();
+    work.charge(
+        4,
+        std::mem::size_of::<crate::source_table::CertifiedSourceTable>(),
+    )
+    .map_err(anyhow::Error::msg)?;
+    Ok(match value {
         starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
         starlark::__macro_refs::Either::Right(value) => Some(TransitionDefinitionGen {
             implementation: value.implementation.to_value(),
@@ -6042,7 +6059,7 @@ fn transition_definition_from_value<'v>(value: Value<'v>) -> Option<TransitionDe
             definition_source: value.definition_source.clone(),
             source_identities_by_filename: value.source_identities_by_filename.clone(),
         }),
-    }
+    })
 }
 
 impl FrozenTransitionDefinition {
@@ -6070,7 +6087,7 @@ impl FrozenTransitionDefinition {
     pub(crate) fn source_identities_by_filename(
         &self,
     ) -> &Arc<[(CompactString, BzlModuleSourceProvenance)]> {
-        &self.source_identities_by_filename
+        self.source_identities_by_filename.raw()
     }
 }
 impl<V> fmt::Display for TransitionDefinitionGen<V> {
@@ -6197,6 +6214,14 @@ fn attribute_definition_from_value<'v>(
     let Some(definition) = AttributeDefinition::from_value(value) else {
         return Ok(None);
     };
+    // Attribute conversion is a new invocation-local control phase.
+    let mut publication_work = crate::bzl_module::semantic_evaluation::budget::Budget::default();
+    publication_work
+        .charge(
+            4,
+            std::mem::size_of::<crate::source_table::CertifiedSourceTable>(),
+        )
+        .map_err(anyhow::Error::msg)?;
     let definition = match definition {
         starlark::__macro_refs::Either::Left(value) => value.clone(),
         starlark::__macro_refs::Either::Right(value) => AttributeDefinitionGen {
@@ -7134,7 +7159,7 @@ fn set_attribute_cfg<'v>(
         Some(value) => {
             if let Some(exec) = StarlarkExecTransition::from_value(value) {
                 (exec.0.is_none(), exec.0.clone(), None, None)
-            } else if let Some(transition) = transition_definition_from_value(value) {
+            } else if let Some(transition) = transition_definition_from_value(value)? {
                 (false, None, Some(transition), None)
             } else if let Some(transition) = analysis_test_transition_from_value(value) {
                 (false, None, None, Some(transition))
@@ -8241,10 +8266,11 @@ fn invoke_rule_initializer<'v>(
         .zip(argument_values.iter().copied())
         .map(|(name, value)| (name.as_str(), value))
         .collect::<Vec<_>>();
-    let bzl = BzlEvaluationContext::macro_runtime_context(
+    let bzl = BzlEvaluationContext::macro_runtime_context_with_table(
         (*definition.definition_source).clone(),
-        definition.source_identities_by_filename.clone(),
-    );
+        &definition.source_identities_by_filename,
+    )
+    .map_err(anyhow::Error::msg)?;
     let result = {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&bzl);
@@ -8345,7 +8371,12 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
             .filter(|value| !value.is_none());
         let implementation = self.implementation;
         let definition_source = self.definition_source.clone();
-        let source_identities_by_filename = self.source_identities_by_filename.clone();
+        let mut publication_work =
+            crate::bzl_module::semantic_evaluation::budget::Budget::default();
+        let source_identities_by_filename = self
+            .source_identities_by_filename
+            .capture(&mut publication_work)
+            .map_err(|e| starlark::Error::new_other(anyhow::Error::msg(e)))?;
         let required_toolchains = self.required_toolchains.clone();
         let declared_exec_groups = self
             .declared_exec_groups
@@ -8357,15 +8388,22 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let subrule_callables = self.subrule_callables.clone();
         let late_bound_attributes = self.late_bound_attributes.clone();
         let capability = self.capability.clone();
-        let incoming_transition = self.incoming_transition.as_ref().map(|transition| {
-            LoadingTransitionDefinition::new(
-                transition.implementation,
-                transition.inputs.clone(),
-                transition.outputs.clone(),
-                transition.definition_source.clone(),
-                transition.source_identities_by_filename.clone(),
-            )
-        });
+        let incoming_transition = self
+            .incoming_transition
+            .as_ref()
+            .map(|transition| {
+                Ok::<_, String>(LoadingTransitionDefinition::with_source_table(
+                    transition.implementation,
+                    transition.inputs.clone(),
+                    transition.outputs.clone(),
+                    transition.definition_source.clone(),
+                    transition
+                        .source_identities_by_filename
+                        .capture(&mut publication_work)?,
+                ))
+            })
+            .transpose()
+            .map_err(|e| starlark::Error::new_other(anyhow::Error::msg(e)))?;
         let heap = eval.heap();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
@@ -8439,12 +8477,12 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                             }
                             (false, None, Some(transition)) => {
                                 AttributeDependencyConfiguration::Starlark(
-                                    LoadingTransitionDefinition::new(
+                                    LoadingTransitionDefinition::with_source_table(
                                         transition.implementation,
                                         transition.inputs.clone(),
                                         transition.outputs.clone(),
                                         transition.definition_source.clone(),
-                                        transition.source_identities_by_filename.clone(),
+                                        transition.source_identities_by_filename.capture(&mut publication_work).map_err(anyhow::Error::msg)?,
                                     ),
                                 )
                             }
@@ -8894,10 +8932,11 @@ fn invoke_rule_label_computed_default(
             allocate_macro_attribute(attribute.value.as_ref(), module.heap())
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    let bzl = BzlEvaluationContext::macro_runtime_context(
+    let bzl = BzlEvaluationContext::macro_runtime_context_with_table(
         (*definition.definition_source).clone(),
-        definition.source_identities_by_filename.clone(),
-    );
+        &definition.source_identities_by_filename,
+    )
+    .map_err(anyhow::Error::msg)?;
     let context = MacroEvaluationContext { recorder, bzl };
     let result = {
         let mut evaluator = Evaluator::new(&module);
@@ -8959,10 +8998,11 @@ fn invoke_rule_outputs_callback(
             allocate_macro_attribute(attribute.value.as_ref(), module.heap())
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    let bzl = BzlEvaluationContext::macro_runtime_context(
+    let bzl = BzlEvaluationContext::macro_runtime_context_with_table(
         (*definition.definition_source).clone(),
-        definition.source_identities_by_filename.clone(),
-    );
+        &definition.source_identities_by_filename,
+    )
+    .map_err(anyhow::Error::msg)?;
     let context = MacroEvaluationContext { recorder, bzl };
     let result = {
         let mut evaluator = Evaluator::new(&module);
@@ -9180,10 +9220,11 @@ fn invoke_symbolic_macro<'v>(
     };
 
     let module = starlark::environment::Module::new();
-    let bzl = BzlEvaluationContext::macro_runtime_context(
+    let bzl = BzlEvaluationContext::macro_runtime_context_with_table(
         (*definition.definition_source).clone(),
-        definition.source_identities_by_filename.clone(),
-    );
+        &definition.source_identities_by_filename,
+    )
+    .map_err(anyhow::Error::msg)?;
     let context = MacroEvaluationContext { recorder, bzl };
     let result = {
         let mut macro_eval = Evaluator::new(&module);
@@ -9441,15 +9482,20 @@ fn symbolic_macro_global<'v>(
     Ok(SymbolicMacroDefinitionGen {
         implementation,
         definition_source: Arc::new(context.source_identity_for_call(eval)?.clone()),
-        source_identities_by_filename: context.source_identities_by_filename(),
+        source_identities_by_filename: context.source_table().map_err(anyhow::Error::msg)?,
         attributes: attributes.into(),
         documentation,
         exported_name: OnceCell::new(),
     })
 }
 
-#[starlark_module]
 pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
+    package_globals_impl(builder);
+    environment_globals::provider_globals(builder);
+}
+
+#[starlark_module]
+fn package_globals_impl(builder: &mut GlobalsBuilder) {
     fn repository_rule<'v>(
         implementation: Value<'v>,
         #[starlark(require = named)] attrs: Option<Value<'v>>,
@@ -9991,7 +10037,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         }
         let incoming_transition = cfg
             .map(|value| {
-                transition_definition_from_value(value).ok_or_else(|| {
+                transition_definition_from_value(value)?.ok_or_else(|| {
                     anyhow::anyhow!(
                         "`cfg` must be set to a transition object initialized by the transition() function."
                     )
@@ -10100,7 +10146,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             declared_exec_groups: declared_exec_groups(exec_groups)?,
             named_exec_transition_attributes,
             definition_source: Arc::new(context.source_identity_for_call(eval)?.clone()),
-            source_identities_by_filename: context.source_identities_by_filename(),
+            source_identities_by_filename: context.source_table().map_err(anyhow::Error::msg)?,
             required_toolchains: toolchain_requirements(toolchains, eval)?,
             advertised_providers: advertised_provider_ids(provides, "rule provides")?,
             required_fragments: required_configuration_fragments(fragments),
@@ -10118,14 +10164,6 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         })
     }
 
-    fn provider<'v>(
-        doc: Option<Value<'v>>,
-        #[starlark(require = named)] fields: Option<Value<'v>>,
-        #[starlark(require = named)] init: Option<Value<'v>>,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> anyhow::Result<Value<'v>> {
-        user_provider_from_arguments(doc, fields, init, eval)
-    }
     fn transition<'v>(
         #[starlark(require = named)] implementation: StarlarkCallable<'v>,
         #[starlark(require = named)] inputs: UnpackListOrTuple<&str>,
@@ -10146,7 +10184,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             inputs,
             outputs,
             definition_source: Arc::new(source.clone()),
-            source_identities_by_filename: context.source_identities_by_filename(),
+            source_identities_by_filename: context.source_table().map_err(anyhow::Error::msg)?,
         })
     }
 }
@@ -10958,79 +10996,13 @@ fn build_genrule_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
-fn complete_loading_globals(
-    bool_config: bool,
-    bzlmod_native: bool,
-    source: Option<&CanonicalLabel>,
-) -> Globals {
-    let mut globals = GlobalsBuilder::new();
-    populate_universe(&mut globals);
-    package_globals(&mut globals);
-    select_globals(&mut globals);
-    LibraryExtension::Json.add(&mut globals);
-    if bzlmod_native {
-        globals.set("native", BzlmodNativeModule);
-    } else if bool_config {
-        globals.set("native", BzlNativeModule);
-    } else {
-        globals.set("native", NativeModule);
-    }
-    globals.set("attr", AttrModule);
-    if bool_config {
-        LibraryExtension::StructType.add(&mut globals);
-        bzl_only_globals(&mut globals);
-        bzl_visibility_globals(&mut globals);
-        globals.set(
-            "proto_common_do_not_use",
-            AllocStruct([("INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION", true)]),
-        );
-        globals.set("config", ConfigModule);
-        globals.set("config_common", ConfigCommonModule);
-        aspect_globals(&mut globals);
-        apple_common_globals(&mut globals);
-        cc_common_globals(&mut globals);
-        globals.set("java_common", JavaCommonModule);
-        label_globals(&mut globals);
-        testing_bootstrap_globals(&mut globals);
-        globals.set("OutputGroupInfo", OutputGroupInfo);
-        globals.set("RunEnvironmentInfo", RunEnvironmentInfo);
-        globals.set(
-            "PackageSpecificationInfo",
-            BuiltinProviderKey::new("PackageSpecificationInfo"),
-        );
-        globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
-        if let Some(source) = source {
-            populate_if_allowed(&mut globals, source);
-        }
-    } else {
-        globals.set("config", BuildFileConfigModule);
-        build_genrule_globals(&mut globals);
-        build_module_metadata_globals(&mut globals);
-    }
-    globals.set("platform_common", PlatformCommonModule);
-    globals.set("depset", AnalysisBuiltinCallable::new("depset"));
-    globals.build()
-}
-
-pub(crate) fn loading_globals() -> Globals {
-    complete_loading_globals(true, false, None)
-}
-
-pub(crate) fn bzlmod_loading_globals() -> Globals {
-    complete_loading_globals(true, true, None)
-}
-
-pub(crate) fn loading_globals_for_source(source: &CanonicalLabel) -> Globals {
-    complete_loading_globals(true, false, Some(source))
-}
-
-pub(crate) fn bzlmod_loading_globals_for_source(source: &CanonicalLabel) -> Globals {
-    complete_loading_globals(true, true, Some(source))
-}
-
-pub(crate) fn build_file_loading_globals() -> Globals {
-    complete_loading_globals(false, false, None)
-}
+mod environment_globals;
+pub(crate) use environment_globals::build_file_loading_globals;
+pub(crate) use environment_globals::bzlmod_loading_globals;
+pub(crate) use environment_globals::bzlmod_loading_globals_for_source;
+pub(crate) use environment_globals::loading_globals;
+pub(crate) use environment_globals::loading_globals_for_source;
+pub(crate) use environment_globals::populate_bzl_environment_globals;
 
 #[cfg(test)]
 mod module_extension_definition_tests {
@@ -13105,5 +13077,9 @@ ext = module_extension(
 /// Actual source-independent Loading native registration table. Consumers must
 /// compare genuine Engine native wrappers and retain their actual defaults.
 pub fn callable_registration_globals() -> Globals {
-    loading_globals()
+    environment_globals::callable_registration_globals()
 }
+
+#[cfg(test)]
+#[path = "package/source_table_tests.rs"]
+mod source_table_tests;

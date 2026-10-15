@@ -1,6 +1,7 @@
 //! Source authority belongs to the actual original module, not its display path.
 use std::sync::Arc;
 
+use slug_build_api_v2::CallableEnvironmentBinding;
 use slug_build_api_v2::CallableModuleIdentity;
 use slug_build_api_v2::CallableModuleSource;
 use slug_build_api_v2::CallableSourceAuthority;
@@ -8,6 +9,7 @@ use slug_build_api_v2::CallableSourceAuthorityData;
 use slug_build_api_v2::published_value::PublishedValueArenaBuilder;
 use slug_loading_v2::BzlLoadManifest;
 use slug_loading_v2::BzlModuleIdentity;
+use slug_loading_v2::defining_module_source_context;
 use slug_loading_v2::defining_module_source_manifest;
 use starlark::codemap::CodeMap;
 use starlark::values::Value;
@@ -23,7 +25,9 @@ pub(super) struct SourceAuthorities<'v> {
     memo: memo::SourceMemo<'v>,
     mappings: conversion::MappingAudits,
 }
+mod manifest;
 mod memo;
+use manifest::SourceManifest;
 impl<'v> SourceAuthorities<'v> {
     fn complete<T>(
         &mut self,
@@ -85,8 +89,14 @@ impl<'v> SourceAuthorities<'v> {
     ) -> Result<CallableSourceAuthority, String> {
         let client_data =
             client_data.ok_or("Args callback requires actual original-module source metadata")?;
-        let manifest = defining_module_source_manifest(client_data)
-            .ok_or("Args callback original-module metadata has no tracked source manifest")?;
+        let manifest =
+            if let Some(context) = defining_module_source_context(client_data) {
+                SourceManifest::Effective(context)
+            } else {
+                SourceManifest::Raw(defining_module_source_manifest(client_data).ok_or(
+                    "Args callback original-module metadata has no tracked source manifest",
+                )?)
+            };
         // Each incoming root proof lookup is charged even on a memo hit.
         step(builder, remaining)?;
         if let Some(authority) = self.memo.root(client_data, code) {
@@ -94,9 +104,9 @@ impl<'v> SourceAuthorities<'v> {
         }
         let digest = self.digest(code, builder, remaining)?;
         let mut verified = false;
-        for source in &*manifest.reachable {
+        for source in manifest.reachable() {
             step(builder, remaining)?;
-            if source.identity == manifest.root && source.source_digest == digest {
+            if source.identity == *manifest.root() && source.source_digest == digest {
                 verified = true;
                 break;
             }
@@ -110,7 +120,7 @@ impl<'v> SourceAuthorities<'v> {
         let new_module = cached.is_none();
         let authority = match cached {
             Some(authority) => authority,
-            None => convert(manifest, &mut self.mappings, builder, remaining)?,
+            None => conversion::convert_manifest(manifest, &mut self.mappings, builder, remaining)?,
         };
         let new_member = !self.memo.member(&authority, code);
         // Root success implies membership, but not vice versa. Preflight all
@@ -206,11 +216,12 @@ fn step(builder: &mut PublishedValueArenaBuilder, remaining: &mut usize) -> Resu
 fn identity(source: &BzlModuleIdentity) -> CallableModuleIdentity {
     CallableModuleIdentity {
         label: source.label.clone(),
-        workspace_path: source.workspace_path.clone(),
+        source: source.source.clone(),
         repository_mapping: source.repository_mapping.clone(),
     }
 }
 mod conversion;
+#[cfg(test)]
 use conversion::convert;
 
 #[cfg(test)]

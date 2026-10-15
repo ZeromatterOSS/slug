@@ -42,7 +42,7 @@ const TOP_LEVELS: &[&str] = &[
 fn owner(label: &str) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
-        workspace_path: label.into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(label.into()),
         repository_mapping: Arc::from([]),
     }
 }
@@ -53,7 +53,12 @@ fn freeze_with_loader(
     loader: Option<&dyn FileLoader>,
 ) -> Result<FrozenModule, String> {
     let ast = AstModule::parse(
-        identity.workspace_path.to_string_lossy().as_ref(),
+        identity
+            .source
+            .workspace_path()
+            .expect("workspace fixture source")
+            .to_string_lossy()
+            .as_ref(),
         source.to_owned(),
         &Dialect::Bazel,
     )

@@ -19,7 +19,7 @@ pub(super) struct SourcePreparations {
 /// A trusted native producer's borrowed complete source-output admission.
 ///
 /// R plus transfer scratch stays fully paid; complete final Q must fit R.
-/// This proves payment in this builder and
+/// Successful finish also pays complete native constructor work. This proves payment in this builder and
 /// binds it to the exact successfully validated authority allocation, not the
 /// completeness of an arbitrary Rust caller's pre-copy forecast. Abandonment
 /// poisons the builder, including after an ignored error. No credit transfers.
@@ -27,6 +27,7 @@ pub(super) struct SourcePreparations {
 pub struct PublicationSourcePreparation<'a> {
     builder: &'a mut PublishedValueArenaBuilder,
     retained_output: usize,
+    identity_bound: usize,
     next_credit: usize,
     finished: bool,
 }
@@ -34,13 +35,18 @@ impl PublishedValueArenaBuilder {
     /// Admit complete final output and the reviewed consumed Vec backings.
     /// `retained_output` must cover full constructor Q; `output_transfer` may
     /// classify only temporary backing, never moved elements or source payload.
+    /// `identity_bound` prepays the complete native audit memo before output
+    /// clones and is checked against actual Data before its allocation.
     pub fn begin_source_authority(
         &mut self,
         retained_output: usize,
         output_transfer: usize,
         mapping_scratch: usize,
+        identity_bound: usize,
     ) -> Result<PublicationSourcePreparation<'_>, PublishedValueError> {
         let result = (|| {
+            let audit_scratch =
+                CallableSourceAuthority::publication_audit_scratch_bytes(identity_bound)?;
             let count = self
                 .source_preparations
                 .paid
@@ -59,6 +65,7 @@ impl PublishedValueArenaBuilder {
             };
             let scratch = output_transfer
                 .checked_add(mapping_scratch)
+                .and_then(|n| n.checked_add(audit_scratch))
                 .and_then(|n| n.checked_add(header))
                 .and_then(|n| n.checked_add(size_of::<PublicationSourcePreparation<'_>>()))
                 .and_then(|n| {
@@ -85,6 +92,7 @@ impl PublishedValueArenaBuilder {
             Ok(next_credit) => Ok(PublicationSourcePreparation {
                 builder: self,
                 retained_output,
+                identity_bound,
                 next_credit,
                 finished: false,
             }),
@@ -94,7 +102,9 @@ impl PublishedValueArenaBuilder {
             }
         }
     }
-    pub(super) fn prepaid_source_bytes(
+    // A committed entry proves BOTH Q payment and completed native work,
+    // tied to this exact authority allocation in this builder.
+    pub(super) fn prepared_source_audit(
         &mut self,
         source: &CallableSourceAuthority,
     ) -> Result<Option<usize>, PublishedValueError> {
@@ -135,11 +145,13 @@ impl PublicationSourcePreparation<'_> {
         if self.builder.failed_budget {
             return Err(PublishedValueError::Limit("poisoned source preparation"));
         }
-        // Own the validated Data and Q together until the full retained-R check passes.
-        let data = CallableSourceAuthority::prepare(data).map_err(|error| match error {
-            crate::CallableGraphError::Limit(kind) => PublishedValueError::Limit(kind),
-            _ => PublishedValueError::Invalid("source authority data"),
-        })?;
+        // The complete maximum memo peak was paid before returning this token.
+        // Actual native work is charged before each operation; this entry cannot
+        // be minted from byte payment alone or from a foreign constructor.
+        let data =
+            CallableSourceAuthority::prepare_for_publication(data, self.identity_bound, || {
+                self.builder.charge_visit()
+            })?;
         let bytes = data.byte_cost();
         if bytes > self.retained_output {
             return Err(PublishedValueError::Invalid(

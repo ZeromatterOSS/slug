@@ -142,8 +142,35 @@ fn retained_records_cover_ordered_metadata_inline_edges_and_hidden_certificates(
         3 + native_count,
     ];
     assert_eq!(rows.len(), expected.len());
-    for (row, expected) in rows.into_iter().zip(expected) {
-        assert_eq!(count(&[Some(row)], &[edge]).unwrap(), expected);
+    for (index, (row, expected)) in rows.into_iter().zip(expected).enumerate() {
+        let source_count = match &row {
+            PublishedNode::Function(function) => function.code.source.fact_count(),
+            PublishedNode::Code(code) => code.source.fact_count(),
+            _ => 0,
+        };
+        let native_count = match index {
+            11 => files_count,
+            12 => provider_count,
+            15 => native_count,
+            _ => 0,
+        };
+        let (facts, _) = local_visits(
+            &[Some(row)],
+            &[edge],
+            &[None],
+            &[],
+            0,
+            0,
+            &mut 0,
+            &mut 0,
+            &mut 0,
+            &mut false,
+        )
+        .unwrap();
+        assert_eq!(facts.total, expected);
+        assert_eq!(facts.source, source_count);
+        assert_eq!(facts.native, native_count);
+        assert_eq!(facts.source + facts.native + facts.other(), expected);
     }
     let plain = PublishedNode::Provider(PublishedProvider {
         identity: crate::ProviderIdentity::builtin("ToolchainInfo"),

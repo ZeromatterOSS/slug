@@ -3,7 +3,9 @@ use super::*;
 fn identity(name: &str) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(&format!("@@rules_cc+//cc/private:{name}.bzl")).unwrap(),
-        workspace_path: format!("/fixtures/{name}.bzl").into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(
+            format!("/fixtures/{name}.bzl").into(),
+        ),
         repository_mapping: Arc::from([]),
     }
 }
@@ -25,7 +27,11 @@ fn evaluated_child(source: &str) -> FrozenBzlModule {
     FrozenBzlModule {
         semantic_inputs: None,
         module: module.freeze().unwrap(),
-        path: identity.workspace_path,
+        path: identity
+            .source
+            .workspace_path()
+            .expect("workspace fixture source")
+            .to_path_buf(),
         loads: vec![],
         manifest: prepared.manifest().clone(),
         bzl_load_visibility: BzlLoadVisibility::default(),

@@ -574,10 +574,11 @@ pub use registry_dice::RegistryRefusalScopeFailure;
 #[doc(hidden)]
 pub use registry_dice::RegistryRefusalSite;
 #[doc(hidden)]
+pub use selected_repo_spec::HostModuleExtensionUsageScope;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionImport;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequest;
-#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequests;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsError;

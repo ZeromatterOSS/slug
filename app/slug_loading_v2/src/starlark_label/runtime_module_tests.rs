@@ -19,7 +19,7 @@ fn identity(label: &str, mapped: &str) -> BzlModuleIdentity {
     BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
         // Deliberately identical filenames do not imply identical module identity.
-        workspace_path: PathBuf::from("/same/defs.bzl"),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from("/same/defs.bzl")),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("alias").unwrap(),
             CanonicalRepoName::new(mapped).unwrap(),

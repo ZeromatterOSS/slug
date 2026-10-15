@@ -102,3 +102,14 @@ host; use the branch/commit, not that path, as durable identity. Nothing is
 pushed or accepted by preservation. Reconcile main's later prerequisites before
 resuming evidence. Production integration omits preservation metadata and
 requires all gates in the current Stage 5/6 fixture ledger.
+
+## October 15 WP1222 scoped builtin Apple/version acceptance
+
+[WP1222 acceptance](slug-v2-subplans/wp1222-general-builtin-apple-exports-acceptance-2026-10-15.json)
+records the original six-file Apple export/version family and its generic guarded
+publication/source/mapping prerequisites. The prepared diagnostic Rust cquery
+completed with equivalent output (67.425s, 340,924 KiB); both FULL checks and
+actual 74-file preservation pass. Exact owned source/document atomic integration
+is pending. Repository/resource/build-info adapters, authentic Rust/M7A/M8,
+action/REAPI, Stage10 and whole-goal memory fit remain open; this scope does not
+select successor implementation.

@@ -104,7 +104,7 @@ fn scratch_provenance_no_publication(
     );
 }
 
-const SCRATCH_PROVENANCE_LABEL_MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='//pkg:missing')\nuse_repo(e, proof='proof')\n";
+const SCRATCH_PROVENANCE_LABEL_MODULE: &str = "module(name='consumer')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='//pkg:missing')\nuse_repo(e, proof='proof')\n";
 const SCRATCH_PROVENANCE_LABEL_EXTENSION: &str = r#"
 path_tag=tag_class(attrs={'file':attr.label()})
 def impl(ctx):
@@ -247,7 +247,7 @@ async fn selected_scratch_label_provenance_need_replay_and_typed_arguments() {
     ));
 }
 
-const SCRATCH_PROVENANCE_DOWNLOAD_MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+const SCRATCH_PROVENANCE_DOWNLOAD_MODULE: &str = "module(name='consumer')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
 const SCRATCH_PROVENANCE_DOWNLOAD_BYTES: &[u8] = b"normal selected downloaded generator";
 fn scratch_provenance_download_extension() -> String {
     let checksum = format!("{:x}", Sha256::digest(SCRATCH_PROVENANCE_DOWNLOAD_BYTES));

@@ -86,7 +86,7 @@ fn evaluate_module(
             "@@//ordinary:toolchain_config_methods.bzl"
         })
         .unwrap(),
-        workspace_path: PathBuf::from(FILE),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(FILE)),
         repository_mapping: Arc::from([]),
     };
     let ast = AstModule::parse(FILE, source.to_owned(), &Dialect::Bazel)

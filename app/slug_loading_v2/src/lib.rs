@@ -10,7 +10,6 @@
 
 #[doc(hidden)]
 pub mod analysis_fragments;
-mod apple_common;
 mod artifact_root;
 #[doc(hidden)]
 pub use artifact_root::alloc_artifact_root;
@@ -23,6 +22,9 @@ pub use artifact_root::artifact_root_value;
 pub use artifact_root::artifact_root_value_ref;
 pub mod attrs;
 mod builtin_restriction;
+pub(crate) mod bzl_environment;
+pub use bzl_environment::BzlEnvironmentSourceBinding;
+pub use bzl_environment::BzlModuleSourceContext;
 pub mod bzl_module;
 mod bzl_visibility;
 mod canonical_repository_load_route;
@@ -40,7 +42,10 @@ pub mod cc_context;
 mod cc_features;
 mod cc_header_info;
 mod cc_variables;
+mod dotted_version;
 mod evaluator_roots;
+pub use dotted_version::alloc_frozen_dotted_version;
+pub use dotted_version::dotted_version_ref;
 pub mod function_owner;
 pub use cc_variables::CcVariablesHeader;
 #[doc(hidden)]
@@ -82,6 +87,7 @@ mod host_package_inventory;
 mod host_package_inventory_tests;
 pub mod keys;
 pub mod load_label;
+mod source_table;
 mod module_extension;
 mod module_extension_innate_repository;
 mod module_extension_repository_file_effect;
@@ -103,6 +109,7 @@ mod root_subtree_package_set;
 pub mod rule_outputs;
 mod starlark_label;
 pub use starlark_label::defining_module_identity;
+pub use starlark_label::defining_module_source_context;
 pub use starlark_label::defining_module_source_manifest;
 mod subrule;
 #[doc(hidden)]
@@ -115,7 +122,6 @@ mod testing_bootstrap;
 mod testing_bootstrap_tests;
 mod transition;
 pub mod visibility;
-mod xcode_version_info;
 
 pub use attrs::AttributeKind;
 pub use attrs::AttributeProvenance;

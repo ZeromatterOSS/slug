@@ -178,6 +178,15 @@ impl HostCanonicalRepositoryRoute {
         }
     }
 
+    /// Borrow the actual builtin producer until its complete copy is admitted.
+    #[doc(hidden)]
+    pub fn builtin_repository_mapping(&self) -> Option<&HostBuiltinBazelToolsRepositoryMapping> {
+        match &self.source {
+            HostCanonicalRepositoryRouteSource::Builtin(builtin) => Some(&builtin.mapping),
+            _ => None,
+        }
+    }
+
     /// Complete final mapping consumed by the generic Starlark evaluator.
     #[doc(hidden)]
     pub fn bzl_repository_mapping(&self) -> Arc<[(ApparentRepoName, CanonicalRepoName)]> {

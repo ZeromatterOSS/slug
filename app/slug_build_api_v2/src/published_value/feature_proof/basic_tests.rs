@@ -3,7 +3,7 @@ use compact_str::CompactString;
 use super::*;
 use crate::cc_features::*;
 
-fn features(name: CompactString) -> CcToolchainFeatures {
+pub(in crate::published_value) fn features(name: CompactString) -> CcToolchainFeatures {
     CcToolchainFeatures::new(
         vec![CcFeature {
             name,

@@ -1,5 +1,4 @@
 //! Selected Local owner invocation keeps original inputs, epochs and child failures.
-use dice::DetectCycles;
 use dice::Dice;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsKey;
 use slug_bzlmod_v2::HostSelectedExtensionDemandKey;
@@ -12,9 +11,12 @@ use crate::bzl_module::local_extension_definition_tests as fixture;
 async fn owner(tx: &mut dice::DiceTransaction) -> Arc<HostSelectedExtensionOwner> {
     let workspace = NormalizedAbsolutePath::new(fixture::WORKSPACE).unwrap();
     let SourcePreparationOutcome::Complete(requests) = tx
-        .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
-            workspace.dupe(),
-        ))
+        .compute(
+            &HostSelectedExtensionDefinitionLoadRequestsKey::new_with_scope(
+                workspace.dupe(),
+                slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+            ),
+        )
         .await
         .unwrap()
     else {
@@ -45,15 +47,21 @@ fn child(marker: &str) -> String {
 
 #[tokio::test]
 async fn selected_command_local_owner_dispatch_preserves_need_and_observations() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let root = format!("{}/local", fixture::WORKSPACE);
     let extension = fixture::extension("local");
     let a = child("A");
     let (mut tx, epoch) = fixture::transaction(&dice, &root, &extension, Some(&a), true).await;
     let owner = owner(&mut tx).await;
     let workspace = NormalizedAbsolutePath::new(fixture::WORKSPACE).unwrap();
-    let aggregate_key = HostPureModuleExtensionInvocationsObservationKey::new(workspace.dupe());
-    let aggregate_legacy_key = HostPureModuleExtensionInvocationsKey::new(workspace.dupe());
+    let aggregate_key = HostPureModuleExtensionInvocationsObservationKey::new_with_scope(
+        workspace.dupe(),
+        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+    );
+    let aggregate_legacy_key = HostPureModuleExtensionInvocationsKey::new_with_scope(
+        workspace.dupe(),
+        slug_bzlmod_v2::HostModuleExtensionUsageScope::RootUsages,
+    );
     let observed_key =
         HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner.dupe());
     let legacy_key = HostSelectedExtensionOwnerPureKey::new(workspace.dupe(), owner.dupe());

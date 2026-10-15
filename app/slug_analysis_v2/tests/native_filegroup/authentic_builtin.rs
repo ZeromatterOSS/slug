@@ -65,20 +65,23 @@ impl BuiltinWorkspace {
         target: &str,
         configuration: ConfigurationKey,
     ) -> Result<Arc<ConfiguredNodeResult>, String> {
-        let mut updater = dice.updater_with_data(UserComputationData {
+        let epoch = root_epoch(&self.0);
+        let repositories = builtin_fixture::local_repositories(&self.0);
+        let repositories = repositories
+            .iter()
+            .map(|(canonical, path)| (canonical.as_str(), path.as_str()))
+            .collect::<Vec<_>>();
+        let mut data = UserComputationData {
             activation_tracker: Some(Arc::new(RootActivationTracker::default())),
             cycle_detector: Some(analysis_cycle_detector()),
             ..Default::default()
-        });
-        // The ordinary helper installs a local bazel_tools override. This
-        // request must instead use the immutable Bazel 9.2 built-in route.
-        inject_root_target_inputs_with_policy(
-            &mut updater,
-            &self.0,
-            root_epoch(&self.0),
-            REPOSITORIES,
-            false,
-        );
+        };
+        let host = builtin_fixture::RepositoryHostInputs::prepare(&self.0, &mut data);
+        let mut updater = dice.updater_with_data(data);
+        host.inject(&mut updater);
+        // Use the actual declared local inputs while retaining the immutable
+        // Bazel 9.2 built-in route, rather than a local bazel_tools override.
+        inject_root_target_inputs_with_policy(&mut updater, &self.0, epoch, &repositories, false);
         let mut transaction = updater.commit().await;
         let key = ConfiguredNodeAnalysisObservationKey::new(
             NormalizedAbsolutePath::new(self.0.clone()).unwrap(),
@@ -117,24 +120,6 @@ const MODULES: &[(&str, &str)] = &[
     ("rules_apple", "4.1.0"),
     ("rules_swift", "3.1.2"),
     ("abseil-cpp", "20250814.1"),
-];
-
-const REPOSITORIES: &[(&str, &str)] = &[
-    ("rules_license+", "rules_license"),
-    ("buildozer+", "buildozer"),
-    ("platforms", "platforms"),
-    ("platforms+", "platforms"),
-    ("zlib+", "zlib"),
-    ("bazel_features+", "bazel_features"),
-    ("protobuf+", "protobuf"),
-    ("rules_java+", "rules_java"),
-    ("rules_cc+", "rules_cc"),
-    ("rules_python+", "rules_python"),
-    ("rules_shell+", "rules_shell"),
-    ("apple_support+", "apple_support"),
-    ("rules_apple+", "rules_apple"),
-    ("rules_swift+", "rules_swift"),
-    ("abseil-cpp+", "abseil-cpp"),
 ];
 
 impl Drop for BuiltinWorkspace {

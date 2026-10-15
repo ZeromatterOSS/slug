@@ -16,7 +16,9 @@ fn unchanged_repo_relative_path_uses_genuine_source_generated_and_shared_solib_r
                 "@@rules_cc+//cc/private/compile:cc_compilation_helper.bzl",
             )
             .unwrap(),
-            workspace_path: PathBuf::from("/rules_cc/cc/private/compile/cc_compilation_helper.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/rules_cc/cc/private/compile/cc_compilation_helper.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_skylib").unwrap(),
                 CanonicalRepoName::new("bazel_skylib+").unwrap(),

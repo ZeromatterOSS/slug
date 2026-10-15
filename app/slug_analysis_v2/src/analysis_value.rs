@@ -734,11 +734,6 @@ impl<'a> AnalysisValueMaterializer<'a> {
     ) -> Result<FrozenValue, String> {
         let mut fields = SmallMap::new();
         match value {
-            ProviderValue::XcodeVersionInfo(_) => {
-                return Ok(slug_loading_v2::provider::alloc_default_xcode_version_info(
-                    self.heap,
-                ));
-            }
             ProviderValue::FeatureFlagInfo(info) => {
                 return Ok(slug_loading_v2::provider::alloc_frozen_feature_flag_info(
                     self.heap,
@@ -889,6 +884,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
                     self.heap,
                     fragment.clone(),
                 )
+            }
+            AnalysisValueKind::DottedVersion(version) => {
+                slug_loading_v2::alloc_frozen_dotted_version(self.heap, version.clone())
             }
             AnalysisValueKind::CcToolchainVariables(value) => self.cc_variables(value)?,
             AnalysisValueKind::CcHeaderInfo(info) => {
@@ -1220,6 +1218,9 @@ impl<'v> AnalysisValueLowerer<'v> {
         if let Some(info) = crate::package_specification::from_value(value) {
             return Ok(AnalysisValue::package_specification_info(info));
         }
+        if let Some(version) = slug_loading_v2::dotted_version_ref(value) {
+            return Ok(AnalysisValue::dotted_version(version.clone()));
+        }
         if let Some(fragment) = slug_loading_v2::analysis_fragments::cpp_fragment_value(value) {
             return Ok(AnalysisValue::cpp_fragment(fragment));
         }
@@ -1350,8 +1351,6 @@ mod tests {
     use slug_build_api_v2::PlatformInfo;
     use slug_build_api_v2::ProviderId;
     use slug_build_api_v2::RunEnvironmentInfo;
-    use slug_loading_v2::provider::DeclarationOnlyAppleProviderKey;
-    use slug_loading_v2::provider::DeclarationOnlyAppleProviderKind;
     use slug_loading_v2::provider::alloc_starlark_provider_callable;
     use slug_loading_v2::provider::starlark_provider_identity;
     use starlark::values::list::ListRef;
@@ -1859,84 +1858,6 @@ mod tests {
                 );
             });
         }
-    }
-
-    #[test]
-    fn apple_provider_key_lookup_requires_typed_xcode_and_rejects_objc() {
-        let occurrence = |name| {
-            ProviderValue::Occurrence(ProviderOccurrence::empty(ProviderIdentity::builtin(name)))
-        };
-        assert!(matches!(
-            ProviderCollection::new(vec![
-                ProviderValue::DefaultInfo(DefaultInfo::empty()),
-                occurrence("XcodeVersionInfo"),
-            ]),
-            Err(slug_build_api_v2::ProviderError::InvalidXcodeVersionInfoOccurrence)
-        ));
-        let providers = ProviderCollection::new(vec![
-            ProviderValue::DefaultInfo(DefaultInfo::empty()),
-            occurrence("ObjcInfo"),
-            ProviderValue::XcodeVersionInfo(
-                slug_build_api_v2::XcodeVersionInfo::default_empty_version(),
-            ),
-        ])
-        .unwrap();
-        let retained = ConfiguredTargetValue::new(
-            AnalysisConfiguredTargetKey::new(
-                slug_identity_v2::CanonicalLabel::parse("@@//:apple").unwrap(),
-                [4, 5, 6],
-            ),
-            providers,
-        );
-        let heap = FrozenHeap::new();
-        let value = AnalysisValueMaterializer::new(&heap)
-            .target(&retained)
-            .unwrap();
-        let target = AnalysisConfiguredTargetValue::from_value(value.to_value()).unwrap();
-        for kind in [DeclarationOnlyAppleProviderKind::ObjcInfo] {
-            let key = heap.alloc(DeclarationOnlyAppleProviderKey(kind));
-            let expected = format!(
-                "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
-                kind.names().1
-            );
-            assert_eq!(
-                target.is_in(key.to_value()).unwrap_err().to_string(),
-                expected
-            );
-            Heap::temp(|scratch| {
-                assert_eq!(
-                    target.at(key.to_value(), scratch).unwrap_err().to_string(),
-                    expected
-                )
-            });
-        }
-        let xcode = heap.alloc(DeclarationOnlyAppleProviderKey(
-            DeclarationOnlyAppleProviderKind::XcodeVersionInfo,
-        ));
-        assert!(target.is_in(xcode.to_value()).unwrap());
-        let expected_xcode = target
-            .providers
-            .get(&ProviderIdentity::builtin("XcodeVersionInfo"))
-            .unwrap()
-            .to_value();
-        Heap::temp(|scratch| {
-            assert!(
-                target
-                    .at(xcode.to_value(), scratch)
-                    .unwrap()
-                    .ptr_eq(expected_xcode)
-            );
-        });
-        let present = alloc_starlark_provider_callable(&heap, "DefaultInfo").unwrap();
-        let absent = alloc_starlark_provider_callable(&heap, "ToolchainInfo").unwrap();
-        assert!(target.is_in(present.to_value()).unwrap());
-        assert!(!target.is_in(absent.to_value()).unwrap());
-        assert!(!target.is_in(Value::new_none()).unwrap());
-        Heap::temp(|scratch| {
-            assert!(target.at(present.to_value(), scratch).is_ok());
-            assert!(target.at(absent.to_value(), scratch).is_err());
-            assert!(target.at(Value::new_none(), scratch).is_err());
-        });
     }
 
     #[test]

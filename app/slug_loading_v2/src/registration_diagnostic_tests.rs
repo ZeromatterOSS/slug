@@ -27,10 +27,10 @@ async fn owner_fixture(
 
     use crate::module_extension_repository_instantiation::tests::WORKSPACE;
     use crate::module_extension_repository_instantiation::tests::transaction_untracked;
-    let dice = Arc::new(dice::Dice::builder().build(dice::DetectCycles::Enabled));
-    let ordinary = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, first='first')\n";
+    let dice = crate::canonical_repository_route_tests::tests::generated_graph_dice();
+    let ordinary = "module(name='consumer')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, first='first')\n";
     let innate_module =
-        "module(name='bazel_tools')\nr=use_repo_rule('//:ext.bzl','repo')\nr(name='first')\n";
+        "module(name='consumer')\nr=use_repo_rule('//:ext.bzl','repo')\nr(name='first')\n";
     let extension = "repo=repository_rule(lambda ctx:None)\ndef impl(ctx):\n    repo(name='first')\next=module_extension(implementation=impl)\n";
     let mut tx = transaction_untracked(
         &dice,

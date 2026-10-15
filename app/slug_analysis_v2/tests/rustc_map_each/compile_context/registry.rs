@@ -18,7 +18,12 @@ use super::*;
 
 const REGISTRY: &str = "https://registry.invalid";
 
+mod version_inventory;
+
 pub(super) fn prepare_workspace(root: &std::path::Path) {
+    // Prepare the builtin source closure before establishing this fixture's
+    // deliberately selected-registry routes. Later snapshots only observe it.
+    builtin_fixture::prepare_if_ordinary(root);
     let path = root.join("MODULE.bazel");
     let original = fs::read_to_string(&path).unwrap();
     let mut module = original;
@@ -48,22 +53,60 @@ impl RegistryIo for FixtureRegistry {
     }
 }
 
-pub(super) fn dice(root: &std::path::Path) -> Arc<Dice> {
+// This fixture deliberately projects its authored synthetic MODULE declaration
+// version for each finite request from the actual prepared graph. Rule/program
+// bodies and all dependency/alias declarations remain byte-for-byte unchanged.
+fn registry_files(root: &std::path::Path) -> Vec<(String, Arc<[u8]>)> {
+    use std::collections::BTreeMap;
+    use std::collections::BTreeSet;
+
+    use slug_bzlmod_v2::ModuleFile;
+
+    let mut sources = vec![
+        fs::read_to_string(root.join("MODULE.bazel")).unwrap(),
+        include_str!("../../../../slug_bzlmod_v2/builtin/bazel_tools/MODULE.bazel").to_owned(),
+    ];
+    let mut paths = builtin_fixture::local_repositories(root)
+        .into_iter()
+        .map(|(_, path)| root.join(path).join("MODULE.bazel"))
+        .collect::<BTreeSet<_>>();
+    paths.extend(
+        REPOSITORIES
+            .iter()
+            .map(|(_, path)| root.join(path).join("MODULE.bazel")),
+    );
+    sources.extend(paths.iter().map(|path| fs::read_to_string(path).unwrap()));
+    let mut versions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut request = |name: &str, version: &str| {
+        if REPOSITORIES
+            .iter()
+            .any(|(_, repository)| *repository == name)
+        {
+            versions
+                .entry(name.to_owned())
+                .or_default()
+                .insert(version.to_owned());
+        }
+    };
+    for source in &sources {
+        for (name, version) in version_inventory::requests(source) {
+            request(&name, &version);
+        }
+    }
     let mut files = Vec::new();
     for (_, repository) in REPOSITORIES {
         let module = fs::read_to_string(root.join(repository).join("MODULE.bazel")).unwrap();
-        // Pinned builtin/bazel_tools/MODULE.bazel:37 requests rules_cc 0.2.17
-        // during discovery even though this fixture's root selects version 1.0.
-        // Serve that one additional metadata node, with its matching declaration;
-        // do not turn the offline transport into an arbitrary-version registry.
-        let versions: &[&str] = if *repository == "rules_cc" {
-            &["1.0", "0.2.17"]
-        } else {
-            &["1.0"]
-        };
-        for version in versions {
-            let declared = format!("module(name = '{repository}', version = '1.0')");
-            assert!(module.contains(&declared));
+        let parsed = ModuleFile::parse(&module).unwrap();
+        let header = parsed.module.unwrap();
+        assert_eq!(header.name, *repository);
+        let original_version = header.version.unwrap();
+        versions
+            .entry((*repository).to_owned())
+            .or_default()
+            .insert(original_version.clone());
+        let declared = format!("module(name = '{repository}', version = '{original_version}')");
+        assert!(module.contains(&declared));
+        for version in &versions[*repository] {
             let metadata = module.replacen(
                 &declared,
                 &format!("module(name = '{repository}', version = '{version}')"),
@@ -77,8 +120,15 @@ pub(super) fn dice(root: &std::path::Path) -> Arc<Dice> {
                 Arc::<[u8]>::from(format!(r#"{{"url":"https://origin.invalid/{repository}.tgz","integrity":"sha256-test"}}"#).into_bytes())));
         }
     }
+    files
+}
+
+pub(super) fn dice(root: &std::path::Path) -> Arc<Dice> {
     let mut builder = Dice::builder();
-    install_registry_io(&mut builder, Arc::new(FixtureRegistry(files)));
+    install_registry_io(
+        &mut builder,
+        Arc::new(FixtureRegistry(registry_files(root))),
+    );
     builder.build(DetectCycles::Enabled)
 }
 
@@ -127,7 +177,7 @@ pub(super) async fn request(
     configuration: ConfigurationKey,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
     let workspace = NormalizedAbsolutePath::new(root.to_path_buf()).unwrap();
-    let base = root_epoch(root);
+    let base = observation_epoch(root);
     let mut observations = base
         .observations()
         .iter()
@@ -153,19 +203,19 @@ pub(super) async fn request(
         }
     }
     let epoch = PathObservationEpoch::from_shared(observations).unwrap();
-    let builtins = BUILTIN_MODULES
+    let prepared_local = builtin_fixture::local_repositories(root);
+    let local = prepared_local
         .iter()
-        .map(|(name, _)| (format!("{name}+"), *name))
-        .collect::<Vec<_>>();
-    let local = builtins
-        .iter()
-        .map(|(canonical, directory)| (canonical.as_str(), *directory))
+        .map(|(canonical, directory)| (canonical.as_str(), directory.as_str()))
         .chain(HOST_PLATFORM_REPOSITORIES.iter().copied())
         .collect::<Vec<_>>();
-    let mut updater = dice.updater_with_data(UserComputationData {
+    let mut data = UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
-    });
+    };
+    let host = builtin_fixture::RepositoryHostInputs::prepare(root, &mut data);
+    let mut updater = dice.updater_with_data(data);
+    host.inject(&mut updater);
     inject_root_target_inputs_with_policy(&mut updater, root, epoch, &local, false);
     inject_registry_request_inputs(
         &mut updater,
@@ -253,4 +303,41 @@ pub(super) async fn request(
             .map_err(ToString::to_string),
         other => Err(format!("selected fixture analysis: {other:?}")),
     }
+}
+
+#[test]
+fn finite_registry_metadata_covers_actual_requested_versions_without_relocalizing_sources() {
+    // The complete compile-context fixture already selects registry routes.
+    let root = super::workspace();
+    let module_path = root.join("MODULE.bazel");
+    let before = fs::read(&module_path).unwrap();
+    let files = registry_files(&root);
+    let metadata = |name: &str, version: &str| {
+        let url = format!("{REGISTRY}/modules/{name}/{version}/MODULE.bazel");
+        let (_, bytes) = files.iter().find(|(key, _)| key == &url).unwrap();
+        slug_bzlmod_v2::ModuleFile::parse(std::str::from_utf8(bytes).unwrap()).unwrap()
+    };
+    for (name, version) in [
+        ("rules_cc", "1.0"),
+        ("rules_cc", "0.2.17"),
+        ("bazel_skylib", "1.0"),
+        ("bazel_skylib", "1.8.2"),
+    ] {
+        let header = metadata(name, version).module.unwrap();
+        assert_eq!(header.name, name);
+        assert_eq!(header.version.as_deref(), Some(version));
+    }
+    assert!(
+        !files
+            .iter()
+            .any(|(url, _)| url.contains("/bazel_skylib/999/"))
+    );
+    assert_eq!(fs::read(&module_path).unwrap(), before);
+    assert!(
+        !builtin_fixture::local_repositories(&root)
+            .iter()
+            .any(|(canonical, _)| REPOSITORIES
+                .iter()
+                .any(|(selected, _)| canonical == selected))
+    );
 }

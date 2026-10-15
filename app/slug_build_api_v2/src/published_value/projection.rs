@@ -321,7 +321,9 @@ pub(crate) fn validate_value(
             PublishedNode::ProviderConstructor(b) if a.provider == b.id => Ok(()),
             _ => Err(PublishedValueError::Invalid("raw projection")),
         },
-        (_, PublishedNode::Native(atom)) if value == atom.value() => Ok(()),
+        (_, PublishedNode::Native(atom)) if native_projection_matches(value, atom.value()) => {
+            Ok(())
+        }
         (AnalysisValueKind::List(a), PublishedNode::List(r))
         | (AnalysisValueKind::Tuple(a), PublishedNode::Tuple(r)) => children(a, origin, *r),
         (AnalysisValueKind::Dictionary(a), PublishedNode::Dictionary(r)) => {
@@ -401,11 +403,22 @@ pub(super) fn child(
         }
     }
     if let PublishedNode::Native(atom) = expected.node() {
-        if value == atom.value() {
+        if native_projection_matches(value, atom.value()) {
             return Ok(());
         }
     }
     Err(PublishedValueError::Invalid("projection child origin"))
+}
+
+// Language-equal versions can have different observable spellings. A native
+// projection must preserve the complete model, including that spelling.
+fn native_projection_matches(value: &AnalysisValue, expected: &AnalysisValue) -> bool {
+    match (value.kind(), expected.kind()) {
+        (AnalysisValueKind::DottedVersion(left), AnalysisValueKind::DottedVersion(right)) => {
+            left == right
+        }
+        _ => value == expected,
+    }
 }
 fn children(
     values: &[AnalysisValue],

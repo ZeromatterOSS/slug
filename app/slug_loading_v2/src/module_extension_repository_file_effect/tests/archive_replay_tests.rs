@@ -68,7 +68,7 @@ ext = module_extension(implementation=impl)
 "#;
     // Opaque cache-partition metadata is retained even without a cache consumer.
     for canonical_id in ["", "independent namespace Ω", "another partition"] {
-        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
         let actual_source = source.replace(
             "False, '', {}, {}",
             &format!("False, {canonical_id:?}, {{}}, {{}}"),
@@ -110,7 +110,7 @@ ext = module_extension(implementation=impl)
 
 #[tokio::test]
 async fn general_archive_calls_suspend_then_replay_exact_order_and_terminal_reference() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let mut transaction = transaction_untracked(&dice, MODULE, ARCHIVES, true).await;
     let owner = owner(&mut transaction).await;
     let key = HostSelectedRepositoryFileEffectKey::new(
@@ -180,7 +180,7 @@ async fn general_archive_calls_suspend_then_replay_exact_order_and_terminal_refe
 
 #[tokio::test]
 async fn changed_prefix_revoked_epoch_and_swallowed_generated_observation_fail_closed() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let mut transaction = transaction_untracked(&dice, MODULE, ARCHIVES, true).await;
     let owner = owner(&mut transaction).await;
     let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
@@ -237,7 +237,7 @@ async fn changed_prefix_revoked_epoch_and_swallowed_generated_observation_fail_c
 
 #[tokio::test]
 async fn repository_metadata_only_change_invalidates_and_restores_without_archive_epoch() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
     let source = |version: &str| {
         format!(
             "def write(ctx):\n    ctx.file('same', 'content', executable=False)\n    return ctx.repo_metadata(attrs_for_reproducibility={{'version': {version:?}}})\nindependent_repository=repository_rule(implementation=write)\ndef impl(ctx):\n    independent_repository(name='first')\next=module_extension(implementation=impl)\n"

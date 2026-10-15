@@ -16,6 +16,12 @@ use std::hash::Hash;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::bzl_module::semantic_evaluation::budget::Budget;
+use crate::source_table::CertifiedSourceTable;
+use crate::source_table::SourceTableCapture;
+#[path = "provider/source_table_context.rs"]
+mod source_table_context;
+
 use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
@@ -91,10 +97,6 @@ pub use template_variable_info::alloc_frozen_template_variable_info;
 pub use template_variable_info::template_variable_info;
 pub use template_variable_info::template_variable_info_ref;
 
-pub use crate::xcode_version_info::alloc_default_xcode_version_info;
-pub use crate::xcode_version_info::default_xcode_version_info;
-pub use crate::xcode_version_info::is_default_xcode_version_info;
-
 /// Borrow the actual Label owner before projecting an owned canonical label.
 pub fn starlark_label_ref(value: Value<'_>) -> Option<&CanonicalLabel> {
     StarlarkLabel::from_value(value).map(StarlarkLabel::canonical)
@@ -149,59 +151,6 @@ impl<'v> StarlarkValue<'v> for BuiltinProviderKey {
     }
 }
 
-// Objc remains declaration-only. The Xcode key shares this compact identity
-// class but admits only the authenticated empty-version constructor tuple.
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, Hash, Allocative)]
-pub enum DeclarationOnlyAppleProviderKind {
-    ObjcInfo,
-    XcodeVersionInfo,
-}
-impl DeclarationOnlyAppleProviderKind {
-    pub const fn names(self) -> (&'static str, &'static str) {
-        match self {
-            Self::ObjcInfo => ("ObjcInfo", "Objc"),
-            Self::XcodeVersionInfo => ("XcodeVersionInfo", "XcodeVersionConfig"),
-        }
-    }
-}
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct DeclarationOnlyAppleProviderKey(pub DeclarationOnlyAppleProviderKind);
-impl fmt::Display for DeclarationOnlyAppleProviderKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<function {}>", self.0.names().0)
-    }
-}
-starlark::starlark_simple_value!(DeclarationOnlyAppleProviderKey);
-#[starlark_value(type = "Provider")]
-impl<'v> StarlarkValue<'v> for DeclarationOnlyAppleProviderKey {
-    fn invoke(
-        &self,
-        _me: Value<'v>,
-        args: &Arguments<'v, '_>,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<Value<'v>> {
-        match self.0 {
-            DeclarationOnlyAppleProviderKind::XcodeVersionInfo => {
-                crate::xcode_version_info::construct(args, eval)
-            }
-            DeclarationOnlyAppleProviderKind::ObjcInfo => Err(starlark::Error::new_other(
-                anyhow::anyhow!("apple_common.Objc construction is unsupported"),
-            )),
-        }
-    }
-
-    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
-        "slug.apple-common.declaration-provider".hash(hasher);
-        self.0.hash(hasher);
-        Ok(())
-    }
-
-    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
-        Ok(Self::from_value(other).is_some_and(|other| self.0 as u8 == other.0 as u8))
-    }
-}
-
 /// Builtin callable and configured-target provider key.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct OutputGroupInfo;
@@ -239,7 +188,8 @@ impl<'v> StarlarkValue<'v> for OutputGroupInfo {
 pub(crate) struct BzlEvaluationContext {
     source_label: CompactString,
     source_identity: BzlModuleIdentity,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    source_table: SourceTableCapture,
+    publication_work: RefCell<Budget>,
     bzl_load_visibility: RefCell<Option<BzlLoadVisibility>>,
 }
 
@@ -250,6 +200,12 @@ pub(crate) struct BzlEvaluationContext {
 pub struct TransitionEvaluationContext(BzlEvaluationContext);
 
 impl TransitionEvaluationContext {
+    pub(crate) fn with_table(
+        identity: BzlModuleIdentity,
+        table: &CertifiedSourceTable,
+    ) -> Result<Self, String> {
+        BzlEvaluationContext::macro_runtime_context_with_table(identity, table).map(Self)
+    }
     pub fn new(
         source_identity: BzlModuleIdentity,
         source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
@@ -272,44 +228,32 @@ impl BzlEvaluationContext {
         };
         let label = CanonicalLabel::parse(&canonical)
             .expect("Bzl evaluation context requires a valid source label");
-        Self {
-            source_identity: BzlModuleIdentity {
-                label,
-                workspace_path: PathBuf::new(),
-                repository_mapping: Arc::from([]),
-            },
-            source_label,
-            source_identities_by_filename: Arc::from([]),
-            bzl_load_visibility: RefCell::new(None),
-        }
+        let identity = BzlModuleIdentity {
+            label,
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::new()),
+            repository_mapping: Arc::from([]),
+        };
+        let mut context = Self::from_raw_sources(identity, Arc::from([]));
+        context.source_label = source_label;
+        context
     }
 
     #[cfg(test)]
     pub(crate) fn from_identity(source_identity: BzlModuleIdentity) -> Self {
-        Self {
-            source_label: source_identity.label.to_string().into(),
-            source_identity,
-            source_identities_by_filename: Arc::from([]),
-            bzl_load_visibility: RefCell::new(None),
-        }
+        let label = source_identity.label.to_string().into();
+        let mut context = Self::from_raw_sources(source_identity, Arc::from([]));
+        context.source_label = label;
+        context
     }
 
     pub(crate) fn from_manifest(manifest: &BzlLoadManifest) -> Self {
-        let canonical_source = manifest.root.label.to_string();
-        let source_label = if manifest.root.label.package().repo().is_root() {
-            canonical_source
-                .strip_prefix("@@")
-                .expect("canonical root labels begin with @@")
-                .into()
-        } else {
-            canonical_source.into()
-        };
-        Self {
-            source_label,
-            source_identity: manifest.root.clone(),
-            source_identities_by_filename: manifest_starlark_sources(manifest),
-            bzl_load_visibility: RefCell::new(None),
-        }
+        Self::from_raw_sources(manifest.root.clone(), manifest_starlark_sources(manifest))
+    }
+
+    pub(crate) fn from_source_context(
+        context: &crate::BzlModuleSourceContext,
+    ) -> Result<Self, String> {
+        Self::from_effective_context(context)
     }
 
     pub(crate) fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> {
@@ -376,10 +320,10 @@ impl BzlEvaluationContext {
                     "source-sensitive builtin requires actual defining .bzl module provenance"
                 )
             })?;
-        if !self.source_identities_by_filename.is_empty() {
+        if !self.source_table.raw().is_empty() {
             return crate::starlark_label::validate_defining_module_source(
                 data,
-                &self.source_identities_by_filename,
+                self.source_table.raw(),
             );
         }
         crate::starlark_label::defining_module_identity(data).ok_or_else(|| {
@@ -393,27 +337,13 @@ impl BzlEvaluationContext {
         source_identity: BzlModuleIdentity,
         source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     ) -> Self {
-        let canonical_source = source_identity.label.to_string();
-        let source_label = if source_identity.label.package().repo().is_root() {
-            canonical_source
-                .strip_prefix("@@")
-                .expect("canonical root labels begin with @@")
-                .into()
-        } else {
-            canonical_source.into()
-        };
-        Self {
-            source_label,
-            source_identity,
-            source_identities_by_filename,
-            bzl_load_visibility: RefCell::new(None),
-        }
+        Self::from_raw_sources(source_identity, source_identities_by_filename)
     }
 
     pub(crate) fn source_identities_by_filename(
         &self,
     ) -> Arc<[(CompactString, BzlModuleSourceProvenance)]> {
-        self.source_identities_by_filename.clone()
+        self.source_table.raw().clone()
     }
 
     pub(crate) fn source_label_for_call(
@@ -1947,9 +1877,6 @@ pub(crate) fn empty_evaluator_depset<'v>(
 }
 
 pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> {
-    if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
-        return Some(ProviderIdentity::builtin(key.0.names().0));
-    }
     if let Some(key) = BuiltinProviderKey::from_value(value) {
         return Some(ProviderIdentity::builtin(key.name));
     }
@@ -1990,15 +1917,6 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
 pub fn configured_target_provider_identity(
     value: Value<'_>,
 ) -> starlark::Result<Option<ProviderIdentity>> {
-    if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
-        if matches!(key.0, DeclarationOnlyAppleProviderKind::XcodeVersionInfo) {
-            return Ok(Some(ProviderIdentity::builtin("XcodeVersionInfo")));
-        }
-        return Err(starlark::Error::new_other(anyhow::anyhow!(
-            "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
-            key.0.names().1
-        )));
-    }
     Ok(starlark_provider_identity(value))
 }
 
@@ -2255,8 +2173,6 @@ mod tests {
 
     use super::AnalysisBuiltinCallable;
     use super::BuiltinProviderKey;
-    use super::DeclarationOnlyAppleProviderKey;
-    use super::DeclarationOnlyAppleProviderKind;
     use super::FeatureFlagInfoConstructor;
     use super::StarlarkDefaultInfo;
     use super::TemplateVariableInfoConstructor;
@@ -2294,33 +2210,6 @@ mod tests {
             .eval_module(ast, &loading_globals())
             .map_err(|error| error.to_string())?;
         module.freeze().map_err(|error| format!("{error:?}"))
-    }
-
-    #[test]
-    fn declaration_only_apple_keys_are_compact_distinct_and_domain_separated() {
-        const _: [(); 1] = [(); std::mem::size_of::<DeclarationOnlyAppleProviderKind>()];
-        fn assert_allocative<T: allocative::Allocative>() {}
-        assert_allocative::<DeclarationOnlyAppleProviderKind>();
-        let heap = starlark::values::FrozenHeap::new();
-        let objc = heap.alloc(DeclarationOnlyAppleProviderKey(
-            DeclarationOnlyAppleProviderKind::ObjcInfo,
-        ));
-        let xcode = heap.alloc(DeclarationOnlyAppleProviderKey(
-            DeclarationOnlyAppleProviderKind::XcodeVersionInfo,
-        ));
-        let ordinary = heap.alloc(BuiltinProviderKey::new("ObjcInfo"));
-        assert_eq!(objc.to_string(), "<function ObjcInfo>");
-        assert_eq!(xcode.to_string(), "<function XcodeVersionInfo>");
-        assert!(!objc.to_value().equals(xcode.to_value()).unwrap());
-        assert!(!objc.to_value().equals(ordinary.to_value()).unwrap());
-        let hash = |value: starlark::values::Value<'_>| value.get_hashed().unwrap().hash();
-        assert_ne!(hash(objc.to_value()), hash(xcode.to_value()));
-        assert_ne!(hash(objc.to_value()), hash(ordinary.to_value()));
-        assert_eq!(
-            configured_target_provider_identity(xcode.to_value()).unwrap(),
-            Some(ProviderIdentity::builtin("XcodeVersionInfo"))
-        );
-        assert!(configured_target_provider_identity(objc.to_value()).is_err());
     }
 
     #[test]
@@ -2534,8 +2423,6 @@ mod analysis_builtin_certificate_tests;
 pub fn native_provider_token(value: Value<'_>) -> Option<(&'static str, ProviderIdentity)> {
     let class = if BuiltinProviderKey::from_value(value).is_some() {
         "BuiltinProviderKey"
-    } else if DeclarationOnlyAppleProviderKey::from_value(value).is_some() {
-        "DeclarationOnlyAppleProviderKey"
     } else if TemplateVariableInfoConstructor::from_value(value).is_some() {
         "TemplateVariableInfoConstructor"
     } else if FeatureFlagInfoConstructor::from_value(value).is_some() {

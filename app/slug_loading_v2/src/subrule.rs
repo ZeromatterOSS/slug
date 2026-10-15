@@ -854,7 +854,9 @@ mod tests {
     fn owner(label: &str, tools_repository: &str) -> BzlModuleIdentity {
         BzlModuleIdentity {
             label: CanonicalLabel::parse(label).unwrap(),
-            workspace_path: PathBuf::from("/workspace/defs.bzl"),
+            source: slug_build_api_v2::ModuleSourceOrigin::Workspace(PathBuf::from(
+                "/workspace/defs.bzl",
+            )),
             repository_mapping: Arc::from([(
                 ApparentRepoName::new("bazel_tools").unwrap(),
                 CanonicalRepoName::new(tools_repository).unwrap(),
