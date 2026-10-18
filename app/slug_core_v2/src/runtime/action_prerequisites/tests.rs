@@ -25,13 +25,8 @@ mod cpp_compile_tests;
 
 #[test]
 fn resource_metadata_refuses_before_source_and_generated_prerequisites() {
-    use slug_build_api_v2::actions::RetainedSpawnResourceSet;
     let owner = key("consumer", false);
-    let recipe = RetainedSpawnResourceSet::new(
-        CanonicalLabel::parse(RetainedSpawnResourceSet::SOURCE_LABEL).unwrap(),
-        RetainedSpawnResourceSet::SOURCE_DIGEST,
-    )
-    .unwrap();
+    let (resource, calls) = resource_support::descriptor("unrelated.prerequisites");
     let missing = artifact(&key("missing", false), "missing", ActionOutputKind::File);
     let ordinary = spawn(vec![missing], vec![output("done")]);
     let retained = ActionSpec::spawn(
@@ -39,23 +34,18 @@ fn resource_metadata_refuses_before_source_and_generated_prerequisites() {
             .spawn_spec()
             .unwrap()
             .clone()
-            .with_resource_set(recipe),
+            .with_resource_set(resource),
     );
     let closure =
         ValidatedActionClosure::new(Arc::from([node(owner.clone(), vec![retained])])).unwrap();
     let action = &closure.owners()[0].actions()[0];
-    assert_eq!(
-        crate::runtime::dice::source_staging::source_spawn(action)
-            .unwrap_err()
-            .as_ref(),
-        "Spawn resource_set execution is not admitted",
-    );
-    assert_eq!(
+    assert!(crate::runtime::dice::source_staging::source_spawn(action).is_ok());
+    assert!(
         ActionPrerequisitePlan::new(&closure, &owner, 0)
             .unwrap_err()
-            .as_ref(),
-        "Spawn resource_set execution is not admitted",
+            .contains("producer")
     );
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
     let ordinary =
         ValidatedActionClosure::new(Arc::from([node(owner.clone(), vec![ordinary])])).unwrap();
     assert!(
@@ -724,3 +714,6 @@ mod symlink_tests;
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[path = "symlink_equivalence_tests.rs"]
 mod symlink_equivalence_tests;
+
+#[path = "../source_staging/resource_set_test_support.rs"]
+mod resource_support;

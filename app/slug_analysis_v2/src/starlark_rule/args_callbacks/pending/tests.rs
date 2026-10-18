@@ -179,7 +179,7 @@ fn pending_rows_prepare_gc_traced_snapshots_then_finish_without_module_and_keep_
         )
         .unwrap();
     actions
-        .register_pending(PendingRegisteredAction::spawn(header.clone(), line).unwrap())
+        .register_pending(PendingRegisteredAction::spawn(&module, header.clone(), line).unwrap())
         .unwrap();
     actions
         .register_pending(PendingRegisteredAction::args_write(
@@ -209,14 +209,24 @@ fn pending_rows_prepare_gc_traced_snapshots_then_finish_without_module_and_keep_
         after < before,
         "GC must reclaim unreachable heap allocations: before={before}, after={after}"
     );
+    let mut storage_owner = super::super::Publisher::new(&module);
     let mut prepared = actions
         .registry()
         .actions()
         .iter()
-        .map(|action| action.prepare(&module, &mut draft).unwrap())
+        .map(|action| {
+            action
+                .prepare(&module, &mut draft, &mut |r, b| {
+                    storage_owner
+                        .resource_storage(r, b, false)
+                        .map_err(|error| error.to_string())
+                })
+                .unwrap()
+        })
         .collect::<Vec<_>>()
         .into_iter();
-    slug_loading_v2::subrule_invocation::clear_args_snapshots(&module);
+    drop(storage_owner);
+    slug_loading_v2::subrule_invocation::clear_args_snapshots(&module).unwrap();
     drop(module.freeze().unwrap());
     let actions = actions
         .try_map::<ActionSpec, anyhow::Error>(|_| prepared.next().unwrap().complete(&mut complete))
@@ -297,17 +307,25 @@ fn pending_headers_refuse_conflicts_and_snapshot_membership_before_publication()
     let other = Module::new();
     assert!(
         pending
-            .prepare(&other, &mut |_snapshot| -> anyhow::Result<Draft> {
-                panic!("membership check must precede draft publication")
-            })
+            .prepare(
+                &other,
+                &mut |_snapshot| -> anyhow::Result<Draft> {
+                    panic!("membership check must precede draft publication")
+                },
+                &mut |_, _| panic!("ArgsWrite must not allocate Spawn storage")
+            )
             .is_err()
     );
-    slug_loading_v2::subrule_invocation::clear_args_snapshots(&module);
+    slug_loading_v2::subrule_invocation::clear_args_snapshots(&module).unwrap();
     assert!(
         pending
-            .prepare(&module, &mut |_snapshot| -> anyhow::Result<Draft> {
-                panic!("stale token must fail before draft publication")
-            })
+            .prepare(
+                &module,
+                &mut |_snapshot| -> anyhow::Result<Draft> {
+                    panic!("stale token must fail before draft publication")
+                },
+                &mut |_, _| panic!("ArgsWrite must not allocate Spawn storage")
+            )
             .is_err()
     );
 }
@@ -365,15 +383,16 @@ fn pending_spawn_inputs_snapshot_membership_and_use_shared_end_lowerer() {
     let tools = module.heap().alloc(AllocList([set]));
     module.set("tools", tools);
     let header = spawn_header(&root());
-    let pending = PendingRegisteredAction::spawn(header.clone(), PendingCommandLine::default())
-        .unwrap()
-        .with_inputs(
-            &module,
-            Some(set),
-            Some(tools),
-            AnalysisActionCallScope::Root,
-        )
-        .unwrap();
+    let pending =
+        PendingRegisteredAction::spawn(&module, header.clone(), PendingCommandLine::default())
+            .unwrap()
+            .with_inputs(
+                &module,
+                Some(set),
+                Some(tools),
+                AnalysisActionCallScope::Root,
+            )
+            .unwrap();
     Evaluator::new(&module)
         .eval_module(
             AstModule::parse("mutation.bzl", "tools.clear()".to_owned(), &Dialect::Bazel).unwrap(),
@@ -418,23 +437,57 @@ fn pending_spawn_inputs_snapshot_membership_and_use_shared_end_lowerer() {
     };
     assert!(retained.shares_store_with(again));
     assert!(
-        pending.prepare(&module, &mut draft).is_err(),
+        pending
+            .prepare(&module, &mut draft, &mut |_, _| panic!(
+                "missing lowered inputs must refuse before prepared storage"
+            ))
+            .is_err(),
         "captured inputs must never fall back to independently lowered prototype fields"
     );
+    // This legacy semantic fixture uses the real Publisher storage owner but
+    // intentionally clears its empty-resource collector before original freeze.
+    let mut publication = super::super::Publisher::new(&module);
     let prepared = pending
-        .prepare_with_inputs(&module, Some(pair), &mut draft)
+        .prepare_with_inputs(
+            &module,
+            Some(pair),
+            &mut draft,
+            &mut |_| anyhow::bail!("this fixture contains no resource token"),
+            &mut |r, b| {
+                publication
+                    .resource_storage(r, b, false)
+                    .map_err(|error| error.to_string())
+            },
+        )
         .unwrap();
+    drop(publication);
     drop(lowerer);
-    slug_loading_v2::subrule_invocation::clear_args_snapshots(&module);
+    slug_loading_v2::subrule_invocation::clear_args_snapshots(&module).unwrap();
     drop(module.freeze().unwrap());
     let action = prepared.complete(&mut complete).unwrap();
-    let expected_action = PreparedAction::<Draft>::Spawn {
+    // These two expected-only values use a persistent real bounded oracle;
+    // they do not stand in for production's same-Publisher preparation.
+    let mut expected_storage =
+        slug_build_api_v2::published_value::PublishedValueArenaBuilder::new();
+    let mut admit_spawn = |r, b| {
+        expected_storage
+            .charge_storage(slug_build_api_v2::DepsetStorageCharge {
+                nodes: 0,
+                edges: 0,
+                visits: r,
+                bytes: b,
+            })
+            .map_err(|error| error.to_string())
+    };
+    resource_storage::prepared::<Draft>(&mut admit_spawn).unwrap();
+    let expected_action = PreparedAction::<Draft>::Spawn(Box::new(PreparedSpawn {
         header: header.clone(),
         command_line: PreparedCommandLine {
             segments: Vec::new(),
         },
         inputs: Some((expected.clone(), expected)),
-    }
+        resource_set: None,
+    }))
     .complete(&mut complete)
     .unwrap();
     let providers = ProviderCollection::from_values(
@@ -462,13 +515,15 @@ fn pending_spawn_inputs_snapshot_membership_and_use_shared_end_lowerer() {
     let split = ArtifactInputs::new(vec![ArtifactInputSource::Depset(
         RetainedArtifactInputs::new(independent).unwrap(),
     )]);
-    let split_action = PreparedAction::<Draft>::Spawn {
+    resource_storage::prepared::<Draft>(&mut admit_spawn).unwrap();
+    let split_action = PreparedAction::<Draft>::Spawn(Box::new(PreparedSpawn {
         header,
         command_line: PreparedCommandLine {
             segments: Vec::new(),
         },
         inputs: Some((split.clone(), split)),
-    }
+        resource_set: None,
+    }))
     .complete(&mut complete)
     .unwrap();
     assert!(

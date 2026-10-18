@@ -437,14 +437,8 @@ fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
     let prepared = workspace.prepare();
     let action = prepared.configured_action();
     assert!(spawn_command(action, &defaults()).is_ok());
-    let recipe = slug_build_api_v2::actions::RetainedSpawnResourceSet::new(
-        slug_identity_v2::CanonicalLabel::parse(
-            slug_build_api_v2::actions::RetainedSpawnResourceSet::SOURCE_LABEL,
-        )
-        .unwrap(),
-        slug_build_api_v2::actions::RetainedSpawnResourceSet::SOURCE_DIGEST,
-    )
-    .unwrap();
+    let (resource, calls) = resource_support::descriptor("unrelated.remote");
+    let ordinary_command = spawn_command(action, &defaults()).unwrap();
     let guarded = slug_analysis_v2::ConfiguredNodeResult::new_rule(
         workspace.owner.clone(),
         slug_build_api_v2::ProviderCollection::from_values(vec![], false).unwrap(),
@@ -457,7 +451,7 @@ fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
                 .spawn_spec()
                 .unwrap()
                 .clone()
-                .with_resource_set(recipe),
+                .with_resource_set(resource),
         )],
         vec![action.context().clone()],
     )
@@ -465,9 +459,10 @@ fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
     // Both source and generated REAPI routes use this policy projection before
     // input serialization, parameter expansion, CAS transfer or Execute.
     assert_eq!(
-        spawn_command(&guarded.actions()[0], &defaults()).unwrap_err(),
-        "Spawn resource_set REAPI execution is not admitted"
+        spawn_command(&guarded.actions()[0], &defaults()).unwrap(),
+        ordinary_command
     );
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
     for (changed, expected) in [
         (
             workspace.defs.replace(
@@ -613,3 +608,6 @@ fn native_spawn_projection_uses_current_consumer_cancellation_before_digest() {
             .any(|blob| blob.data() == b"parameter-mapped\n")
     );
 }
+
+#[path = "../../../slug_core_v2/src/runtime/source_staging/resource_set_test_support.rs"]
+mod resource_support;

@@ -39,6 +39,16 @@ lifetime, and it drops before publication. No owner, heap, semantic identity,
 comparison, event credit or cap is replaced.
 
 
+## Resource callback registration
+
+Both action routes retain actual original resource callbacks in the existing
+GC-traced collector, independently of Args. Starlark Def eligibility checks its
+own original module binding, never an unrelated consumer module. Other admitted
+callables follow ordinary publication eligibility. Registration does not call
+the function; wrong signature/body/return errors belong to numeric evaluation.
+Source integrity remains tracked and does not select semantics. Stage6 owns the
+shared publication/accounting contract and numeric/remote boundaries.
+
 ## Original builtin exports and source environments
 
 Loading prepares the original bundled export before ordinary semantic lookup.

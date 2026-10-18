@@ -20,7 +20,12 @@ use super::*;
 #[path = "../../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod fixture;
 
-pub(super) const DEFS: &str = r#"def _impl(ctx):
+#[path = "../source_execution/cas_fixture.rs"]
+mod cas_fixture;
+
+pub(super) const DEFS: &str = r#"def _resources(os, count):
+    fail('real-chain-resource-must-not-execute')
+def _impl(ctx):
     seed = ctx.actions.declare_file('seed')
     file = ctx.actions.declare_file('file')
     tree = ctx.actions.declare_directory('tree')
@@ -28,13 +33,13 @@ pub(super) const DEFS: &str = r#"def _impl(ctx):
     done = ctx.actions.declare_file('done')
     result_tree = ctx.actions.declare_directory('result_tree')
     ctx.actions.write(seed, 'seed')
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[file, tree, empty], arguments=['produce', file.path])
+    ctx.actions.run(resource_set=_resources, executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[file, tree, empty], arguments=['produce', file.path])
     args = ctx.actions.args()
     args.add('consume')
     args.add(file.path)
     args.use_param_file('@%s', use_always = True)
     args.set_param_file_format('multiline')
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[file, tree, empty, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[done, result_tree], arguments=[args])
+    ctx.actions.run(resource_set=_resources, executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[file, tree, empty, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[done, result_tree], arguments=[args])
     return [DefaultInfo(files=depset([done]))]
 stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=True), 'tool':attr.label(allow_single_file=True)})
 "#;
@@ -389,6 +394,18 @@ struct CheckedTransport {
     inner: ActionChainReapiTransport,
     mutation: Option<CasMutation>,
     executions: AtomicUsize,
+    resource_counters: std::sync::Mutex<Vec<Arc<AtomicUsize>>>,
+}
+impl CheckedTransport {
+    fn assert_resource_zero(&self) {
+        for counter in self.resource_counters.lock().unwrap().iter() {
+            assert_eq!(
+                counter.load(Ordering::SeqCst),
+                0,
+                "remote chain invoked numeric resource callback"
+            );
+        }
+    }
 }
 impl ActionChainTransport for CheckedTransport {
     type Session = ActionChainReapiSession;
@@ -401,15 +418,53 @@ impl ActionChainTransport for CheckedTransport {
         inputs: Arc<PreparedActionChainInputs>,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
-        self.inner.start(inputs, args_context).await
+        let (wrapped, counter) = inputs.with_resource_set_invocation_counter().unwrap();
+        assert_eq!(wrapped, *inputs);
+        let plan = wrapped.plan().unwrap();
+        let mut callbacks = 0;
+        for step in plan.actions() {
+            if let Some(resource) = step
+                .action()
+                .spawn_spec()
+                .and_then(|spawn| spawn.resource_set())
+            {
+                let error = resource
+                    .evaluate(
+                        slug_build_api_v2::actions::ResourceSetInputs {
+                            os: slug_build_api_v2::actions::ResourceSetOs::Linux,
+                            parent_input_count: 2,
+                        },
+                        &resource_support::Context::default(),
+                    )
+                    .unwrap_err()
+                    .to_string();
+                assert!(
+                    error.contains("real-chain-resource-must-not-execute"),
+                    "{error}"
+                );
+                callbacks += 1;
+            }
+        }
+        assert_eq!(callbacks, 2);
+        drop(plan);
+        assert_eq!(counter.load(Ordering::SeqCst), callbacks);
+        counter.store(0, Ordering::SeqCst); // only after both genuine calls finish
+        self.resource_counters.lock().unwrap().push(counter);
+        self.assert_resource_zero();
+        let result = self.inner.start(Arc::new(wrapped), args_context).await;
+        self.assert_resource_zero();
+        result
     }
     async fn stage(
         &self,
         session: &mut Self::Session,
         index: usize,
     ) -> Result<Self::Staged, Self::Error> {
+        self.assert_resource_zero();
         check_projection(session, index);
-        self.inner.stage(session, index).await
+        let result = self.inner.stage(session, index).await;
+        self.assert_resource_zero();
+        result
     }
     async fn execute(
         &self,
@@ -417,25 +472,17 @@ impl ActionChainTransport for CheckedTransport {
         index: usize,
         staged: Self::Staged,
     ) -> Result<(), Self::Error> {
+        self.assert_resource_zero();
         self.executions.fetch_add(1, Ordering::SeqCst);
-        self.inner.execute(session, index, staged).await?;
+        let result = self.inner.execute(session, index, staged).await;
+        self.assert_resource_zero();
+        result?;
         if index == 1 {
             if let Some(mutation) = self.mutation {
                 let digest = session.results[1].remote().unwrap().result.output_files()[0].digest();
-                let root = PathBuf::from(std::env::var("SLUG_V2_NATIVELINK_TEST_ROOT").unwrap());
-                // Only the supervised fixture CAS is mutated, never workspace outputs.
-                // NativeLink filesystem_store::DIGEST_FOLDER is "d".
-                for store in ["fast-content", "slow-content"] {
-                    let path = root.join("cas").join(store).join("d").join(format!(
-                        "{}-{}",
-                        digest.hash(),
-                        digest.size_bytes()
-                    ));
-                    assert!(
-                        path.is_file(),
-                        "verified generated blob absent at {}",
-                        path.display()
-                    );
+                // Check exact completed bodies in BOTH supervised stores before
+                // changing either. Filename generations are not content authority.
+                for path in cas_fixture::completed_blob_paths(digest) {
                     match mutation {
                         CasMutation::Remove => std::fs::remove_file(path).unwrap(),
                         CasMutation::Corrupt => {
@@ -485,7 +532,10 @@ impl ActionChainTransport for CheckedTransport {
         Ok(())
     }
     async fn finish(&self, session: Self::Session) -> Result<Self::Output, Self::Error> {
-        self.inner.finish(session).await
+        self.assert_resource_zero();
+        let result = self.inner.finish(session).await;
+        self.assert_resource_zero();
+        result
     }
 }
 
@@ -498,6 +548,7 @@ fn transport(mutation: Option<CasMutation>) -> CheckedTransport {
         .unwrap(),
         mutation,
         executions: AtomicUsize::new(0),
+        resource_counters: std::sync::Mutex::new(Vec::new()),
     }
 }
 
@@ -599,8 +650,10 @@ fn nativelink_chain_generated_file_tree_cache_change_restore() {
             }
             TerminalOutput::new(0, String::new(), String::new())
         }));
+        transport.assert_resource_zero();
         workspace.assert_no_outputs();
     }
+    assert_eq!(transport.resource_counters.lock().unwrap().len(), 4);
     assert_eq!(transport.executions.load(Ordering::SeqCst), 12);
 }
 
@@ -702,5 +755,65 @@ fn chain_start_uses_current_consumer_cancellation_before_connection() {
         .unwrap()
         .len(),
         3
+    );
+}
+
+#[path = "../../../slug_core_v2/src/runtime/source_staging/resource_set_test_support.rs"]
+mod resource_support;
+#[test]
+fn resource_chain_preflight_retains_failing_original_without_invoking_it() {
+    let workspace = Workspace::new();
+    let original = workspace.prepare();
+    let (inputs, counter) = original.with_resource_set_invocation_counter().unwrap();
+    assert_eq!(inputs, *original);
+    let plan = inputs.plan().unwrap();
+    let mut resources = 0;
+    for action in plan.actions() {
+        if let Some(spawn) = action.action().spawn_spec() {
+            let resource = spawn
+                .resource_set()
+                .expect("actual original chain resource");
+            assert!(resource.published_callable().original_slot().is_some());
+            let error = resource
+                .evaluate(
+                    slug_build_api_v2::actions::ResourceSetInputs {
+                        os: slug_build_api_v2::actions::ResourceSetOs::Linux,
+                        parent_input_count: 2,
+                    },
+                    &resource_support::Context::default(),
+                )
+                .unwrap_err()
+                .to_string();
+            assert!(
+                error.contains("real-chain-resource-must-not-execute"),
+                "{error}"
+            );
+            resources += 1;
+        }
+    }
+    assert_eq!(resources, 2);
+    assert_eq!(counter.load(Ordering::SeqCst), 2);
+    counter.store(0, Ordering::SeqCst);
+    // The same source/chain projection owner receives both resource-bearing
+    // Spawns, whose errors cannot be invoked to decide remote support.
+    let templates = Template::prepare(
+        &inputs,
+        &Default::default(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
+    assert_eq!(templates.len(), 3);
+    assert_eq!(counter.load(Ordering::SeqCst), 0);
+    // The closed helper refuses instead of inventing a callback for a plain plan.
+    std::fs::write(
+        workspace.root.join("defs.bzl"),
+        DEFS.replace("resource_set=_resources, ", ""),
+    )
+    .unwrap();
+    assert!(
+        workspace
+            .prepare()
+            .with_resource_set_invocation_counter()
+            .is_err()
     );
 }

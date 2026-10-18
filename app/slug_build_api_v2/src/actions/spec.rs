@@ -1125,8 +1125,8 @@ impl SpawnSpec {
         self
     }
 
-    pub fn resource_set(&self) -> Option<RetainedSpawnResourceSet> {
-        self.resource_set
+    pub fn resource_set(&self) -> Option<&RetainedSpawnResourceSet> {
+        self.resource_set.as_ref()
     }
 
     pub fn invocation(&self) -> &RetainedSpawnInvocation {
@@ -1181,7 +1181,11 @@ impl SpawnSpec {
             && self.execution_requirements == other.execution_requirements
             && self.mnemonic == other.mnemonic
             && self.progress_message == other.progress_message
-            && self.resource_set == other.resource_set
+            && match (&self.resource_set, &other.resource_set) {
+                (None, None) => true,
+                (Some(left), Some(right)) => left.publication_eq_with(right, state),
+                _ => false,
+            }
             && self
                 .command_line
                 .publication_eq_with(&other.command_line, state)
@@ -1826,3 +1830,7 @@ impl PartialEq for ActionSpec {
     }
 }
 impl Eq for ActionSpec {}
+
+#[cfg(test)]
+#[path = "spec/resource_header_layout_tests.rs"]
+mod resource_header_layout_tests;

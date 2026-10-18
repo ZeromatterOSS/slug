@@ -957,7 +957,9 @@ async fn prepared_analysis_key(
         base_configuration.with_starlark_option(explicit)
     });
     match prepare_configured_node_analysis(transaction, workspace, target, configuration).await {
-        AnalysisPreparationOutcome::Need(_) => Err("root request returned Needs".to_owned()),
+        AnalysisPreparationOutcome::Need(needs) => {
+            Err(format!("root request returned Needs: {needs:#?}"))
+        }
         AnalysisPreparationOutcome::Complete(Ok(key)) => Ok(key),
         AnalysisPreparationOutcome::Complete(Err(error)) => Err(error.to_string()),
     }
@@ -12245,10 +12247,6 @@ probe = rule(implementation = _impl, attrs = {"mode": attr.string()})
         ("shell_list", "command must be a string"),
         ("shell_too_long", "deferred long-command helper script"),
         ("resource_dict", "resource_set"),
-        (
-            "resource_callable",
-            "callable resource_set is not supported",
-        ),
         ("exec_group", "unknown execution group 'named'"),
         ("shadow", "shadowed_action is not supported"),
         ("manifests", "input_manifests must be a sequence"),
@@ -12274,6 +12272,25 @@ probe = rule(implementation = _impl, attrs = {"mode": attr.string()})
         .unwrap_err();
         assert!(error.contains(expected), "{mode}: {error}");
     }
+    let valid = analyze_request(
+        &dice,
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//pkg:resource_callable").unwrap(),
+            typed_action_test_configuration(),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert!(
+        valid.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .resource_set()
+            .is_some()
+    );
 }
 
 #[tokio::test]
@@ -15944,3 +15961,6 @@ mod source_table_sharing_tests;
 
 #[path = "starlark_rule/builtin_fixture.rs"]
 mod builtin_fixture;
+
+#[path = "starlark_rule/resource_set_tests.rs"]
+mod resource_set_tests;

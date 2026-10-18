@@ -1617,7 +1617,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             operation,
         )?;
         validate_supported_spawn_options(&request, operation)?;
-        let mut spec = SpawnSpec::new(
+        let spec = SpawnSpec::new(
             invocation,
             RetainedCommandLine::new(Vec::new()),
             inputs,
@@ -1629,21 +1629,21 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             mnemonic,
             request.progress_message,
         );
-        if let slug_loading_v2::subrule_invocation::AnalysisResourceSet::Recipe(recipe) =
-            request.resource_set
-        {
-            spec = spec.with_resource_set(recipe);
-        }
         let mut action = slug_build_api_v2::ActionSpec::spawn(spec);
         if let Some(name) = exec_group_name(&selected_group) {
             action = action.with_exec_group(name);
         }
-        let pending = PendingRegisteredAction::spawn(action, command_line)?.with_inputs(
-            module,
-            request.inputs,
-            request.tools,
-            request.scope.clone(),
-        )?;
+        let pending = PendingRegisteredAction::spawn(module, action, command_line)?
+            .with_inputs(module, request.inputs, request.tools, request.scope.clone())?
+            .with_resource_set(
+                module,
+                match request.resource_set {
+                    slug_loading_v2::subrule_invocation::AnalysisResourceSet::None => None,
+                    slug_loading_v2::subrule_invocation::AnalysisResourceSet::Callable(value) => {
+                        Some(value)
+                    }
+                },
+            )?;
         self.register(|actions| actions.register_pending(pending))
     }
 
@@ -1898,12 +1898,6 @@ fn validate_supported_spawn_options(
         .is_some_and(|value| !value.is_none())
     {
         anyhow::bail!("ctx.actions.{operation} shadowed_action is not supported");
-    }
-    if matches!(
-        request.resource_set,
-        slug_loading_v2::subrule_invocation::AnalysisResourceSet::Unsupported
-    ) {
-        anyhow::bail!("ctx.actions.{operation} callable resource_set is not supported");
     }
     Ok(())
 }
@@ -2501,9 +2495,9 @@ pub(crate) fn evaluate_loaded_rule(
     }
     .map_err(|error| error.to_string())?;
 
+    let mut publisher = args_callbacks::Publisher::with_resource_sets(&module)?;
     let returned = build_info_transform::returned_providers(returned);
     let mut lowerer = AnalysisValueLowerer::from_module(&module);
-    let mut publisher = args_callbacks::Publisher::new(&module);
     let mut provider_values = Vec::with_capacity(returned.len());
     let mut original_providers = Vec::new();
     for (index, value) in returned.into_iter().enumerate() {
@@ -2557,7 +2551,7 @@ pub(crate) fn evaluate_loaded_rule(
     }
     // Move phase-private registrations out of the sink before publication.
     // No callback inspection, evaluation or DICE work runs under this lock.
-    let mut pending_actions = {
+    let pending_actions = {
         let mut guard = actions
             .lock()
             .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?;
@@ -2566,20 +2560,42 @@ pub(crate) fn evaluate_loaded_rule(
             CtxActions::<PendingRegisteredAction>::new_typed(output_root.clone()),
         )
     };
-    cc_compile_action::finalize(&module, &mut lowerer, &mut pending_actions)
+    let pending_actions = cc_compile_action::finalize(&module, &mut lowerer, pending_actions)
         .map_err(|error| error.to_string())?;
+    let preparing_publisher = std::cell::RefCell::new(&mut publisher);
     let prepared = pending_actions
         .registry()
         .actions()
         .iter()
         .map(|action| {
             let inputs = action.lower_inputs(&module, &mut lowerer, &executable_provenance)?;
-            action.prepare_with_inputs(&module, inputs, &mut |snapshot| {
-                publisher.prepare(snapshot, &mut lowerer)
-            })
+            let preparing_lowerer = std::cell::RefCell::new(&mut lowerer);
+            action.prepare_with_inputs(
+                &module,
+                inputs,
+                &mut |snapshot| {
+                    preparing_publisher
+                        .borrow_mut()
+                        .prepare(snapshot, &mut preparing_lowerer.borrow_mut())
+                },
+                &mut |token| {
+                    resource_set::prepare(
+                        &mut preparing_publisher.borrow_mut(),
+                        token,
+                        &mut preparing_lowerer.borrow_mut(),
+                    )
+                },
+                &mut |records, bytes| {
+                    preparing_publisher
+                        .borrow_mut()
+                        .resource_storage(records, bytes, false)
+                        .map_err(|e| e.to_string())
+                },
+            )
         })
         .collect::<anyhow::Result<Vec<_>>>()
         .map_err(|error| error.to_string())?;
+    drop(preparing_publisher);
     let graph = publisher
         .seal(&mut lowerer)
         .map_err(|error| error.to_string())?;
@@ -2654,7 +2670,9 @@ pub(crate) fn evaluate_loaded_rule(
             prepared
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("missing prepared action"))?
-                .complete(&mut |draft| publisher.complete(draft))
+                .complete_with_resource_sets(&mut |draft| publisher.complete(draft), &mut |draft| {
+                    resource_set::complete(&publisher, draft)
+                })
         })
         .map_err(|error| error.to_string())?;
     let providers = complete_runfiles_support(
@@ -2701,6 +2719,7 @@ mod integer_list_projection_tests {
 mod args_callbacks;
 mod build_info_transform;
 mod function_owner;
+mod resource_set;
 mod source_authorities;
 use args_callbacks::pending::PendingCommandLine;
 use args_callbacks::pending::PendingRegisteredAction;

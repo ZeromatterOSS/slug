@@ -34,23 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-422-m7a-general-builtin-apple-exports
+Packet: WP-7-423-m7a-general-resource-set
 
-Scoped Apple/version capability accepted; exact source/document atomic integration
-is pending. The original pinned six-file Apple export slice and DottedVersion
-run through general Build/Bzlmod environments, initialized providers and original
-callbacks, with the selected handwritten Apple/version/default-Xcode adapters
-removed. Supporting generic publication/source/mapping/owner prerequisites retain
-complete semantic facts and bounded guarded storage. See the
-[acceptance record](./slug-v2-subplans/wp1222-general-builtin-apple-exports-acceptance-2026-10-15.json)
-and [current packet](./slug-v2-subplans/current-packet.md).
+General resource callback registration, original numeric evaluation and remote
+no-use pass the scoped component gates. The resource recipe and three guards are
+removed. Normal/owned focused proof, broader guards, default CLI provenance and
+all three real NativeLink source/chain integrity probes pass. Exact owned source
+and document atomic integration remains pending; see the
+[current packet](./slug-v2-subplans/current-packet.md).
 
-The prepared diagnostic Rust cquery completes with Bazel-equivalent nonempty output:
-exit 0, 67.425s, 340,924 KiB; both FULL result checks, actual 74-file preservation
-and explicit pin release pass. Remaining repository/resource/build-info adapters
-are replacement-required. Authentic Rust, M7A/M8, action/REAPI, Stage 10, full
-closure and whole-goal memory fit remain open. General resource_set design is
-pending independent review; no successor implementation is authorized here.
+Repository-process and build-info adapters still require replacement. Next is
+the general build-info callback ownership/execution decision. Authentic Rust,
+required action comparison, Rust REAPI execution, full closure, Stage 10 and
+whole-goal memory fit remain open. The predecessor diagnostic query is preserved
+and was not rerun for this component.
 
 ### Bootstrap command queue
 

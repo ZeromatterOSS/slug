@@ -21,7 +21,15 @@ impl Workspace {
         fixture::write(root.path());
         fs::write(
             root.path().join("defs.bzl"),
-            fixture::DEFS.replace("    out =", "    print('execution-event')\n    out ="),
+            format!(
+                "def _resources(os, count):\n    fail('core-source-resource-must-not-execute')\n{}",
+                fixture::DEFS
+                    .replace("    out =", "    print('execution-event')\n    out =")
+                    .replace(
+                        "arguments = [args]",
+                        "arguments = [args], resource_set = _resources"
+                    )
+            ),
         )
         .unwrap();
         let runtime =

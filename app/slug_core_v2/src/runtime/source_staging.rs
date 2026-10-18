@@ -26,9 +26,6 @@ pub(in crate::runtime) fn source_spawn(
     let spawn = action
         .spawn_spec()
         .ok_or_else(|| error("source staging requires a typed Spawn"))?;
-    if spawn.resource_set().is_some() {
-        return Err(error("Spawn resource_set execution is not admitted"));
-    }
     Ok(spawn)
 }
 
@@ -185,9 +182,6 @@ pub(in crate::runtime) fn visit_files_to_run(
 pub(in crate::runtime) fn declared_artifacts(
     spawn: &SpawnSpec,
 ) -> Result<SmallSet<AnalysisArtifact>, Arc<str>> {
-    if spawn.resource_set().is_some() {
-        return Err(error("Spawn resource_set execution is not admitted"));
-    }
     if spawn.unused_inputs_list().is_some() {
         return Err(error(
             "unused-input pruning is not admitted for source staging",
@@ -412,3 +406,7 @@ impl WorkspaceRuntime {
 #[cfg(test)]
 #[path = "source_staging/tests.rs"]
 mod tests;
+
+#[cfg(feature = "resource-set-test-support")]
+#[path = "source_staging/resource_set_counter.rs"]
+mod resource_set_counter;

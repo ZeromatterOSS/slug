@@ -165,6 +165,12 @@ impl<A: RegisterableAction> ActionRegistry<A> {
         &self.actions
     }
 
+    /// Consume phase-owned rows without copying them. The obsolete output
+    /// lookup index is released; any rebuilt registry must validate its rows.
+    pub fn into_actions(self) -> Vec<A> {
+        self.actions
+    }
+
     /// Consume phase-local rows into validated completed rows, retaining the
     /// original output index and declaration order. Call outside producer locks.
     /// No partial target registry escapes on conversion or validation failure.
@@ -266,3 +272,7 @@ pub(crate) fn validate_output_path(path: &str) -> Result<(), ActionError> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "registry/consuming_tests.rs"]
+mod consuming_tests;

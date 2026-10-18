@@ -153,11 +153,18 @@ events. No local output is written and no CLI/daemon build is activated.
 
 The request-local REAPI adapter uploads sources, virtual files, directories, Command
 and Action and verifies every required CAS digest through bounded reads, including
-hits, before AC/Execute. This rejects NativeLink's advertised in-flight inputs.
+hits, before AC/Execute. Presence alone never certifies input contents;
+incomplete or corrupt data cannot produce a verified staged capability.
 It shares the existing regular-output shape and digest checks. Unsupported headers,
 explicit retries/timeouts and a different cache endpoint fail closed. That source-only API retains scalar output bytes in memory. The selected-chain
 operation below adds generated input binding without retaining output bytes;
 general scheduling remains open; selected-output publication is described below.
+
+Registered original resource callbacks remain metadata on source and generated-
+input chains. AC lookup, uploads, Execute and output validation never evaluate
+them. Real would-error callback controls and exact zero counters cover cold/hit/
+change and incomplete/corrupt CAS failures. Local resource scheduling and
+fallback execution remain unsupported; ordinary policy refusals are unchanged.
 
 WP-7-35 admits declared regular-file output trees on that same native source Spawn
 operation. Commands sort file/directory lists and their combined output_paths;

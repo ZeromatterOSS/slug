@@ -31,12 +31,13 @@ pub struct ArgsSnapshotRegistration {
 }
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
-struct RegisteredSnapshotGen<V> {
+pub(crate) struct RegisteredSnapshotGen<V> {
     #[trace(unsafe_ignore)]
-    owner: Arc<()>,
+    pub(crate) owner: Arc<()>,
+    pub(crate) resources: crate::resource_set::ResourceRegistry<V>,
     snapshots: Arc<Mutex<Vec<EvaluatorArgsSnapshotGen<V>>>>,
 }
-starlark::starlark_complex_value!(RegisteredSnapshot);
+starlark::starlark_complex_value!(pub(crate) RegisteredSnapshot);
 unsafe impl<'v> Coerce<RegisteredSnapshotGen<Value<'v>>> for RegisteredSnapshotGen<FrozenValue> {}
 impl<V> fmt::Display for RegisteredSnapshotGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -59,24 +60,50 @@ where
     type Canonical = FrozenRegisteredSnapshot;
 }
 
+/// The sole fallible creation boundary, including Args-only evaluations.
+/// Its fixed entry debit precedes the root read and joins the actual collector.
+pub(crate) fn collector<'v>(module: &'v Module) -> anyhow::Result<&'v RegisteredSnapshot<'v>> {
+    let entry =
+        crate::resource_set::ResourceRegistry::<Value<'v>>::entry().map_err(anyhow::Error::msg)?;
+    if let Some(collector) = existing_collector(module)? {
+        collector
+            .resources
+            .pay_entry(entry)
+            .map_err(anyhow::Error::msg)?;
+        return Ok(collector);
+    }
+    let resources = crate::resource_set::ResourceRegistry::new(
+        entry,
+        std::mem::size_of::<RegisteredSnapshot<'v>>(),
+    )
+    .map_err(anyhow::Error::msg)?;
+    let value = module.heap().alloc_complex(RegisteredSnapshot {
+        owner: Arc::new(()),
+        resources,
+        snapshots: Arc::new(Mutex::new(Vec::new())),
+    });
+    crate::evaluator_roots::set_pending_args_snapshots(module, value);
+    RegisteredSnapshot::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("invalid pending Args collector"))
+}
+/// Caller prepays reads on the registration ledger or its receiving Publisher.
+pub(crate) fn existing_collector<'v>(
+    module: &'v Module,
+) -> anyhow::Result<Option<&'v RegisteredSnapshot<'v>>> {
+    crate::evaluator_roots::pending_args_snapshots(module)
+        .map(|value| {
+            RegisteredSnapshot::from_value(value)
+                .ok_or_else(|| anyhow::anyhow!("invalid pending Args snapshot collector"))
+        })
+        .transpose()
+}
+
 /// Register a complete snapshot under its evaluator's GC-traced module root.
 pub fn register_args_snapshot<'v>(
     module: &'v Module,
     snapshot: EvaluatorArgsSnapshot<'v>,
 ) -> anyhow::Result<ArgsSnapshotRegistration> {
-    let collector = match crate::evaluator_roots::pending_args_snapshots(module) {
-        Some(value) => value,
-        None => {
-            let value = module.heap().alloc_complex(RegisteredSnapshot {
-                owner: Arc::new(()),
-                snapshots: Arc::new(Mutex::new(Vec::new())),
-            });
-            crate::evaluator_roots::set_pending_args_snapshots(module, value);
-            value
-        }
-    };
-    let collector = RegisteredSnapshot::from_value(collector)
-        .ok_or_else(|| anyhow::anyhow!("invalid pending Args snapshot collector"))?;
+    let collector = collector(module)?;
     let mut snapshots = collector
         .snapshots
         .lock()
@@ -111,7 +138,13 @@ pub fn args_snapshot<'v>(
         .ok_or_else(|| anyhow::anyhow!("unknown Args snapshot registration"))
 }
 
-/// Release this evaluator's pending snapshot root after successful native publication.
-pub fn clear_args_snapshots(module: &Module) {
+/// Isolated host-test teardown/reset, with no Starlark or production callers.
+/// This does not preserve spent work across empty Args-only test recreations.
+/// Resource-bearing/poisoned/transferred state always preserves its rooted data.
+pub fn clear_args_snapshots(module: &Module) -> anyhow::Result<()> {
+    if let Some(collector) = existing_collector(module)? {
+        collector.resources.ensure_clearable()?;
+    }
     crate::evaluator_roots::set_pending_args_snapshots(module, Value::new_none());
+    Ok(())
 }

@@ -23,6 +23,10 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::task::Poll;
 
+#[cfg(feature = "resource-set-test-support")]
+#[path = "resource_set_counter_support.rs"]
+mod resource_set_counter_support;
+
 #[cfg(all(test, target_os = "linux"))]
 #[path = "progress_refusal_diagnostic.rs"]
 mod progress_refusal_diagnostic;

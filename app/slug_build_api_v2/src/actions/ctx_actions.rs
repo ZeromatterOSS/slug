@@ -257,6 +257,11 @@ impl<A: RegisterableAction + From<ActionSpec>> CtxActions<A> {
         self.registry
     }
 
+    /// Consume the phase owner, preserving its actual root and row registry.
+    pub fn into_parts(self) -> (crate::DerivedArtifactRoot, ActionRegistry<A>) {
+        (self.root, self.registry)
+    }
+
     fn declare_output(
         &self,
         path: impl Into<String>,

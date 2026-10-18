@@ -1,0 +1,51 @@
+{
+  "status": "SCOPED_COMPONENT_ACCEPTED_AT_PREINTEGRATION_FREEZE",
+  "packet": "WP-7-423-m7a-general-resource-set",
+  "baseline": "0433a9a6842fab862c36ab57107a0524272cffdc",
+  "capability": "Actual original resource callbacks for all run/run_shell routes; explicit numeric evaluation and real remote source/chain no-use",
+  "classification": {
+    "exact": "Pinned Bazel 9.2 callable eligibility/numeric dictionary/remote no-use",
+    "slug_native": "Structural identity, prepaid bounded publication and cooperative runtime limits",
+    "unsupported": "Local scheduling,sandbox,worker,fallback,estimate cache"
+  },
+  "results": {
+    "focused_normal": 80,
+    "focused_owned": 80,
+    "broader": 394,
+    "actual_backend": 3,
+    "fresh_reapi13": "normal13 current; owned13 qualified only across ignored source-test changes; repeated13 not added to unique counts",
+    "default_cli": "normal build and owned check, Core default-only; no owned linked-binary claim"
+  },
+  "source": {
+    "normal_files": 2504,
+    "owned_regular_blobs": 4982,
+    "owned_index_entries": 5006,
+    "unchanged_head_symlinks_qualified": 24,
+    "owned_source_paths": 56,
+    "new_source_paths": 20,
+    "tree": "d11b58f453c02bad73ad0db3b80b191a0e70c58a"
+  },
+  "evidence": {
+    "target/wp1223/source-epoch-v13.json": "b1501df7cb5c81901ec5df1052642a0dc1f822317ac1dcb04aec271e1bf8f41c",
+    "target/wp1223/joint-source-v2/joint-source-review.json": "38063a1231ee92b24120afca19652af729cb3ba90904bf8d0c77c2809938a466",
+    "target/wp1223/native-normal-owned-focused-runtime-review.json": "22a542544279eddfbc1622a53abb344dbd2e7f0a1e85160684fc5d04acb70b46",
+    "target/wp1223/owner-broads-default-cli-review.json": "cca966caed07c77b0ee281acaf4b34aadb071441726a1d23a648919f27b50de5",
+    "target/wp1223/final-backend-runtime-projection-review.json": "0ff2cf5ec15199a543faad96a951af8eba5e9ab86ddd1184aad25573fb675b9f",
+    "target/wp1223/backend-normal-v13/receipt.json": "c52e8b36319025277cb65ee4f0113cf962f278f6bac276e90455345d30d85b91",
+    "target/wp1223/native-normal-v13/receipt.json": "782fee5255386763e66a0e328b7dac0d71cb349f1e0636ca5e805905bc94623b",
+    "target/wp1223/native-owned-v11/receipt.json": "f8a7f11fe9ee24807742de1c58aa820b22bde87b2477cd1a7a9b137d4ba157fb",
+    "target/wp1223/default-cli-v10/receipt.json": "f6e1df8f0135acc7c8b2933f43b9221aa5d7ed44930e7056401835223535918c",
+    "target/wp1223/resource-retirement-audit/audit.json": "24a78dfc167a241b7db2d8857306094fcc60240b2c37e9a107d4c38ac7d5fd5d"
+  },
+  "lifecycle": "All three separate fresh verifying backends terminated143. Failed prior attempts remain failures; no timeout serves as integrity rejection.",
+  "integration": "Source and narrow HEAD-owned documents must integrate atomically after final document/projection review. This freeze predicts no commit result.",
+  "public_command": "No public query rerun for this component; predecessor used destination must not rerun.",
+  "remaining": [
+    "Repository-process and build-info adapters",
+    "Authentic configured Rust analysis",
+    "Required action comparison and actual Rust REAPI build",
+    "Complete Slug closure",
+    "Stage 10 graph/fixedpoint and independent miss/warm proofs",
+    "Whole-goal equivalent-command memory fit"
+  ]
+}

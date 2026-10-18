@@ -1,4 +1,3 @@
-use slug_build_api_v2::ActionError;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputMetadata;
 use slug_build_api_v2::BuildInfoCallbackRecipe;
@@ -14,19 +13,23 @@ use super::super::context_lifecycle_tests::declaration_sink;
 use super::*;
 
 fn ready_actions(sink: &SynchronousAnalysisActionSink) -> CtxActions {
-    sink.actions
+    let rows = sink
+        .actions
         .lock()
         .unwrap()
-        .clone()
-        .try_map(|action| {
-            Ok::<_, ActionError>(
-                action
-                    .as_action_spec()
-                    .expect("ordinary build-info and file-write actions are complete")
-                    .clone(),
-            )
+        .registry()
+        .actions()
+        .iter()
+        .map(|action| {
+            action
+                .as_action_spec()
+                .expect("ordinary build-info and file-write actions are complete")
+                .clone()
         })
-        .unwrap()
+        .collect();
+    let mut snapshot = CtxActions::new(sink.root.clone());
+    snapshot.replace_actions(rows).unwrap();
+    snapshot
 }
 
 fn request(kind: BuildInfoTransformKind, name: &str) -> BuildInfoTransformRequest<'_> {

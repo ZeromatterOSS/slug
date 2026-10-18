@@ -72,6 +72,43 @@ impl<'v> Publisher<'v> {
         }
     }
 
+    /// Admit the exact live registration collector before ANY provider capture.
+    pub(super) fn with_resource_sets(module: &'v Module) -> Result<Self, String> {
+        let mut publisher = Self::new(module);
+        slug_loading_v2::resource_set::transfer_resource_sets(module, |visits, bytes| {
+            // Includes phase Box fees still live beyond arena seal. Retain the
+            // whole conservative forecast rather than subtracting a portion.
+            publisher.graph.resource_storage(visits, bytes, false)
+        })?;
+        Ok(publisher)
+    }
+    pub(super) fn resource_storage(
+        &mut self,
+        visits: usize,
+        bytes: usize,
+        temporary: bool,
+    ) -> anyhow::Result<()> {
+        self.graph
+            .resource_storage(visits, bytes, temporary)
+            .map_err(anyhow::Error::msg)
+    }
+    pub(super) fn resource_set_value(
+        &mut self,
+        token: &slug_loading_v2::resource_set::ResourceSetRegistration,
+    ) -> anyhow::Result<Value<'v>> {
+        slug_loading_v2::resource_set::resource_set_value(self.module, token, |visits, bytes| {
+            self.graph.resource_storage(visits, bytes, true)
+        })
+    }
+    pub(super) fn capture_resource_callable(
+        &mut self,
+        value: Value<'v>,
+        lowerer: &mut AnalysisValueLowerer<'v>,
+    ) -> anyhow::Result<PublishedNodeId> {
+        self.graph
+            .add_callable(value, lowerer)
+            .map_err(anyhow::Error::msg)
+    }
     pub(super) fn capture(
         &mut self,
         value: Value<'v>,
@@ -230,6 +267,23 @@ impl FrozenPublisher {
         self.projections
             .borrow_mut()
             .value(&self.graph.value(node).map_err(|e| e.to_string())?)
+    }
+    pub(super) fn resource_original(
+        &self,
+        node: PublishedNodeId,
+    ) -> anyhow::Result<(
+        slug_build_api_v2::published_value::PublishedValueRef,
+        OwnedFrozenValue,
+    )> {
+        let published = self.graph.value(node)?;
+        let slot = published
+            .original_slot()
+            .ok_or_else(|| anyhow::anyhow!("resource callback has no original root"))?;
+        let original = self
+            .originals
+            .owned_root(slot.index())
+            .map_err(anyhow::Error::msg)?;
+        Ok((published, original))
     }
     pub(super) fn complete(
         &self,

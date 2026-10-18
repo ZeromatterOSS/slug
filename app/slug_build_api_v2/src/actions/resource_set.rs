@@ -1,38 +1,149 @@
-//! Finite analysis-only resource callback identity; execution remains deferred.
+//! Deferred numeric resource callbacks; remote execution retains without calling.
+use std::alloc::Layout;
+use std::fmt;
+use std::sync::Arc;
+
 use allocative::Allocative;
+use compact_str::CompactString;
 use dupe::Dupe;
-use slug_identity_v2::CanonicalLabel;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative, Dupe)]
-enum ResourceSetKind {
-    RulesCcLink,
+use crate::PublishedValueError;
+use crate::PublishedValueRef;
+use crate::analysis_value::PublicationEqState;
+
+/// Server-process Host OS, independent of target and execution platforms.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ResourceSetOs {
+    Linux,
+    Osx,
+    Windows,
+    FreeBsd,
+    OpenBsd,
+    Unknown,
 }
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative, Dupe)]
-pub struct RetainedSpawnResourceSet(ResourceSetKind);
-
-impl RetainedSpawnResourceSet {
-    pub const SOURCE_LABEL: &'static str = "@@rules_cc+//cc/private/link:finalize_link_action.bzl";
-    pub const SOURCE_DIGEST: [u8; 32] = [
-        0xad, 0xc6, 0xea, 0x3b, 0x35, 0x5d, 0x0c, 0x5e, 0x5f, 0xbf, 0x1b, 0x1e, 0x9e, 0xaa, 0x7d,
-        0x7d, 0xd7, 0xc0, 0xc0, 0x95, 0x23, 0x4a, 0x0c, 0xff, 0x7f, 0xdb, 0x4f, 0xc7, 0x2e, 0xb1,
-        0x67, 0xc9,
-    ];
-
-    pub fn new(source: CanonicalLabel, digest: [u8; 32]) -> Result<Self, String> {
-        if source != CanonicalLabel::parse(Self::SOURCE_LABEL).expect("pinned canonical source")
-            || digest != Self::SOURCE_DIGEST
-        {
-            return Err("resource_set requires the pinned rules_cc link source".to_owned());
+impl ResourceSetOs {
+    pub fn canonical_name(self) -> &'static str {
+        match self {
+            Self::Linux => "linux",
+            Self::Osx => "osx",
+            Self::Windows => "windows",
+            Self::FreeBsd => "freebsd",
+            Self::OpenBsd => "openbsd",
+            Self::Unknown => "unknown",
         }
-        Ok(Self(ResourceSetKind::RulesCcLink))
-    }
-
-    pub fn source(&self) -> &'static str {
-        Self::SOURCE_LABEL
-    }
-
-    pub fn digest(&self) -> &'static [u8; 32] {
-        &Self::SOURCE_DIGEST
     }
 }
+
+/// A numeric consumer supplies tracked parent membership, including tools and
+/// executable, counting tree artifacts once and excluding virtual paramfiles.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct ResourceSetInputs {
+    pub os: ResourceSetOs,
+    pub parent_input_count: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ResourceEstimate {
+    pub memory_mb: f64,
+    pub cpu: f64,
+    pub local_test: i32,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ResourceSetError {
+    Unsupported(CompactString),
+    Callback(CompactString),
+    InvalidReturn(CompactString),
+    Limit(CompactString),
+    Cancelled,
+}
+impl fmt::Display for ResourceSetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unsupported(message) => write!(f, "resource_set unsupported: {message}"),
+            Self::Callback(message) => write!(f, "resource_set callback: {message}"),
+            Self::InvalidReturn(message) => write!(f, "resource_set return: {message}"),
+            Self::Limit(message) => write!(f, "resource_set limit: {message}"),
+            Self::Cancelled => f.write_str("resource_set evaluation cancelled"),
+        }
+    }
+}
+impl std::error::Error for ResourceSetError {}
+
+/// Current consumer policy, borrowed only for this numeric call.
+pub trait ResourceSetEvaluationContext {
+    fn is_cancelled(&self) -> bool;
+    fn print(&self, message: &str) -> Result<(), ResourceSetError>;
+    fn mnemonic(&self) -> &str;
+}
+
+/// One fresh evaluator per explicit invocation. No producer evaluator, request,
+/// cancellation token, action sink or lock may be retained by the backend.
+pub trait ResourceSetRuntime: fmt::Debug + Send + Sync {
+    fn evaluate(
+        &self,
+        inputs: ResourceSetInputs,
+        context: &dyn ResourceSetEvaluationContext,
+    ) -> Result<ResourceEstimate, ResourceSetError>;
+}
+
+#[derive(Debug, Clone, Dupe, Allocative)]
+pub struct RetainedSpawnResourceSet(Arc<RetainedSpawnResourceSetData>);
+
+#[derive(Debug, Allocative)]
+struct RetainedSpawnResourceSetData {
+    callable: PublishedValueRef,
+    // Executable foreign ownership and allocation belong to the publisher.
+    #[allocative(skip)]
+    runtime: Arc<dyn ResourceSetRuntime>,
+}
+impl RetainedSpawnResourceSet {
+    pub fn from_published(
+        callable: PublishedValueRef,
+        runtime: Arc<dyn ResourceSetRuntime>,
+    ) -> Result<Self, PublishedValueError> {
+        callable.arena().validate_root(callable.node_id())?;
+        if callable.original_slot().is_none() {
+            return Err(PublishedValueError::Invalid("resource_set original root"));
+        }
+        Ok(Self(Arc::new(RetainedSpawnResourceSetData {
+            callable,
+            runtime,
+        })))
+    }
+
+    pub fn published_callable(&self) -> &PublishedValueRef {
+        &self.0.callable
+    }
+
+    pub fn evaluate(
+        &self,
+        inputs: ResourceSetInputs,
+        context: &dyn ResourceSetEvaluationContext,
+    ) -> Result<ResourceEstimate, ResourceSetError> {
+        self.0.runtime.evaluate(inputs, context)
+    }
+
+    /// Typed descriptor allocation only: data, alignment and Arc counters.
+    /// The publisher separately prepays its runtime allocation and originals.
+    /// This layout supplies no admission credit or independent budget.
+    pub fn allocation_layout() -> (usize, usize) {
+        let (layout, _) = Layout::new::<[usize; 2]>()
+            .extend(Layout::new::<RetainedSpawnResourceSetData>())
+            .expect("fixed resource_set descriptor layout");
+        let bytes = layout.pad_to_align().size();
+        (bytes.div_ceil(std::mem::size_of::<usize>()), bytes)
+    }
+
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.0
+            .callable
+            .publication_eq_with(&other.0.callable, state)
+    }
+}
+impl PartialEq for RetainedSpawnResourceSet {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+impl Eq for RetainedSpawnResourceSet {}

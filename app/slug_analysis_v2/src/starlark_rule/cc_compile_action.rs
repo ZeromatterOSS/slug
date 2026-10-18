@@ -1,5 +1,6 @@
 //! Native construction snapshots plus the evaluator-end recipe publication seam.
 //! No command expansion, discovery, execution, or ambient environment reads.
+use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::CppCompileConstruction;
 use slug_build_api_v2::CppCompileData;
 use slug_build_api_v2::CppCompileSpec;
@@ -435,66 +436,93 @@ impl SynchronousAnalysisActionSink {
 pub(super) fn finalize<'v, A>(
     module: &'v Module,
     lowerer: &mut AnalysisValueLowerer<'v>,
-    actions: &mut CtxActions<A>,
-) -> anyhow::Result<()>
+    actions: CtxActions<A>,
+) -> anyhow::Result<CtxActions<A>>
 where
-    A: slug_build_api_v2::RegisterableAction + From<slug_build_api_v2::ActionSpec> + Clone,
+    A: slug_build_api_v2::RegisterableAction + From<slug_build_api_v2::ActionSpec>,
 {
     let pending = slug_loading_v2::cc_compile_action::pending(module);
-    if pending.is_empty() {
-        return Ok(());
-    }
-    let mut merged = Vec::with_capacity(actions.registry().actions().len() + pending.len());
-    let normal = actions.registry().actions();
+    let build =
+        |index, (prepared, variables, context): (PreparedCcCompile<'v>, Value<'v>, Value<'v>)| {
+            let mut pending = prepared.snapshot;
+            let variables = lowerer
+                .lower(variables, &format!("$actions[{index}].variables"))
+                .map_err(anyhow::Error::msg)?;
+            let AnalysisValueKind::CcToolchainVariables(variables) = variables.kind() else {
+                anyhow::bail!("CppCompile requires native Variables");
+            };
+            let compilation_context = lowerer
+                .lower(context, &format!("$actions[{index}].compilation_context"))
+                .map_err(anyhow::Error::msg)?;
+            let [additional, tools, non_code, declared, cache] = prepared.input_depsets;
+            let mandatory = union(
+                DepsetOrder::Default,
+                pending.additional_files.to_vec(),
+                vec![
+                    optional_depset(Some(additional), "additional inputs", lowerer)?,
+                    depset(tools, "tool inputs", lowerer)?,
+                ],
+            )?;
+            pending.construction.mandatory_spawn_inputs = inputs(union(
+                DepsetOrder::Postorder,
+                pending.mandatory_direct.to_vec(),
+                vec![mandatory, depset(non_code, "non-code inputs", lowerer)?],
+            )?)?;
+            pending.construction.declared_headers =
+                inputs(depset(declared, "declared headers", lowerer)?)?;
+            pending.construction.cache_key_inputs =
+                inputs(optional_depset(Some(cache), "cache-only inputs", lowerer)?)?;
+            let spec = CppCompileSpec::new(CppCompileData {
+                construction: pending.construction,
+                variables: variables.clone(),
+                compilation_context,
+            })
+            .map_err(anyhow::Error::msg)?;
+            let mut action = slug_build_api_v2::ActionSpec::cpp_compile(spec);
+            if let Some(group) = pending.exec_group {
+                action = action.with_exec_group(group.to_string());
+            }
+            Ok(action)
+        };
+    merge_pending_actions(
+        actions,
+        pending
+            .into_iter()
+            .map(|row| (row.0.snapshot.normal_action_count, row)),
+        build,
+    )
+}
+
+/// Move the already registered native phase rows through the same checked order.
+/// Empty input preserves the exact owner; failure consumes unpublished phase state.
+pub(super) fn merge_pending_actions<A, P>(
+    actions: CtxActions<A>,
+    pending: impl ExactSizeIterator<Item = (usize, P)>,
+    mut build: impl FnMut(usize, P) -> anyhow::Result<ActionSpec>,
+) -> anyhow::Result<CtxActions<A>>
+where
+    A: slug_build_api_v2::RegisterableAction + From<ActionSpec>,
+{
+    if pending.len() == 0 {
+        return Ok(actions);
+    };
+    let (root, registry) = actions.into_parts();
+    let normal = registry.into_actions();
+    let normal_len = normal.len();
+    let mut merged = Vec::with_capacity(normal_len + pending.len());
+    let mut normal = normal.into_iter();
     let mut cursor = 0;
-    for (index, (prepared, variables, context)) in pending.into_iter().enumerate() {
-        let mut pending = prepared.snapshot;
+    for (index, (boundary, payload)) in pending.enumerate() {
         anyhow::ensure!(
-            pending.normal_action_count >= cursor && pending.normal_action_count <= normal.len(),
+            boundary >= cursor && boundary <= normal_len,
             "CppCompile pending action order is invalid"
         );
-        merged.extend_from_slice(&normal[cursor..pending.normal_action_count]);
-        cursor = pending.normal_action_count;
-        let variables = lowerer
-            .lower(variables, &format!("$actions[{index}].variables"))
-            .map_err(anyhow::Error::msg)?;
-        let AnalysisValueKind::CcToolchainVariables(variables) = variables.kind() else {
-            anyhow::bail!("CppCompile requires native Variables");
-        };
-        let compilation_context = lowerer
-            .lower(context, &format!("$actions[{index}].compilation_context"))
-            .map_err(anyhow::Error::msg)?;
-        let [additional, tools, non_code, declared, cache] = prepared.input_depsets;
-        let mandatory = union(
-            DepsetOrder::Default,
-            pending.additional_files.to_vec(),
-            vec![
-                optional_depset(Some(additional), "additional inputs", lowerer)?,
-                depset(tools, "tool inputs", lowerer)?,
-            ],
-        )?;
-        pending.construction.mandatory_spawn_inputs = inputs(union(
-            DepsetOrder::Postorder,
-            pending.mandatory_direct.to_vec(),
-            vec![mandatory, depset(non_code, "non-code inputs", lowerer)?],
-        )?)?;
-        pending.construction.declared_headers =
-            inputs(depset(declared, "declared headers", lowerer)?)?;
-        pending.construction.cache_key_inputs =
-            inputs(optional_depset(Some(cache), "cache-only inputs", lowerer)?)?;
-        let spec = CppCompileSpec::new(CppCompileData {
-            construction: pending.construction,
-            variables: variables.clone(),
-            compilation_context,
-        })
-        .map_err(anyhow::Error::msg)?;
-        let mut action = slug_build_api_v2::ActionSpec::cpp_compile(spec);
-        if let Some(group) = pending.exec_group {
-            action = action.with_exec_group(group.to_string());
-        }
-        merged.push(action.into());
+        merged.extend(normal.by_ref().take(boundary - cursor));
+        cursor = boundary;
+        merged.push(build(index, payload)?.into());
     }
-    merged.extend_from_slice(&normal[cursor..]);
+    merged.extend(normal);
+    let mut actions = CtxActions::new_typed(root);
     actions.replace_actions(merged)?;
-    Ok(())
+    Ok(actions)
 }

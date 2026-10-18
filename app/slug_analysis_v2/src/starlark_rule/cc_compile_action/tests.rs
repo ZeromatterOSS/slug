@@ -217,3 +217,5 @@ fn native_compile_scanning_override_precedes_configured_requested_conjunction() 
         }
     }
 }
+
+mod consuming;

@@ -389,3 +389,7 @@ impl WorkspaceRuntime {
 #[cfg(test)]
 #[path = "action_chain_staging/tests.rs"]
 mod tests;
+
+#[cfg(feature = "resource-set-test-support")]
+#[path = "action_chain_staging/resource_set_counter.rs"]
+mod resource_set_counter;

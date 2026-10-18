@@ -53,6 +53,29 @@ impl<'v> PublicationBuilder<'v> {
             root_credit: storage::PeakCredit::default(),
         }
     }
+    pub(super) fn resource_storage(
+        &mut self,
+        visits: usize,
+        bytes: usize,
+        temporary: bool,
+    ) -> Result<(), String> {
+        self.graph
+            .charge_storage(slug_build_api_v2::DepsetStorageCharge {
+                nodes: 0,
+                edges: 0,
+                bytes: 0,
+                visits,
+            })
+            .map_err(|e| e.to_string())?;
+        if temporary {
+            self.graph
+                .producer_scratch()
+                .charge_bytes(bytes)
+                .map_err(|e| e.to_string())
+        } else {
+            self.graph.charge_bytes(bytes).map_err(|e| e.to_string())
+        }
+    }
     pub(super) fn add_callable(
         &mut self,
         value: Value<'v>,
@@ -416,3 +439,7 @@ mod storage;
 #[cfg(test)]
 #[path = "graph/record_tests.rs"]
 mod record_tests;
+
+#[cfg(test)]
+#[path = "graph/resource_set_quota_tests.rs"]
+mod resource_set_quota_tests;

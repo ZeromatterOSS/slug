@@ -8,7 +8,9 @@ use super::*;
 #[path = "../source_staging/test_workspace.rs"]
 mod fixture;
 
-const DEFS: &str = r#"def _impl(ctx):
+const DEFS: &str = r#"def _resources(os, count):
+    fail('real-chain-resource-must-not-execute')
+def _impl(ctx):
     seed = ctx.actions.declare_file('seed')
     file = ctx.actions.declare_file('file')
     tree = ctx.actions.declare_directory('tree')
@@ -16,10 +18,10 @@ const DEFS: &str = r#"def _impl(ctx):
     right = ctx.actions.declare_file('right')
     done = ctx.actions.declare_file('done')
     ctx.actions.write(seed, 'seed')
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[file, tree])
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[file], outputs=[left])
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[tree], outputs=[right])
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[left, right], outputs=[done])
+    ctx.actions.run(resource_set=_resources, executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[file, tree])
+    ctx.actions.run(resource_set=_resources, executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[file], outputs=[left])
+    ctx.actions.run(resource_set=_resources, executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[tree], outputs=[right])
+    ctx.actions.run(resource_set=_resources, executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[left, right], outputs=[done])
     return [DefaultInfo(files=depset([done]))]
 stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=True), 'tool':attr.label(allow_single_file=True)})
 "#;

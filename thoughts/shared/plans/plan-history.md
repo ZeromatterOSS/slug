@@ -113,3 +113,12 @@ actual 74-file preservation pass. Exact owned source/document atomic integration
 is pending. Repository/resource/build-info adapters, authentic Rust/M7A/M8,
 action/REAPI, Stage10 and whole-goal memory fit remain open; this scope does not
 select successor implementation.
+
+## October 18 WP1223 general resource callbacks
+
+[Scoped acceptance](slug-v2-subplans/wp1223-general-resource-set-acceptance-2026-10-18.json) records actual original resource callback
+registration/numeric evaluation and remote no-use. Both focused views, broader
+guards, default CLI provenance and all three actual NativeLink integrity cases pass.
+The predecessor was integrated in 0433a9a6842f. Repository/build-info replacement,
+authentic Rust, full closure and Stage 10 remain open. Failed fixture attempts
+are preserved separately; this record predicts no future integration commit.

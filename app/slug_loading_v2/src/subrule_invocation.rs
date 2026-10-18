@@ -59,7 +59,6 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::tuple::AllocTuple;
 use starlark::values::tuple::TupleRef;
-use starlark::values::typing::StarlarkCallable;
 use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -91,10 +90,9 @@ pub enum AnalysisToolchainRequest<'v> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum AnalysisResourceSet {
+pub enum AnalysisResourceSet<'v> {
     None,
-    Unsupported,
-    Recipe(slug_build_api_v2::actions::RetainedSpawnResourceSet),
+    Callable(Value<'v>),
 }
 
 #[derive(Debug, Clone)]
@@ -113,7 +111,7 @@ pub struct AnalysisSpawnRequest<'v> {
     pub execution_requirements: Option<Value<'v>>,
     pub exec_group: Option<&'v str>,
     pub shadowed_action: Option<Value<'v>>,
-    pub resource_set: AnalysisResourceSet,
+    pub resource_set: AnalysisResourceSet<'v>,
     pub toolchain: AnalysisToolchainRequest<'v>,
 }
 
@@ -224,7 +222,7 @@ pub enum EvaluatorVectorMapEachGen<V> {
 mod args_callbacks;
 #[cfg(test)]
 mod args_callbacks_tests;
-mod pending_args;
+pub(crate) mod pending_args;
 pub use pending_args::ArgsSnapshotRegistration;
 pub use pending_args::args_snapshot;
 pub use pending_args::clear_args_snapshots;
@@ -1512,19 +1510,18 @@ fn bind_shell_command(value: Value<'_>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn bind_resource_set(
-    value: Option<Value<'_>>,
-    operation: &str,
-) -> anyhow::Result<AnalysisResourceSet> {
+fn bind_resource_set<'v>(
+    module: &'v Module,
+    value: Option<Value<'v>>,
+    _operation: &str,
+) -> anyhow::Result<AnalysisResourceSet<'v>> {
     let Some(value) = value.filter(|value| !value.is_none()) else {
         return Ok(AnalysisResourceSet::None);
     };
-    let callable: Option<StarlarkCallable<'_>> = StarlarkCallable::unpack_value(value)
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-    if callable.is_some() {
-        return Ok(AnalysisResourceSet::Unsupported);
-    }
-    anyhow::bail!("ctx.actions.{operation} resource_set must be callable or None")
+    // Eligibility inspections are charged on this invocation's collector, not
+    // an unrelated producer/consumer module or a retrospective forecast.
+    crate::resource_set::validate_for_invocation(module, value)?;
+    Ok(AnalysisResourceSet::Callable(value))
 }
 
 fn bind_toolchain<'v>(
@@ -1555,6 +1552,7 @@ fn bind_shadowed_action<'v>(
 
 #[allow(clippy::too_many_arguments)]
 fn bind_run_request<'v>(
+    module: &'v Module,
     sink: &dyn AnalysisActionSink,
     scope: AnalysisActionCallScope,
     outputs: Value<'v>,
@@ -1596,7 +1594,7 @@ fn bind_run_request<'v>(
     bind_input_manifests(input_manifests, "run")?;
     let exec_group = bind_optional_string(exec_group, "ctx.actions.run exec_group")?;
     let shadowed_action = bind_shadowed_action(shadowed_action, "run")?;
-    let resource_set = bind_resource_set(resource_set, "run")?;
+    let resource_set = bind_resource_set(module, resource_set, "run")?;
     let toolchain = bind_toolchain(toolchain, "run")?;
     Ok(AnalysisSpawnRequest {
         scope,
@@ -1620,6 +1618,7 @@ fn bind_run_request<'v>(
 
 #[allow(clippy::too_many_arguments)]
 fn bind_run_shell_request<'v>(
+    module: &'v Module,
     scope: AnalysisActionCallScope,
     outputs: Value<'v>,
     inputs: Option<Value<'v>>,
@@ -1657,7 +1656,7 @@ fn bind_run_shell_request<'v>(
     bind_input_manifests(input_manifests, "run_shell")?;
     let exec_group = bind_optional_string(exec_group, "ctx.actions.run_shell exec_group")?;
     let shadowed_action = bind_shadowed_action(shadowed_action, "run_shell")?;
-    let resource_set = bind_resource_set(resource_set, "run_shell")?;
+    let resource_set = bind_resource_set(module, resource_set, "run_shell")?;
     let toolchain = bind_toolchain(toolchain, "run_shell")?;
     Ok(AnalysisSpawnRequest {
         scope,
@@ -1805,6 +1804,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         let mut request = bind_run_shell_request(
+            eval.module(),
             actions.scope.clone(),
             outputs,
             inputs,
@@ -1866,6 +1866,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         let mut request = bind_run_request(
+            eval.module(),
             actions.action_sink.as_ref(),
             actions.scope.clone(),
             outputs,
@@ -1887,12 +1888,6 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         )?;
         actions.token.require_active("run", actions.context_name)?;
         request.arguments = prepare_link_arguments(request.arguments, eval.heap())?;
-        if matches!(request.resource_set, AnalysisResourceSet::Unsupported)
-            && let Some(recipe) =
-                resource_set.and_then(|callback| crate::resource_set::authenticate(callback, eval))
-        {
-            request.resource_set = AnalysisResourceSet::Recipe(recipe);
-        }
         actions.action_sink.spawn(eval.module(), request)?;
         Ok(NoneType)
     }

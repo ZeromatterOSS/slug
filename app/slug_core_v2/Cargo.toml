@@ -9,6 +9,8 @@ version = "0.1.0"
 [features]
 default = []
 native-probe-observer = []
+# Closed callback-counter instrumentation; absent from ordinary builds.
+resource-set-test-support = []
 
 [dependencies]
 allocative = { workspace = true }

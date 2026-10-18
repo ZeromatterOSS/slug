@@ -238,9 +238,9 @@ args.add_all([{"member": "retained"}], map_each = mapper)
     .unwrap();
     assert!(args_snapshot(&other, &token).is_err());
     assert!(args_snapshot(&module, &other_token).is_err());
-    clear_args_snapshots(&other);
+    clear_args_snapshots(&other).unwrap();
     assert!(other.freeze().is_ok());
-    clear_args_snapshots(&module);
+    clear_args_snapshots(&module).unwrap();
     assert!(args_snapshot(&module, &token).is_err());
     let roots = TupleRef::from_value(module.extra_value().unwrap()).unwrap();
     assert!(

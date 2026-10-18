@@ -197,7 +197,7 @@ fn callback_free_action(spawn: &SpawnSpec) -> ActionSpec {
         spawn.progress_message(),
     );
     if let Some(resource) = spawn.resource_set() {
-        result = result.with_resource_set(resource);
+        result = result.with_resource_set(resource.clone());
     }
     ActionSpec::spawn(result)
 }

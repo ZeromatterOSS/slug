@@ -475,27 +475,16 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
     };
     let base = make("tool", "arg", "out", "env", "req", "Mnemonic", "progress");
     use slug_build_api_v2::actions::RetainedSpawnResourceSet;
-    let source = CanonicalLabel::parse(RetainedSpawnResourceSet::SOURCE_LABEL).unwrap();
-    let recipe =
-        RetainedSpawnResourceSet::new(source.clone(), RetainedSpawnResourceSet::SOURCE_DIGEST)
-            .unwrap();
-    assert_eq!(recipe.source(), RetainedSpawnResourceSet::SOURCE_LABEL);
-    assert_eq!(recipe.digest(), &RetainedSpawnResourceSet::SOURCE_DIGEST);
-    assert_eq!(std::mem::size_of::<Option<RetainedSpawnResourceSet>>(), 1);
-    assert!(
-        RetainedSpawnResourceSet::new(
-            CanonicalLabel::parse("@@rules_cc+//cc/private/link:other.bzl").unwrap(),
-            RetainedSpawnResourceSet::SOURCE_DIGEST,
-        )
-        .is_err()
+    let (recipe, calls) = resource_support::descriptor("unrelated.resource");
+    assert!(recipe.published_callable().original_slot().is_some());
+    assert_eq!(
+        std::mem::size_of::<Option<RetainedSpawnResourceSet>>(),
+        std::mem::size_of::<RetainedSpawnResourceSet>()
     );
-    let mut changed_digest = RetainedSpawnResourceSet::SOURCE_DIGEST;
-    changed_digest[0] ^= 1;
-    assert!(RetainedSpawnResourceSet::new(source, changed_digest).is_err());
     let ordinary = base.spawn_spec().unwrap();
     assert_eq!(ordinary.resource_set(), None);
-    let retained = ordinary.clone().with_resource_set(recipe);
-    assert_eq!(retained.resource_set(), Some(recipe));
+    let retained = ordinary.clone().with_resource_set(recipe.clone());
+    assert_eq!(retained.resource_set(), Some(&recipe));
     assert_eq!(
         retained.render_argv().unwrap(),
         ordinary.render_argv().unwrap()
@@ -514,6 +503,7 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
         &["pkg/params"],
     );
     let forced_resource = forced.clone().with_resource_set(recipe);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert_ne!(forced, forced_resource);
     assert_eq!(
         forced.expand_forced_param_files().unwrap(),
@@ -1863,3 +1853,8 @@ fn forced_param_files_reject_unowned_limits_invalid_paths_and_output_collisions(
 }
 
 mod source_paths;
+
+#[path = "actions/resource_set_tests.rs"]
+mod resource_set_tests;
+#[path = "../../slug_core_v2/src/runtime/source_staging/resource_set_test_support.rs"]
+mod resource_support;

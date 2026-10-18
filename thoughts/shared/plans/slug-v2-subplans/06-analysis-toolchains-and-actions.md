@@ -25,6 +25,30 @@ this launch projection deduplicates inherited names. Configured SymlinkTree
 action environment stays separate. No ambient client resolution, run/test launch
 or Windows runfiles behavior is implied.
 
+## General retained resource callbacks
+
+Direct and genuine subrule run/run_shell retain the original resource callback,
+including empty Args. Registration checks callable/global eligibility without
+invocation. One traced collector feeds the same audited publication graph and
+original slot; callback identity shares provider/Args/action equality. Cumulative
+precopy work and storage transfer once to the same Publisher. Private boxed
+pending/prepared Spawn rows preserve public action layout, and consuming Cc
+finalization preserves pending actions without cloning them.
+
+Explicit numeric evaluation calls the original in a fresh evaluator with Host OS,
+distinct parent-input count and borrowed current cancellation/print/mnemonic.
+Pinned Bazel 9.2 registration and numeric dictionary behavior are exact.
+Structural identity and cooperative limits of 64 MiB, 30 seconds and 50 stack frames are Slug-native;
+they do not establish a hard allocator or RSS fence. Source and generated-input
+remote execution retain this metadata and never invoke it. Local scheduling,
+sandbox/worker/fallback execution and estimate caching remain unsupported.
+
+This replaces earlier registration profiles and resource-only remote refusals.
+Ordinary unsupported execution policies and complete source/owner/integrity
+checks remain. [Scoped evidence](wp1223-general-resource-set-acceptance-2026-10-18.json) covers all four registration routes,
+normal/owned focused tests and real source/chain cache and CAS integrity probes;
+it does not close authentic Rust, selfhosting or whole-command memory fit.
+
 ## General deferred Args callbacks
 
 Args callback profiles for Rust crate/link arguments and Cargo runfiles are
@@ -47,7 +71,7 @@ cooperative and do not establish a hard allocator, instruction or RSS fence.
 Native container materialization uses owning phase-local memo keys and preserves
 shared and distinct empty lists; canonical empty-tuple normalization remains an
 explicit boundary. ArgsWrite query/execution and Spawn ActionKey stay deferred.
-Repository-process, resource, build-info and Apple tuple adapters remain
+Repository-process and build-info adapters remain
 replacement-required. These APIs do not close authentic Rust, memory, M7A or M8.
 
 ## Original function-valued providers (WP1221)
@@ -2486,16 +2510,9 @@ retained action/key/cache/identity owner or native link action family is added.
 Both-route root/subrule snapshots, forced parameter bytes, source/configuration
 restoration, original-variable freeze and actual GC protect this handoff.
 
-The sole pinned rules_cc0.2.17 link resource callback admits registration only:
-concrete Def plus unique canonical/parsed/evaluated source identity and exact
-retained opening call span authenticate its fixed module-global expression.
-Failed authority remains ordinary late unsupported handling. SpawnSpec retains
-one compact immutable kind in publication equality, without callback Value,
-heap or estimate. Root wrapped registration and both-route source/configuration
-restoration use unchanged public finalize; genuine child preserves earlier
-suspended-root workspace_name refusal. Core source/prerequisite input traversal
-and shared REAPI Spawn projection refuse this metadata before execution/CAS;
-generic callbacks, estimates, resource overrides and scheduling remain deferred.
+The earlier registration-only resource profile is superseded by the general
+retained resource callback contract above. No native API table establishes
+complete compiler/linker execution or selfhosting.
 
 ## Library SONAME
 

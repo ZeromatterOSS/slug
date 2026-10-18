@@ -1,5 +1,4 @@
-//! Unchanged public finalize registers the finite callback on the generic Spawn.
-use slug_build_api_v2::actions::RetainedSpawnResourceSet;
+//! Unchanged public finalize retains its original callback on the generic Spawn.
 
 use super::super::cc_configure_features::config;
 use super::*;
@@ -55,9 +54,32 @@ fn assert_registration(result: &ConfiguredNodeResult, marker: &str, mode: &str) 
     };
     assert_eq!(action.exec_group(), Some("cpp_link"));
     let spawn = action.spawn_spec().unwrap();
-    let recipe = spawn.resource_set().expect("finite resource descriptor");
-    assert_eq!(recipe.source(), RetainedSpawnResourceSet::SOURCE_LABEL);
-    assert_eq!(recipe.digest(), &RetainedSpawnResourceSet::SOURCE_DIGEST);
+    let original = spawn.resource_set().expect("original resource callback");
+    assert!(original.published_callable().original_slot().is_some());
+    let context = resource_support::Context::default();
+    for (os, count, memory) in [
+        (slug_build_api_v2::actions::ResourceSetOs::Linux, 0, 50.0),
+        (slug_build_api_v2::actions::ResourceSetOs::Osx, 20, 16.0),
+        (
+            slug_build_api_v2::actions::ResourceSetOs::Windows,
+            20,
+            1520.0,
+        ),
+    ] {
+        let estimate = original
+            .evaluate(
+                slug_build_api_v2::actions::ResourceSetInputs {
+                    os,
+                    parent_input_count: count,
+                },
+                &context,
+            )
+            .unwrap();
+        assert_eq!(
+            (estimate.memory_mb, estimate.cpu, estimate.local_test),
+            (memory, 1.0, 0)
+        );
+    }
     assert_eq!(
         spawn.render_argv().unwrap(),
         ["runner".to_owned(), format!("--stamp={marker}:{mode}")]
@@ -145,7 +167,7 @@ async fn unchanged_finalize_registers_resource_metadata_and_restores_source_conf
         let mut changed_source = pinned_source.clone();
         changed_source.extend_from_slice(b"\n# changed source certificate\n");
         fs::write(&pinned_path, changed_source).unwrap();
-        let error = super::request_configured(
+        let changed_callback = super::request_configured(
             &dice,
             &root,
             root_epoch(&root),
@@ -154,11 +176,9 @@ async fn unchanged_finalize_registers_resource_metadata_and_restores_source_conf
             fast.clone(),
         )
         .await
-        .unwrap_err();
-        assert!(
-            error.contains("callable resource_set is not supported"),
-            "{error}"
-        );
+        .unwrap();
+        assert_registration(&changed_callback, "A", "fastbuild");
+        assert_ne!(changed_callback, first);
         fs::write(&pinned_path, pinned_source).unwrap();
         assert_eq!(
             super::request_configured(
@@ -187,3 +207,6 @@ async fn unchanged_finalize_registers_resource_metadata_and_restores_source_conf
         fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[path = "../../../slug_core_v2/src/runtime/source_staging/resource_set_test_support.rs"]
+mod resource_support;

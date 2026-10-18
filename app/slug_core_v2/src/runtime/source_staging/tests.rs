@@ -4,12 +4,7 @@ use super::*;
 
 #[test]
 fn resource_metadata_refuses_before_malformed_declared_inputs() {
-    use slug_build_api_v2::actions::RetainedSpawnResourceSet;
-    let recipe = RetainedSpawnResourceSet::new(
-        CanonicalLabel::parse(RetainedSpawnResourceSet::SOURCE_LABEL).unwrap(),
-        RetainedSpawnResourceSet::SOURCE_DIGEST,
-    )
-    .unwrap();
+    let (resource, calls) = resource_support::descriptor("unrelated.staging");
     let source = AnalysisArtifact::Source(CanonicalLabel::parse("@@//:unobserved").unwrap());
     let mut malformed = FilesToRunProvider::empty();
     malformed.executable = Some(source.clone());
@@ -33,11 +28,10 @@ fn resource_metadata_refuses_before_malformed_declared_inputs() {
             "omit its executable"
         }));
         assert_eq!(
-            declared_artifacts(&ordinary.with_resource_set(recipe))
-                .unwrap_err()
-                .as_ref(),
-            "Spawn resource_set execution is not admitted",
+            declared_artifacts(&ordinary.with_resource_set(resource.clone())).unwrap_err(),
+            previous,
         );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 }
 
@@ -460,3 +454,6 @@ fn build_owner(runtime: &WorkspaceRuntime, name: &str) -> ConfiguredTargetKey {
         .unwrap()
         .clone()
 }
+
+#[path = "resource_set_test_support.rs"]
+mod resource_support;
