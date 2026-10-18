@@ -1818,7 +1818,7 @@ impl ActionSpec {
                 (ActionPayload::Symlink(l), ActionPayload::Symlink(r)) => l == r,
                 (ActionPayload::SolibSymlink(l), ActionPayload::SolibSymlink(r)) => l == r,
                 (ActionPayload::BuildInfoTransform(l), ActionPayload::BuildInfoTransform(r)) => {
-                    l == r
+                    l.publication_eq_with(r, state)
                 }
                 _ => false,
             }

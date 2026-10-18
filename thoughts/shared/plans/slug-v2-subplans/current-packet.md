@@ -1,60 +1,53 @@
-# General retained Spawn resource callbacks
+# Original build-info callbacks and native rendering
 
-Packet: WP-7-423-m7a-general-resource-set
+Packet: WP-7-424-m7a-general-build-info-transform
 
 Status: SCOPED_CAPABILITY_ACCEPTED; exact owned atomic integration pending.
-[Acceptance record](wp1223-general-resource-set-acceptance-2026-10-18.json).
+[Acceptance record](wp1224-general-build-info-transform-acceptance-2026-10-18.json).
 
-## Outcome and classification
+## Observable capability
 
-Direct and genuine subrule run/run_shell register actual Starlark callbacks,
-including empty Args. The source/hash/callsite resource recipe is removed.
-Original globals, captures, source/mapping authority and aliases share the same
-audited provider/Args/action graph and equality state. Registration and query do
-not invoke callbacks. Explicit numeric evaluation uses the original callable;
-remote source and generated-input chains retain metadata without invoking it.
+Build-info actions retain and evaluate actual original Starlark callbacks.
+Metadata/query invoke zero times; native ordinary and builtin Source execution
+invokes once per attempt and validates actual source/status authority before
+publication. Source A/B/A, current print/cancel, aliases, GC, refusal and physical
+mutation controls pass. This advances the native-action prerequisite for the
+public Rust/Slug closure. No public bootstrap command was rerun for this component.
 
-Bazel 9.2 registration/globality, numeric dictionary behavior and remote no-use
-are exact source-pinned APIs. Structural identity, bounded storage and cooperative
-numeric runtime limits are Slug-native. Local scheduling, sandbox/worker/fallback
-execution and estimate caching remain unsupported.
+The shared collector/Publisher/equality graph, prepaid storage and borrowed
+consumer context are specified in [Stage6](06-analysis-toolchains-and-actions.md).
+Pinned Bazel callable/access/parsing/dictionary/replacement slices are exact.
+Status ordering, valid-Unicode final Latin1 encoding, structural identity and
+cooperative limits are Slug-native. Derived-template producer-result integration
+and remote BuildInfo execution remain deferred.
 
-One traced collector and cumulative poisoned ledger prepay storage and transfer
-once to the same Publisher before provider copying. Four-slot roots, original
-slots and private boxed Spawn rows preserve complete public action layout.
-Consuming Cc finalization moves pending actions; failure publishes no batch.
+## Executed gates and integration
 
-## Executed evidence
+Normal and isolated owned views each cover 163 focused selectors, including a
+separate present-empty SOURCE_DATE_EPOCH run. Qualified passed nodes remain
+valid despite failed historical outer attempts; those attempts remain failures.
+Broader actions/Analysis suites pass 432 lane executions. A fresh normal default
+CLI build and isolated owned default CLI check pass with default-only features.
+Owned check does not claim a separately linked binary. NativeLink backend proof
+from WP1223 remains historical; this native-only change adds no backend claim.
 
-Normal and isolated owned views each cover 80 focused selectors. Current REAPI 13
-replaces its older execution within that total; repeated checks are not added to
-the unique count. Broader BuildAPI actions and Analysis library guards total 394.
-All three required separately fresh verifying NativeLink cases pass: source
-cold/hit/change and incomplete/corrupt CAS, generated-input cache/change/restore,
-and generated CAS eviction/corruption plus producer failures. Actual original
-would-error positive controls reset before exact zero transport counters.
+The final 50-path source view has 14 new private source/test leaves, 2,520 normal
+and 2,517 owned source/config pins. Root owns projection, LIVE and integration;
+inherited dirty work is preserved separately. Independent source and runtime
+review pass. Narrow documents and exact atomic integration are the final gates;
+this text predicts no future commit result.
 
-Fresh normal developer CLI build and separate owned CLI check pass with Core
-default-only features. Closed counter instrumentation is absent from ordinary
-builds. The final view of 2,504 source files and projection of 56 owned paths preserve
-inherited dirty ownership. Earlier failed fixture/watchdog attempts remain failed evidence;
-the corrected probe requires real read/cleanup/missing responses and real source
-staging digest rejection. No timeout counts as integrity rejection.
+## Next concrete blocker
 
-## Integration and next blocker
+General repository process/workspace execution must replace the remaining GCC
+ProbeForm/argv/effect and Homebrew caller profiles. It needs one real sequential
+workspace, command-fresh actual Host process observations, bounded storage and
+complete Linux confinement/lifecycle authority. Source-only readiness is not an
+activated successor or proof that these platform gates exist.
 
-Baseline 0433a9a6842fab862c36ab57107a0524272cffdc. Root owns LIVE, index,
-projection, validation and integration; workers use disjoint TARGET candidates.
-Final source/runtime review is accepted; document and exact owned atomic commit
-remain final integration gates. No future commit result is predicted.
-
-Repository-process and build-info adapters remain replacement-required. The next
-general API decision is actual build-info callback publication/native rendering;
-its source-only readiness has not activated a successor. Authentic Rust analysis,
-required action comparison, real Rust REAPI execution, full Slug closure,
-Stage 10 fixed point and whole-goal memory fit remain open. No public query was
-rerun for this component. The predecessor used diagnostic query destination must
-never be reused.
+Authentic configured Rust analysis, required action comparison, Rust REAPI build,
+complete Slug closure, Stage 10 fixed point and equivalent-command memory fit
+remain open. The predecessor used query destination must never be reused.
 
 Contracts: [Stage4](04-starlark-loading-and-build-packages.md),
 [Stage6](06-analysis-toolchains-and-actions.md),

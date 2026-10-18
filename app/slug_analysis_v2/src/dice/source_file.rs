@@ -473,3 +473,8 @@ async fn resolve_root_source_input(
         }
     }
 }
+
+mod content;
+pub use content::ObservedSourceFile;
+pub use content::SourceFileContent;
+pub use content::resolve_source_file_input_observed;

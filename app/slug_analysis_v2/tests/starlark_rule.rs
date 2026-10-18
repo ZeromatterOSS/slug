@@ -15964,3 +15964,6 @@ mod builtin_fixture;
 
 #[path = "starlark_rule/resource_set_tests.rs"]
 mod resource_set_tests;
+
+#[path = "starlark_rule/build_info_transform_tests.rs"]
+mod build_info_transform_tests;

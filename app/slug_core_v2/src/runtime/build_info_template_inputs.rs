@@ -1,11 +1,10 @@
-//! Tracked installed BuildInfo template content, without status or execution authority.
+//! Tracked Source BuildInfo template content, without status or execution authority.
 
 use slug_analysis_v2::ConfiguredAction;
 use slug_analysis_v2::ConfiguredBuildInfoActionView;
-use slug_analysis_v2::ObservedCatalogSourceFile;
-use slug_analysis_v2::resolve_catalog_source_input_observed;
+use slug_analysis_v2::ObservedSourceFile;
+use slug_analysis_v2::resolve_source_file_input_observed;
 use slug_build_api_v2::AnalysisArtifact;
-use slug_build_api_v2::BuildInfoTransformKind;
 
 use super::source_staging::checked_build_frontier;
 use super::*;
@@ -17,14 +16,14 @@ pub(super) struct BuildInfoTemplatePreparationKey {
     action: usize,
 }
 
-/// DICE metadata retains the selected action and original immutable catalog owner.
+/// DICE metadata retains the selected action and original immutable content owner.
 /// A held handle also keeps the evaluation graph alive. No filesystem lease is needed.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(super) struct BuildInfoTemplateInputs {
     evaluation: Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
     owner: usize,
     action: usize,
-    source: ObservedCatalogSourceFile,
+    source: ObservedSourceFile,
     observations: PathObservationEpoch,
     certificate: SourceCertificate,
 }
@@ -38,7 +37,7 @@ impl BuildInfoTemplateInputs {
         &self.evaluation().action_closure.owners()[self.owner].actions()[self.action]
     }
 
-    pub(super) fn source(&self) -> &ObservedCatalogSourceFile {
+    pub(super) fn source(&self) -> &ObservedSourceFile {
         &self.source
     }
 
@@ -69,21 +68,9 @@ pub(super) fn checked_template_label<'a>(
     }
     let AnalysisArtifact::Source(label) = view.template() else {
         return Err(error(
-            "BuildInfo template preparation requires an installed Source template",
+            "BuildInfo Derived template execution requires a verified producer output and source frontier",
         ));
     };
-    let target = match view.callback().kind() {
-        BuildInfoTransformKind::Info => "non_volatile_file.h.template",
-        BuildInfoTransformKind::Version => "volatile_file.h.template",
-    };
-    if label.package().repo().as_str() != "bazel_tools"
-        || label.package().package().as_str() != "tools/build_defs/build_info/templates"
-        || label.target().as_str() != target
-    {
-        return Err(error(
-            "BuildInfo template differs from its installed callback role",
-        ));
-    }
     Ok(label)
 }
 
@@ -134,19 +121,13 @@ impl BuildInfoTemplatePreparationKey {
             })?;
         let label = checked_template_label(action, &self.build.workspace, &self.owner)?;
         let source =
-            match resolve_catalog_source_input_observed(ctx, &self.build.workspace, label).await {
+            match resolve_source_file_input_observed(ctx, &self.build.workspace, label).await {
                 PreparationOutcome::Need(need) => return Ok(PreparationOutcome::Need(need)),
                 PreparationOutcome::Complete(result) => {
                     result.map_err(|value| error(format!("{value:?}")))?
                 }
             };
-        source
-            .result()
-            .as_ref()
-            .map_err(error)?
-            .as_ref()
-            .as_ref()
-            .map_err(error)?;
+        source.result().as_ref().map_err(error)?;
         let observations =
             union_build_observations(&observations, source.observations()).map_err(error)?;
         let certificate = SourceCertificate::from_epoch(observations.dupe()).map_err(error)?;

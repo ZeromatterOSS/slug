@@ -15,7 +15,7 @@ use crate::runtime::action_output_staging::ActionOutputStaging;
 use crate::runtime::action_output_staging::PublishedActionOutputs;
 use crate::runtime::configured_output::ConfiguredOutputOwner;
 
-pub(super) const MAX_HEADER_BYTES: usize = 2 * 1024 * 1024;
+pub(super) const MAX_HEADER_BYTES: usize = slug_build_api_v2::BUILD_INFO_MAX_OUTPUT_BYTES;
 pub(super) fn check_header_size(length: usize) -> io::Result<()> {
     if length > MAX_HEADER_BYTES {
         Err(io::Error::other(
@@ -104,8 +104,6 @@ impl NativeBuildInfoHeaderPublicationRoot {
         {
             return Err(io::Error::other("header prepared owner differs"));
         }
-        // The precomputed body supplies only its already-owned resource length.
-        check_header_size(inputs.header.len())?;
         self.origin.publish(&mut terminal.physical)?;
         let consumed = terminal
             .physical
@@ -242,7 +240,6 @@ impl NativeCommandRoot for NativeBuildInfoHeaderPublicationRoot {
             {
                 return Err(computation("header terminal already prepared"));
             }
-            check_header_size(terminal.original.header.len()).map_err(computation)?;
             let owner = context.command.runtime.configured_output.clone();
             self.origin
                 .complete(&mut terminal.physical, context)

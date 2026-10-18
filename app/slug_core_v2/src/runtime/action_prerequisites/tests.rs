@@ -61,9 +61,10 @@ fn resource_metadata_refuses_before_source_and_generated_prerequisites() {
 
 #[test]
 fn build_info_transforms_and_constant_outputs_refuse_before_prerequisite_traversal() {
-    use slug_build_api_v2::BuildInfoCallbackRecipe;
+    use slug_build_api_v2::BuildInfoTransformHeader;
     use slug_build_api_v2::BuildInfoTransformKind;
     use slug_build_api_v2::BuildInfoTransformSpec;
+    use slug_build_api_v2::RetainedBuildInfoTransform;
     use slug_build_api_v2::WorkspaceStatusArtifacts;
     let statuses = WorkspaceStatusArtifacts::new(
         slug_workspace_v2::NormalizedAbsolutePath::new("/workspace").unwrap(),
@@ -84,18 +85,36 @@ fn build_info_transforms_and_constant_outputs_refuse_before_prerequisite_travers
             ),
         ),
     ] {
+        #[derive(Debug)]
+        struct NoRender;
+        impl slug_build_api_v2::BuildInfoTransformRuntime for NoRender {
+            fn render(
+                &self,
+                _: &[u8],
+                _: &[u8],
+                _: &dyn slug_build_api_v2::BuildInfoEvaluationContext,
+            ) -> Result<Vec<u8>, slug_build_api_v2::BuildInfoTransformError> {
+                panic!("prerequisite metadata must not invoke")
+            }
+        }
+        let (published, calls) = resource_support::descriptor("unrelated.build_info.prerequisite");
         let spec = BuildInfoTransformSpec::new(
-            status.clone(),
-            AnalysisArtifact::Source(CanonicalLabel::parse("@@//:unobserved.template").unwrap()),
-            output.clone(),
-            BuildInfoCallbackRecipe::new(
+            BuildInfoTransformHeader::new(
                 kind,
-                CanonicalLabel::parse(BuildInfoCallbackRecipe::SOURCE_LABEL).unwrap(),
-                BuildInfoCallbackRecipe::SOURCE_DIGEST,
+                status.clone(),
+                AnalysisArtifact::Source(
+                    CanonicalLabel::parse("@@//:unobserved.template").unwrap(),
+                ),
+                output.clone(),
             )
             .unwrap(),
-        )
-        .unwrap();
+            RetainedBuildInfoTransform::from_published(
+                published.published_callable().clone(),
+                Arc::new(NoRender),
+            )
+            .unwrap(),
+        );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
         let closure = ValidatedActionClosure::new(Arc::from([node(
             owner.clone(),
             vec![ActionSpec::build_info_transform(spec)],

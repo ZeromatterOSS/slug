@@ -2570,7 +2570,7 @@ pub(crate) fn evaluate_loaded_rule(
         .map(|action| {
             let inputs = action.lower_inputs(&module, &mut lowerer, &executable_provenance)?;
             let preparing_lowerer = std::cell::RefCell::new(&mut lowerer);
-            action.prepare_with_inputs(
+            action.prepare_with_callbacks(
                 &module,
                 inputs,
                 &mut |snapshot| {
@@ -2580,6 +2580,13 @@ pub(crate) fn evaluate_loaded_rule(
                 },
                 &mut |token| {
                     resource_set::prepare(
+                        &mut preparing_publisher.borrow_mut(),
+                        token,
+                        &mut preparing_lowerer.borrow_mut(),
+                    )
+                },
+                &mut |token| {
+                    build_info_transform::prepare(
                         &mut preparing_publisher.borrow_mut(),
                         token,
                         &mut preparing_lowerer.borrow_mut(),
@@ -2670,9 +2677,11 @@ pub(crate) fn evaluate_loaded_rule(
             prepared
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("missing prepared action"))?
-                .complete_with_resource_sets(&mut |draft| publisher.complete(draft), &mut |draft| {
-                    resource_set::complete(&publisher, draft)
-                })
+                .complete_with_callbacks(
+                    &mut |draft| publisher.complete(draft),
+                    &mut |draft| resource_set::complete(&publisher, draft),
+                    &mut |draft| build_info_transform::complete(&publisher, draft),
+                )
         })
         .map_err(|error| error.to_string())?;
     let providers = complete_runfiles_support(

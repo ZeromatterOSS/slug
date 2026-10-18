@@ -122,3 +122,12 @@ guards, default CLI provenance and all three actual NativeLink integrity cases p
 The predecessor was integrated in 0433a9a6842f. Repository/build-info replacement,
 authentic Rust, full closure and Stage 10 remain open. Failed fixture attempts
 are preserved separately; this record predicts no future integration commit.
+
+## October 18 WP1224 original build-info callbacks
+
+[Scoped acceptance](slug-v2-subplans/wp1224-general-build-info-transform-acceptance-2026-10-18.json) records original callback publication and
+one-shot native Source rendering, replacing the build-info recipe family. Both
+focused views, broader guards and default CLI provenance pass. Failed attempts
+remain preserved; prior NativeLink results are historical. Repository-process
+profiles are the next blocker; authentic Rust, full closure and Stage 10 remain
+open. This preintegration record predicts no future commit result.

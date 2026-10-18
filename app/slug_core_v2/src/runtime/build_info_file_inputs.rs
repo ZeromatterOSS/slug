@@ -1,7 +1,9 @@
-//! Current native publication reads actual status bytes into the checked renderer.
+//! One original callback invocation followed by exact physical-input validation.
 use std::io;
 
 use slug_analysis_v2::ConfiguredBuildInfoActionView;
+use slug_build_api_v2::BuildInfoEvaluationContext;
+use slug_build_api_v2::BuildInfoTransformError;
 
 use super::build_info_native_inputs::BuildInfoNativeInputs;
 use super::build_info_native_inputs::BuildInfoNativeInputsKey;
@@ -9,6 +11,9 @@ use super::workspace_status_file_inputs::WorkspaceStatusFileInputs;
 use super::workspace_status_publication::WorkspaceStatusPublicationRoot;
 use super::workspace_status_publication::WorkspaceStatusPublicationTerminal;
 use super::*;
+
+#[path = "build_info_file_inputs/control.rs"]
+mod control;
 
 #[derive(Clone)]
 pub(super) struct NativeBuildInfoFileInputsRoot {
@@ -19,7 +24,7 @@ pub(super) struct NativeBuildInfoFileInputsTerminal {
     pub(super) publication: WorkspaceStatusPublicationTerminal,
     original: Arc<BuildInfoNativeInputs>,
     origin: Arc<WorkspaceStatusPublicationRoot>,
-    permit: Option<Arc<Mutex<Option<ReadPermit>>>>,
+    permit: Arc<Mutex<Option<ReadPermit>>>,
     pub(super) consumed: Option<Arc<ConsumedBuildInfo>>,
 }
 impl NativeBuildInfoFileInputsTerminal {
@@ -29,10 +34,15 @@ impl NativeBuildInfoFileInputsTerminal {
 }
 // The slot is shared by terminal clones; grants themselves cannot be cloned.
 enum ReadPermit {
-    Prepared(Arc<BuildInfoNativeInputs>),
+    Unevaluated(Arc<BuildInfoNativeInputs>),
+    Prepared {
+        inputs: Arc<BuildInfoNativeInputs>,
+        header: Vec<u8>,
+    },
     Published {
         inputs: Arc<BuildInfoNativeInputs>,
         files: Arc<WorkspaceStatusFileInputs>,
+        header: Vec<u8>,
     },
 }
 #[derive(Debug)]
@@ -60,37 +70,23 @@ impl NativeBuildInfoFileInputsRoot {
         }
         Ok(())
     }
-    fn take_permit(
-        &self,
-        terminal: &NativeBuildInfoFileInputsTerminal,
-        published: bool,
-    ) -> io::Result<ReadPermit> {
+    fn take_permit(&self, terminal: &NativeBuildInfoFileInputsTerminal) -> io::Result<ReadPermit> {
         let permit = terminal
             .permit
-            .as_ref()
-            .ok_or_else(|| io::Error::other("physical BuildInfo has no read permit"))?
             .lock()
             .map_err(|_| io::Error::other("physical BuildInfo read permit poisoned"))?
             .take()
             .ok_or_else(|| io::Error::other("physical BuildInfo read permit spent"))?;
-        // Every attempted use spends the shared grant, including binding/phase errors.
-        // The lock is released before checks and synchronous filesystem work.
+        // Even a foreign owner or phase error spends this shared grant. The
+        // guard is gone before validation, DICE completion, VM or filesystem IO.
         self.check_original(terminal)?;
-        if !matches!(
-            (&permit, published),
-            (ReadPermit::Prepared(_), false) | (ReadPermit::Published { .. }, true)
-        ) {
-            return Err(io::Error::other(
-                "physical BuildInfo read permit phase differs",
-            ));
-        }
         Ok(permit)
     }
     pub(super) fn publish_files(
         &self,
         terminal: &mut NativeBuildInfoFileInputsTerminal,
     ) -> io::Result<Arc<WorkspaceStatusFileInputs>> {
-        let ReadPermit::Prepared(inputs) = self.take_permit(terminal, false)? else {
+        let ReadPermit::Prepared { inputs, header } = self.take_permit(terminal)? else {
             return Err(io::Error::other(
                 "physical BuildInfo publication permit spent",
             ));
@@ -101,13 +97,12 @@ impl NativeBuildInfoFileInputsRoot {
         let files = self.origin.publish_with_files(&mut terminal.publication)?;
         *terminal
             .permit
-            .as_ref()
-            .unwrap()
             .lock()
             .map_err(|_| io::Error::other("physical BuildInfo read permit poisoned"))? =
             Some(ReadPermit::Published {
                 inputs,
                 files: files.clone(),
+                header,
             });
         Ok(files)
     }
@@ -119,7 +114,8 @@ impl NativeBuildInfoFileInputsRoot {
         let ReadPermit::Published {
             inputs,
             files: issued,
-        } = self.take_permit(terminal, true)?
+            header,
+        } = self.take_permit(terminal)?
         else {
             return Err(io::Error::other(
                 "physical BuildInfo files have not published",
@@ -134,20 +130,9 @@ impl NativeBuildInfoFileInputsRoot {
         )
         .map_err(|e| io::Error::other(e.to_string()))?;
         let mut scratch = [0; 8236];
-        let actual = files.read(&inputs.status, view.status(), &mut scratch)?;
-        let source = inputs
-            .template
-            .source()
-            .result()
-            .as_ref()
-            .map_err(|e| io::Error::other(e.to_string()))?
-            .as_ref()
-            .as_ref()
-            .map_err(|e| io::Error::other(e.to_string()))?;
-        let header = view
-            .callback()
-            .render_supplied_bytes(actual, source.bytes())
-            .map_err(|e| io::Error::other(e.to_string()))?;
+        // This proves actual bytes equal the exact captured bytes already
+        // passed to the original callback. Validation never calls it again.
+        files.read(&inputs.status, view.status(), &mut scratch)?;
         terminal.consumed = Some(Arc::new(ConsumedBuildInfo {
             inputs,
             files,
@@ -184,35 +169,84 @@ impl NativeCommandRoot for NativeBuildInfoFileInputsRoot {
         &self,
         tx: &mut dice::DiceTransaction,
     ) -> Result<PreparationOutcome<Self::Terminal>, NativeDemandSessionError> {
-        Ok(self
-            .origin
-            .compute(tx)
-            .await?
-            .map(|publication| NativeBuildInfoFileInputsTerminal {
-                original: publication.inputs.clone(),
-                publication,
-                origin: self.origin.clone(),
-                permit: None,
-                consumed: None,
-            }))
+        match self.origin.compute(tx).await? {
+            PreparationOutcome::Need(need) => Ok(PreparationOutcome::Need(need)),
+            PreparationOutcome::Complete(publication) => {
+                // Native fixed control is admitted at its actual owner, before
+                // the allocation; the runtime's separate single invocation
+                // ledger covers all input-scaled parsing/VM/rendering work.
+                control::admit().map_err(computation)?;
+                let original = publication.inputs.clone();
+                // Issued before any terminal clone. A second complete can never
+                // mint an independent callback or physical-publication grant.
+                let permit = Arc::new(Mutex::new(Some(ReadPermit::Unevaluated(original.clone()))));
+                Ok(PreparationOutcome::Complete(
+                    NativeBuildInfoFileInputsTerminal {
+                        original,
+                        publication,
+                        origin: self.origin.clone(),
+                        permit,
+                        consumed: None,
+                    },
+                ))
+            }
+        }
     }
+
     fn complete<'a>(
         &'a self,
         terminal: &'a mut Self::Terminal,
         context: NativeCommandCompletionContext<'a, '_>,
     ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
         async move {
-            self.check_original(terminal).map_err(computation)?;
-            if terminal.permit.is_some() || terminal.consumed.is_some() {
+            let ReadPermit::Unevaluated(inputs) =
+                self.take_permit(terminal).map_err(computation)?
+            else {
                 return Err(computation("physical BuildInfo terminal already prepared"));
+            };
+            if !Arc::ptr_eq(&inputs, &terminal.original) || terminal.consumed.is_some() {
+                return Err(computation("physical BuildInfo evaluation owner differs"));
             }
-            // No permit lock exists across the inherited capture/DICE completion.
+            let sink = context.callback_output.ok_or_else(|| {
+                computation("native BuildInfo callback requires a current output sink")
+            })?;
+            let scope = context.command.runtime.source_scope.as_deref();
+            // The single grant is already spent, with no mutex held across
+            // inherited capture validation or the original evaluator below.
             self.origin
                 .complete(&mut terminal.publication, context)
                 .await?;
-            terminal.permit = Some(Arc::new(Mutex::new(Some(ReadPermit::Prepared(
-                terminal.original.clone(),
-            )))));
+            let view = ConfiguredBuildInfoActionView::from_configured_action(
+                inputs.template.action(),
+                &inputs.status.capture.workspace,
+            )
+            .map_err(computation)?;
+            let source = inputs
+                .template
+                .source()
+                .result()
+                .as_ref()
+                .map_err(computation)?;
+            let callback_context = RequestBuildInfoContext {
+                scope,
+                sink,
+                mnemonic: view.action().mnemonic(),
+            };
+            let header = view
+                .callback()
+                .render(
+                    inputs.status.bytes(view.status().kind()),
+                    source.bytes(),
+                    &callback_context,
+                )
+                .map_err(computation)?;
+            super::build_info_header_publication::check_header_size(header.len())
+                .map_err(computation)?;
+            *terminal
+                .permit
+                .lock()
+                .map_err(|_| computation("physical BuildInfo read permit poisoned"))? =
+                Some(ReadPermit::Prepared { inputs, header });
             Ok(())
         }
     }
@@ -222,5 +256,23 @@ impl NativeCommandRoot for NativeBuildInfoFileInputsRoot {
     }
     fn publication_completed(&self, terminal: &Self::Terminal) -> bool {
         self.origin.publication_completed(&terminal.publication)
+    }
+}
+
+/// Borrows the current native consumer only while its original callable runs.
+struct RequestBuildInfoContext<'a> {
+    scope: Option<&'a source_service::SourceServiceScope>,
+    sink: &'a NativeCallbackOutput<'a>,
+    mnemonic: &'a str,
+}
+impl BuildInfoEvaluationContext for RequestBuildInfoContext<'_> {
+    fn is_cancelled(&self) -> bool {
+        self.scope.is_some_and(|scope| scope.is_cancelled())
+    }
+    fn print(&self, text: &str) -> Result<(), BuildInfoTransformError> {
+        (self.sink)(text)
+    }
+    fn mnemonic(&self) -> &str {
+        self.mnemonic
     }
 }

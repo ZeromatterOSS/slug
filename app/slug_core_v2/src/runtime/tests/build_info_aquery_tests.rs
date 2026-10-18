@@ -11,7 +11,7 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionOutputMetadata;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::AnalysisArtifact;
-use slug_build_api_v2::BuildInfoCallbackRecipe;
+use slug_build_api_v2::BuildInfoTransformHeader;
 use slug_build_api_v2::BuildInfoTransformSpec;
 use slug_build_api_v2::WorkspaceStatusArtifacts;
 use slug_query_v2::AqueryScope;
@@ -242,13 +242,11 @@ async fn build_info_aquery_real_producer_fields_scopes_and_borrowed_owners() {
             assert!(std::ptr::eq(view.template(), spec.template()));
             assert!(std::ptr::eq(view.callback(), spec.callback()));
             assert!(std::ptr::eq(view.output(), spec.output()));
-            assert_eq!(
-                view.callback().source().to_string(),
-                BuildInfoCallbackRecipe::SOURCE_LABEL
-            );
-            assert_eq!(
-                view.callback().digest(),
-                &BuildInfoCallbackRecipe::SOURCE_DIGEST
+            assert!(
+                view.callback()
+                    .published_callable()
+                    .original_slot()
+                    .is_some()
             );
             assert_eq!(view.output().metadata(), metadata);
             assert_eq!(view.status().root().workspace(), evaluation.workspace());
@@ -425,15 +423,16 @@ async fn build_info_aquery_metadata_guards_info_identity_and_priority() {
     let original = build_info_owner(evaluation);
     let spec = original.actions()[1].build_info_transform_spec().unwrap();
     let make = |template: AnalysisArtifact| {
-        ActionSpec::build_info_transform(
-            BuildInfoTransformSpec::new(
+        ActionSpec::build_info_transform(BuildInfoTransformSpec::new(
+            slug_build_api_v2::BuildInfoTransformHeader::new(
+                spec.kind(),
                 spec.status().clone(),
                 template,
                 spec.output().clone(),
-                spec.callback().clone(),
             )
             .unwrap(),
-        )
+            spec.callback().clone(),
+        ))
     };
     let foreign_workspace = NormalizedAbsolutePath::new("/foreign").unwrap();
     let foreign = BuildCommandEvaluation {
@@ -633,5 +632,19 @@ async fn build_info_aquery_metadata_guards_info_identity_and_priority() {
                 .to_string()
                 .contains(ordinary)
         );
+    }
+}
+
+// Actual installed callback tests only; any unexpected print is visible failure.
+struct InstalledBuildInfoContext;
+impl slug_build_api_v2::BuildInfoEvaluationContext for InstalledBuildInfoContext {
+    fn is_cancelled(&self) -> bool {
+        false
+    }
+    fn print(&self, text: &str) -> Result<(), slug_build_api_v2::BuildInfoTransformError> {
+        panic!("unexpected installed callback print: {text}")
+    }
+    fn mnemonic(&self) -> &str {
+        "TranslateBuildInfo"
     }
 }

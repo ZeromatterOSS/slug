@@ -25,6 +25,40 @@ this launch projection deduplicates inherited names. Configured SymlinkTree
 action environment stays separate. No ambient client resolution, run/test launch
 or Windows runfiles behavior is implied.
 
+## General retained build-info transforms
+
+transform_info_file and transform_version_file retain the actual original Def or
+FrozenDef, including captured values. File/private DEFAULT checks follow the
+pinned Bazel API; source, name, callsite and template-role recipes are removed.
+Registration, metadata and query never invoke. The same four-slot traced
+collector, original slots, Publisher and PublicationEqState preserve aliases
+across providers, Args, resources and BuildInfo. Cumulative poisoned ledgers
+prepay copies and typed storage; private boxed phase rows transfer once without
+widening public action layouts. No second graph, registry or allowance exists.
+
+Native execution of an observed Source template uses actual workspace-status
+bytes and calls the original once per attempt, outside final publication locks.
+One shared attempt grant is spent before preparation or evaluation; a cloned
+terminal cannot mint another call. Current print, cancellation and mnemonic are
+borrowed. Publication validates the same source observations and physical status
+receipt, then consumes the already rendered bytes. Revalidation failure publishes
+nothing and never reruns the callback within that attempt. Pure input DICE retains
+immutable template/status owners and never stores callback output or a consumer.
+
+The general observed Source-content API shares the existing builtin catalog Arc
+or the actual filesystem PathObservationKey FileBytes owner, and merges complete
+path/content epochs. Main and materialized sources use this same route. Derived
+File registration is supported; execution awaits a genuine producer-result and
+frontier owner, with no path fallback. Remote BuildInfo execution remains deferred.
+
+Exact Bazel 9.2 slices are callable/File/private access, LF/first-space/last-wins
+status parsing, full string dictionary validation and ordered literal replacement.
+Slug-native choices are sorted status keys, final Latin1 encoding with one '?'
+per non-Latin1 Unicode scalar, structural identity and cooperative limits. The
+single invocation ledger bounds parse/VM/validation/render work and bytes;
+64 MiB heap, 30 seconds, 50 stack frames and 2 MiB output do not establish a hard
+RSS fence or whole-command fit. [Scoped acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json) records the executed proof.
+
 ## General retained resource callbacks
 
 Direct and genuine subrule run/run_shell retain the original resource callback,
@@ -71,7 +105,7 @@ cooperative and do not establish a hard allocator, instruction or RSS fence.
 Native container materialization uses owning phase-local memo keys and preserves
 shared and distinct empty lists; canonical empty-tuple normalization remains an
 explicit boundary. ArgsWrite query/execution and Spawn ActionKey stay deferred.
-Repository-process and build-info adapters remain
+Repository-process adapters remain
 replacement-required. These APIs do not close authentic Rust, memory, M7A or M8.
 
 ## Original function-valued providers (WP1221)

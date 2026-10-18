@@ -165,3 +165,77 @@ fn pending_none_spawn_uses_actual_module_ledger_and_refuses_before_box_creation(
         }
     }
 }
+
+#[allow(dead_code)]
+enum PreviousPendingBoxed {
+    Ready(ActionSpec),
+    Spawn(Box<PendingSpawn>),
+    ArgsWrite(PendingArgsWrite),
+}
+#[allow(dead_code)]
+enum PreviousPreparedBoxed<R> {
+    Ready(ActionSpec),
+    Spawn(Box<PreparedSpawn<R>>),
+    ArgsWrite { header: ActionSpec, recipe: R },
+}
+#[test]
+fn build_info_boxes_preserve_previous_phase_arrays_and_full_layout_precharge() {
+    type R = crate::starlark_rule::args_callbacks::DraftRecipe;
+    assert_eq!(
+        size_of::<PendingRegisteredAction>(),
+        size_of::<PreviousPendingBoxed>()
+    );
+    assert_eq!(
+        align_of::<PendingRegisteredAction>(),
+        align_of::<PreviousPendingBoxed>()
+    );
+    assert_eq!(
+        size_of::<PreparedAction<R>>(),
+        size_of::<PreviousPreparedBoxed<R>>()
+    );
+    assert_eq!(
+        align_of::<PreparedAction<R>>(),
+        align_of::<PreviousPreparedBoxed<R>>()
+    );
+    type P = super::super::build_info::PendingBuildInfo;
+    type F = super::super::build_info::PreparedBuildInfo;
+    for (body, pointer, alignment, prepared) in [
+        (size_of::<P>(), size_of::<Box<P>>(), align_of::<P>(), false),
+        (size_of::<F>(), size_of::<Box<F>>(), align_of::<F>(), true),
+    ] {
+        let bytes = body + pointer + alignment + 8 * size_of::<usize>();
+        let facts = bytes.div_ceil(size_of::<usize>());
+        let mut tape = Vec::new();
+        let mut pay = |r, b| {
+            tape.push((r, b));
+            Ok(())
+        };
+        if prepared {
+            build_info_prepared(&mut pay).unwrap()
+        } else {
+            admit::<P>(&mut pay).unwrap()
+        }
+        assert_eq!(tape, [(CONTROL_WORK, CONTROL_BYTES), (facts, bytes)]);
+        for (w, b, ok) in [
+            (
+                NODE_LIMIT - CONTROL_WORK - facts,
+                BYTE_LIMIT - CONTROL_BYTES - bytes,
+                true,
+            ),
+            (NODE_LIMIT - CONTROL_WORK - facts + 1, 0, false),
+            (0, BYTE_LIMIT - CONTROL_BYTES - bytes + 1, false),
+        ] {
+            let mut graph = PublishedValueArenaBuilder::new();
+            charge(&mut graph, w, b).unwrap();
+            let result = if prepared {
+                build_info_prepared(&mut |r, b| charge(&mut graph, r, b))
+            } else {
+                admit::<P>(&mut |r, b| charge(&mut graph, r, b))
+            };
+            assert_eq!(result.is_ok(), ok);
+            if !ok {
+                assert!(graph.charge_visit().is_err())
+            }
+        }
+    }
+}

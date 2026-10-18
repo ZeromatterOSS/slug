@@ -1,0 +1,55 @@
+{
+  "status": "SCOPED_COMPONENT_ACCEPTED_AT_PREINTEGRATION_FREEZE",
+  "packet": "WP-7-424-m7a-general-build-info-transform",
+  "baseline": "b0e010550e02b1c4ffcde2ca567a46770ff39604",
+  "capability": "Actual original build-info callbacks and one-shot native observed Source rendering; no metadata invocation or recipes",
+  "classification": {
+    "exact": "Pinned Bazel 9.2 callable/File/private access, status parsing, dictionary validation and ordered literal substitution",
+    "slug_native": "Sorted status keys, Unicode scalar to final Latin1 replacement, structural identity and cooperative bounded evaluation",
+    "unsupported": "Derived-template producer-result bridge and remote BuildInfo execution"
+  },
+  "results": {
+    "focused_normal": 163,
+    "focused_owned": 163,
+    "broader_lane_executions": 432,
+    "default_cli": "Normal default-only build plus isolated owned default-only check; no owned linked binary",
+    "current_empty_epoch": "Separate SOURCE_DATE_EPOCH present-empty execution in both current views",
+    "backend": "No fresh backend required or claimed for this native-only change; prior WP1223 NativeLink proof historical"
+  },
+  "evidence": {
+    "target/wp1224/design-review/review.json": "4c2aacf8aa625718bc39ded5f3e6d762d631ed219ea9e1ec7e541e50a211d008",
+    "target/wp1224/general-source-correction-design-review.json": "8fa6f970770b55e25cfe797909b25c139cc77680925eddebcac167197820b41e",
+    "target/wp1224/joint-source-plan-v7.json": "047a113f7d62f9ffd7d9ff19c5da275b60e8ba8413293a5c255699873acfb476",
+    "target/wp1224/joint-source-review-v7.json": "3114740376852d22a9cd38227f6061946fdbd83faab5d7cd6e2caa6ebef74dbf",
+    "target/wp1224/owned-runtime-evidence-join-v1.json": "000b4fb5dfad7dca791afcd7115ab277fbfbcf35513c17502be8870223cd6f66",
+    "target/wp1224/owned-runtime-evidence-review-v1.json": "11b26b4bae5c2354a4a39fe876b541025b7abc76dadd39152c07ca3293588e60",
+    "target/wp1224/focused-empty-runtime-review-v1.json": "c7a74ec63b91e3fc8e3efce8ba73304c203cb090fca7a9254bf89ebe8a091472",
+    "target/wp1224/broads-cli-runtime-review-v1.json": "2d9ea6f47b6e8ccdd86cb1173aec34fe77563c0a9f9c0333d2ef1bc6b1e14326",
+    "target/wp1224/native-normal-v2/receipt.json": "a6e92c3c507954378d5c90dc2e55228a891cbf94b94d0b4466cd3f95befa8d1a",
+    "target/wp1224/empty-epoch-v1/receipt.json": "73e586b70f94b1d11c0f77bdb157eb0885e457f9c3a273e08d47dc191c3b8d12",
+    "target/wp1224/owner-broads-v1/receipt.json": "ea603ceb85569720d1843d5128dbcef1030f822dd818e051600e5a93a50f7dfd",
+    "target/wp1224/default-cli-v1/receipt.json": "917af06ad60d5470e9cd070348781c844c89e929ce3ce1c52e054fc383cf7e02",
+    "target/wp1224/source-projection.json": "9297a17481144defde457ec38578c74ffb0b7e7d6a93d884ffa8ce4a48f3da70",
+    "target/wp1224/build-info-retirement-audit.json": "3121e45198124ac5bb5a2e2a148dd417c27f2e9cdc307bb9164b06789d994696"
+  },
+  "source": {
+    "owned_paths": 50,
+    "new_source_paths": 14,
+    "normal_source_config_pins": 2520,
+    "owned_source_config_pins": 2517,
+    "owned_regular_blobs": 4997,
+    "qualified_unchanged_head_symlinks_omitted": 24
+  },
+  "evidence_reuse": "Qualified passed owned nodes remain valid across explicitly reviewed owner deltas. Failed outer attempts remain failures. Unique focused counts do not add repeated checks; broader counts include repeated guards.",
+  "integrity": "Actual Source path/content observations and physical status receipt revalidate already rendered output; one shared attempt grant and current consumer context, no callback in pure input DICE.",
+  "integration": "Pending final narrow-document/projection review and atomic source/document commit; no commit result predicted.",
+  "public_command": "No public bootstrap command rerun. Prior used diagnostic destination must not be reused.",
+  "remaining": [
+    "General repository process/workspace API replacing GCC/Homebrew profiles",
+    "Authentic configured Rust analysis",
+    "Required action comparison and real Rust REAPI execution",
+    "Full Slug closure and Derived producer bridge",
+    "Stage10 graph comparison, stage1/stage2 fixed point and independent miss/warm gates",
+    "Equivalent-command whole-goal memory fit"
+  ]
+}

@@ -34,20 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-423-m7a-general-resource-set
+Packet: WP-7-424-m7a-general-build-info-transform
 
-General resource callback registration, original numeric evaluation and remote
-no-use pass the scoped component gates. The resource recipe and three guards are
-removed. Normal/owned focused proof, broader guards, default CLI provenance and
-all three real NativeLink source/chain integrity probes pass. Exact owned source
-and document atomic integration remains pending; see the
+Original build-info callback publication and one-shot native Source rendering
+pass their scoped gates; source/name/callsite recipes are removed. Normal/owned
+focused proof, broader guards and fresh default CLI provenance pass. Exact owned
+source/document atomic integration remains pending; see the
 [current packet](./slug-v2-subplans/current-packet.md).
 
-Repository-process and build-info adapters still require replacement. Next is
-the general build-info callback ownership/execution decision. Authentic Rust,
-required action comparison, Rust REAPI execution, full closure, Stage 10 and
-whole-goal memory fit remain open. The predecessor diagnostic query is preserved
-and was not rerun for this component.
+The next concrete blocker is general repository process/workspace execution,
+replacing the remaining GCC/Homebrew profiles with real command-fresh Host
+observations, bounded same-root storage and Linux lifecycle/confinement owners.
+Authentic Rust analysis, required action comparison, Rust REAPI execution,
+complete Slug closure, Stage 10 and whole-goal memory fit remain open.
 
 ### Bootstrap command queue
 

@@ -109,14 +109,14 @@ use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryRequestGenerationKey;
 use slug_bzlmod_v2::RegistryUrls;
-use slug_bzlmod_v2::RepositoryFilesystemEpoch;
-use slug_bzlmod_v2::RepositoryFilesystemEpochKey;
-use slug_bzlmod_v2::RepositoryFilesystemRecord;
-use slug_bzlmod_v2::RepositoryFilesystemTranscript;
 use slug_bzlmod_v2::RepositoryExecuteEpoch;
 use slug_bzlmod_v2::RepositoryExecuteEpochKey;
 use slug_bzlmod_v2::RepositoryExecuteRecord;
 use slug_bzlmod_v2::RepositoryExecuteTranscript;
+use slug_bzlmod_v2::RepositoryFilesystemEpoch;
+use slug_bzlmod_v2::RepositoryFilesystemEpochKey;
+use slug_bzlmod_v2::RepositoryFilesystemRecord;
+use slug_bzlmod_v2::RepositoryFilesystemTranscript;
 use slug_bzlmod_v2::RepositoryMaterializationGeneration;
 use slug_bzlmod_v2::RepositoryMaterializationGenerationKey;
 use slug_bzlmod_v2::RepositoryMaterializationKind;
@@ -971,7 +971,9 @@ impl fmt::Display for NativeDemandSessionError {
             Self::ArchiveInternalNonProgress => {
                 f.write_str("repository archive preparation made no progress")
             }
-            Self::RepositoryFilesystem(error) => write!(f, "repository filesystem: {}", error.message),
+            Self::RepositoryFilesystem(error) => {
+                write!(f, "repository filesystem: {}", error.message)
+            }
             Self::ArchiveTranscript(_) => f.write_str("repository archive transcript conflict"),
             Self::ExecuteTranscript(_) => f.write_str("repository execution transcript conflict"),
             Self::RevisionInternalNonProgress => {
@@ -1220,8 +1222,13 @@ enum TerminalDemandAssociation {
     TransientTerminalLocal,
 }
 
+/// Current consumer output policy. Never retained in semantic or attempt results.
+type NativeCallbackOutput<'a> =
+    dyn Fn(&str) -> Result<(), slug_build_api_v2::BuildInfoTransformError> + 'a;
+
 /// Borrowed only during one selected native attempt; never exposed to transport.
 struct NativeCommandCompletionContext<'a, 'runtime> {
+    callback_output: Option<&'a NativeCallbackOutput<'a>>,
     command: &'a NativeDemandCommand<'runtime>,
     transaction: &'a dice::DiceTransaction,
     selected_repository_requests: &'a [Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>],
@@ -6471,6 +6478,32 @@ impl WorkspaceRuntime {
     where
         R: NativeCommandRoot,
     {
+        self.drive_command_inner(request, root, None)
+    }
+
+    /// Callback-capable consumers supply their current fallible output sink.
+    /// This uses the same attempt, source validation and publication machinery.
+    fn drive_command_with_callback_output<R>(
+        &self,
+        request: NativeDemandRequestInputBundle,
+        root: R,
+        output: &NativeCallbackOutput<'_>,
+    ) -> Result<DrivenCommand<R::Terminal>, NativeDemandSessionError>
+    where
+        R: NativeCommandRoot,
+    {
+        self.drive_command_inner(request, root, Some(output))
+    }
+
+    fn drive_command_inner<R>(
+        &self,
+        request: NativeDemandRequestInputBundle,
+        root: R,
+        callback_output: Option<&NativeCallbackOutput<'_>>,
+    ) -> Result<DrivenCommand<R::Terminal>, NativeDemandSessionError>
+    where
+        R: NativeCommandRoot,
+    {
         begin_probe_phase!(preflight_phase, self, CommandPreflight);
         let preflight = self.begin_native_demand_command_with_inputs(request)?;
         finish_probe_phase!(preflight_phase);
@@ -6598,6 +6631,7 @@ impl WorkspaceRuntime {
                             .complete(
                                 &mut terminal,
                                 NativeCommandCompletionContext {
+                                    callback_output,
                                     command: guard.command(),
                                     transaction: &transaction,
                                     selected_repository_requests: prepared
@@ -7883,7 +7917,8 @@ impl NativeDemandCommand<'_> {
                     .filesystem_transcript
                     .records_for(request.id().owner(), request.id().ordinal())
                     .count()
-                || self.filesystem_transcript.records().len() + needs.repository_filesystem_operations().len()
+                || self.filesystem_transcript.records().len()
+                    + needs.repository_filesystem_operations().len()
                     > slug_bzlmod_v2::REPOSITORY_FILESYSTEM_MAX_CALLS
             {
                 return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
@@ -8091,7 +8126,9 @@ impl NativeDemandCommand<'_> {
                 finish_probe_phase!(need_phase);
                 return Ok(NativeDemandProgress::Paths);
             }
-            if needs.repository_executes().is_empty() && needs.repository_filesystem_operations().is_empty() {
+            if needs.repository_executes().is_empty()
+                && needs.repository_filesystem_operations().is_empty()
+            {
                 return Err(NativeDemandSessionError::PathInternalNonProgress);
             }
             finish_probe_phase!(need_phase);

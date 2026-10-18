@@ -70,13 +70,19 @@ pub use dice::ObservedCatalogSourceFile;
 #[doc(hidden)]
 pub use dice::ObservedConfiguredNodeAnalysisPreparationOutcome;
 #[doc(hidden)]
+pub use dice::ObservedSourceFile;
+#[doc(hidden)]
 pub use dice::ObservedSourcePath;
 pub use dice::RegistrationAnalysisError;
+#[doc(hidden)]
+pub use dice::SourceFileContent;
 pub use dice::prepare_configured_node_analysis;
 #[doc(hidden)]
 pub use dice::prepare_configured_node_analysis_observed;
 #[doc(hidden)]
 pub use dice::resolve_catalog_source_input_observed;
+#[doc(hidden)]
+pub use dice::resolve_source_file_input_observed;
 #[doc(hidden)]
 pub use dice::resolve_source_input_observed;
 pub use exec_group::ConfiguredExecGroup;

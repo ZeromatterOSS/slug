@@ -12,9 +12,9 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionOutputMetadata;
 use slug_build_api_v2::AnalysisArtifact;
-use slug_build_api_v2::BuildInfoCallbackRecipe;
 use slug_build_api_v2::BuildInfoTransformKind;
 use slug_build_api_v2::BuildInfoTransformSpec;
+use slug_build_api_v2::RetainedBuildInfoTransform;
 use slug_build_api_v2::WorkspaceStatusArtifact;
 use slug_build_api_v2::WorkspaceStatusArtifactKind;
 use slug_configuration_v2::HostPathFlavor;
@@ -69,7 +69,7 @@ impl<'a> ConfiguredBuildInfoActionView<'a> {
         if spec.status().root().workspace() != workspace {
             return Err("configured BuildInfo status belongs to a different command workspace");
         }
-        let (status_kind, metadata) = match spec.callback().kind() {
+        let (status_kind, metadata) = match spec.kind() {
             BuildInfoTransformKind::Info => (
                 WorkspaceStatusArtifactKind::Stable,
                 ActionOutputMetadata::Ordinary,
@@ -142,7 +142,7 @@ impl<'a> ConfiguredBuildInfoActionView<'a> {
         self.spec().template()
     }
 
-    pub fn callback(&self) -> &'a BuildInfoCallbackRecipe {
+    pub fn callback(&self) -> &'a RetainedBuildInfoTransform {
         self.spec().callback()
     }
 

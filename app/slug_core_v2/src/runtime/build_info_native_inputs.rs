@@ -1,4 +1,4 @@
-//! Certified native status/template metadata and independently owned header bytes.
+//! Certified immutable native status/template metadata; evaluation is attempt-owned.
 use slug_analysis_v2::ConfiguredBuildInfoActionView;
 
 use super::super::workspace_status_inputs::*;
@@ -15,7 +15,6 @@ pub(super) struct BuildInfoNativeInputsKey(pub(super) BuildInfoTemplatePreparati
 pub(super) struct BuildInfoNativeInputs {
     pub(super) template: Arc<BuildInfoTemplateInputs>,
     pub(super) status: Arc<WorkspaceStatusContent>,
-    pub(super) header: Vec<u8>,
 }
 
 fn error(value: impl fmt::Display) -> Arc<str> {
@@ -58,24 +57,8 @@ impl Key for BuildInfoNativeInputsKey {
             if view.status() != expected_status {
                 return Err(error("native BuildInfo status descriptor differs"));
             }
-            let source = template
-                .source()
-                .result()
-                .as_ref()
-                .map_err(error)?
-                .as_ref()
-                .as_ref()
-                .map_err(error)?;
-            let header = view
-                .callback()
-                .render_supplied_bytes(status.bytes(view.status().kind()), source.bytes())
-                .map_err(error)?;
             Ok(PreparationOutcome::Complete(Arc::new(
-                BuildInfoNativeInputs {
-                    template,
-                    status,
-                    header,
-                },
+                BuildInfoNativeInputs { template, status },
             )))
         }
         .await;

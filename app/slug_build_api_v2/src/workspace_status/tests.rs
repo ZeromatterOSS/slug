@@ -188,55 +188,5 @@ fn supplied_status_values_preserve_literal_separators_duplicates_and_ownership()
     );
 }
 
-#[test]
-fn supplied_status_values_compose_with_checked_build_info_recipes() {
-    use slug_identity_v2::CanonicalLabel;
-
-    use crate::BuildInfoCallbackRecipe;
-    use crate::BuildInfoTransformKind;
-
-    let checked = |kind| {
-        BuildInfoCallbackRecipe::new(
-            kind,
-            CanonicalLabel::parse(BuildInfoCallbackRecipe::SOURCE_LABEL).unwrap(),
-            BuildInfoCallbackRecipe::SOURCE_DIGEST,
-        )
-        .unwrap()
-    };
-    let info = checked(BuildInfoTransformKind::Info);
-    let version = checked(BuildInfoTransformKind::Version);
-    let info_template = "#define BUILD_EMBED_LABEL \"{BUILD_EMBED_LABEL}\"\n#define BUILD_HOST \"{BUILD_HOST}\"\n#define BUILD_USER \"{BUILD_USER}\"\n";
-    let version_template = "#define BUILD_SCM_REVISION \"{BUILD_SCM_REVISION}\"\n#define BUILD_SCM_STATUS \"{BUILD_SCM_STATUS}\"\n#define BUILD_TIMESTAMP {BUILD_TIMESTAMP}\n";
-    let parsed = WorkspaceStatusArtifacts::parse_supplied_values(
-        b"BUILD_EMBED_LABEL caf\xE9\nBUILD_HOST builder\r\nBUILD_USER user\nBUILD_SCM_REVISION abc\nBUILD_SCM_STATUS clean\nBUILD_TIMESTAMP 1\nBUILD_TIMESTAMP 2\r\nBUILD_TIMESTAMP\n",
-    );
-    let before = parsed.clone();
-    assert_eq!(
-        info.render_template(&parsed, info_template).unwrap(),
-        "#define BUILD_EMBED_LABEL \"café\"\n#define BUILD_HOST \"builder\r\"\n#define BUILD_USER \"user\"\n"
-    );
-    assert_eq!(
-        version.render_template(&parsed, version_template).unwrap(),
-        "#define BUILD_SCM_REVISION \"abc\"\n#define BUILD_SCM_STATUS \"clean\"\n#define BUILD_TIMESTAMP 2\r\n"
-    );
-    assert_eq!(parsed, before);
-    let empty_timestamp = WorkspaceStatusArtifacts::parse_supplied_values(b"BUILD_TIMESTAMP \n");
-    assert_eq!(
-        version
-            .render_template(&empty_timestamp, version_template)
-            .unwrap(),
-        "#define BUILD_SCM_REVISION \"0\"\n#define BUILD_SCM_STATUS \"\"\n#define BUILD_TIMESTAMP \n"
-    );
-    let missing =
-        WorkspaceStatusArtifacts::parse_supplied_values(b"BUILD_TIMESTAMP\nBUILD_TIMESTAMP\t123\n");
-    for template in [version_template, "", "no timestamp placeholder"] {
-        assert_eq!(
-            version.render_template(&missing, template),
-            Err(
-                "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."
-            )
-        );
-    }
-    // Supplied bytes plus checked recipes do not prove status production,
-    // template observation or original Latin1 output-byte encoding.
-}
+// Callback/status composition vectors moved to the actual frozen Analysis
+// runtime tests; no source-selected recipe or rendering implementation remains.

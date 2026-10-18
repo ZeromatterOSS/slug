@@ -1,10 +1,8 @@
-//! Finite, source-authenticated build-info callback admission. No callback is
-//! invoked or retained here; the immutable recipe belongs to the action owner.
-use sha2::Digest;
-use sha2::Sha256;
+//! Original build-info registration into the existing traced callable collector.
+use allocative::Allocative;
 use slug_build_api_v2::AnalysisArtifact;
-use slug_build_api_v2::BuildInfoCallbackRecipe;
 use slug_build_api_v2::BuildInfoTransformKind;
+use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::values::Value;
 
@@ -12,25 +10,30 @@ use crate::builtin_restriction::check_default_allowlist;
 use crate::builtin_restriction::source_identities_for_evaluator;
 use crate::subrule_invocation::AnalysisArtifactValue;
 
-const LABEL: &str = BuildInfoCallbackRecipe::SOURCE_LABEL;
-const SHA: [u8; 32] = BuildInfoCallbackRecipe::SOURCE_DIGEST;
-
+/// Distinct family token; GC storage and the one poisoned ledger are shared.
+#[derive(Debug, Allocative)]
+pub struct BuildInfoCallbackRegistration(crate::resource_set::ResourceSetRegistration);
 #[derive(Debug)]
 pub struct BuildInfoTransformRequest<'a> {
-    pub callback: BuildInfoCallbackRecipe,
+    pub module: &'a Module,
+    pub kind: BuildInfoTransformKind,
+    pub callback: BuildInfoCallbackRegistration,
     pub template: AnalysisArtifact,
     pub output_file_name: &'a str,
 }
-
-pub(crate) fn prepare<'a>(
+pub(crate) fn prepare<'v>(
     kind: BuildInfoTransformKind,
-    transform_func: Value<'_>,
-    template: Value<'_>,
-    output_file_name: &'a str,
-    eval: &Evaluator<'_, '_, '_>,
-) -> anyhow::Result<BuildInfoTransformRequest<'a>> {
-    // parameters_spec downcasts concrete Def/FrozenDef only. A callable object,
-    // native function or name/type-spoofing value is not a Starlark function.
+    transform_func: Value<'v>,
+    template: Value<'v>,
+    output_file_name: &'v str,
+    eval: &Evaluator<'v, '_, '_>,
+) -> anyhow::Result<BuildInfoTransformRequest<'v>> {
+    crate::resource_set::prepay_action_storage(
+        eval.module(),
+        8,
+        std::mem::size_of::<BuildInfoTransformRequest<'v>>() + 8 * std::mem::size_of::<usize>(),
+    )?;
+    // No original-global-name rule: actual Starlark closures are admitted.
     anyhow::ensure!(
         transform_func.parameters_spec().is_some(),
         "build-info transform_func must be a Starlark function"
@@ -39,40 +42,41 @@ pub(crate) fn prepare<'a>(
         .ok_or_else(|| anyhow::anyhow!("build-info template must be a File"))?;
     let sources = source_identities_for_evaluator(eval)?;
     check_default_allowlist(eval, &sources)?;
-    let span = eval
-        .call_stack_top_location()
-        .ok_or_else(|| anyhow::anyhow!("build-info callback requires pinned source authority"))?;
-    let mut matching = sources
-        .iter()
-        .filter(|(filename, _)| filename.as_str() == span.filename());
-    let (_, source) = matching
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("build-info callback requires pinned source authority"))?;
-    let evaluated: [u8; 32] = Sha256::digest(span.file.source().as_bytes()).into();
-    let site = span.resolve_span();
-    // Pinned bazel_cc_build_info.bzl36/37 select immutable module-global defs.
-    // Both defs are capture-free and the full file has no imports. Their names
-    // alone carry no authority; these exact callsites fix callback expressions.
-    let line = match kind {
-        BuildInfoTransformKind::Version => 35,
-        BuildInfoTransformKind::Info => 36,
-    };
-    anyhow::ensure!(
-        matching.next().is_none()
-            && source.identity.label.to_string() == LABEL
-            && source.source_digest == SHA
-            && evaluated == SHA
-            && (site.begin.line, site.end.line) == (line, line),
-        "build-info callback requires the unchanged pinned source and transform callsite"
-    );
-    let callback = BuildInfoCallbackRecipe::new(kind, source.identity.label.clone(), SHA)
-        .map_err(anyhow::Error::msg)?;
+    let callback = register_callback(eval.module(), transform_func)?;
     Ok(BuildInfoTransformRequest {
+        module: eval.module(),
+        kind,
         callback,
         template: template.artifact().clone(),
         output_file_name,
     })
 }
-
+/// Trusted Rust registration used by the Starlark binder after DEFAULT access.
+/// This validates the original function, not source identity or expected effects.
+pub fn register_callback<'v>(
+    module: &'v Module,
+    value: Value<'v>,
+) -> anyhow::Result<BuildInfoCallbackRegistration> {
+    crate::resource_set::prepay_action_storage(
+        module,
+        8,
+        std::mem::size_of::<BuildInfoCallbackRegistration>() + 8 * std::mem::size_of::<usize>(),
+    )?;
+    anyhow::ensure!(
+        value.parameters_spec().is_some(),
+        "build-info transform_func must be a Starlark function"
+    );
+    Ok(BuildInfoCallbackRegistration(
+        crate::resource_set::register_resource_set(module, value)?,
+    ))
+}
+/// Posttransfer lookup spends only the receiving Publisher's same ledger.
+pub fn callback_value<'v>(
+    module: &'v Module,
+    token: &BuildInfoCallbackRegistration,
+    charge: impl FnMut(usize, usize) -> Result<(), String>,
+) -> anyhow::Result<Value<'v>> {
+    crate::resource_set::resource_set_value(module, &token.0, charge)
+}
 #[cfg(test)]
 mod tests;

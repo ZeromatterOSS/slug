@@ -284,8 +284,7 @@ fn run_environment_inputs_and_module_roots_roundtrip_through_borrowed_native_aud
     ));
 }
 
-#[path = "test_support.rs"]
-mod support;
+use super::loaded_source as support;
 
 #[path = "set_capture_tests.rs"]
 mod set_capture;

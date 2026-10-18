@@ -443,3 +443,10 @@ mod record_tests;
 #[cfg(test)]
 #[path = "graph/resource_set_quota_tests.rs"]
 mod resource_set_quota_tests;
+
+#[cfg(test)]
+#[path = "graph/test_support.rs"]
+pub(in crate::starlark_rule) mod loaded_source;
+
+#[cfg(test)]
+mod build_info_quota_tests;

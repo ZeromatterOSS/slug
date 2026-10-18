@@ -39,5 +39,25 @@ pub(super) fn prepared<R>(
     admit::<PreparedSpawn<R>>(charge)
 }
 
+pub(super) fn build_info_pending(module: &Module) -> anyhow::Result<()> {
+    admit::<super::build_info::PendingBuildInfo>(&mut |r, b| {
+        slug_loading_v2::resource_set::prepay_action_storage(module, r, b)
+            .map_err(|e| e.to_string())
+    })
+    .map_err(anyhow::Error::msg)
+}
+pub(super) fn build_info_prepared(
+    charge: &mut impl FnMut(usize, usize) -> Result<(), String>,
+) -> Result<(), String> {
+    admit::<super::build_info::PreparedBuildInfo>(charge)
+}
 #[cfg(test)]
 mod tests;
+
+pub(in crate::starlark_rule) fn build_info_header(module: &Module) -> anyhow::Result<()> {
+    admit::<slug_build_api_v2::BuildInfoTransformHeader>(&mut |r, b| {
+        slug_loading_v2::resource_set::prepay_action_storage(module, r, b)
+            .map_err(|e| e.to_string())
+    })
+    .map_err(anyhow::Error::msg)
+}

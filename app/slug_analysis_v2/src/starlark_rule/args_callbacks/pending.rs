@@ -29,8 +29,11 @@ use starlark::values::Value;
 use crate::analysis_value::AnalysisValueLowerer;
 use crate::files_to_run_spawn::ExecutableArtifactProvenance;
 
+mod build_info;
 mod inputs;
-mod resource_storage;
+pub(in crate::starlark_rule) mod resource_storage;
+use build_info::PendingBuildInfo;
+use build_info::PreparedBuildInfo;
 
 #[derive(Debug, Clone, Allocative)]
 enum PendingCommandLineSegment {
@@ -159,6 +162,7 @@ pub(in crate::starlark_rule) enum PendingRegisteredAction {
     Ready(ActionSpec),
     Spawn(Box<PendingSpawn>),
     ArgsWrite(PendingArgsWrite),
+    BuildInfo(Box<PendingBuildInfo>),
 }
 
 impl From<ActionSpec> for PendingRegisteredAction {
@@ -168,6 +172,16 @@ impl From<ActionSpec> for PendingRegisteredAction {
 }
 
 impl PendingRegisteredAction {
+    pub(in crate::starlark_rule) fn build_info(
+        module: &Module,
+        header: slug_build_api_v2::BuildInfoTransformHeader,
+        callback: slug_loading_v2::build_info_transform::BuildInfoCallbackRegistration,
+    ) -> anyhow::Result<Self> {
+        Ok(Self::BuildInfo(PendingBuildInfo::new(
+            module, header, callback,
+        )?))
+    }
+
     pub(in crate::starlark_rule) fn spawn(
         module: &Module,
         header: ActionSpec,
@@ -219,11 +233,12 @@ impl PendingRegisteredAction {
         })
     }
 
-    fn header(&self) -> &ActionSpec {
+    fn header(&self) -> Option<&ActionSpec> {
         match self {
-            Self::Ready(action) => action,
-            Self::Spawn(action) => &action.header,
-            Self::ArgsWrite(action) => &action.header,
+            Self::Ready(action) => Some(action),
+            Self::Spawn(action) => Some(&action.header),
+            Self::ArgsWrite(action) => Some(&action.header),
+            Self::BuildInfo(_) => None,
         }
     }
 
@@ -279,6 +294,7 @@ impl PendingRegisteredAction {
         }
     }
 
+    #[cfg(test)]
     pub(in crate::starlark_rule) fn prepare_with_inputs<'v, R: Clone>(
         &self,
         module: &'v Module,
@@ -291,7 +307,36 @@ impl PendingRegisteredAction {
         >,
         admit_spawn: &mut impl FnMut(usize, usize) -> Result<(), String>,
     ) -> anyhow::Result<PreparedAction<R>> {
+        self.prepare_with_callbacks(
+            module,
+            lowered_inputs,
+            publish,
+            publish_resource,
+            &mut |_| anyhow::bail!("build-info publisher required"),
+            admit_spawn,
+        )
+    }
+    pub(in crate::starlark_rule) fn prepare_with_callbacks<'v, R: Clone>(
+        &self,
+        module: &'v Module,
+        lowered_inputs: Option<(ArtifactInputs, ArtifactInputs)>,
+        publish: &mut impl FnMut(EvaluatorArgsSnapshot<'v>) -> anyhow::Result<R>,
+        publish_resource: &mut impl FnMut(
+            &slug_loading_v2::resource_set::ResourceSetRegistration,
+        ) -> anyhow::Result<
+            super::super::resource_set::DraftResourceSet,
+        >,
+        publish_build_info: &mut impl FnMut(
+            &slug_loading_v2::build_info_transform::BuildInfoCallbackRegistration,
+        ) -> anyhow::Result<
+            super::super::build_info_transform::DraftBuildInfo,
+        >,
+        admit_spawn: &mut impl FnMut(usize, usize) -> Result<(), String>,
+    ) -> anyhow::Result<PreparedAction<R>> {
         match self {
+            Self::BuildInfo(action) => Ok(PreparedAction::BuildInfo(
+                action.prepare(publish_build_info, admit_spawn)?,
+            )),
             Self::Ready(action) => Ok(PreparedAction::Ready(action.clone())),
             Self::Spawn(action) => {
                 anyhow::ensure!(
@@ -320,13 +365,24 @@ impl PendingRegisteredAction {
 
 impl RegisterableAction for PendingRegisteredAction {
     fn outputs(&self) -> &[ActionOutput] {
-        self.header().outputs()
+        if let Self::BuildInfo(action) = self {
+            std::slice::from_ref(action.header.output())
+        } else {
+            self.header().expect("ordinary row").outputs()
+        }
     }
     fn mnemonic(&self) -> &str {
-        self.header().mnemonic()
+        if matches!(self, Self::BuildInfo(_)) {
+            "TranslateBuildInfo"
+        } else {
+            self.header().expect("ordinary row").mnemonic()
+        }
     }
     fn validate(&self) -> Result<(), ActionError> {
-        RegisterableAction::validate(self.header())
+        match self.header() {
+            Some(header) => RegisterableAction::validate(header),
+            None => Ok(()),
+        }
     }
     fn as_action_spec(&self) -> Option<&ActionSpec> {
         match self {
@@ -348,6 +404,7 @@ pub(in crate::starlark_rule) enum PreparedAction<R> {
     Ready(ActionSpec),
     Spawn(Box<PreparedSpawn<R>>),
     ArgsWrite { header: ActionSpec, recipe: R },
+    BuildInfo(Box<PreparedBuildInfo>),
 }
 
 fn decorations(header: &ActionSpec, action: ActionSpec) -> ActionSpec {
@@ -373,6 +430,7 @@ impl<R> PreparedAction<R> {
             anyhow::bail!("resource completion required")
         })
     }
+    #[cfg(test)]
     pub(in crate::starlark_rule) fn complete_with_resource_sets(
         self,
         publish: &mut impl FnMut(
@@ -387,7 +445,33 @@ impl<R> PreparedAction<R> {
             slug_build_api_v2::actions::RetainedSpawnResourceSet,
         >,
     ) -> anyhow::Result<ActionSpec> {
+        self.complete_with_callbacks(publish, publish_resource, &mut |_| {
+            anyhow::bail!("build-info completion required")
+        })
+    }
+    pub(in crate::starlark_rule) fn complete_with_callbacks(
+        self,
+        publish: &mut impl FnMut(
+            R,
+        ) -> anyhow::Result<(
+            RetainedArgsRecipe,
+            Option<RetainedSpawnParamFilePolicy>,
+        )>,
+        publish_resource: &mut impl FnMut(
+            super::super::resource_set::DraftResourceSet,
+        ) -> anyhow::Result<
+            slug_build_api_v2::actions::RetainedSpawnResourceSet,
+        >,
+        publish_build_info: &mut impl FnMut(
+            super::super::build_info_transform::DraftBuildInfo,
+        ) -> anyhow::Result<
+            slug_build_api_v2::RetainedBuildInfoTransform,
+        >,
+    ) -> anyhow::Result<ActionSpec> {
         match self {
+            Self::BuildInfo(action) => Ok(ActionSpec::build_info_transform(
+                (*action).complete(publish_build_info)?,
+            )),
             Self::Ready(action) => Ok(action),
             Self::Spawn(spawn) => {
                 let PreparedSpawn {

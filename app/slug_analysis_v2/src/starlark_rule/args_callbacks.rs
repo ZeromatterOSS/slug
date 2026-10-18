@@ -100,6 +100,14 @@ impl<'v> Publisher<'v> {
             self.graph.resource_storage(visits, bytes, true)
         })
     }
+    pub(super) fn build_info_value(
+        &mut self,
+        token: &slug_loading_v2::build_info_transform::BuildInfoCallbackRegistration,
+    ) -> anyhow::Result<Value<'v>> {
+        slug_loading_v2::build_info_transform::callback_value(self.module, token, |w, b| {
+            self.graph.resource_storage(w, b, true)
+        })
+    }
     pub(super) fn capture_resource_callable(
         &mut self,
         value: Value<'v>,
@@ -342,3 +350,6 @@ impl FrozenPublisher {
         Ok((RetainedArgsRecipe::new(calls, draft.format), draft.policy))
     }
 }
+
+#[cfg(test)]
+pub(in crate::starlark_rule) use graph::loaded_source::LoadedSource;

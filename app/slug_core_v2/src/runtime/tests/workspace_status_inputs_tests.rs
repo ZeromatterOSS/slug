@@ -157,18 +157,8 @@ fn status_raw_conversion_has_exact_utf8_sorted_buffers_dates_and_refusal_priorit
     assert_eq!(value.stable, stable_bytes("é𐐀", "höst"));
     let parsed = WorkspaceStatusArtifacts::parse_supplied_values(&value.stable);
     assert_eq!(parsed.get("BUILD_USER"), Some("Ã©ð\u{90}\u{90}\u{80}"));
-    let callback = BuildInfoCallbackRecipe::new(
-        slug_build_api_v2::BuildInfoTransformKind::Info,
-        CanonicalLabel::parse(BuildInfoCallbackRecipe::SOURCE_LABEL).unwrap(),
-        BuildInfoCallbackRecipe::SOURCE_DIGEST,
-    )
-    .unwrap();
-    assert_eq!(
-        callback
-            .render_supplied_bytes(&value.stable, TEMPLATE_CASES[1].2)
-            .unwrap(),
-        header_bytes(1, "é𐐀", "höst", 1_700_000_000)
-    );
+    // Raw status metadata is independent of callback execution. The genuine
+    // header-publication tests below own the complete rendered-byte oracle.
     let mut cases = Vec::new();
     for policy in [
         StatusPolicy::UnsupportedEmbed,
@@ -755,9 +745,17 @@ fn genuine_native_status_shares_capture_across_configurations_renders_complete_h
         .clone();
     for (index, input) in held.iter().enumerate() {
         assert!(Arc::ptr_eq(status, &input.status));
-        assert_eq!(input.header, header_bytes(index % 2, &user, host, seconds));
-        assert_ne!(input.header.as_ptr(), input.status.stable.as_ptr());
-        assert_ne!(input.header.as_ptr(), input.status.volatile.as_ptr());
+        assert!(
+            input
+                .template
+                .action()
+                .build_info_transform_spec()
+                .unwrap()
+                .callback()
+                .published_callable()
+                .original_slot()
+                .is_some()
+        );
         for (demand, result) in input.template.observations().observations() {
             assert!(Arc::ptr_eq(
                 result,
@@ -791,7 +789,8 @@ fn genuine_native_status_shares_capture_across_configurations_renders_complete_h
     assert_eq!(held[0].status.stable, expected_stable);
     assert_eq!(held[0].status.volatile, expected_volatile);
     for (index, input) in held.iter().enumerate() {
-        assert_eq!(input.header, header_bytes(index % 2, &user, host, seconds));
+        assert_eq!(input.status.stable, expected_stable);
+        assert_eq!(input.status.volatile, expected_volatile);
     }
     drop(held);
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -826,7 +825,13 @@ fn native_status_retry_new_request_cancellation_and_foreign_capture_refuse_witho
     let held = first.accepted.terminal_for_test()[0].clone();
     let previous_stable = held.status.stable.clone();
     let previous_volatile = held.status.volatile.clone();
-    let previous_header = held.header.clone();
+    let previous_callback = held
+        .template
+        .action()
+        .build_info_transform_spec()
+        .unwrap()
+        .callback()
+        .clone();
     assert!(held.template.observations().observations().values().any(|result| matches!(result.as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) if bytes.ends_with(b"# status certified retry\n"))));
     revoked(&runtime);
     let next_root = StatusRoot::new(keys.clone());
@@ -839,7 +844,14 @@ fn native_status_retry_new_request_cancellation_and_foreign_capture_refuse_witho
     assert_ne!(held.status, fresh.status);
     assert_eq!(held.status.stable, previous_stable);
     assert_eq!(held.status.volatile, previous_volatile);
-    assert_eq!(held.header, previous_header);
+    assert_eq!(
+        held.template
+            .action()
+            .build_info_transform_spec()
+            .unwrap()
+            .callback(),
+        &previous_callback
+    );
     let before = runtime
         .native_demand_sessions
         .state

@@ -1,6 +1,6 @@
 //! Native immutable build-info registration; callback execution is deferred.
+use slug_build_api_v2::BuildInfoTransformHeader;
 use slug_build_api_v2::BuildInfoTransformKind;
-use slug_build_api_v2::BuildInfoTransformSpec;
 use slug_loading_v2::build_info_transform::BuildInfoTransformRequest;
 
 use super::*;
@@ -10,6 +10,7 @@ impl SynchronousAnalysisActionSink {
         &self,
         request: BuildInfoTransformRequest<'_>,
     ) -> anyhow::Result<AnalysisArtifactValue> {
+        super::args_callbacks::pending::resource_storage::build_info_header(request.module)?;
         let relative = if self.package_path.is_empty() {
             request.output_file_name.to_owned()
         } else {
@@ -19,7 +20,7 @@ impl SynchronousAnalysisActionSink {
             self.owner.label().package().repo(),
             &relative,
         );
-        let volatile = request.callback.kind() == BuildInfoTransformKind::Version;
+        let volatile = request.kind == BuildInfoTransformKind::Version;
         let output = if volatile {
             ActionOutput::new_constant(self.root.clone(), relative.clone())
         } else {
@@ -30,11 +31,11 @@ impl SynchronousAnalysisActionSink {
         } else {
             self.workspace_status.stable()
         };
-        let spec = BuildInfoTransformSpec::new(
+        let header = BuildInfoTransformHeader::new(
+            request.kind,
             status.dupe(),
             request.template,
             output.dupe(),
-            request.callback,
         )
         .map_err(anyhow::Error::msg)?;
         // All fallible model/path validation precedes mutation. Registration and
@@ -49,7 +50,12 @@ impl SynchronousAnalysisActionSink {
                 "output '{relative}' has already been declared with a different type or metadata"
             );
         }
-        self.register(|actions| actions.register_build_info_transform(spec))?;
+        let pending = super::args_callbacks::pending::PendingRegisteredAction::build_info(
+            request.module,
+            header,
+            request.callback,
+        )?;
+        self.register(|actions| actions.register_pending(pending))?;
         declarations.insert(relative, output.dupe());
         Ok(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
             owner: self.owner.clone(),
@@ -68,6 +74,14 @@ pub(super) fn returned_providers(value: Value<'_>) -> Vec<Value<'_>> {
         ListRef::from_value(value).map_or_else(|| vec![value], |list| list.iter().collect())
     }
 }
+
+mod publication;
+mod runtime;
+pub(super) use publication::DraftBuildInfo;
+pub(super) use publication::complete;
+pub(super) use publication::prepare;
+#[cfg(test)]
+pub(super) use runtime::StarlarkBuildInfoRuntime as RuntimeAllocationType;
 
 #[cfg(test)]
 mod tests;

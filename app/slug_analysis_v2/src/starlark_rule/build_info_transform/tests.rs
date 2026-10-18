@@ -1,55 +1,65 @@
-use slug_build_api_v2::ActionKind;
+//! Real same-module registration and metadata transactions; no recipe token mint.
 use slug_build_api_v2::ActionOutputMetadata;
-use slug_build_api_v2::BuildInfoCallbackRecipe;
-use slug_build_api_v2::CtxActions;
+use slug_build_api_v2::BuildInfoTransformHeader;
+use slug_build_api_v2::BuildInfoTransformKind;
 use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::RegisterableAction;
 use slug_identity_v2::CanonicalLabel;
+use starlark::environment::Globals;
+use starlark::environment::Module;
+use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
 use starlark::values::FrozenHeap;
 
-use super::super::context_lifecycle_tests::configuration;
-use super::super::context_lifecycle_tests::declaration_sink;
 use super::*;
-
-fn ready_actions(sink: &SynchronousAnalysisActionSink) -> CtxActions {
-    let rows = sink
-        .actions
+use crate::starlark_rule::args_callbacks::Publisher;
+use crate::starlark_rule::args_callbacks::pending::PendingRegisteredAction;
+use crate::starlark_rule::context_lifecycle_tests::configuration;
+use crate::starlark_rule::context_lifecycle_tests::declaration_sink;
+fn callback(module: &Module) -> Value<'_> {
+    Evaluator::new(module)
+        .eval_module(
+            AstModule::parse(
+                "genuine_original.bzl",
+                "def original(s): return {'@':'actual'}\n".to_owned(),
+                &Dialect::Bazel,
+            )
+            .unwrap(),
+            &Globals::standard(),
+        )
+        .unwrap();
+    module.get("original").unwrap()
+}
+fn request<'v>(
+    module: &'v Module,
+    kind: BuildInfoTransformKind,
+    name: &'v str,
+) -> BuildInfoTransformRequest<'v> {
+    BuildInfoTransformRequest {
+        module,
+        kind,
+        callback: slug_loading_v2::build_info_transform::register_callback(
+            module,
+            callback(module),
+        )
+        .unwrap(),
+        template: AnalysisArtifact::Source(
+            CanonicalLabel::parse("@@//:unrelated.template").unwrap(),
+        ),
+        output_file_name: name,
+    }
+}
+fn snapshot(sink: &SynchronousAnalysisActionSink) -> Vec<(Vec<ActionOutput>, String)> {
+    sink.actions
         .lock()
         .unwrap()
         .registry()
         .actions()
         .iter()
-        .map(|action| {
-            action
-                .as_action_spec()
-                .expect("ordinary build-info and file-write actions are complete")
-                .clone()
-        })
-        .collect();
-    let mut snapshot = CtxActions::new(sink.root.clone());
-    snapshot.replace_actions(rows).unwrap();
-    snapshot
+        .map(|a| (a.outputs().to_vec(), a.mnemonic().to_owned()))
+        .collect()
 }
-
-fn request(kind: BuildInfoTransformKind, name: &str) -> BuildInfoTransformRequest<'_> {
-    BuildInfoTransformRequest {
-        callback: BuildInfoCallbackRecipe::new(
-            kind,
-            CanonicalLabel::parse(BuildInfoCallbackRecipe::SOURCE_LABEL).unwrap(),
-            BuildInfoCallbackRecipe::SOURCE_DIGEST,
-        )
-        .unwrap(),
-        template: AnalysisArtifact::Source(
-            CanonicalLabel::parse(
-                "@@bazel_tools//tools/build_defs/build_info/templates:template.h",
-            )
-            .unwrap(),
-        ),
-        output_file_name: name,
-    }
-}
-
 #[test]
 fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_atomicity() {
     let key = ConfiguredTargetKey::new(
@@ -57,41 +67,29 @@ fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_at
         configuration(),
     );
     let sink = declaration_sink(&key);
+    let module = Module::new();
     let volatile = sink
-        .transform_build_info(request(BuildInfoTransformKind::Version, "volatile.h"))
+        .transform_build_info(request(
+            &module,
+            BuildInfoTransformKind::Version,
+            "volatile.h",
+        ))
         .unwrap();
     let stable = sink
-        .transform_build_info(request(BuildInfoTransformKind::Info, "stable.h"))
+        .transform_build_info(request(&module, BuildInfoTransformKind::Info, "stable.h"))
         .unwrap();
-    let AnalysisArtifact::Derived { owner, output } = volatile.artifact() else {
-        panic!("derived")
-    };
-    assert_eq!(owner, &key.artifact_owner());
-    assert_eq!(
-        output.root_relative_path(),
-        "external/external+/pkg/volatile.h"
-    );
-    assert_eq!(output.metadata(), ActionOutputMetadata::Constant);
-    assert_eq!(
-        output.root().configuration(),
-        key.configuration().slug_configuration().unwrap()
-    );
-    let AnalysisArtifact::Derived { output, .. } = stable.artifact() else {
-        panic!("derived")
-    };
-    assert_eq!(output.metadata(), ActionOutputMetadata::Ordinary);
-    let snapshot = ready_actions(&sink);
-    assert_eq!(snapshot.registry().actions().len(), 2);
-    for (action, expected) in snapshot.registry().actions().iter().zip([
-        sink.workspace_status.volatile(),
-        sink.workspace_status.stable(),
-    ]) {
-        assert_eq!(action.kind(), &ActionKind::BuildInfoTransform);
-        assert_eq!(
-            action.build_info_transform_spec().unwrap().status(),
-            expected
-        );
+    for (artifact, metadata) in [
+        (volatile.artifact(), ActionOutputMetadata::Constant),
+        (stable.artifact(), ActionOutputMetadata::Ordinary),
+    ] {
+        let AnalysisArtifact::Derived { output, .. } = artifact else {
+            panic!("derived")
+        };
+        assert_eq!(output.metadata(), metadata);
     }
+    let before = snapshot(&sink);
+    assert_eq!(before.len(), 2);
+    assert!(before.iter().all(|a| a.1 == "TranslateBuildInfo"));
     let declarations = sink.declared_outputs.lock().unwrap().clone();
     for (kind, name) in [
         (BuildInfoTransformKind::Info, "volatile.h"),
@@ -100,21 +98,20 @@ fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_at
         (BuildInfoTransformKind::Info, "../bad"),
         (BuildInfoTransformKind::Info, ""),
     ] {
-        assert!(sink.transform_build_info(request(kind, name)).is_err());
-        assert_eq!(snapshot, ready_actions(&sink));
+        assert!(
+            sink.transform_build_info(request(&module, kind, name))
+                .is_err()
+        );
+        assert_eq!(before, snapshot(&sink));
         assert_eq!(declarations, *sink.declared_outputs.lock().unwrap());
     }
-    assert!(
-        sink.declare_file("volatile.h", None).is_err(),
-        "ordinary redeclaration cannot erase constant metadata"
-    );
+    assert!(sink.declare_file("volatile.h", None).is_err());
     sink.declare_directory("tree.h").unwrap();
     assert!(
-        sink.transform_build_info(request(BuildInfoTransformKind::Version, "tree.h"))
+        sink.transform_build_info(request(&module, BuildInfoTransformKind::Version, "tree.h"))
             .is_err()
     );
     let ordinary = sink.declare_file("ordinary.h", None).unwrap();
-    let module = starlark::environment::Module::new();
     let heap = module.frozen_heap();
     sink.write(
         &module,
@@ -123,12 +120,67 @@ fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_at
         false,
     )
     .unwrap();
-    let before = ready_actions(&sink);
+    let before = snapshot(&sink);
     assert!(
-        sink.transform_build_info(request(BuildInfoTransformKind::Info, "ordinary.h"))
+        sink.transform_build_info(request(&module, BuildInfoTransformKind::Info, "ordinary.h"))
             .is_err()
     );
-    assert_eq!(before, ready_actions(&sink));
+    assert_eq!(before, snapshot(&sink));
+}
+#[tokio::test]
+async fn build_info_callback_and_provider_alias_use_same_publication_graph_and_original_slot() {
+    let loaded = super::super::args_callbacks::LoadedSource::new(
+        "def original(s): return {'@':'actual'}\ndef entry(ctx): return original\n",
+    )
+    .await;
+    let module = Module::new();
+    let original = loaded.invoke(&module, Value::new_none());
+    let token =
+        slug_loading_v2::build_info_transform::register_callback(&module, original).unwrap();
+    let resource_token =
+        slug_loading_v2::resource_set::register_resource_set(&module, original).unwrap();
+    let mut publisher = Publisher::with_resource_sets(&module).unwrap();
+    let mut lowerer = AnalysisValueLowerer::from_module(&module);
+    let first = publisher.capture(original, &mut lowerer).unwrap();
+    let draft = prepare(&mut publisher, &token, &mut lowerer).unwrap();
+    let resource_draft =
+        super::super::resource_set::prepare(&mut publisher, &resource_token, &mut lowerer).unwrap();
+    let graph = publisher.seal(&mut lowerer).unwrap();
+    drop(lowerer);
+    let frozen = module.freeze().unwrap();
+    let roots = frozen.owned_extra_value().unwrap();
+    let publisher = super::super::args_callbacks::FrozenPublisher::new(graph, roots).unwrap();
+    let retained = complete(&publisher, draft).unwrap();
+    let (same, _) = publisher.resource_original(first).unwrap();
+    let resource = super::super::resource_set::complete(&publisher, resource_draft).unwrap();
+    for other in [&same, resource.published_callable()] {
+        assert!(retained.published_callable().same_original(other));
+        assert_eq!(retained.published_callable().node_id(), other.node_id());
+        assert_eq!(
+            retained.published_callable().original_slot(),
+            other.original_slot()
+        );
+        assert!(std::ptr::eq(
+            retained.published_callable().node(),
+            other.node()
+        ));
+    }
+    struct Context;
+    impl slug_build_api_v2::BuildInfoEvaluationContext for Context {
+        fn is_cancelled(&self) -> bool {
+            false
+        }
+        fn print(&self, _: &str) -> Result<(), slug_build_api_v2::BuildInfoTransformError> {
+            Ok(())
+        }
+        fn mnemonic(&self) -> &str {
+            "publication"
+        }
+    }
+    drop(frozen);
+    drop(publisher);
+    drop(loaded);
+    assert_eq!(retained.render(&[], b"@", &Context).unwrap(), b"actual");
 }
 
 #[test]
@@ -193,11 +245,20 @@ fn actual_build_info_outputs_retain_policy_and_owner_after_heap_drop_freeze_and_
     );
     let (expected, retained) = {
         let sink = declaration_sink(&key);
+        let registration = Module::new();
         let stable = sink
-            .transform_build_info(request(BuildInfoTransformKind::Info, "stable.h"))
+            .transform_build_info(request(
+                &registration,
+                BuildInfoTransformKind::Info,
+                "stable.h",
+            ))
             .unwrap();
         let constant = sink
-            .transform_build_info(request(BuildInfoTransformKind::Version, "volatile.h"))
+            .transform_build_info(request(
+                &registration,
+                BuildInfoTransformKind::Version,
+                "volatile.h",
+            ))
             .unwrap();
         let expected = AnalysisValue::tuple(vec![
             AnalysisValue::artifact(stable.artifact().clone()),

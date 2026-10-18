@@ -49,6 +49,15 @@ the function; wrong signature/body/return errors belong to numeric evaluation.
 Source integrity remains tracked and does not select semantics. Stage6 owns the
 shared publication/accounting contract and numeric/remote boundaries.
 
+## Build-info callback registration
+
+Both transform APIs retain actual original Def/FrozenDef callbacks and captures
+in the existing GC-traced collector. File and private DEFAULT eligibility follow
+the pinned Bazel API; source integrity remains tracked without selecting a
+replacement body. Registration and metadata never invoke. Stage6 owns shared
+publication identity, one-shot native Source rendering and explicit deferred
+producer/remote boundaries.
+
 ## Original builtin exports and source environments
 
 Loading prepares the original bundled export before ordinary semantic lookup.

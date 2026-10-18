@@ -20,9 +20,14 @@ mod solib_symlink;
 mod spawn_command_line;
 pub mod spec;
 
-pub use build_info_transform::BuildInfoCallbackRecipe;
+pub use build_info_transform::BUILD_INFO_MAX_OUTPUT_BYTES;
+pub use build_info_transform::BuildInfoEvaluationContext;
+pub use build_info_transform::BuildInfoTransformError;
+pub use build_info_transform::BuildInfoTransformHeader;
 pub use build_info_transform::BuildInfoTransformKind;
+pub use build_info_transform::BuildInfoTransformRuntime;
 pub use build_info_transform::BuildInfoTransformSpec;
+pub use build_info_transform::RetainedBuildInfoTransform;
 pub use cpp_compile::CppCompileConstruction;
 pub use cpp_compile::CppCompileData;
 pub use cpp_compile::CppCompileDependencies;

@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use slug_identity_v2::CanonicalLabel;
 use slug_workspace_v2::NormalizedAbsolutePath;
 
 use super::*;
@@ -12,13 +13,68 @@ use crate::ReapiCommandProjection;
 use crate::WorkspaceStatusArtifacts;
 use crate::artifact_root::test_support as roots;
 
-fn recipe(kind: BuildInfoTransformKind) -> BuildInfoCallbackRecipe {
-    BuildInfoCallbackRecipe::new(
-        kind,
-        CanonicalLabel::parse(BuildInfoCallbackRecipe::SOURCE_LABEL).unwrap(),
-        BuildInfoCallbackRecipe::SOURCE_DIGEST,
-    )
-    .unwrap()
+// Typed descriptor/header proof only. Analysis owns real Starlark rendering.
+#[derive(Debug)]
+struct Originals;
+impl crate::published_value::PublishedOriginalBinding for Originals {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn root_count(&self) -> usize {
+        1
+    }
+    fn imported_arenas(&self) -> &[crate::PublishedValueArena] {
+        &[]
+    }
+}
+#[derive(Debug)]
+struct NeverRender;
+impl BuildInfoTransformRuntime for NeverRender {
+    fn render(
+        &self,
+        _: &[u8],
+        _: &[u8],
+        _: &dyn BuildInfoEvaluationContext,
+    ) -> Result<Vec<u8>, BuildInfoTransformError> {
+        panic!("metadata must never invoke BuildInfo callback")
+    }
+}
+fn original(slot: bool) -> Result<crate::PublishedValueRef, crate::PublishedValueError> {
+    use crate::published_value::*;
+    let mut builder = PublishedValueArenaBuilder::new();
+    let node = builder.reserve().unwrap();
+    builder
+        .set_node(
+            node,
+            PublishedNode::Intrinsic(PublishedIntrinsic {
+                api: crate::NativeCallableApiId::new("unrelated.build_info", 1).unwrap(),
+                parameters: Arc::from([]),
+                receiver: None,
+                return_annotation: None,
+            }),
+        )
+        .unwrap();
+    if slot {
+        builder
+            .set_original_slot(node, PublishedRootSlot::new(0).unwrap())
+            .unwrap();
+    }
+    builder.seal(Arc::new(Originals))?.value(node)
+}
+fn descriptor() -> RetainedBuildInfoTransform {
+    RetainedBuildInfoTransform::from_published(original(true).unwrap(), Arc::new(NeverRender))
+        .unwrap()
+}
+fn checked_spec(
+    status: crate::WorkspaceStatusArtifact,
+    template: AnalysisArtifact,
+    output: ActionOutput,
+    kind: BuildInfoTransformKind,
+) -> Result<BuildInfoTransformSpec, String> {
+    Ok(BuildInfoTransformSpec::new(
+        BuildInfoTransformHeader::new(kind, status, template, output)?,
+        descriptor(),
+    ))
 }
 fn template(name: &str) -> AnalysisArtifact {
     AnalysisArtifact::Source(
@@ -42,7 +98,7 @@ fn spec(
             (status.volatile(), ActionOutput::new_constant(root, output))
         }
     };
-    BuildInfoTransformSpec::new(status.dupe(), template(name), output, recipe(kind)).unwrap()
+    checked_spec(status.dupe(), template(name), output, kind).unwrap()
 }
 
 #[test]
@@ -65,11 +121,11 @@ fn build_info_specs_preserve_all_owned_inputs_and_metadata() {
     let status = WorkspaceStatusArtifacts::new(NormalizedAbsolutePath::new("/workspace").unwrap());
     for (template, count) in [(status.volatile(), 1), (status.stable(), 2)] {
         let input = AnalysisArtifact::WorkspaceStatus(template.dupe());
-        let same_role = BuildInfoTransformSpec::new(
+        let same_role = checked_spec(
             status.volatile().dupe(),
             input.clone(),
             a.output().dupe(),
-            recipe(BuildInfoTransformKind::Version),
+            BuildInfoTransformKind::Version,
         )
         .unwrap();
         assert_eq!(same_role.inputs().len(), count);
@@ -143,23 +199,19 @@ fn build_info_specs_preserve_all_owned_inputs_and_metadata() {
             "pkg/v.h"
         )
     );
+    let callback = descriptor();
+    let same = callback.clone();
     assert!(
-        BuildInfoCallbackRecipe::new(
-            BuildInfoTransformKind::Info,
-            CanonicalLabel::parse("@@foreign//tools/build_defs/build_info:bazel_cc_build_info.bzl")
-                .unwrap(),
-            BuildInfoCallbackRecipe::SOURCE_DIGEST
-        )
-        .is_err()
+        callback
+            .published_callable()
+            .same_original(same.published_callable())
     );
-    assert!(
-        BuildInfoCallbackRecipe::new(
-            BuildInfoTransformKind::Info,
-            CanonicalLabel::parse(BuildInfoCallbackRecipe::SOURCE_LABEL).unwrap(),
-            [0; 32]
-        )
-        .is_err()
-    );
+    // The genuine builder refuses the missing binding at seal, before a
+    // descriptor can exist. Never fabricate an invalid sealed arena.
+    assert!(matches!(
+        original(false),
+        Err(crate::PublishedValueError::Invalid("missing original slot"))
+    ));
 }
 
 #[test]
@@ -204,10 +256,7 @@ fn constant_metadata_is_orthogonal_and_cannot_enter_other_action_families() {
             BuildInfoTransformKind::Info,
         ),
     ] {
-        assert!(
-            BuildInfoTransformSpec::new(status.dupe(), template("t"), output, recipe(kind))
-                .is_err()
-        );
+        assert!(checked_spec(status.dupe(), template("t"), output, kind).is_err());
     }
     for action in [
         ActionSpec::new(
@@ -288,369 +337,84 @@ fn build_info_registration_is_ordered_atomic_and_conflicts_across_metadata() {
 }
 
 #[test]
-fn build_info_callback_render_preserves_defaults_order_and_errors() {
-    use BuildInfoTransformKind::Info;
-    use BuildInfoTransformKind::Version;
-    use slug_configuration_v2::CanonicalStringMap;
-
-    // Whole literal expectations, independent of the renderer and replacement
-    // helper. Map order must not choose the authenticated callback's pass order.
-    let cases: &[(BuildInfoTransformKind, &[(&str, &str)], &str, &str)] = &[
-        (
-            Info,
-            &[],
-            "#define BUILD_EMBED_LABEL \"{BUILD_EMBED_LABEL}\"\n#define BUILD_HOST \"{BUILD_HOST}\"\n#define BUILD_USER \"{BUILD_USER}\"\n",
-            "#define BUILD_EMBED_LABEL \"\"\n#define BUILD_HOST \"hostname\"\n#define BUILD_USER \"username\"\n",
-        ),
-        (
-            Version,
-            &[("BUILD_TIMESTAMP", "123")],
-            "#define BUILD_SCM_REVISION \"{BUILD_SCM_REVISION}\"\n#define BUILD_SCM_STATUS \"{BUILD_SCM_STATUS}\"\n#define BUILD_TIMESTAMP {BUILD_TIMESTAMP}\n",
-            "#define BUILD_SCM_REVISION \"0\"\n#define BUILD_SCM_STATUS \"\"\n#define BUILD_TIMESTAMP 123\n",
-        ),
-        (
-            Info,
-            &[
-                ("BUILD_USER", ""),
-                ("BUILD_HOST", ""),
-                ("BUILD_EMBED_LABEL", ""),
-                ("OTHER", "ignored"),
-            ],
-            "{BUILD_EMBED_LABEL}{BUILD_HOST}{BUILD_USER}|{OTHER}|{BUILD_TIMESTAMP}",
-            "|{OTHER}|{BUILD_TIMESTAMP}",
-        ),
-        (
-            Version,
-            &[
-                ("BUILD_TIMESTAMP", ""),
-                ("BUILD_SCM_REVISION", ""),
-                ("BUILD_SCM_STATUS", ""),
-            ],
-            "{BUILD_SCM_REVISION}{BUILD_SCM_STATUS}{BUILD_TIMESTAMP}|{BUILD_HOST}",
-            "|{BUILD_HOST}",
-        ),
-        (
-            Info,
-            &[
-                ("BUILD_USER", "u{BUILD_EMBED_LABEL}{BUILD_USER}"),
-                ("BUILD_HOST", "{BUILD_USER}"),
-                ("BUILD_EMBED_LABEL", "{BUILD_HOST}"),
-            ],
-            "{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}|{BUILD_EMBED_LABEL}",
-            "u{BUILD_EMBED_LABEL}{BUILD_USER}|u{BUILD_EMBED_LABEL}{BUILD_USER}|u{BUILD_EMBED_LABEL}{BUILD_USER}|u{BUILD_EMBED_LABEL}{BUILD_USER}",
-        ),
-        (
-            Version,
-            &[
-                ("BUILD_TIMESTAMP", "t{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}"),
-                ("BUILD_SCM_STATUS", "{BUILD_TIMESTAMP}"),
-                ("BUILD_SCM_REVISION", "{BUILD_SCM_STATUS}"),
-            ],
-            "{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}|{BUILD_SCM_REVISION}",
-            "t{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}|t{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}|t{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}|t{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}",
-        ),
-        (
-            Info,
-            &[("BUILD_EMBED_LABEL", "{BUILD_"), ("BUILD_HOST", "later")],
-            "{BUILD_EMBED_LABEL}HOST}|{BUILD_EMBED_LABEL}EMBED_LABEL}",
-            "later|{BUILD_EMBED_LABEL}",
-        ),
-        (
-            Version,
-            &[
-                ("BUILD_SCM_REVISION", "{BUILD_"),
-                ("BUILD_SCM_STATUS", "later"),
-                ("BUILD_TIMESTAMP", "present"),
-            ],
-            "{BUILD_SCM_REVISION}SCM_STATUS}|{BUILD_SCM_REVISION}SCM_REVISION}",
-            "later|{BUILD_SCM_REVISION}",
-        ),
-        (
-            Info,
-            &[
-                ("BUILD_EMBED_LABEL", "{BUILD_EMBED_LABEL}"),
-                ("BUILD_HOST", "{BUILD_HOST}"),
-                ("BUILD_USER", "{BUILD_USER}"),
-            ],
-            "{BUILD_EMBED_LABEL}{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}",
-            "{BUILD_EMBED_LABEL}{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}",
-        ),
-        (
-            Version,
-            &[
-                ("BUILD_TIMESTAMP", "{BUILD_TIMESTAMP}"),
-                ("BUILD_SCM_REVISION", "{BUILD_SCM_REVISION}"),
-                ("BUILD_SCM_STATUS", "{BUILD_SCM_STATUS}"),
-            ],
-            "{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}{BUILD_TIMESTAMP}",
-            "{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}{BUILD_TIMESTAMP}",
-        ),
-        (Info, &[], "plain {UNKNOWN}\n", "plain {UNKNOWN}\n"),
-        (Info, &[], "", ""),
-        (Version, &[("BUILD_TIMESTAMP", "")], "", ""),
-        (
-            Version,
-            &[("BUILD_TIMESTAMP", " not-a-number \r\n")],
-            "T={BUILD_TIMESTAMP};T={BUILD_TIMESTAMP}",
-            "T= not-a-number \r\n;T= not-a-number \r\n",
-        ),
-    ];
-    for &(kind, pairs, template, expected) in cases {
-        let callback = recipe(kind);
-        let status = CanonicalStringMap::from_pairs(pairs.iter().copied());
-        let before = status.clone();
-        let callback_before = callback.clone();
-        assert_eq!(
-            callback.render_template(&status, template).unwrap(),
-            expected
-        );
-        assert_eq!(
-            callback.render_template(&status, template).unwrap(),
-            expected
-        );
-        assert_eq!(status, before);
-        assert_eq!(callback, callback_before);
+fn build_info_descriptor_dispatch_lifetime_and_shared_alias_state_are_explicit() {
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+    #[derive(Debug)]
+    struct Dispatch(Arc<AtomicUsize>);
+    impl BuildInfoTransformRuntime for Dispatch {
+        fn render(
+            &self,
+            status: &[u8],
+            template: &[u8],
+            context: &dyn BuildInfoEvaluationContext,
+        ) -> Result<Vec<u8>, BuildInfoTransformError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(status, b"actual status");
+            assert_eq!(context.mnemonic(), "ConsumerMnemonic");
+            assert!(!context.is_cancelled());
+            context.print("actual current sink")?;
+            Ok(template.to_vec())
+        }
     }
-    let callback = recipe(Version);
-    let status = CanonicalStringMap::from_pairs([("BUILD_SCM_REVISION", "9"), ("UNKNOWN", "x")]);
-    for template in ["{BUILD_TIMESTAMP}", "", "no recognized placeholder"] {
-        assert_eq!(
-            callback.render_template(&status, template),
-            Err(
-                "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."
-            )
-        );
+    struct Consumer(std::cell::RefCell<Vec<String>>);
+    impl BuildInfoEvaluationContext for Consumer {
+        fn is_cancelled(&self) -> bool {
+            false
+        }
+        fn print(&self, text: &str) -> Result<(), BuildInfoTransformError> {
+            self.0.borrow_mut().push(text.to_owned());
+            Ok(())
+        }
+        fn mnemonic(&self) -> &str {
+            "ConsumerMnemonic"
+        }
     }
-}
-
-#[test]
-fn build_info_callback_render_outputs_outlive_borrowed_unicode_inputs() {
-    use BuildInfoTransformKind::Info;
-    use BuildInfoTransformKind::Version;
-    use slug_configuration_v2::CanonicalStringMap;
-
-    let (info, version, unchanged) = {
-        let info_recipe = recipe(Info);
-        let version_recipe = recipe(Version);
-        let status = CanonicalStringMap::from_pairs([
-            ("BUILD_EMBED_LABEL", "  é😀\"\\\r\n\0  "),
-            ("BUILD_HOST", "主机"),
-            ("BUILD_USER", ""),
-            ("BUILD_SCM_REVISION", "rév😀"),
-            ("BUILD_SCM_STATUS", "\"\\\r\n\0"),
-            ("BUILD_TIMESTAMP", " not numeric 😀 "),
-        ]);
-        let template =
-            "前[{BUILD_EMBED_LABEL}][{BUILD_EMBED_LABEL}]|{BUILD_HOST}|{BUILD_USER}|{OTHER}\n"
-                .to_owned();
-        let version_template =
-            "前{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}\n".to_owned();
-        let unchanged_template = "unchanged é😀\0\r\n{OTHER}".to_owned();
-        let original = (
-            status.clone(),
-            template.clone(),
-            version_template.clone(),
-            unchanged_template.clone(),
-        );
-        let info = info_recipe.render_template(&status, &template).unwrap();
-        let version = version_recipe
-            .render_template(&status, &version_template)
+    let calls = Arc::new(AtomicUsize::new(0));
+    let backend = Arc::new(Dispatch(calls.clone()));
+    let weak = Arc::downgrade(&backend);
+    let a = RetainedBuildInfoTransform::from_published(original(true).unwrap(), backend.clone())
+        .unwrap();
+    let b =
+        RetainedBuildInfoTransform::from_published(original(true).unwrap(), Arc::new(NeverRender))
             .unwrap();
-        let unchanged = info_recipe
-            .render_template(&status, &unchanged_template)
+    let foreign =
+        RetainedBuildInfoTransform::from_published(original(true).unwrap(), Arc::new(NeverRender))
             .unwrap();
+    assert_eq!(a, b);
+    assert!(!a.published_callable().same_original(b.published_callable()));
+    let mut state = crate::analysis_value::PublicationEqState::default();
+    assert!(a.publication_eq_with(&b, &mut state));
+    assert!(
+        a.published_callable()
+            .publication_eq_with(b.published_callable(), &mut state)
+    );
+    assert!(
+        !a.published_callable()
+            .publication_eq_with(foreign.published_callable(), &mut state)
+    );
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "metadata and Eq never invoke"
+    );
+    let copy = a.clone();
+    drop(backend);
+    drop(a);
+    assert!(weak.upgrade().is_some());
+    let context = Consumer(std::cell::RefCell::new(Vec::new()));
+    for expected in [1, 2] {
         assert_eq!(
-            info,
-            "前[  é😀\"\\\r\n\0  ][  é😀\"\\\r\n\0  ]|主机||{OTHER}\n"
-        );
-        assert_eq!(version, "前rév😀|\"\\\r\n\0| not numeric 😀 \n");
-        assert_eq!(unchanged, "unchanged é😀\0\r\n{OTHER}");
-        assert_eq!(
-            info_recipe.render_template(&status, &template).unwrap(),
-            info
-        );
-        assert_eq!(
-            version_recipe
-                .render_template(&status, &version_template)
+            copy.render(b"actual status", b"actual template", &context)
                 .unwrap(),
-            version
+            b"actual template"
         );
-        assert_eq!(
-            info_recipe.source().to_string(),
-            BuildInfoCallbackRecipe::SOURCE_LABEL
-        );
-        assert_eq!(
-            version_recipe.digest(),
-            &BuildInfoCallbackRecipe::SOURCE_DIGEST
-        );
-        assert_eq!(
-            (&status, &template, &version_template, &unchanged_template),
-            (&original.0, &original.1, &original.2, &original.3)
-        );
-        // A value longer than its key exercises growing passes; the empty USER
-        // above shrinks. Neither observation implies an allocation bound.
-        let growing = CanonicalStringMap::from_pairs([("BUILD_HOST", "界😀".repeat(64))]);
-        let grown = info_recipe
-            .render_template(&growing, "{BUILD_HOST}{BUILD_HOST}")
-            .unwrap();
-        assert_eq!(grown, "界😀".repeat(128));
-        drop(growing);
-        drop(grown);
-        drop(original);
-        drop(status);
-        drop(template);
-        drop(version_template);
-        drop(unchanged_template);
-        drop(info_recipe);
-        drop(version_recipe);
-        (info, version, unchanged)
-    };
-    // Every recipe, input and snapshot owner has now been released.
-    assert_eq!(
-        info.as_bytes(),
-        "前[  é😀\"\\\r\n\0  ][  é😀\"\\\r\n\0  ]|主机||{OTHER}\n".as_bytes()
-    );
-    assert_eq!(
-        version.as_bytes(),
-        "前rév😀|\"\\\r\n\0| not numeric 😀 \n".as_bytes()
-    );
-    assert_eq!(
-        unchanged.as_bytes(),
-        "unchanged é😀\0\r\n{OTHER}".as_bytes()
-    );
-}
-
-#[test]
-fn build_info_supplied_bytes_preserve_full_headers_raw_values_and_errors() {
-    use BuildInfoTransformKind::Info;
-    use BuildInfoTransformKind::Version;
-
-    let info_header = b"#define BUILD_EMBED_LABEL \"{BUILD_EMBED_LABEL}\"\n#define BUILD_HOST \"{BUILD_HOST}\"\n#define BUILD_USER \"{BUILD_USER}\"\n";
-    let version_header = b"#define BUILD_SCM_REVISION \"{BUILD_SCM_REVISION}\"\n#define BUILD_SCM_STATUS \"{BUILD_SCM_STATUS}\"\n#define BUILD_TIMESTAMP {BUILD_TIMESTAMP}\n";
-    let cases: &[(BuildInfoTransformKind, &[u8], &[u8], &[u8])] = &[
-        (Info, b"", info_header, b"#define BUILD_EMBED_LABEL \"\"\n#define BUILD_HOST \"hostname\"\n#define BUILD_USER \"username\"\n"),
-        (Version, b"BUILD_TIMESTAMP 123\n", version_header, b"#define BUILD_SCM_REVISION \"0\"\n#define BUILD_SCM_STATUS \"\"\n#define BUILD_TIMESTAMP 123\n"),
-        (Info, b"BUILD_EMBED_LABEL caf\xE9\nBUILD_HOST \xC3\xA9\nBUILD_USER \xFF\x80\0\r\n", info_header, b"#define BUILD_EMBED_LABEL \"caf\xE9\"\n#define BUILD_HOST \"\xC3\xA9\"\n#define BUILD_USER \"\xFF\x80\0\r\"\n"),
-        (Version, b"BUILD_SCM_REVISION r\xE9\nBUILD_SCM_STATUS \xFF\0\r\nBUILD_TIMESTAMP first\nBUILD_TIMESTAMP  not numeric \r\nBUILD_TIMESTAMP\n", version_header, b"#define BUILD_SCM_REVISION \"r\xE9\"\n#define BUILD_SCM_STATUS \"\xFF\0\r\"\n#define BUILD_TIMESTAMP  not numeric \r\n"),
-        (Info, b"BUILD_EMBED_LABEL old\nBUILD_EMBED_LABEL \nBUILD_EMBED_LABEL\nBUILD_HOST \nBUILD_USER \n", b"[{BUILD_EMBED_LABEL}][{BUILD_HOST}][{BUILD_USER}]\xFE\0\r", b"[][][]\xFE\0\r"),
-        (Version, b"BUILD_TIMESTAMP \n", version_header, b"#define BUILD_SCM_REVISION \"0\"\n#define BUILD_SCM_STATUS \"\"\n#define BUILD_TIMESTAMP \n"),
-        (Version, b"BUILD_TIMESTAMP \n", b"", b""),
-        (Info, b"", b"", b""),
-    ];
-    for &(kind, status, template, expected) in cases {
-        let callback = recipe(kind);
-        let before = callback.clone();
-        let status = status.to_vec();
-        let template = template.to_vec();
-        let inputs = (status.clone(), template.clone());
-        for _ in 0..2 {
-            assert_eq!(
-                callback.render_supplied_bytes(&status, &template).unwrap(),
-                expected
-            );
-        }
-        assert_eq!((&status, &template), (&inputs.0, &inputs.1));
-        assert_eq!(callback, before);
+        assert_eq!(calls.load(Ordering::SeqCst), expected);
     }
-    let callback = recipe(Version);
-    for status in [b"".as_slice(), b"BUILD_TIMESTAMP\nBUILD_TIMESTAMP\t123\n"] {
-        for template in [
-            b"{BUILD_TIMESTAMP}".as_slice(),
-            b"",
-            b"no recognized key\xFF\0\r",
-        ] {
-            assert_eq!(
-                callback.render_supplied_bytes(status, template),
-                Err(
-                    "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."
-                )
-            );
-        }
-    }
-}
-
-#[test]
-fn build_info_supplied_bytes_keep_ordered_literal_and_cross_boundary_passes() {
-    use BuildInfoTransformKind::Info;
-    use BuildInfoTransformKind::Version;
-
-    let cases: &[(BuildInfoTransformKind, &[u8], &[u8], &[u8])] = &[
-        (Info, b"BUILD_EMBED_LABEL {BUILD_HOST}\nBUILD_HOST {BUILD_USER}\nBUILD_USER \xE9{BUILD_EMBED_LABEL}{BUILD_USER}\n", b"{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}", b"\xE9{BUILD_EMBED_LABEL}{BUILD_USER}|\xE9{BUILD_EMBED_LABEL}{BUILD_USER}|\xE9{BUILD_EMBED_LABEL}{BUILD_USER}"),
-        (Version, b"BUILD_SCM_REVISION {BUILD_SCM_STATUS}\nBUILD_SCM_STATUS {BUILD_TIMESTAMP}\nBUILD_TIMESTAMP \xFF{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}\n", b"{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}", b"\xFF{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}|\xFF{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}|\xFF{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}"),
-        (Info, b"BUILD_EMBED_LABEL {BUILD_\nBUILD_HOST later\x80\n", b"{BUILD_EMBED_LABEL}HOST}|{BUILD_EMBED_LABEL}EMBED_LABEL}", b"later\x80|{BUILD_EMBED_LABEL}"),
-        (Version, b"BUILD_SCM_REVISION {BUILD_\nBUILD_SCM_STATUS later\xFE\nBUILD_TIMESTAMP \n", b"{BUILD_SCM_REVISION}SCM_STATUS}|{BUILD_SCM_REVISION}SCM_REVISION}", b"later\xFE|{BUILD_SCM_REVISION}"),
-        (Info, b"BUILD_EMBED_LABEL {BUILD_EMBED_LABEL}\nBUILD_HOST {BUILD_HOST}\nBUILD_USER {BUILD_USER}\n", b"{BUILD_EMBED_LABEL}{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}|{OTHER}", b"{BUILD_EMBED_LABEL}{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}|{OTHER}"),
-        (Version, b"BUILD_SCM_REVISION {BUILD_SCM_REVISION}\nBUILD_SCM_STATUS {BUILD_SCM_STATUS}\nBUILD_TIMESTAMP {BUILD_TIMESTAMP}\n", b"{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}{BUILD_TIMESTAMP}", b"{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}{BUILD_TIMESTAMP}"),
-    ];
-    for &(kind, status, template, expected) in cases {
-        let callback = recipe(kind);
-        assert_eq!(
-            callback.render_supplied_bytes(status, template).unwrap(),
-            expected
-        );
-        assert_eq!(
-            callback.render_supplied_bytes(status, template).unwrap(),
-            expected
-        );
-    }
-}
-
-#[test]
-fn build_info_supplied_bytes_roundtrip_all_bytes_and_outlive_input_owners() {
-    use BuildInfoTransformKind::Info;
-    use BuildInfoTransformKind::Version;
-
-    let (matched, unchanged_info, unchanged_version) = {
-        let info = recipe(Info);
-        let version = recipe(Version);
-        let mut status = b"BUILD_TIMESTAMP 1\nBUILD_HOST ".to_vec();
-        status.extend(std::iter::repeat_n(0xE9, 512));
-        status.extend_from_slice(b"\0\r\n");
-        let template = b"\xFF[{BUILD_HOST}][{BUILD_HOST}]\0\r".to_vec();
-        // This byte sequence contains no recognized placeholder, and includes
-        // valid and invalid UTF8, raw delimiters and all control characters.
-        let all_bytes = (0..=255u8).collect::<Vec<_>>();
-        let snapshots = (
-            status.clone(),
-            template.clone(),
-            all_bytes.clone(),
-            info.clone(),
-            version.clone(),
-        );
-        let matched = info.render_supplied_bytes(&status, &template).unwrap();
-        let unchanged_info = info.render_supplied_bytes(&status, &all_bytes).unwrap();
-        let unchanged_version = version.render_supplied_bytes(&status, &all_bytes).unwrap();
-        assert_eq!(unchanged_info, all_bytes);
-        assert_eq!(unchanged_version, all_bytes);
-        assert_eq!(
-            info.render_supplied_bytes(&status, &template).unwrap(),
-            matched
-        );
-        assert_eq!(
-            (&status, &template, &all_bytes, &info, &version),
-            (
-                &snapshots.0,
-                &snapshots.1,
-                &snapshots.2,
-                &snapshots.3,
-                &snapshots.4
-            )
-        );
-        drop(snapshots);
-        drop(status);
-        drop(template);
-        drop(all_bytes);
-        drop(info);
-        drop(version);
-        (matched, unchanged_info, unchanged_version)
-    };
-    // Only the returned byte Vecs survive the supplied input/recipe owners.
-    let mut expected = b"\xFF[".to_vec();
-    expected.extend(std::iter::repeat_n(0xE9, 512));
-    expected.extend_from_slice(b"\0\r][");
-    expected.extend(std::iter::repeat_n(0xE9, 512));
-    expected.extend_from_slice(b"\0\r]\0\r");
-    assert_eq!(matched, expected);
-    assert_eq!(unchanged_info, (0..=255u8).collect::<Vec<_>>());
-    assert_eq!(unchanged_version, (0..=255u8).collect::<Vec<_>>());
+    assert_eq!(
+        *context.0.borrow(),
+        vec!["actual current sink", "actual current sink"]
+    );
+    drop(copy);
+    assert!(weak.upgrade().is_none());
 }

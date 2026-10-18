@@ -445,7 +445,7 @@ fn native_headers_publish_actual_info_version_paths_modes_metadata_and_configura
         fs::write(&build, source).unwrap();
         let root = HeaderProbe::new(keys[index].clone(), HeaderMode::CloneOnce, false);
         let driven = runtime
-            .drive_command(native_request(&runtime), root.clone())
+            .drive_command_with_callback_output(native_request(&runtime), root.clone(), &|_| Ok(()))
             .unwrap();
         let terminal = driven.accepted.terminal_for_test();
         let result = header_result(terminal).clone();
@@ -485,7 +485,10 @@ fn native_headers_publish_actual_info_version_paths_modes_metadata_and_configura
             fs::metadata(&path).unwrap().permissions().mode() & 0o777,
             0o444
         );
-        assert_ne!(result.consumed.header.as_ptr(), input.header.as_ptr());
+        assert_ne!(
+            result.consumed.header.as_ptr(),
+            input.status.stable.as_ptr()
+        );
         let other = path.parent().unwrap().join("unrelated-preserved");
         if !other.exists() {
             fs::write(&other, b"not a declared output").unwrap();
@@ -513,9 +516,10 @@ fn native_headers_publish_actual_info_version_paths_modes_metadata_and_configura
     // Readable old 0555 is admitted; replacement remains exactly nonexecutable0444.
     fs::set_permissions(&paths[0], fs::Permissions::from_mode(0o555)).unwrap();
     let replaced = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoHeaderPublicationRoot::new(keys[1].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     assert_eq!(
@@ -555,9 +559,10 @@ fn native_headers_copied_physical_consumed_pending_and_old_result_cannot_restore
             .unwrap();
     let keys = native_keys(&runtime);
     let setup = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoHeaderPublicationRoot::new(keys[1].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     let old = setup
@@ -591,16 +596,21 @@ fn native_headers_copied_physical_consumed_pending_and_old_result_cannot_restore
         let root = HeaderProbe::new(keys[1].clone(), mode, true);
         assert!(
             runtime
-                .drive_command(native_request(&runtime), root.clone())
+                .drive_command_with_callback_output(
+                    native_request(&runtime),
+                    root.clone(),
+                    &|_| Ok(())
+                )
                 .is_err()
         );
         header_failed(&runtime, &root, &before);
         assert_eq!(fs::read(&path).unwrap(), expected);
     }
     let recovered = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoHeaderPublicationRoot::new(keys[1].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     assert_eq!(
@@ -639,7 +649,7 @@ fn native_headers_real_scalar_and_status_mutations_refuse_after_publication_and_
             .clone();
         let root = HeaderProbe::new(keys[1].clone(), HeaderMode::Mutate(mutation), true);
         let error = runtime
-            .drive_command(native_request(&runtime), root.clone())
+            .drive_command_with_callback_output(native_request(&runtime), root.clone(), &|_| Ok(()))
             .err()
             .unwrap();
         assert!(
@@ -690,7 +700,7 @@ fn native_headers_source_retry_and_abort_have_no_early_header_effects_and_recove
         true,
     );
     let driven = runtime
-        .drive_command(native_request(&runtime), retry.clone())
+        .drive_command_with_callback_output(native_request(&runtime), retry.clone(), &|_| Ok(()))
         .unwrap();
     let value = driven.accepted.terminal_for_test();
     let published = header_result(value);
@@ -729,7 +739,11 @@ fn native_headers_source_retry_and_abort_have_no_early_header_effects_and_recove
     let header = fs::read(header_path(&published.consumed.inputs)).unwrap();
     let abort = HeaderProbe::new(keys[1].clone(), HeaderMode::Abort, true);
     assert!(matches!(
-        runtime.drive_command(native_request(&runtime), abort.clone()),
+        runtime.drive_command_with_callback_output(
+            native_request(&runtime),
+            abort.clone(),
+            &|_| Ok(())
+        ),
         Err(NativeDemandSessionError::Computation(_))
     ));
     header_failed(&runtime, &abort, &before);
@@ -744,9 +758,10 @@ fn native_headers_source_retry_and_abort_have_no_early_header_effects_and_recove
         header
     );
     let recovered = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoHeaderPublicationRoot::new(keys[1].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     assert_eq!(
@@ -770,9 +785,10 @@ fn native_header_bound_uses_real_catalog_ordered_markers_and_scalar_shape_guard(
             .unwrap();
     let keys = native_keys(&runtime);
     let driven = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoHeaderPublicationRoot::new(keys[1].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     let result = driven
@@ -800,15 +816,11 @@ fn native_header_bound_uses_real_catalog_ordered_markers_and_scalar_shape_guard(
         .result()
         .as_ref()
         .map_err(|e| e.to_string())
-        .unwrap()
-        .as_ref()
-        .as_ref()
-        .map_err(|e| e.to_string())
         .unwrap();
     assert_eq!(source.bytes(), TEMPLATE_CASES[1].2);
     let actual = view
         .callback()
-        .render_supplied_bytes(&pure.stable, source.bytes())
+        .render(&pure.stable, source.bytes(), &InstalledBuildInfoContext)
         .unwrap();
     let expected=format!("#define BUILD_EMBED_LABEL \"\"\n#define BUILD_HOST \"{}xxxx\"\n#define BUILD_USER \"{user}\"\n",user.repeat(341)).into_bytes();
     assert_eq!(actual, expected);
@@ -859,4 +871,9 @@ fn native_header_bound_uses_real_catalog_ordered_markers_and_scalar_shape_guard(
         expected_header(input)
     );
     revoked(&runtime);
+}
+
+mod callback_execution {
+    use super::*;
+    include!("build_info_callback_execution_tests.rs");
 }

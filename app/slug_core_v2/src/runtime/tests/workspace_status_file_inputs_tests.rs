@@ -342,7 +342,7 @@ impl NativeCommandRoot for FileProbe {
                 .err()
                 .unwrap();
             assert!(
-                error.to_string().contains("read permit phase differs"),
+                error.to_string().contains("files have not published"),
                 "{error}"
             );
             let spent = self.root.publish_files(&mut clone).err().unwrap();
@@ -388,25 +388,12 @@ impl NativeCommandRoot for FileProbe {
             for input in &value.metadata {
                 let mut scratch = [0; 8236];
                 let physical = read_checked(&files, input, &mut scratch)?;
-                let view = ConfiguredBuildInfoActionView::from_configured_action(
-                    input.template.action(),
-                    &input.status.capture.workspace,
-                )
-                .unwrap();
-                let source = input
-                    .template
-                    .source()
-                    .result()
-                    .as_ref()
-                    .map_err(|error| std::io::Error::other(error.to_string()))?
-                    .as_ref()
-                    .as_ref()
-                    .map_err(|error| std::io::Error::other(error.to_string()))?;
-                value.rendered.push(
-                    view.callback()
-                        .render_supplied_bytes(physical, source.bytes())
-                        .unwrap(),
+                assert_eq!(
+                    physical,
+                    input.status.bytes(selected_descriptor(input).kind())
                 );
+                // Independent literal oracle only: no VM inside publication.
+                value.rendered.push(expected_header(input));
             }
         }
         Ok(())
@@ -466,15 +453,15 @@ fn native_file_inputs_read_both_roles_cover_configurations_and_release_four_read
     let keys = native_keys(&runtime);
     let root = FileProbe::new(keys.clone(), 0, FileMode::CloneOnce, true);
     let driven = runtime
-        .drive_command(native_request(&runtime), root.clone())
+        .drive_command_with_callback_output(native_request(&runtime), root.clone(), &|_| Ok(()))
         .unwrap();
     let value = driven.accepted.terminal_for_test();
     let held = consumed(value).clone();
     assert_eq!(held.header, expected_header(&held.inputs));
     assert_ne!(
         held.header.as_ptr(),
-        held.inputs.header.as_ptr(),
-        "physical header independently owned"
+        held.inputs.status.stable.as_ptr(),
+        "attempt-rendered header independently owns bytes from status"
     );
     assert_eq!(value.rendered.len(), value.metadata.len());
     let snapshot = runtime
@@ -517,9 +504,10 @@ fn native_file_inputs_read_both_roles_cover_configurations_and_release_four_read
         );
     }
     let direct = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoFileInputsRoot::new(keys[1].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     let stable = direct
@@ -599,9 +587,10 @@ fn native_file_inputs_old_receipts_are_history_and_cannot_grant_equal_new_status
             .unwrap();
     let keys = native_keys(&runtime);
     let first = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoFileInputsRoot::new(keys[1].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     let old = first
@@ -627,7 +616,11 @@ fn native_file_inputs_old_receipts_are_history_and_cannot_grant_equal_new_status
         false,
     );
     assert!(matches!(
-        runtime.drive_command(native_request(&runtime), premature.clone()),
+        runtime.drive_command_with_callback_output(
+            native_request(&runtime),
+            premature.clone(),
+            &|_| Ok(())
+        ),
         Err(NativeDemandSessionError::Revision(
             RequestRevisionError::OutputPublication(_)
         ))
@@ -642,16 +635,21 @@ fn native_file_inputs_old_receipts_are_history_and_cannot_grant_equal_new_status
         false,
     );
     assert!(matches!(
-        runtime.drive_command(native_request(&runtime), rejected.clone()),
+        runtime.drive_command_with_callback_output(
+            native_request(&runtime),
+            rejected.clone(),
+            &|_| Ok(())
+        ),
         Err(NativeDemandSessionError::Revision(
             RequestRevisionError::OutputPublication(_)
         ))
     ));
     assert_no_file_grant(&runtime, &rejected, &before);
     let second = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoFileInputsRoot::new(keys[3].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     let new = second
@@ -749,7 +747,11 @@ fn native_file_inputs_refuse_same_capture_metadata_and_foreign_root_before_effec
         let root = FileProbe::new(keys.clone(), 0, mode, true);
         assert!(
             runtime
-                .drive_command(native_request(&runtime), root.clone())
+                .drive_command_with_callback_output(
+                    native_request(&runtime),
+                    root.clone(),
+                    &|_| Ok(())
+                )
                 .is_err()
         );
         assert_no_file_grant(&runtime, &root, &before);
@@ -779,7 +781,7 @@ fn native_file_inputs_actual_read_refuses_inode_bytes_modes_alias_links_and_pare
             .clone();
         let root = FileProbe::new(keys, 1, FileMode::Mutate(mutation), false);
         let error = runtime
-            .drive_command(native_request(&runtime), root.clone())
+            .drive_command_with_callback_output(native_request(&runtime), root.clone(), &|_| Ok(()))
             .err()
             .unwrap();
         assert!(
@@ -811,7 +813,7 @@ fn native_file_inputs_source_retry_aborts_partial_reads_and_publication_errors_g
     bytes.extend_from_slice(b"# physical file consumption retry\n");
     let retry = FileProbe::new(keys.clone(), 0, FileMode::SourceEdit(build, bytes), false);
     let driven = runtime
-        .drive_command(native_request(&runtime), retry.clone())
+        .drive_command_with_callback_output(native_request(&runtime), retry.clone(), &|_| Ok(()))
         .unwrap();
     let value = driven.accepted.terminal_for_test();
     assert_eq!(
@@ -850,7 +852,11 @@ fn native_file_inputs_source_retry_aborts_partial_reads_and_publication_errors_g
     let abort = FileProbe::new(keys.clone(), 0, FileMode::Abort, false);
     let existing = final_bytes(workspace.path());
     assert!(matches!(
-        runtime.drive_command(native_request(&runtime), abort.clone()),
+        runtime.drive_command_with_callback_output(
+            native_request(&runtime),
+            abort.clone(),
+            &|_| Ok(())
+        ),
         Err(NativeDemandSessionError::Computation(_))
     ));
     assert_eq!(final_bytes(workspace.path()), existing);
@@ -872,7 +878,7 @@ fn native_file_inputs_source_retry_aborts_partial_reads_and_publication_errors_g
         }
         let root = FileProbe::new(keys.clone(), 0, mode, false);
         let error = runtime
-            .drive_command(native_request(&runtime), root.clone())
+            .drive_command_with_callback_output(native_request(&runtime), root.clone(), &|_| Ok(()))
             .err()
             .unwrap();
         assert!(
@@ -904,9 +910,10 @@ fn native_file_inputs_source_retry_aborts_partial_reads_and_publication_errors_g
         assert_no_file_grant(&runtime, &root, &before);
     }
     let recovered = runtime
-        .drive_command(
+        .drive_command_with_callback_output(
             native_request(&runtime),
             NativeBuildInfoFileInputsRoot::new(keys[0].clone()),
+            &|_| Ok(()),
         )
         .unwrap();
     assert_eq!(

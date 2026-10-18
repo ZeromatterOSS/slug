@@ -1,7 +1,8 @@
 //! Installed rule construction and pure rendering from supplied template/status strings.
 use slug_build_api_v2::ActionOutputMetadata;
 use slug_build_api_v2::AnalysisArtifact;
-use slug_build_api_v2::BuildInfoCallbackRecipe;
+use slug_build_api_v2::BuildInfoEvaluationContext;
+use slug_build_api_v2::BuildInfoTransformError;
 use slug_build_api_v2::BuildInfoTransformKind;
 use slug_build_api_v2::DerivedArtifactRoot;
 use slug_build_api_v2::SymlinkTarget;
@@ -45,18 +46,22 @@ fn group(result: &ConfiguredNodeResult, name: &str) -> Vec<AnalysisArtifact> {
         .collect()
 }
 
+struct Consumer;
+impl BuildInfoEvaluationContext for Consumer {
+    fn is_cancelled(&self) -> bool {
+        false
+    }
+    fn print(&self, _: &str) -> Result<(), BuildInfoTransformError> {
+        panic!("unchanged installed transforms do not print")
+    }
+    fn mnemonic(&self) -> &str {
+        "TranslateBuildInfo"
+    }
+}
 fn check_rendered_header(spec: &slug_build_api_v2::BuildInfoTransformSpec) {
-    let status = slug_configuration_v2::CanonicalStringMap::from_pairs([
-        ("BUILD_EMBED_LABEL", "release"),
-        ("BUILD_HOST", "builder"),
-        ("BUILD_USER", "user"),
-        ("BUILD_SCM_REVISION", "abc123"),
-        ("BUILD_SCM_STATUS", "clean"),
-        ("BUILD_TIMESTAMP", "123456"),
-    ]);
     let status_bytes = b"BUILD_EMBED_LABEL release\nBUILD_HOST builder\nBUILD_USER user\nBUILD_SCM_REVISION abc123\nBUILD_SCM_STATUS clean\nBUILD_TIMESTAMP 123456\n";
     // Supplied immutable catalog bodies, not runtime template-read authority.
-    let (template, expected) = match spec.callback().kind() {
+    let (template, expected) = match spec.kind() {
         BuildInfoTransformKind::Info => (
             include_str!(
                 "../../../../../slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/build_info/templates/non_volatile_file.h.template"
@@ -73,32 +78,19 @@ fn check_rendered_header(spec: &slug_build_api_v2::BuildInfoTransformSpec) {
     let before = spec.clone();
     for _ in 0..2 {
         assert_eq!(
-            spec.callback().render_template(&status, template).unwrap(),
-            expected
-        );
-        assert_eq!(
             spec.callback()
-                .render_supplied_bytes(status_bytes, template.as_bytes())
+                .render(status_bytes, template.as_bytes(), &Consumer)
                 .unwrap(),
             expected.as_bytes()
         );
         assert_eq!(spec, &before);
     }
-    if spec.callback().kind() == BuildInfoTransformKind::Version {
-        assert_eq!(
-            spec.callback()
-                .render_supplied_bytes(b"", template.as_bytes()),
-            Err(
-                "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."
-            )
-        );
-        assert_eq!(
-            spec.callback()
-                .render_template(&Default::default(), template),
-            Err(
-                "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."
-            )
-        );
+    if spec.kind() == BuildInfoTransformKind::Version {
+        let error = spec
+            .callback()
+            .render(b"", template.as_bytes(), &Consumer)
+            .unwrap_err();
+        assert!(error.to_string().contains("timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."),"{error}");
     }
 }
 
@@ -138,14 +130,12 @@ fn check(result: &ConfiguredNodeResult, root: &std::path::Path, configuration: &
             .expect("typed transform in source order");
         check_rendered_header(spec);
         assert_eq!(action.mnemonic(), "TranslateBuildInfo");
-        assert_eq!(spec.callback().kind(), kind);
-        assert_eq!(
-            spec.callback().source().to_string(),
-            BuildInfoCallbackRecipe::SOURCE_LABEL
-        );
-        assert_eq!(
-            spec.callback().digest(),
-            &BuildInfoCallbackRecipe::SOURCE_DIGEST
+        assert_eq!(spec.kind(), kind);
+        assert!(
+            spec.callback()
+                .published_callable()
+                .original_slot()
+                .is_some()
         );
         assert_eq!(spec.status().kind(), role);
         assert_eq!(spec.status().root().workspace().as_path(), root);
@@ -271,7 +261,7 @@ async fn installed_build_info_and_unchanged_main_external_instances_register_rea
 }
 
 #[tokio::test]
-async fn installed_build_info_restores_full_configuration_and_rejects_java_callbacks() {
+async fn installed_build_info_restores_full_configuration_and_retains_original_callbacks() {
     let root = fixture();
     let dice = registry::dice(&root);
     let a = config(&[]);
@@ -289,15 +279,33 @@ async fn installed_build_info_restores_full_configuration_and_rejects_java_callb
     assert_ne!(left.output().root(), right.output().root());
     let restored = request(&dice, &root, INSTALLED, a).await.unwrap();
     assert_eq!(first, restored);
-    let error = request(
+    // The protected name predates recipe retirement. Java's actual original
+    // is now general registration metadata; it is not rejected by source hash.
+    let java = request(
         &dice,
         &root,
         "@@bazel_tools//tools/build_defs/build_info:java_build_info",
         config(&[]),
     )
     .await
-    .unwrap_err();
-    assert!(error.contains("unchanged pinned source"), "{error}");
+    .unwrap();
+    assert!(
+        java.actions()
+            .iter()
+            .any(|action| action.build_info_transform_spec().is_some())
+    );
+    for spec in java
+        .actions()
+        .iter()
+        .filter_map(|action| action.build_info_transform_spec())
+    {
+        assert!(
+            spec.callback()
+                .published_callable()
+                .original_slot()
+                .is_some()
+        );
+    }
     assert!(!root.join("bazel-out").exists());
     fs::remove_dir_all(root).unwrap();
 }

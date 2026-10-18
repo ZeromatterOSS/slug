@@ -18,6 +18,17 @@ Make REAPI the primary and routine execution boundary for Slug V2.
 - no Slug-local sandbox implementation until the post-aquery execution/cache
   gate is stable.
 
+## Native build-info Source ownership
+
+BuildInfo is a native action with retained original Starlark evaluation. Its pure
+DICE input view owns tracked immutable Source content and workspace-status bytes;
+the active attempt owns evaluation and physical publication validation. It does
+not enter REAPI transport. General Source bytes share builtin catalog or actual
+filesystem observations, preserving path/content dependencies and release.
+Derived templates await genuine producer-output/receipt/frontier integration;
+remote BuildInfo execution remains unsupported. This native capability does not
+extend the earlier real NativeLink proof or admit Rust action execution.
+
 ## Current priority and handoff
 
 Canonical Live Status and [current-packet.md](./current-packet.md) own scheduling.

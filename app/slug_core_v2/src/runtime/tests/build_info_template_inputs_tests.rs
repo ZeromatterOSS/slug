@@ -138,8 +138,12 @@ async fn installed_templates_retain_main_external_target_exec_catalog_owners_and
                     .any(|retained| std::ptr::eq(retained, action))
             );
             let path = format!("tools/build_defs/build_info/templates/{name}");
-            let source = first.source().result().as_ref().unwrap();
+            let content = first.source().result().as_ref().unwrap();
+            let source = content
+                .catalog_owner()
+                .expect("actual builtin catalog owner");
             let value = source.as_ref().as_ref().unwrap();
+            assert_eq!(content.bytes(), bytes);
             assert_eq!(value.path(), path);
             assert_eq!(value.bytes(), bytes);
             assert_eq!(hex::encode(value.sha256()), hash);
@@ -173,7 +177,13 @@ async fn installed_templates_retain_main_external_target_exec_catalog_owners_and
             );
             assert!(Arc::ptr_eq(
                 source,
-                changed.source().result().as_ref().unwrap()
+                changed
+                    .source()
+                    .result()
+                    .as_ref()
+                    .unwrap()
+                    .catalog_owner()
+                    .unwrap()
             ));
             let restored = ready(tx.compute(&key).await.unwrap());
             assert!(Arc::ptr_eq(&first, &restored));
@@ -181,7 +191,15 @@ async fn installed_templates_retain_main_external_target_exec_catalog_owners_and
         }
     }
     let weak = Arc::downgrade(&held[0]);
-    let catalog_weak = Arc::downgrade(held[0].source().result().as_ref().unwrap());
+    let catalog_weak = Arc::downgrade(
+        held[0]
+            .source()
+            .result()
+            .as_ref()
+            .unwrap()
+            .catalog_owner()
+            .unwrap(),
+    );
     drop(tx);
     dice.wait_for_idle().await;
     drop(dice);
@@ -189,15 +207,7 @@ async fn installed_templates_retain_main_external_target_exec_catalog_owners_and
     assert!(catalog_weak.upgrade().is_some());
     for (index, input) in held.iter().enumerate() {
         assert_eq!(
-            input
-                .source()
-                .result()
-                .as_ref()
-                .unwrap()
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .bytes(),
+            input.source().result().as_ref().unwrap().bytes(),
             TEMPLATE_CASES[index % 2].2
         );
     }
@@ -344,15 +354,16 @@ async fn template_preparation_rejects_absent_owner_ordinal_family_and_uninstalle
     }
     let spec = owner.actions()[1].build_info_transform_spec().unwrap();
     let make = |template| {
-        ActionSpec::build_info_transform(
-            BuildInfoTransformSpec::new(
+        ActionSpec::build_info_transform(BuildInfoTransformSpec::new(
+            slug_build_api_v2::BuildInfoTransformHeader::new(
+                spec.kind(),
                 spec.status().clone(),
                 template,
                 spec.output().clone(),
-                spec.callback().clone(),
             )
             .unwrap(),
-        )
+            spec.callback().clone(),
+        ))
     };
     let derived = AnalysisArtifact::Derived {
         owner: owner_key.artifact_owner(),
@@ -362,20 +373,26 @@ async fn template_preparation_rejects_absent_owner_ordinal_family_and_uninstalle
             ActionOutputKind::File,
         ),
     };
+    for template in [
+        AnalysisArtifact::Source(CanonicalLabel::parse("@@//:custom").unwrap()),
+        owner.actions()[0]
+            .build_info_transform_spec()
+            .unwrap()
+            .template()
+            .clone(),
+    ] {
+        let expected = template.clone();
+        let valid = build_info_node(owner, vec![make(template)], true);
+        let label =
+            checked_template_label(&valid.actions()[0], evaluation.workspace(), owner_key).unwrap();
+        assert_eq!(
+            &AnalysisArtifact::Source(label.clone()),
+            &expected,
+            "general Source metadata has no installed-role selector"
+        );
+    }
     for (template, expected) in [
-        (
-            AnalysisArtifact::Source(CanonicalLabel::parse("@@//:custom").unwrap()),
-            "installed callback role",
-        ),
-        (
-            owner.actions()[0]
-                .build_info_transform_spec()
-                .unwrap()
-                .template()
-                .clone(),
-            "installed callback role",
-        ),
-        (derived, "installed Source template"),
+        (derived, "verified producer output"),
         (
             AnalysisArtifact::WorkspaceStatus(spec.status().clone()),
             "ordinary File template",
@@ -516,6 +533,8 @@ fn native_template_preparation_certifies_current_frontier_ignores_shadow_and_ref
             .result()
             .as_ref()
             .unwrap()
+            .catalog_owner()
+            .unwrap()
             .as_ref()
             .as_ref()
             .unwrap()
@@ -563,8 +582,19 @@ fn native_template_preparation_certifies_current_frontier_ignores_shadow_and_ref
         demand.path().as_path() == workspace.path().join("BUILD.bazel") && matches!(result.as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) if bytes.ends_with(b"# observed source B\n"))
     }));
     assert!(Arc::ptr_eq(
-        held.source().result().as_ref().unwrap(),
-        current.source().result().as_ref().unwrap()
+        held.source()
+            .result()
+            .as_ref()
+            .unwrap()
+            .catalog_owner()
+            .unwrap(),
+        current
+            .source()
+            .result()
+            .as_ref()
+            .unwrap()
+            .catalog_owner()
+            .unwrap()
     ));
     assert_eq!(
         std::fs::read_to_string(&shadow).unwrap(),
@@ -614,14 +644,7 @@ fn native_template_preparation_certifies_current_frontier_ignores_shadow_and_ref
     drop(targets);
     drop(runtime);
     assert_eq!(
-        held.source()
-            .result()
-            .as_ref()
-            .unwrap()
-            .as_ref()
-            .as_ref()
-            .unwrap()
-            .bytes(),
+        held.source().result().as_ref().unwrap().bytes(),
         TEMPLATE_CASES[1].2
     );
 }

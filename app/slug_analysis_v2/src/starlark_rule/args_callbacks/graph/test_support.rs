@@ -34,7 +34,7 @@ use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark_map::sorted_map::SortedMap;
 
-pub(super) struct LoadedSource {
+pub(in crate::starlark_rule) struct LoadedSource {
     package: LegacyLoadedPackage,
     path: std::path::PathBuf,
 }
@@ -44,7 +44,7 @@ impl Drop for LoadedSource {
     }
 }
 impl LoadedSource {
-    pub(super) async fn new(source: &str) -> Self {
+    pub(in crate::starlark_rule) async fn new(source: &str) -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = std::env::temp_dir().join(format!(
             "slug-published-test-{}-{}",
@@ -153,10 +153,18 @@ impl LoadedSource {
             .unwrap();
         Self { package, path }
     }
-    pub(super) fn invoke<'v>(&self, module: &'v Module, input: Value<'v>) -> Value<'v> {
+    pub(in crate::starlark_rule) fn invoke<'v>(
+        &self,
+        module: &'v Module,
+        input: Value<'v>,
+    ) -> Value<'v> {
         self.invoke_with_owner(module, input, true)
     }
-    pub(super) fn invoke_transient<'v>(&self, module: &'v Module, input: Value<'v>) -> Value<'v> {
+    pub(in crate::starlark_rule) fn invoke_transient<'v>(
+        &self,
+        module: &'v Module,
+        input: Value<'v>,
+    ) -> Value<'v> {
         self.invoke_with_owner(module, input, false)
     }
     fn invoke_with_owner<'v>(

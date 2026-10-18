@@ -361,7 +361,16 @@ fn native_status_publication_creates_preserves_rewrites_and_shares_global_paths(
     revoked(&runtime);
     let expected_stable = held.status.stable.clone();
     let expected_volatile = held.status.volatile.clone();
-    let expected_header = held.header.clone();
+    // NativeInputs owns immutable template/status metadata, never rendered output.
+    let expected_template = held
+        .template
+        .source()
+        .result()
+        .as_ref()
+        .unwrap()
+        .bytes()
+        .to_vec();
+    let template_weak = Arc::downgrade(&held.template);
     let status_weak = Arc::downgrade(&held.status);
     let capture_weak = Arc::downgrade(&held.status.capture);
     let input_weak = Arc::downgrade(&held);
@@ -374,7 +383,10 @@ fn native_status_publication_creates_preserves_rewrites_and_shares_global_paths(
     drop(runtime);
     assert_eq!(held.status.stable, expected_stable);
     assert_eq!(held.status.volatile, expected_volatile);
-    assert_eq!(held.header, expected_header);
+    assert_eq!(
+        held.template.source().result().as_ref().unwrap().bytes(),
+        expected_template
+    );
     drop(held);
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     while (status_weak.upgrade().is_some()
@@ -387,6 +399,7 @@ fn native_status_publication_creates_preserves_rewrites_and_shares_global_paths(
     assert!(status_weak.upgrade().is_none());
     assert!(capture_weak.upgrade().is_none());
     assert!(input_weak.upgrade().is_none());
+    assert!(template_weak.upgrade().is_none());
 }
 
 #[test]

@@ -6744,3 +6744,10 @@ impl ConfiguredNodeAnalysisKey {
 #[cfg(test)]
 #[path = "dice/target_platform_cpu_tests.rs"]
 mod target_platform_cpu_tests;
+
+#[doc(hidden)]
+pub use source_file::ObservedSourceFile;
+#[doc(hidden)]
+pub use source_file::SourceFileContent;
+#[doc(hidden)]
+pub use source_file::resolve_source_file_input_observed;
