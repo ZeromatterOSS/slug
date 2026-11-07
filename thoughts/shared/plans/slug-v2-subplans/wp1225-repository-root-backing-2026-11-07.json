@@ -1,0 +1,352 @@
+{
+  "baseline": "d202a77e29b4fda077e69bc17ea4874c4635e22a",
+  "bazel_source_pins": {
+    "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java": "69c1ed32510486148b5b84cb37000ddcabc6278df5cd9f5494a61cf4a2981d03",
+    "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkExecutionResult.java": "afb5b71788e293d81aeff544ae59412e53ff6dc9146439b5a9d67d2daa9958f9",
+    "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkPath.java": "e5420c61d0466d2328e8110506c2de7c7f8296f0a7ab708f63d813ce307f0745",
+    "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryContext.java": "6cf61b8ad57ce358f2b74f17c37c7dde26a7141ee5c50ee86ebbfb24af2bba01",
+    "src/main/java/net/starlark/java/annot/Param.java": "3014de7bc7fb2bb40b8f1e8f0ec648bd923eb5777963c9d21111e0dfcae28104"
+  },
+  "bazel_source_revision": "8220c6198837d5c13d53fea211cf3282aa12408a",
+  "classification": "Slug-native Linux developer platform diagnostic; no Bazel parity claim",
+  "cleanup": {
+    "all_owned_launchers_reaped": true,
+    "all_received_root_descriptors_closed": true,
+    "owned_host_reservation_removed": true,
+    "unclosed_received_descriptor_count": 0
+  },
+  "commands": [
+    {
+      "command": "/usr/bin/python3.12 -I -S scripts/v2_repository_root_probe/prepare.py --bwrap /home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap --python /usr/bin/python3.12 --output-root /run/media/system/Colossus/dev/slug/target/wp1225/portable-final-run",
+      "exit_code": 0
+    },
+    {
+      "command": "/usr/bin/python3.12 -I -S scripts/v2_repository_root_probe/parent.py --plan /run/media/system/Colossus/dev/slug/target/wp1225/portable-final-run/plan.json --plan-sha256 abf6ca93269da67733e3924bc51e81724ac5753298b812b9474278cbe2732e57 --output /run/media/system/Colossus/dev/slug/target/wp1225/portable-final-run/run-001 --ack-experiment-only",
+      "elapsed_seconds": 0.10513198300009208,
+      "exit_code": 0,
+      "launchers_passed": 3,
+      "launchers_selected": 3
+    }
+  ],
+  "date": "2026-11-07",
+  "frozen_plan_sha256": "abf6ca93269da67733e3924bc51e81724ac5753298b812b9474278cbe2732e57",
+  "inode_gate": "ACTUAL_64_INODES_EXACT_PLUS_ONE_CONFIRMED",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "parent_readback": {
+    "after_first_launcher_reaped": {
+      "parent_openat_first_matches": true,
+      "root": {
+        "dev": 105,
+        "ino": 1,
+        "mode": 16877
+      }
+    },
+    "after_second_launcher_reaped": {
+      "parent_openat_second_matches": true,
+      "root": {
+        "dev": 105,
+        "ino": 1,
+        "mode": 16877
+      },
+      "userns": {
+        "dev": 5,
+        "ino": 4026533931
+      }
+    },
+    "after_third_launcher_reaped": {
+      "parent_original_fd_reads_third_write": true,
+      "root": {
+        "dev": 105,
+        "ino": 1,
+        "mode": 16877
+      }
+    }
+  },
+  "phases": [
+    {
+      "elapsed_seconds": 0.032321123999963675,
+      "no_unreaped_child": true,
+      "owned_launcher_pid": 23197,
+      "phase": "first",
+      "protocol_sha256": "0c97f6b8a0ed1cd19d4ace840b73aa70dd63c4b406a7d35dd2ff6fc8bd93cf8a",
+      "reaped_returncode": 0,
+      "root_message": {
+        "cwd_matches_root": true,
+        "detached_mount": {
+          "dev": 105,
+          "ino": 1,
+          "mode": 16877
+        },
+        "environment_empty": true,
+        "filesystem": {
+          "f_bsize": 4096,
+          "f_type": 16914836,
+          "struct_size": 120
+        },
+        "inode_setup": {
+          "requested_nr_inodes": 128,
+          "status": "REMOUNT_SUCCEEDED"
+        },
+        "kind": "root",
+        "namespace_egid": 0,
+        "namespace_euid": 0,
+        "nonce": "ac147b955b904d898aeed96491fd74d3",
+        "phase": "first",
+        "pid_in_namespace": 2,
+        "python_startup_environment_keys": [
+          "LC_CTYPE",
+          "PWD"
+        ],
+        "python_startup_lc_ctype": "C.UTF-8",
+        "root": {
+          "dev": 105,
+          "ino": 1,
+          "mode": 16877
+        },
+        "userns": {
+          "dev": 5,
+          "ino": 4026533931
+        }
+      },
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "elapsed_seconds": 0.030950318999884985,
+      "no_unreaped_child": true,
+      "owned_launcher_pid": 23201,
+      "phase": "second",
+      "protocol_sha256": "9454cf1a3ad049d87dc36543d86c782039b96f10dd986283cc22af229455acd1",
+      "reaped_returncode": 0,
+      "root_message": {
+        "cwd_matches_root": true,
+        "environment_empty": true,
+        "filesystem": {
+          "f_bsize": 4096,
+          "f_type": 16914836,
+          "struct_size": 120
+        },
+        "inode_quota": {
+          "after_refusal": {
+            "f_bavail": 1,
+            "f_ffree": 0,
+            "f_files": 64,
+            "f_frsize": 4096
+          },
+          "before_refusal": {
+            "f_bavail": 1,
+            "f_ffree": 0,
+            "f_files": 64,
+            "f_frsize": 4096
+          },
+          "initial": {
+            "f_bavail": 1,
+            "f_ffree": 45,
+            "f_files": 64,
+            "f_frsize": 4096
+          },
+          "last_success": {
+            "after": {
+              "f_bavail": 1,
+              "f_ffree": 0,
+              "f_files": 64,
+              "f_frsize": 4096
+            },
+            "before": {
+              "f_bavail": 1,
+              "f_ffree": 1,
+              "f_files": 64,
+              "f_frsize": 4096
+            },
+            "index": 40
+          },
+          "refusal_errno": 28,
+          "refusal_text": "[Errno 28] No space left on device: 'inode-41'",
+          "status": "EXACT_ACTUAL_64_INODES_THEN_ONE_INODE_ENOSPC",
+          "successful_new_empty_files": 41
+        },
+        "kind": "root",
+        "namespace_egid": 0,
+        "namespace_euid": 0,
+        "nonce": "58414ef8c2c2cf3b0cfd725035d7a575",
+        "phase": "second",
+        "pid_in_namespace": 2,
+        "python_startup_environment_keys": [
+          "LC_CTYPE",
+          "PWD"
+        ],
+        "python_startup_lc_ctype": "C.UTF-8",
+        "quota": {
+          "additional_full_page_files": [
+            "quota-00",
+            "quota-01",
+            "quota-02",
+            "quota-03",
+            "quota-04",
+            "quota-05",
+            "quota-06",
+            "quota-07",
+            "quota-08",
+            "quota-09",
+            "quota-10",
+            "quota-11",
+            "quota-12",
+            "quota-13"
+          ],
+          "f_bavail": 0,
+          "f_blocks": 16,
+          "f_ffree": 44,
+          "f_files": 64,
+          "f_frsize": 4096,
+          "known_file_payload_bytes": 65536,
+          "plus_one_refusal": {
+            "errno": 28,
+            "text": "[Errno 28] No space left on device"
+          },
+          "qualification": "Page-aligned fixed-file data ceiling only; metadata/inodes are separate.",
+          "status": "EXACT_65536_DATA_BYTES_THEN_ONE_BYTE_ENOSPC"
+        },
+        "received_root": {
+          "dev": 105,
+          "ino": 1,
+          "mode": 16877
+        },
+        "root": {
+          "dev": 105,
+          "ino": 1,
+          "mode": 16877
+        },
+        "successor_detached_mount": {
+          "dev": 105,
+          "ino": 1,
+          "mode": 16877
+        },
+        "transition": {
+          "after_data_bytes": 65536,
+          "after_inodes": 64,
+          "before_data_bytes": 131072,
+          "before_inodes": 128,
+          "retained_fd_data_bytes": 65536,
+          "retained_fd_inodes": 64,
+          "root_after": {
+            "dev": 105,
+            "ino": 1,
+            "mode": 16877
+          }
+        },
+        "userns": {
+          "dev": 5,
+          "ino": 4026533931
+        }
+      },
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "elapsed_seconds": 0.03059325699996407,
+      "no_unreaped_child": true,
+      "owned_launcher_pid": 23204,
+      "phase": "third",
+      "protocol_sha256": "415d5e94978a2edbd76df1646e2c25ff3347db37b7a05e2bb3eae20890419531",
+      "reaped_returncode": 0,
+      "root_message": {
+        "cwd_matches_root": true,
+        "environment_empty": true,
+        "filesystem": {
+          "f_bsize": 4096,
+          "f_type": 16914836,
+          "struct_size": 120
+        },
+        "kind": "root",
+        "namespace_egid": 0,
+        "namespace_euid": 0,
+        "nonce": "091f38503006a7a2f646c3f2d1f75e02",
+        "phase": "third",
+        "pid_in_namespace": 2,
+        "python_startup_environment_keys": [
+          "LC_CTYPE",
+          "PWD"
+        ],
+        "python_startup_lc_ctype": "C.UTF-8",
+        "quota_retained": {
+          "data_bytes": 65536,
+          "inode_capacity": 64
+        },
+        "received_root": {
+          "dev": 105,
+          "ino": 1,
+          "mode": 16877
+        },
+        "root": {
+          "dev": 105,
+          "ino": 1,
+          "mode": 16877
+        },
+        "third_existing_file_overwritten": true,
+        "userns": {
+          "dev": 5,
+          "ino": 4026533931
+        }
+      },
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "platform": {
+    "architecture": "x86_64",
+    "bwrap": "/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap",
+    "kernel": "7.2.7-ogc1.1.fc44.x86_64",
+    "page_bytes": 4096,
+    "pins": {
+      "/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+      "/run/media/system/Colossus/dev/slug/scripts/v2_repository_root_probe/parent.py": "c2d040ccb3b493321c800186c77523ac107ece3c668dd081b32a04a599698e90",
+      "/run/media/system/Colossus/dev/slug/scripts/v2_repository_root_probe/prepare.py": "718f5ccb896a2ed10946ad29ce22e0d32e910f3611f81d313d487c29e65d4061",
+      "/run/media/system/Colossus/dev/slug/scripts/v2_repository_root_probe/trusted_helper.py": "23b977c76749d043e3e4201bcc042f500cf98211533f8f7e15a7035c16c4086b",
+      "/usr/bin/python3.12": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+      "/usr/include/linux/mount.h": "990cdb4a6949d1f2d2f6595edd4be1dfa2cb0284dd41e2f18e2b85bd4be30ab2",
+      "/usr/include/linux/nsfs.h": "aa22375d5ee83d406c20891f7fe6a5baeeab4cd965548df6320f1c8f9b1c49ca",
+      "/usr/include/x86_64-linux-gnu/asm/unistd_64.h": "e34e39ab6237ba98b63d03e677f80c780c7416b9374b747f46c474d1920809fe",
+      "/usr/include/x86_64-linux-gnu/bits/statfs.h": "063abffe73524326242b3e46d1d13912d35462e758c41f7658959fd76f7ab70b"
+    },
+    "python": "/usr/bin/python3.12"
+  },
+  "production_next": "Implement independently reviewed inactive immutable workspace protocol, anchored source resolution, FD-relative observations/mutations and native transport. Full confinement, archive envelope, lifecycle, actual originals, freshness, public integration and memory gates remain before activation.",
+  "public_command_advanced": "Prerequisite for authentic configured Rust cquery: quota-backed sequential repository workspace lifetime",
+  "qualification": "Data proof covers page-aligned file data at64KiB, with separately exhausted64-inode capacity and positive data space at inode refusal. It does not bound all kernel metadata RAM or establish a full-size archive/process workload envelope.",
+  "raw_receipt_sha256": "83a5497c24f57a7040b3f1d25bc15b0c280cd847bff2c100a4997417ec9c1fc8",
+  "references": [
+    "https://man7.org/linux/man-pages/man2/open_tree.2.html",
+    "https://man7.org/linux/man-pages/man2/move_mount.2.html",
+    "https://man7.org/linux/man-pages/man2/ioctl_nsfs.2.html",
+    "https://raw.githubusercontent.com/containers/bubblewrap/v0.11.2/bubblewrap.c"
+  ],
+  "rejected_hypotheses": [
+    {
+      "experiment": "v2",
+      "receipt_sha256": "7403a01a79fc67600d68b52b679f52e3e3c5106cb6c6b80de255c7da7afc2e25",
+      "result": "Root survives first namespace; ordinary MS_BIND from retained FD in fresh namespace fails EINVAL22"
+    },
+    {
+      "experiment": "v3",
+      "receipt_sha256": "be9a4ae9fb68c2df28451fe42023de8bce5d58bfc89ea9ad52627a03f282d702",
+      "result": "Attachment reaches quota tests; original inode fixture prematurely fails ENOSPC while byte quota full. This run remains failure; v3.1 isolates quotas."
+    },
+    {
+      "experiment": "v4",
+      "receipt_sha256": "33a5e95e7101b9de8eeda858a746c80117feb3a760a6526dc51cee7a18c18752",
+      "result": "open_tree(CLONE) on never-attached anchor fails EINVAL22; no reusable detached anchor selected"
+    }
+  ],
+  "scope": {
+    "original_execution": false,
+    "production_activation": false,
+    "public_bootstrap_acceptance": false,
+    "security_confinement_claim": false,
+    "source_observer_acceptance": false,
+    "workload_memory_fit": false
+  },
+  "sources": {
+    "scripts/v2_repository_root_probe/README.md": "b51c44a0432bdcb2a601823fb2c5cdb5afa279b2880712df91737c715937fda2",
+    "scripts/v2_repository_root_probe/parent.py": "c2d040ccb3b493321c800186c77523ac107ece3c668dd081b32a04a599698e90",
+    "scripts/v2_repository_root_probe/prepare.py": "718f5ccb896a2ed10946ad29ce22e0d32e910f3611f81d313d487c29e65d4061",
+    "scripts/v2_repository_root_probe/trusted_helper.py": "23b977c76749d043e3e4201bcc042f500cf98211533f8f7e15a7035c16c4086b"
+  },
+  "status": "TRUSTED_FIXED_BACKING_MECHANISM_ACCEPTED"
+}

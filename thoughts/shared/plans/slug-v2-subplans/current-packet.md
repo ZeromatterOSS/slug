@@ -1,55 +1,91 @@
-# Original build-info callbacks and native rendering
+# General sequential repository workspace and process APIs
 
-Packet: WP-7-424-m7a-general-build-info-transform
+Packet: WP-7-425-m7a-general-repository-process
 
-Status: SCOPED_CAPABILITY_ACCEPTED; exact owned atomic integration pending.
-[Acceptance record](wp1224-general-build-info-transform-acceptance-2026-10-18.json).
+Status: INACTIVE_IMPLEMENTATION_READY; production execution remains gated.
+Baseline: d202a77e29b4fda077e69bc17ea4874c4635e22a.
+The [selected implementation design](wp1225-general-repository-workspace-design.md)
+owns the concrete protocol, rooted IO, quotas and file split.
+[Fixed backing evidence](wp1225-repository-root-backing-2026-11-07.json) proves
+three-launch rolling attachment and scaled same-backing quota shrink; it closes
+no production, confinement or public-command gate.
+Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
+is committed and post-verified. Inherited dirty work remains protected.
 
-## Observable capability
+## Outcome and compatibility
 
-Build-info actions retain and evaluate actual original Starlark callbacks.
-Metadata/query invoke zero times; native ordinary and builtin Source execution
-invokes once per attempt and validates actual source/status authority before
-publication. Source A/B/A, current print/cancel, aliases, GC, refusal and physical
-mutation controls pass. This advances the native-action prerequisite for the
-public Rust/Slug closure. No public bootstrap command was rerun for this component.
+Advance authentic configured Rust cquery by replacing both GCC ProbeForm/argv/
+expected-effect and Homebrew caller profiles with actual repository Starlark
+through general process/workspace APIs. Source preparation, API details,
+corrections and genuine integration proof belong to this capability.
 
-The shared collector/Publisher/equality graph, prepaid storage and borrowed
-consumer context are specified in [Stage6](06-analysis-toolchains-and-actions.md).
-Pinned Bazel callable/access/parsing/dictionary/replacement slices are exact.
-Status ordering, valid-Unicode final Latin1 encoding, structural identity and
-cooperative limits are Slug-native. Derived-template producer-result integration
-and remote BuildInfo execution remain deferred.
+Exact pinned Bazel 9.2 slices: original operation order, str/Path/Label arguments,
+environment removal/override, cwd/quiet, exit/stdout/stderr Latin1, and sequential
+file/read/template/execute effects including nonzero-exit writes. Slug-native:
+physical path/structural identity, finite quotas, confined Linux Host read view
+and conservative command-fresh nonhermetic process observations. Networking,
+async execution, unconstrained Host mutation, cross-command process-result reuse
+and unadmitted node/link forms remain unsupported. No tool/caller/source profile
+may choose replacement semantics or platform permissions.
 
-## Executed gates and integration
+## Owners and implementation boundary
 
-Normal and isolated owned views each cover 163 focused selectors, including a
-separate present-empty SOURCE_DATE_EPOCH run. Qualified passed nodes remain
-valid despite failed historical outer attempts; those attempts remain failures.
-Broader actions/Analysis suites pass 432 lane executions. A fresh normal default
-CLI build and isolated owned default CLI check pass with default-only features.
-Owned check does not claim a separately linked binary. NativeLink backend proof
-from WP1223 remains historical; this native-only change adds no backend claim.
+Bzlmod owns immutable reservation, operation, complete state, transcript and
+realization equality. Loading evaluates originals and supplies Path text and
+Need/replay/options/current print semantics; it removes Homebrew selectors.
+Core owns the one actual root, ordered mutation, child quiescence, complete
+bounded snapshot, adoption and release; it removes GCC/source/effect guards.
+No DICE transaction, Starlark evaluation or mutex spans child execution.
 
-The final 50-path source view has 14 new private source/test leaves, 2,520 normal
-and 2,517 owned source/config pins. Root owns projection, LIVE and integration;
-inherited dirty work is preserved separately. Independent source and runtime
-review pass. Narrow documents and exact atomic integration are the final gates;
-this text predicts no future commit result.
+Reserve the eventual absolute root and observation instance before original
+evaluation. Every operation uses that root and exact predecessor; adoption
+transfers the same root without rebasing embedded strings or copying a predicted
+effect. A command-fresh empty process epoch is demanded before any prepared or
+materialization reuse. Every new operation index performs an actual process
+sample; only its exact completed record may replay within the command. DICE
+stores immutable observations, never child/root-FD mutation authority.
 
-## Next concrete blocker
+Retain 128 executes, 1 MiB per output stream, 30-second operational maximum and
+64 MiB physical tree plus cumulative retained snapshot-body discipline. Keep
+actual modes, directories, file bodies, deletions and admitted literal links.
+Timeout/cancel/overflow/setup failure kills and reaps before root disposal;
+normal nonzero exits retain their actual result and next tree.
 
-General repository process/workspace execution must replace the remaining GCC
-ProbeForm/argv/effect and Homebrew caller profiles. It needs one real sequential
-workspace, command-fresh actual Host process observations, bounded storage and
-complete Linux confinement/lifecycle authority. Source-only readiness is not an
-activated successor or proof that these platform gates exist.
+Root owns LIVE, projections, native/Cargo execution and atomic integration.
+Workers use disjoint inactive candidates under the selected design.
+All coupled semantic activation remains atomic after its complete gates.
+Relevant owners: Bzlmod repository_execute/filesystem types; Loading repository
+context/path/file-effect leaves; Core repository_process/filesystem_progress/
+repository_io/source-generations and small private backing/confinement leaves.
+Pinned API semantics: [source contract](wp1225-repository-api-source-contract.md).
+Inherited [Stage5](05-bzlmod-and-repository-graph.md),
+[Stage9](09-v1-extraction-ledger.md) and [DICE](../../../../docs/developers/dice.md)
+contracts apply.
 
-Authentic configured Rust analysis, required action comparison, Rust REAPI build,
-complete Slug closure, Stage 10 fixed point and equivalent-command memory fit
-remain open. The predecessor used query destination must never be reused.
+## Decision and evidence gates
 
-Contracts: [Stage4](04-starlark-loading-and-build-packages.md),
-[Stage6](06-analysis-toolchains-and-actions.md),
-[Stage7](07-reapi-native-execution.md), [Stage9](09-v1-extraction-ledger.md),
-and [DICE](../../../../docs/developers/dice.md).
+Use the proven rolling detached lease: attach incoming lease in its actual
+owning user namespace, mint the next clone only from the attached root during
+trusted setup, and retain it in exclusive native progress. Next launch waits
+for current quiescence, complete snapshot and record acceptance. No keeper,
+Host alias, proc reopening, copying or privileged fallback. Sources retain
+sealed backing without mount operations. The diagnostic's successful scaled
+byte/inode limits do not prove all kernel metadata RAM or the full archive
+workload envelope.
+
+Inactive protocol, anchored resolver, rooted observation/mutation and native
+reader candidates may proceed. Before untrusted activation, prove actual
+pre-payload lease transfer, full archive/process quota transition and retention
+admission, uniform syscall/mount/socket/device/FD confinement and lifecycle.
+Every trusted file/archive/delete/manifest operation must use the same rooted
+FD route, including when the display path is absent or names a foreign Host tree.
+
+Independent final review of the implementation and complete production proof
+precede activation. Reuse existing launcher FD/timeout/cancel/descendant tests and pinned
+Bazel source. Discriminate unrelated sequential originals, absolute path bytes
+after adoption, nonzero writes/deletes, actual env/cwd/quiet, Host helper mutation
+before warm reuse, exact/+1 quotas, foreign predecessor/lease, socket/device/FD
+escape and last-owner release. Then normal/owned owner/direct-dependent checks,
+broader integration once, fresh default CLI and justified public Rust cquery at
+a fresh unused destination under existing lifecycle/equivalent-memory gates.
+Internal or incomplete probes do not close public/bootstrap/whole-fit gates.

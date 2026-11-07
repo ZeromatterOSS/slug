@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-424-m7a-general-build-info-transform
+Packet: WP-7-425-m7a-general-repository-process
 
-Original build-info callback publication and one-shot native Source rendering
-pass their scoped gates; source/name/callsite recipes are removed. Normal/owned
-focused proof, broader guards and fresh default CLI provenance pass. Exact owned
-source/document atomic integration remains pending; see the
+Original build-info callbacks are integrated and post-verified in `d202a77e29b4`.
+The active capability replaces GCC/Homebrew process profiles with one general
+sequential repository workspace and command-fresh actual process observations.
+The fixed three-launch backing diagnostic passes; inactive protocol, rooted IO
+and native-reader implementation can proceed under the selected design.
+Production activation still requires full confinement, lifecycle, archive quota,
+actual-original and public integration gates; see the
 [current packet](./slug-v2-subplans/current-packet.md).
 
-The next concrete blocker is general repository process/workspace execution,
-replacing the remaining GCC/Homebrew profiles with real command-fresh Host
-observations, bounded same-root storage and Linux lifecycle/confinement owners.
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.
 
