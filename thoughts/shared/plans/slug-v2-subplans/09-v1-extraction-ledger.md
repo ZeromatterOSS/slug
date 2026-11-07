@@ -13,6 +13,19 @@ semantic identity change or memory-performance claim is introduced. Component
 evidence and residual production ownership gates are recorded in the
 [acceptance receipt](wp1225-rooted-consumers-acceptance-2026-11-07.json).
 
+The inactive workspace protocol reuses Arc/Allocative immutable owners and
+Buck2-derived SmallMap/SmallSet for ordered substitutions and temporary body
+canonicalization. Template identity uses the existing ordered map comparison;
+environment overrides retain unordered key semantics. Structural reservation,
+predecessor and operation facts remain distinct from physical authority. Equal
+foreign bodies are compared then replaced by already retained owners; history
+charges each new body version without refunds. Conservative metadata bounds
+include actual string/map spare capacity, nested module-version guards, Arc
+layout, snapshot/record arrays and temporary canonicalization storage. No new
+interner, global cache or donor import is introduced. These component bounds
+and tests do not establish public-command memory fit; see the
+[protocol receipt](wp1225-workspace-protocol-acceptance-2026-11-07.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

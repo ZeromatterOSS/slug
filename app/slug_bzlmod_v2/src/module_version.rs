@@ -100,8 +100,66 @@ impl BazelModuleVersion {
         self.canonical.as_str()
     }
 
+    /// Borrowed conservative bound for the complete version guard, including
+    /// shared identifier arrays. Sharing and inline CompactString capacity may
+    /// be charged more than once; equal foreign guards are never assumed shared.
+    pub(crate) fn retained_storage_bytes(&self) -> Option<usize> {
+        let mut bytes = std::mem::size_of::<Self>().checked_add(self.canonical.capacity())?;
+        let arrays = [
+            match &self.release {
+                ReleaseIdentifiers::EmptySentinel => None,
+                ReleaseIdentifiers::Identifiers(items) => Some(items),
+            },
+            self.prerelease.as_ref(),
+        ];
+        for items in arrays.into_iter().flatten() {
+            bytes = bytes
+                .checked_add(2 * std::mem::size_of::<usize>())?
+                .checked_add(
+                    items
+                        .len()
+                        .checked_mul(std::mem::size_of::<VersionIdentifier>())?,
+                )?;
+            for item in items.iter() {
+                bytes = bytes.checked_add(item.spelling.capacity())?;
+            }
+        }
+        Some(bytes)
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         matches!(self.release, ReleaseIdentifiers::EmptySentinel)
+    }
+}
+
+#[cfg(test)]
+mod repository_workspace_storage_tests {
+    use super::*;
+
+    #[test]
+    fn complete_version_storage_includes_both_shared_identifier_arrays() {
+        let version = BazelModuleVersion::parse("1.2-alpha.3").unwrap();
+        let ReleaseIdentifiers::Identifiers(release) = &version.release else {
+            panic!()
+        };
+        let prerelease = version.prerelease.as_ref().unwrap();
+        let arrays = [release, prerelease];
+        let mut expected = std::mem::size_of::<BazelModuleVersion>() + version.canonical.capacity();
+        for array in arrays {
+            expected += 2 * std::mem::size_of::<usize>()
+                + array.len() * std::mem::size_of::<VersionIdentifier>();
+            expected += array
+                .iter()
+                .map(|item| item.spelling.capacity())
+                .sum::<usize>();
+        }
+        assert_eq!(version.retained_storage_bytes(), Some(expected));
+        let clone = version.clone();
+        assert_eq!(clone, version);
+        assert_eq!(
+            clone.retained_storage_bytes(),
+            version.retained_storage_bytes()
+        );
     }
 }
 

@@ -42,6 +42,40 @@ impl HostSelectedExtensionOwner {
         &self.unique_name
     }
 
+    /// Complete borrowed owner-guard bound, including Arc counters and nested
+    /// module-version arrays. Conservative on shared/inline strings; allocates
+    /// nothing and never treats an equal foreign owner as prepaid storage.
+    pub(crate) fn retained_storage_bytes(&self) -> Option<usize> {
+        let label = &self.id.bzl_file;
+        let mut bytes = (2 * std::mem::size_of::<usize>())
+            .checked_add(std::mem::size_of::<Self>())?
+            .checked_add(self.unique_name.retained_capacity_bytes())?
+            .checked_add(label.package().repo().retained_capacity_bytes())?
+            .checked_add(label.package().package().retained_capacity_bytes())?
+            .checked_add(label.target().retained_capacity_bytes())?
+            .checked_add(
+                label
+                    .mapping_id()
+                    .map_or(0, |id| id.retained_capacity_bytes()),
+            )?
+            .checked_add(self.id.extension_name.capacity())?;
+        match &self.id.isolation {
+            None => {}
+            Some(HostSelectedExtensionIsolation::Root { proxy }) => {
+                bytes = bytes.checked_add(proxy.capacity())?;
+            }
+            Some(HostSelectedExtensionIsolation::Module { module, proxy }) => {
+                bytes = bytes.checked_add(proxy.capacity())?;
+                if let HostGraphModuleKey::Module { name, version } = module {
+                    bytes = bytes
+                        .checked_add(name.capacity())?
+                        .checked_add(version.retained_storage_bytes()?)?;
+                }
+            }
+        }
+        Some(bytes)
+    }
+
     #[cfg(test)]
     pub(crate) fn testing(unique_name: &str) -> Self {
         Self::testing_with_kind(unique_name, HostSelectedExtensionOwnerKind::ModuleExtension)
@@ -61,6 +95,33 @@ impl HostSelectedExtensionOwner {
             },
             unique_name: CanonicalRepoName::new(unique_name).unwrap(),
         }
+    }
+}
+
+#[cfg(test)]
+mod repository_workspace_storage_tests {
+    use super::*;
+
+    #[test]
+    fn complete_owner_storage_covers_foreign_spare_strings_and_version_guards() {
+        let mut owner = HostSelectedExtensionOwner::testing("owner");
+        let original = owner.retained_storage_bytes().unwrap();
+        let mut name = String::with_capacity(4096);
+        name.push_str("owner");
+        owner.unique_name = CanonicalRepoName::new(name).unwrap();
+        assert_eq!(owner, HostSelectedExtensionOwner::testing("owner"));
+        assert!(owner.retained_storage_bytes().unwrap() >= original + 4000);
+        let version = crate::module_version::BazelModuleVersion::parse("1.2-alpha.3").unwrap();
+        let guard_bytes = version.retained_storage_bytes().unwrap();
+        let before = owner.retained_storage_bytes().unwrap();
+        owner.id.isolation = Some(HostSelectedExtensionIsolation::Module {
+            module: HostGraphModuleKey::Module {
+                name: "module".into(),
+                version,
+            },
+            proxy: "proxy".into(),
+        });
+        assert!(owner.retained_storage_bytes().unwrap() >= before + guard_bytes);
     }
 }
 

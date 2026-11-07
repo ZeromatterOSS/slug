@@ -41,6 +41,7 @@ mod repository_filesystem;
 mod repository_host_input;
 mod repository_ignore;
 mod repository_label_path;
+mod repository_workspace;
 pub mod resolution;
 mod root_bootstrap;
 mod runtime_source_declaration;
@@ -381,6 +382,8 @@ pub use repository_filesystem::RepositoryFilesystemResult;
 pub use repository_filesystem::RepositoryFilesystemTranscript;
 #[doc(hidden)]
 pub use repository_filesystem::RepositoryFilesystemTranscriptError;
+#[doc(hidden)]
+pub use repository_workspace::*;
 #[doc(hidden)]
 pub use repository_host_input::NeedRepositoryEnvironmentNames;
 #[doc(hidden)]

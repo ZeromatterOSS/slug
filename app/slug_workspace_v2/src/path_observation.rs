@@ -232,8 +232,36 @@ impl NormalizedAbsolutePath {
         self.path.capacity()
     }
 
+    /// Borrowed complete backing bound for retaining this shared path owner.
+    /// Includes Arc counters, PathBuf and spare OS-string capacity; no allocation.
+    #[doc(hidden)]
+    pub fn retained_storage_bytes(&self) -> Option<usize> {
+        (2 * std::mem::size_of::<usize>())
+            .checked_add(std::mem::size_of::<PathBuf>())?
+            .checked_add(self.retained_capacity_bytes())
+    }
+
     pub fn as_path(&self) -> &Path {
         self.path.as_path()
+    }
+}
+
+#[cfg(test)]
+mod repository_workspace_storage_tests {
+    use super::*;
+
+    #[test]
+    fn normalized_path_storage_counts_owner_and_actual_spare_capacity() {
+        let path = NormalizedAbsolutePath::new("/a/b/c").unwrap();
+        assert_eq!(
+            path.retained_storage_bytes(),
+            Some(
+                2 * std::mem::size_of::<usize>()
+                    + std::mem::size_of::<PathBuf>()
+                    + path.path.capacity()
+            )
+        );
+        assert!(path.path.capacity() > path.as_path().as_os_str().len());
     }
 }
 

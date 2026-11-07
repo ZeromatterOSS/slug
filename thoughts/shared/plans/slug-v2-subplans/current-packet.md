@@ -14,8 +14,10 @@ implement anchored resolution and private rooted IO/shared archive extraction.
 The clean owned source view passes 96 workspace tests (two ignored) and all 26
 filesystem/archive guards. The inactive rooted delete/terminal-manifest
 consumers now have [their own acceptance receipt](wp1225-rooted-consumers-acceptance-2026-11-07.json).
-Native process/source integration remains inactive; immutable protocol is an
-unfinished candidate.
+The [immutable workspace protocol](wp1225-workspace-protocol-acceptance-2026-11-07.json)
+now owns inactive reservation, ordered operation/state replay, command epochs
+and cumulative retention admission. Native process/source integration remains
+inactive; Loading and Core still use their prior production routes.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.
 
