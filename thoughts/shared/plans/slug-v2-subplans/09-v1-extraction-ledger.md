@@ -1,5 +1,18 @@
 # Stage 9: V1 Extraction Ledger
 
+## WP425 rooted repository consumers
+
+The inactive descriptor-relative delete and terminal-manifest consumers reuse
+Core's existing RootIo primitives, manifest Frontier and raw-body hash kernel.
+Deletion keeps a command-local compact row array and one UTF-8 path byte arena;
+neither enters DICE or a global cache. The complete discovery plan prepays
+old/new growth peaks and native scratch within the existing source-service
+buffer bank, then removes children before parents. Manifest keeps the existing
+cumulative frontier and streaming buffer credits. No donor import, interner,
+semantic identity change or memory-performance claim is introduced. Component
+evidence and residual production ownership gates are recorded in the
+[acceptance receipt](wp1225-rooted-consumers-acceptance-2026-11-07.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

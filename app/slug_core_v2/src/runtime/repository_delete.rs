@@ -202,6 +202,22 @@ fn io_error(error: impl std::fmt::Display) -> ArchiveMaterializationError {
     ArchiveMaterializationError::materialization(error.to_string())
 }
 
+#[cfg(target_os = "linux")]
+#[path = "repository_delete/rooted.rs"]
+mod rooted;
+
+/// General workspace route; the existing Path consumer remains unchanged.
+#[cfg(target_os = "linux")]
+pub(super) fn delete_at(
+    root: &crate::runtime::repository_root_io::RootIo<'_>,
+    relative: &str,
+    work: &mut DeleteWork,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<bool, ArchiveMaterializationError> {
+    rooted::delete_at(root, relative, work, active, scope)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -203,6 +203,21 @@ fn capture(
     ))
 }
 
+#[cfg(target_os = "linux")]
+#[path = "repository_filesystem_manifest/rooted.rs"]
+mod rooted;
+
+/// FD-backed general workspace route; the existing Path manifest is unchanged.
+#[cfg(target_os = "linux")]
+pub(super) fn final_manifest_at(
+    root: &crate::runtime::repository_root_io::RootIo<'_>,
+    display_root: &Path,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<Arc<str>, ArchiveMaterializationError> {
+    rooted::final_manifest_at(root, display_root, active, scope)
+}
+
 #[cfg(all(test, unix))]
 #[path = "tests/repository_filesystem_manifest_tests.rs"]
 mod tests;

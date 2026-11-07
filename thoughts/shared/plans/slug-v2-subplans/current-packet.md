@@ -12,8 +12,10 @@ no production, confinement or public-command gate.
 [Inactive foundations](wp1225-rooted-foundations-acceptance-2026-11-07.json)
 implement anchored resolution and private rooted IO/shared archive extraction.
 The clean owned source view passes 96 workspace tests (two ignored) and all 26
-filesystem/archive guards. Native process/source integration remains inactive;
-immutable protocol and rooted delete/manifest consumers are unfinished candidates.
+filesystem/archive guards. The inactive rooted delete/terminal-manifest
+consumers now have [their own acceptance receipt](wp1225-rooted-consumers-acceptance-2026-11-07.json).
+Native process/source integration remains inactive; immutable protocol is an
+unfinished candidate.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.
 

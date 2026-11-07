@@ -1,0 +1,135 @@
+{
+  "status": "INACTIVE_ROOTED_CONSUMERS_ACCEPTED",
+  "date": "2026-11-07",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "b9fa8320687aa01045a6f619da87771bda7ae7c7",
+  "source_view": "Clean baseline plus exactly six source files; inherited dirty source and unfinished protocol excluded.",
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/repository_delete.rs": "b5b3bc15e44062093906d4413568abf69658d339ea6b22bf0ca68fb5b6111016",
+    "app/slug_core_v2/src/runtime/repository_filesystem_manifest.rs": "edc493b45a80db768f519a54a26e60441e9130c9cdb063c5340b360def667daf",
+    "app/slug_core_v2/src/runtime/repository_delete/rooted.rs": "832c45c619e3bc5aedd101e5bb3cae1ff2c854dd818fc2ad131a9a3aad8e04dc",
+    "app/slug_core_v2/src/runtime/repository_delete/rooted/tests.rs": "ee60aa02c990c5ec22a4ff85941d0da9274448d7d580b2ded6b60f13cf3bee98",
+    "app/slug_core_v2/src/runtime/repository_filesystem_manifest/rooted.rs": "f004f03f980715920ff36a39f24ba4c3cbc350efee97a50fc0dd28be23e661e8",
+    "app/slug_core_v2/src/runtime/repository_filesystem_manifest/rooted/tests.rs": "00e4aad99ad9cec4f8a074053858674fbe4014f2caefd3d1748cbeb37c287296"
+  },
+  "compatibility": {
+    "Slug-native": [
+      "Descriptor-relative delete and terminal manifest over the selected root, without ambient display-path IO",
+      "General-root literal-link unlink without target traversal; regular hardlinks/special nodes refuse",
+      "Finite credited deletion discovery and stable rooted capture"
+    ],
+    "protected_existing": [
+      "Unchanged legacy Path delete/manifest routes",
+      "Same manifest SHA-256 framing, raw body bytes, sorted DFS, modes, absolute4096 path and complete-tree/frontier budgets",
+      "Archive-only depth remains independent of delete256 and process64"
+    ],
+    "unsupported_or_inactive": [
+      "Production consumers and physical-root selection",
+      "Native process/source integration, archive/process quota transition and complete confinement",
+      "Public bootstrap and equivalent-command memory fit"
+    ]
+  },
+  "compile_gates": [
+    {
+      "command": "cargo test --offline --locked --target-dir /run/media/system/Colossus/dev/slug/target -p slug_core_v2 --lib --no-run --message-format=json",
+      "exit_code": 0,
+      "elapsed_seconds": 138,
+      "toolchain": "nightly-2025-09-14",
+      "cargo_json_sha256": "9a27a78bf4d91d96f5928f89735b84d2e106f6f92e73fddd861a69cfc0253b5b"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_reapi_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 44.69906615299999,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "tests": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--exact",
+      "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_depth_exact_plus_one_and_missing_ancestor_are_bounded",
+      "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_frontier_credits_release_on_success_refusal_and_cancellation",
+      "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_rejects_hardlinks_special_nodes_and_invalid_demands_before_mutation",
+      "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_unlinks_internal_and_escaping_literal_links_without_traversal",
+      "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_uses_original_descriptor_with_absent_and_foreign_display",
+      "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_work_exact_plus_one_accumulates_across_the_complete_tree",
+      "runtime::repository_filesystem_progress::deletion::tests::delete_walk_returns_actual_presence_and_refuses_non_directory_or_symlink_ancestors",
+      "runtime::repository_filesystem_progress::deletion::tests::delete_work_limits_accumulate_without_refund_and_cancellation_stops_io",
+      "runtime::repository_filesystem_progress::deletion::tests::scoped_delete_frontier_credit_releases_on_success_error_and_cancellation",
+      "runtime::repository_filesystem_progress::manifest::rooted::tests::rooted_manifest_cancellation_and_refusal_release_prepaid_buffers",
+      "runtime::repository_filesystem_progress::manifest::rooted::tests::rooted_manifest_complete_entry_byte_and_frontier_exact_plus_one",
+      "runtime::repository_filesystem_progress::manifest::rooted::tests::rooted_manifest_framing_metadata_refuses_changed_file_before_streaming",
+      "runtime::repository_filesystem_progress::manifest::rooted::tests::rooted_manifest_ignores_absent_and_foreign_host_display_tree",
+      "runtime::repository_filesystem_progress::manifest::rooted::tests::rooted_manifest_matches_path_framing_body_modes_and_dfs_restoration",
+      "runtime::repository_filesystem_progress::manifest::rooted::tests::rooted_manifest_preserves_absolute_4096_bound_and_archive_depth_above_256",
+      "runtime::repository_filesystem_progress::manifest::rooted::tests::rooted_manifest_rejects_links_special_nodes_and_regular_hardlinks",
+      "runtime::repository_filesystem_progress::manifest::rooted::tests::rooted_manifest_stream_refuses_replaced_literal_link_before_reading_body",
+      "runtime::repository_filesystem_progress::manifest::tests::terminal_manifest_bounds_breadth_paths_and_content_before_publication",
+      "runtime::repository_filesystem_progress::manifest::tests::terminal_manifest_detects_short_and_growing_files_and_bounds_read_requests",
+      "runtime::repository_generated_archive::rooted_tests::rooted_archive_admits_file_size_before_truncation_and_shares_decoded_limits",
+      "runtime::repository_generated_archive::rooted_tests::rooted_archive_cancelled_before_decode_preserves_existing_file",
+      "runtime::repository_generated_archive::rooted_tests::rooted_archive_refuses_symlink_ancestors_and_leaf_without_touching_target",
+      "runtime::repository_generated_archive::rooted_tests::rooted_archives_replace_on_retained_backing_without_touching_foreign_display_tree",
+      "runtime::repository_generated_archive::tests::aggregate_cap_and_cancellation_stop_extraction",
+      "runtime::repository_generated_archive::tests::general_tar_formats_share_empty_prefix_ordering_caps_and_path_rejection",
+      "runtime::repository_generated_archive::tests::gnu_long_name_header_is_applied_to_following_regular_entry",
+      "runtime::repository_generated_archive::tests::gzip_consumes_concatenated_members_and_validates_trailers_before_success",
+      "runtime::repository_generated_archive::tests::ordered_archives_replace_regular_files_and_preserve_executable_mode_and_mtime",
+      "runtime::repository_generated_archive::tests::oversized_xz_dictionary_is_rejected_before_extracting_a_tar_header",
+      "runtime::repository_generated_archive::tests::path_escape_links_and_file_directory_collisions_fail_closed",
+      "runtime::repository_generated_archive::tests::payload_padding_quota_refusal_preserves_existing_files_and_counts_discarded_entries",
+      "runtime::repository_generated_archive::tests::per_call_decoded_cap_counts_tar_headers_before_payload",
+      "runtime::repository_generated_archive::tests::scoped_generated_archives_count_ordered_replacements_and_all_decoded_bytes",
+      "runtime::repository_generated_archive::tests::scoped_xz_reserves_before_decoding_and_retires_on_codec_failure_and_cancellation",
+      "runtime::repository_generated_archive::tests::within_archive_duplicate_destination_is_rejected_but_prior_archive_is_replaceable",
+      "runtime::repository_root_io::tests::archive_paths_beyond_delete_depth_remain_rooted_and_bounded",
+      "runtime::repository_root_io::tests::body_link_and_create_new_exact_plus_one_are_checked_before_mutation",
+      "runtime::repository_root_io::tests::callback_errors_cancellation_and_unwind_release_temporary_descriptors",
+      "runtime::repository_root_io::tests::capture_rejects_mutation_after_actual_bytes_and_digest",
+      "runtime::repository_root_io::tests::directory_entry_name_path_and_depth_bounds_precede_visitors",
+      "runtime::repository_root_io::tests::ensure_directory_preserves_mkdir_umask_and_existing_modes",
+      "runtime::repository_root_io::tests::lexical_paths_special_modes_and_hardlinks_refuse_without_truncation",
+      "runtime::repository_root_io::tests::literal_links_are_observed_and_unlinked_but_never_traversed",
+      "runtime::repository_root_io::tests::removed_display_never_falls_back_to_new_host_directory",
+      "runtime::repository_root_io::tests::renamed_root_and_foreign_display_preserve_actual_reads_and_mutations",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "selected": 45,
+    "elapsed_seconds": 0.2799858439999525,
+    "executable_sha256": "aecd4ba01df59fce545a40450403d89687cd1d8f783f41e1a1c41e0fcb81bf2c",
+    "preflight_exit_code": 0
+  },
+  "test_scope": {
+    "new_rooted_consumers": 14,
+    "protected_legacy_delete_manifest": 5,
+    "protected_rooted_io_archive": 26,
+    "passed": 45,
+    "failed": 0,
+    "ignored": 0
+  },
+  "test_output_sha256": {
+    "stdout": "d63e519c559d883f576d7f3050f7b216496869a98e9031df85a7366af04c85db",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "review": "Independent final source and compiled-artifact/preflight/raw-result review ACCEPT; direct dependent compile verified before acceptance.",
+  "static_gates": [
+    "Pinned rustfmt",
+    "git diff --check",
+    "scripts/v2_archive_status.sh",
+    "python3 scripts/v2_plan_status.py"
+  ],
+  "reuse": "Existing RootIo, Frontier and raw-body streaming kernel; scratch-only compact delete rows/path arena with prepaid growth peaks, no retained DICE resource or donor import.",
+  "residual": "Inactive component acceptance only. Caller must own exclusive quiescence and reserve native FD credits. Immutable protocol, native reader/source migration, actual sequential originals, confinement, quota/lifecycle, warm Host freshness and public bootstrap integration remain gated by current packet."
+}
