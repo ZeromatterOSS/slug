@@ -11,6 +11,14 @@ use super::SourceCounter;
 use super::SourceServiceError;
 use super::SourceServiceScope;
 
+#[cfg(target_os = "linux")]
+#[path = "regular_file/fd.rs"]
+mod fd;
+#[cfg(target_os = "linux")]
+pub(in crate::runtime) use fd::read_open_regular_file;
+#[cfg(target_os = "linux")]
+pub(in crate::runtime) use fd::read_open_regular_file_after_attempt;
+
 pub(in crate::runtime) const HOST_FILE_OBJECT_BYTES: usize = 1 << 20;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) const KNOWN_SHAS_OBJECT_BYTES: usize = 4_749_878;
@@ -437,11 +445,10 @@ fn read_regular_with(
     path: &Path,
     policy: ReadPolicy,
     mut hook: impl FnMut(ReadPoint, &std::fs::File),
-    mut read: impl FnMut(&mut std::fs::File, &mut [u8]) -> io::Result<usize>,
+    read: impl FnMut(&mut std::fs::File, &mut [u8]) -> io::Result<usize>,
 ) -> Result<Arc<[u8]>, RegularFileError> {
     use std::fs::OpenOptions;
     use std::os::fd::AsRawFd;
-    use std::os::unix::fs::MetadataExt;
     use std::os::unix::fs::OpenOptionsExt;
     scope.check()?;
     let pin = checked_io(
@@ -491,112 +498,40 @@ fn read_regular_with(
                 .open(format!("/proc/self/fd/{}", pin.as_raw_fd()))
         },
     )?;
-    let identity = |m: &std::fs::Metadata| {
-        (
-            m.dev(),
-            m.ino(),
-            m.mode(),
-            m.len(),
-            m.mtime(),
-            m.mtime_nsec(),
-            m.ctime(),
-            m.ctime_nsec(),
-        )
-    };
-    let reopened = checked_io(
+    fd::read_open_with(
         scope,
+        &mut input,
+        &before,
         policy,
-        RegularFileStage::Stat,
-        "scoped registry data stat failed",
-        || input.metadata(),
-    )?;
-    if identity(&reopened) != identity(&before) {
-        return Err(RegularFileError::Changed { before_read: true });
-    }
-    let capacity = if policy.is_host() {
-        before.len() as usize
-    } else {
-        policy.maximum(scope)
-    };
-    let (mut buffer, _read_credit) = ReadCapture::new(scope, policy, capacity)?;
-    let mut chunk = [0u8; CHUNK_BYTES];
-    loop {
-        hook(ReadPoint::BeforeRead, &input);
-        scope.check()?;
-        // Registry keeps its original full chunk, including overflow rejection
-        // before any charge. Host reads its pinned length plus one EOF probe.
-        let remaining = capacity - buffer.len();
-        let requested = if !policy.is_host() {
-            CHUNK_BYTES
-        } else if remaining == 0 {
-            1
-        } else {
-            remaining.min(CHUNK_BYTES)
-        };
-        let result = read(&mut input, &mut chunk[..requested]);
-        if policy.is_host() || result.is_ok() {
-            scope.check()?;
-        }
-        let count = match result {
-            Err(e) if policy.is_host() && e.kind() == io::ErrorKind::Interrupted => {
-                continue;
+        false,
+        hook,
+        read,
+        || {
+            if policy.is_host() {
+                let named = match checked_io(
+                    scope,
+                    policy,
+                    RegularFileStage::Identity,
+                    "scoped Host current name stat failed",
+                    || std::fs::symlink_metadata(path),
+                ) {
+                    Err(RegularFileError::Io { error, .. })
+                        if matches!(
+                            error.kind(),
+                            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+                        ) =>
+                    {
+                        return Err(RegularFileError::Changed { before_read: false });
+                    }
+                    other => other?,
+                };
+                if fd::identity(&named) != fd::identity(&before) {
+                    return Err(RegularFileError::Changed { before_read: false });
+                }
             }
-            other => other.map_err(|error| RegularFileError::Io {
-                stage: RegularFileStage::Read,
-                error,
-                message: "scoped registry local read failed",
-            })?,
-        };
-        hook(ReadPoint::AfterRead, &input);
-        if policy.is_host() {
-            scope.check()?;
-        }
-        if count == 0 {
-            break;
-        }
-        if policy.is_host() && count > remaining {
-            return Err(RegularFileError::Changed { before_read: false });
-        }
-        buffer.append(scope, &chunk[..count])?;
-    }
-    let after = checked_io(
-        scope,
-        policy,
-        RegularFileStage::Stat,
-        "scoped registry final stat failed",
-        || input.metadata(),
-    )?;
-    if identity(&after) != identity(&before) || buffer.len() as u64 != before.len() {
-        return Err(RegularFileError::Changed { before_read: false });
-    }
-    hook(ReadPoint::BeforeConversion, &input);
-    if policy.is_host() {
-        let named = match checked_io(
-            scope,
-            policy,
-            RegularFileStage::Identity,
-            "scoped Host current name stat failed",
-            || std::fs::symlink_metadata(path),
-        ) {
-            Err(RegularFileError::Io { error, .. })
-                if matches!(
-                    error.kind(),
-                    io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
-                ) =>
-            {
-                return Err(RegularFileError::Changed { before_read: false });
-            }
-            other => other?,
-        };
-        if identity(&named) != identity(&before) {
-            return Err(RegularFileError::Changed { before_read: false });
-        }
-    }
-    let result = buffer.finish_with(scope, |_| {})?;
-    if policy.is_host() {
-        scope.check()?;
-    }
-    Ok(result)
+            Ok(())
+        },
+    )
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -613,3 +548,7 @@ pub(super) fn read_regular(
 #[cfg(all(test, target_os = "linux"))]
 #[path = "regular_file_tests.rs"]
 mod tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "regular_file/fd_tests.rs"]
+mod fd_tests;

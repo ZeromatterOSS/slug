@@ -11,6 +11,8 @@
  */
 
 mod file_digest;
+#[cfg(target_os = "linux")]
+pub(in crate::runtime) mod rooted;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) mod scoped_directory;
 #[cfg(all(test, target_os = "linux"))]

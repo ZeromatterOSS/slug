@@ -68,6 +68,10 @@ pub(in crate::runtime) use regular_file::read_host_file_with_charge_origin;
 pub(in crate::runtime) use regular_file::read_host_file_with_known_shas_allowance;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) use regular_file::read_host_file_with_known_shas_allowance_and_census;
+#[cfg(target_os = "linux")]
+pub(in crate::runtime) use regular_file::read_open_regular_file;
+#[cfg(target_os = "linux")]
+pub(in crate::runtime) use regular_file::read_open_regular_file_after_attempt;
 pub(in crate::runtime) use scope::SourceBufferReservation;
 pub(in crate::runtime) use scope::SourceCounter;
 pub(in crate::runtime) use scope::SourceDecoderReservation;

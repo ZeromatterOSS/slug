@@ -185,6 +185,29 @@ use SAME rooted registry, demand/result Arc, full epochs and source budgets.
 Image variant retains root owner/FD and validates instance/sealed generation,
 not an ambient reopened anchor. GeneralSource retains exact FileBytes Arc only.
 
+The inactive rooted observation leaf borrows RootIo plus the already selected
+anchor and scope. It validates the complete demand batch before IO: supported
+operations, matching nonzero instance, component-contained absolute paths of at
+most 4096 bytes, duplicates, at most 131072 demands and at most 4 MiB of retained
+path capacity. Scoped credits cover batch construction and hold link/directory
+result storage through epoch publication. These are Slug-native operational
+bounds, not a change to the Host resolver or a proof of native root selection.
+Directory collection counts borrowed names first, then admits allocation and
+conversion/sort peaks before retaining them in a second checked pass.
+
+Regular-file capture shares one credited FD read kernel. The Host/Registry
+adapter retains its existing pin/reopen/name checks and diagnostics. The rooted
+adapter consumes an already-readable descriptor with positional reads from zero;
+it checks FD identity and rechecks the rooted name before publishing any result.
+The observer charges each attempt before opening, including missing/wrong-kind
+failures, and calls the private already-charged entry point. FileBytes keeps its
+existing 1 MiB object cap. Digest streams through RootIo's existing SHA kernel,
+with fixed scratch and cumulative byte charges up to the selected RootIo file
+bound; it does not allocate a FileBytes object or inherit that object's cap.
+Temporary handle/scratch credits do not establish physical FD or kernel-memory
+admission. Sealed/exclusive-quiescent ownership, exact root/anchor association,
+registry validation and final source/transport integration remain separate gates.
+
 PreparedSourceActionInputs/PreparedActionChainInputs stay resource-free. At native
 completion mint NativeSourceActionInputs/NativeActionChainInputs = immutable
 metadata Arc + closed NativeSourceAccess from full current selected source set/

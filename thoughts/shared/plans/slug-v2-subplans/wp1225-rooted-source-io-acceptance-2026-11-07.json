@@ -1,0 +1,202 @@
+{
+  "status": "INACTIVE_ROOTED_SOURCE_IO_ACCEPTED",
+  "date": "2026-11-07",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "8e155997e58b63797a0a9c7498140e6e68ddddfa",
+  "source_view": "Exactly eight Core source files over the clean pushed baseline; inherited dirty source remains excluded.",
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/path_observation.rs": "c7fce708131b6b5bbdf9bd51416730ea63379e2fa8cec985df1239e48a4664c7",
+    "app/slug_core_v2/src/runtime/source_service.rs": "5369033c927f434c836c69de40fc144656689d1faa2847fb7d14b466bf771de7",
+    "app/slug_core_v2/src/runtime/source_service/regular_file.rs": "f39efcf3ff32ff37f9cf69e01474c7c869989b0f79c03ef3b03f88501f1b1260",
+    "app/slug_core_v2/src/runtime/source_service/regular_file/fd.rs": "37df9903986e73bd167b7db0fdb577baf131d53c59f944c85bd3f32a03ea8f85",
+    "app/slug_core_v2/src/runtime/source_service/regular_file/fd_tests.rs": "9fcd18b30ca42d3ff3f7d014087f7103bc23389c459de44d239f0b548a386c70",
+    "app/slug_core_v2/src/runtime/path_observation/rooted.rs": "d7d61e05e9ecd936d96a0d5792a22314d51e9c887e5bb3a8fa28db6bafab1d37",
+    "app/slug_core_v2/src/runtime/path_observation/rooted/tests.rs": "510d6d7a0b9ef6b0d78076f7f081d5395351dbd307f39a577931fe68501e82eb",
+    "app/slug_core_v2/src/runtime/path_observation/rooted/resolution_tests.rs": "c7e44b252e9ce727453be52250af69dc49e74f8801ffbd38ddfe2b488841c956"
+  },
+  "compatibility": {
+    "Slug-native": [
+      "Borrowed descriptor-relative materialization lstat/link/directory/bytes/digest observations and finite scope bounds",
+      "Actual physical inode/namespace identity and operational instability refusals"
+    ],
+    "exact_actual_graph": [
+      "Existing SHA-256/size domain over actual streamed file bytes; no Bazel configuration checksum or ActionKey projection is introduced"
+    ],
+    "protected_existing": [
+      "Host/Registry pin+reopen/current-name identity policy, diagnostics, hooks, allocation and byte/counter limits",
+      "Host capture byte/EOF/short-read/EINTR/cancellation behavior",
+      "Existing immutable path observation values and anchored resolution semantics"
+    ],
+    "unsupported_or_inactive": [
+      "Native selected root/anchor/epoch registry and sealed physical-root ownership",
+      "Rooted InputImage capture and native source-reader/REAPI transport migration",
+      "Original Starlark/process route activation, full confinement/quota/lifecycle/public-bootstrap and equivalent-command memory fit"
+    ]
+  },
+  "design_review": "Independent design ACCEPT for consumed-FD capture and whole-batch rooted observation contracts; private already-charged entrypoint preserves pre-open admission.",
+  "behavior": [
+    "Host/Registry and the new concrete FD entry share one capture loop; rooted reads consume a readable FD and use positional reads from byte zero",
+    "Complete namespace/anchor/path/operation/duplicate and metadata-budget admission before native observation",
+    "Every rooted operation charges one SourceAttempt before opening, including missing/wrong-kind outcomes; FileBytes uses after-attempt capture without double charge",
+    "Typed frame disappearance/replacement, FD/name mismatch and bound failures refuse the complete epoch",
+    "ReadLink preserves literal native bytes; two-pass directory capture prepays retained names, vectors, Arc transfer and sort peaks",
+    "Link/directory credits outlive partial payloads on failure and remain live through immutable epoch publication",
+    "Actual DICE Need/retry observes real root inodes, follows internal relative/absolute links, distinguishes same-display A/B instances, and rejects external links without Host demands"
+  ],
+  "bounds": {
+    "demands": 131072,
+    "retained_path_storage_bytes": 4194304,
+    "absolute_path_bytes": 4096,
+    "file_bytes_object_bytes": 1048576,
+    "digest_maximum": "Selected RootIo max_file_bytes, at most1GiB, with fixed streaming scratch and cumulative DecodedBytes",
+    "source_bank": "Existing scope limits unchanged; temporary handle credits do not establish kernel-FD/RSS admission"
+  },
+  "compile_gates": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 132.0923828089999,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.06389250500024,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "-p",
+        "slug_reapi_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 42.21425255799977,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "compile_json_sha256": {
+    "source-io-compile-before-credit-order.jsonl": "198b10cbd3ec5c309c535741ae78b0831dc0d560b78f2c416ddd029ebe0ce1bf",
+    "source-io-compile.jsonl": "055da796c6c965dc8769e68b4e8fc958ae6559685b1c8478e12474ee9f600e29",
+    "source-io-dependents.jsonl": "4d995982e33b3806866e9830a7573c97f9414ff5b00c8b5e69175a2ee339639b"
+  },
+  "test_run": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--exact",
+      "runtime::dice::source_service::regular_file::fd_tests::open_fd_capture_after_attempt_preserves_single_preopen_admission",
+      "runtime::dice::source_service::regular_file::fd_tests::open_fd_capture_detects_inode_mutation_and_short_read_without_publication",
+      "runtime::dice::source_service::regular_file::fd_tests::open_fd_capture_ignores_cursor_and_foreign_name_and_releases_consumed_descriptor",
+      "runtime::dice::source_service::regular_file::fd_tests::open_fd_capture_object_and_live_credit_exact_plus_one_keep_cumulative_history",
+      "runtime::dice::source_service::regular_file::fd_tests::open_fd_capture_refuses_foreign_expected_identity_before_allocation",
+      "runtime::dice::source_service::regular_file::fd_tests::open_fd_capture_retries_interruption_and_cancelled_reads_release_all_credit",
+      "runtime::dice::source_service::regular_file::tests::registry_capture_keeps_fixed_capacity_and_refusal_domains",
+      "runtime::dice::source_service::regular_file::tests::scoped_host_conversion_overlap_and_cumulative_history_are_bounded",
+      "runtime::dice::source_service::regular_file::tests::scoped_host_final_storage_refuses_partial_and_cancelled_publication",
+      "runtime::dice::source_service::regular_file::tests::scoped_host_inode_and_current_name_mutation_refuse_without_credit_leaks",
+      "runtime::dice::source_service::regular_file::tests::scoped_host_interrupted_reads_are_bounded_and_scope_failure_wins",
+      "runtime::dice::source_service::regular_file::tests::scoped_host_missing_shapes_and_object_limit_are_typed",
+      "runtime::dice::source_service::regular_file::tests::scoped_host_regular_bytes_empty_and_maximum_keep_accounting_and_owner_domains",
+      "runtime::dice::source_service::tests::scoped_offline_registry_keeps_local_bytes_and_refuses_http",
+      "runtime::dice::source_service::tests::scoped_registry_pinned_non_utf8_symlink_regular_special_and_object_limit",
+      "runtime::dice::source_service::tests::typed_local_refusal_uses_actual_io_and_keeps_missing_successful",
+      "runtime::path_observation::rooted::resolution_tests::actual_dice_external_literal_link_refuses_before_any_host_fallback",
+      "runtime::path_observation::rooted::resolution_tests::actual_dice_needs_resolve_rooted_symlinks_and_distinct_same_display_generations",
+      "runtime::path_observation::rooted::tests::rooted_observation_disappearance_after_typed_frame_never_publishes_missing_epoch",
+      "runtime::path_observation::rooted::tests::rooted_observation_filebytes_exact_object_limit_and_digest_streaming_have_distinct_bounds",
+      "runtime::path_observation::rooted::tests::rooted_observation_missing_wrongkind_special_and_hardlink_results_do_not_follow",
+      "runtime::path_observation::rooted::tests::rooted_observation_preserves_raw_links_sorted_native_names_and_refuses_unresolved_reads",
+      "runtime::path_observation::rooted::tests::rooted_observation_rejects_entire_foreign_above_anchor_and_duplicate_batches_before_io",
+      "runtime::path_observation::rooted::tests::rooted_observation_rootio_bounds_and_changed_framing_are_operational_failures",
+      "runtime::path_observation::rooted::tests::rooted_observation_same_display_distinct_instances_ignore_absent_and_foreign_host_tree",
+      "runtime::path_observation::rooted::tests::rooted_observation_scope_attempt_decoded_and_native_buffer_refusals_release_credits",
+      "runtime::path_observation::scoped_file_tests::known_shas_host_object_allowance_is_exact_and_scoped",
+      "runtime::path_observation::scoped_file_tests::scoped_file_epoch_preserves_bytes_missing_directory_and_original_arcs",
+      "runtime::path_observation::scoped_file_tests::scoped_file_epoch_validates_whole_demand_set_and_aborts_operational_failures",
+      "runtime::path_observation::scoped_file_tests::source_attempt_callback_preserves_whole_set_first_origin_and_sticky_refusal",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "selected": 30,
+    "elapsed_seconds": 0.02233266300027026,
+    "executable_sha256": "f71cfacfa5bb1de16331648eab000b46976e39a122c5aace468b70e2a4c04513",
+    "preflight_exit_code": 0
+  },
+  "test_scope": {
+    "new_fd_capture": 6,
+    "new_rooted_observer": 8,
+    "new_actual_dice_rooted_resolution": 2,
+    "protected_capture": 7,
+    "protected_scoped_observation": 4,
+    "protected_local_registry": 3,
+    "passed": 30,
+    "failed": 0,
+    "ignored": 0
+  },
+  "raw_test_output_sha256": {
+    "stdout": "764ec3206ab611f1bcb85cca0b00bbe062b79d2d2eb11dca1973e89e11c6c07a",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "freshness_correction": {
+    "source_content_changed": false,
+    "timestamp_refreshed": [
+      "app/slug_bzlmod_v2/src/lib.rs",
+      "app/slug_bzlmod_v2/src/repository_workspace.rs",
+      "app/slug_bzlmod_v2/src/module_version.rs",
+      "app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs",
+      "app/slug_workspace_v2/src/path_observation.rs",
+      "app/slug_bzlmod_v2/src/repository_workspace/state.rs",
+      "app/slug_bzlmod_v2/src/repository_workspace/sequence.rs",
+      "app/slug_bzlmod_v2/src/repository_workspace/tests.rs",
+      "app/slug_bzlmod_v2/src/repository_workspace/operation.rs"
+    ],
+    "reason": "Core dependency feature variant reported fresh despite missing an accepted public Workspace method present in source. Prior copied source retained earlier mtimes; force dependency freshness before renewed Core/consumer gates. Prior owner test variants were rebuilt and exercised those methods; stale consumer variant evidence is superseded."
+  },
+  "source_corrections": [
+    "Explicit child-module path and Arc<Dice> test helper receiver types",
+    "Post-frame disappearance cannot become a successful Missing epoch",
+    "Destroy partial result payloads before releasing their live-bank credits"
+  ],
+  "prior_protocol_evidence": "Earlier owner test variants remain valid. This receipt supersedes the prior protocol dependent gate after forcing current accepted protocol-source mtimes, observing Workspace/Bzlmod rebuilds, and compiling current Core/Loading/CLI/REAPI consumers.",
+  "final_review": "Independent final source/correction and compiled-artifact/source-pin/preflight/raw-test/dependent review ACCEPT.",
+  "static_gates": [
+    "Pinned rustfmt",
+    "git diff --check",
+    "scripts/v2_archive_status.sh",
+    "python3 scripts/v2_plan_status.py",
+    "Changed plan links resolve"
+  ],
+  "residual": "Inactive observer only. Its caller must authenticate the full current selected root/anchor/instance association, retain sealed or exclusive-quiescent backing, and own physical FD/kernel resources. No root/registry/native capability enters DICE. Actual physical-root lifecycle, native process, InputImage, source/transport activation and public bootstrap remain under the active packet gates."
+}

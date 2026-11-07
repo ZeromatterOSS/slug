@@ -291,5 +291,10 @@
     "Changed plan links resolve"
   ],
   "utility_reuse": "Existing Arc/Allocative owners and Buck2-derived SmallMap/SmallSet, including eq_ordered; no donor import/new interner/global cache. Component retention credits are not public-command RSS proof.",
-  "residual": "Core must authenticate the selected physical root, quiescent actual completion and current epoch before adoption, and production must use epoch-level aggregate admission. Immutable values contain no native mutation/FD/child authority and cannot revoke old physical ownership. No old production adapter is removed or compatibility/public bootstrap gate closed by this inactive component."
+  "residual": "Core must authenticate the selected physical root, quiescent actual completion and current epoch before adoption, and production must use epoch-level aggregate admission. Immutable values contain no native mutation/FD/child authority and cannot revoke old physical ownership. No old production adapter is removed or compatibility/public bootstrap gate closed by this inactive component.",
+  "validation_followup": {
+    "receipt": "wp1225-rooted-source-io-acceptance-2026-11-07.json",
+    "finding": "Later Core compilation exposed a stale shared-target Workspace feature variant despite the new method being present in source. Earlier copied files retained older mtimes. The owner test variants had rebuilt and remain valid; the earlier dependent check alone does not prove freshness of every production variant.",
+    "correction": "Refresh mtimes of the nine unchanged accepted protocol sources, confirm Workspace/Bzlmod dependency artifacts rebuild, then repeat current Core and named production consumer checks. The linked source-IO receipt supersedes the earlier dependent gate with that evidence."
+  }
 }

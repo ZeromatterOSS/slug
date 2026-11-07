@@ -26,6 +26,18 @@ interner, global cache or donor import is introduced. These component bounds
 and tests do not establish public-command memory fit; see the
 [protocol receipt](wp1225-workspace-protocol-acceptance-2026-11-07.json).
 
+The inactive rooted source observer reuses RootIo and ordinary immutable path
+epochs. The credited regular-file reader now shares one FD capture kernel with
+the unchanged Host/Registry adapters; rooted bytes retain the same exact Arc
+allocation, while digests stream through the existing RootIo SHA kernel.
+Borrowed demand indexes, result vectors, Buck2-derived SortedMap construction
+and link/directory conversion peaks are paid before allocation. Result storage
+credits stay live through epoch publication and follow payload destruction on
+failure; no resource guard or native root enters DICE. This adds no donor import,
+interner or global cache. The source bank is an operational component bound,
+not a physical-FD, kernel-memory or completed-command RSS claim. See the
+[rooted source-IO receipt](wp1225-rooted-source-io-acceptance-2026-11-07.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

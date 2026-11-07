@@ -40,8 +40,9 @@ Original build-info callbacks are integrated and post-verified in `d202a77e29b4`
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.
 The fixed three-launch backing diagnostic passes. Inactive rooted IO,
-delete/manifest consumers and immutable workspace protocol are accepted;
-native process/source integration remains the implementation frontier under
+delete/manifest consumers, immutable workspace protocol and borrowed rooted
+source observations are accepted. Physical-root ownership, native process and
+selected source/transport integration remain the implementation frontier under
 the selected design.
 Production activation still requires full confinement, lifecycle, archive quota,
 actual-original and public integration gates; see the
