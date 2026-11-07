@@ -1,0 +1,199 @@
+{
+  "baseline": "954ae56f0e0477917c14b19fef0c72901960dc70",
+  "compatibility": {
+    "Slug-native": [
+      "Materialization namespace/root identity and raw path confinement",
+      "native descriptor-relative operations and finite operation bounds",
+      "scope-specific infrastructure refusals"
+    ],
+    "protected_existing": [
+      "Host resolver behavior and error schema",
+      "common tar.xz/tar.gz validation, decoded accounting, ordered replacement, modes and mtimes"
+    ],
+    "unsupported_or_not_activated": [
+      "native reservation/setup and process execution",
+      "selected-instance root registry and anchored source-route activation",
+      "whole-tree cumulative snapshot/history admission",
+      "Source/REAPI native reader migration",
+      "complete confinement, full archive envelope, public bootstrap and whole-command memory fit"
+    ]
+  },
+  "compile_gates": [
+    {
+      "command": "cargo test --offline -p slug_workspace_v2 --lib --no-run --message-format=json",
+      "exit_code": 0,
+      "view": "normal, pinned nightly-2025-09-14"
+    },
+    {
+      "command": "cargo test --offline --locked --target-dir /run/media/system/Colossus/dev/slug/target -p slug_workspace_v2 -p slug_core_v2 --lib --no-run --message-format=json",
+      "elapsed_seconds": 181.0,
+      "exit_code": 0,
+      "view": "clean954ae56f0 plus12ownedsourcefiles"
+    },
+    {
+      "command": "cargo test --offline --locked --target-dir /run/media/system/Colossus/dev/slug/target -p slug_core_v2 --lib --no-run --message-format=json",
+      "elapsed_seconds": 12.24,
+      "exit_code": 0,
+      "view": "cleanowned final archive-depth correction"
+    },
+    {
+      "command": "cargo check --offline --locked --target-dir /run/media/system/Colossus/dev/slug/target -p slug_reapi_v2 --message-format=json",
+      "elapsed_seconds": 44.79,
+      "exit_code": 0,
+      "reuse_reason": "Only private local depth ceiling and its owner test changed; final Core recompilation and26tests cover that delta.",
+      "view": "cleanowned prior to private depth-validator/test-only correction; same public interfaces"
+    }
+  ],
+  "date": "2026-11-07",
+  "final_validation": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_workspace_v2-c99f5940e39d0187",
+        "--exact",
+        "path_resolution::anchored_tests::anchored_resolution_constructor_and_structural_identity",
+        "path_resolution::anchored_tests::anchored_resolution_demands_real_root_without_host_ancestors",
+        "path_resolution::anchored_tests::anchored_resolution_follows_nested_relative_and_absolute_internal_links",
+        "path_resolution::anchored_tests::anchored_resolution_refuses_absolute_relative_and_reentering_link_escapes",
+        "path_resolution::anchored_tests::anchored_resolution_preserves_cycle_and_expansion_frontiers",
+        "path_resolution::anchored_tests::anchored_resolution_rejects_foreign_namespace_and_preserves_host_resolver",
+        "path_resolution::anchored_tests::anchored_resolution_observed_epoch_tracks_complete_root_changes_and_restoration",
+        "path_resolution::tests::path_resolution_follows_direct_transitive_parent_and_escaping_links",
+        "path_resolution::tests::observed_resolution_retains_exact_symlink_frontier_after_need"
+      ],
+      "elapsed_seconds": 0.006143612999949255,
+      "executable_sha256": "4f9ccf4078c1e95e85de3842a40492352320ccfc671b594909225e5b06bdd0f1",
+      "exit_code": 0,
+      "receipt": "workspace-result-v2.json",
+      "receipt_sha256": "edf0fb4254d343c68887a88fac2ab3a9aedead21e99dfc73dc486b91611aac7e",
+      "selected": 9
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_workspace_v2-c99f5940e39d0187"
+      ],
+      "elapsed_seconds": 0.056136085999924035,
+      "exit_code": 0,
+      "receipt": "workspace-all-result.json",
+      "receipt_sha256": "27742ea08a8b804d07fc169587908b5d7e42ae1ea4f7958ac5e54d4f03b0a718",
+      "selected": 96
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_workspace_v2-bbf19e6535e44012"
+      ],
+      "elapsed_seconds": 0.05663864100006322,
+      "executable_sha256": "47764da773b7a90adb5d232e035e4fea339a27c7335c343ef70904910f2ca86f",
+      "exit_code": 0,
+      "receipt": "owned-slug_workspace_v2-result.json",
+      "receipt_sha256": "bc6a00c915172cd7a920ad6a1660752340133680a210fed7ecc3ae2957c6c798",
+      "selected": 96
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--exact",
+        "runtime::repository_generated_archive::rooted_tests::rooted_archive_admits_file_size_before_truncation_and_shares_decoded_limits",
+        "runtime::repository_generated_archive::rooted_tests::rooted_archive_cancelled_before_decode_preserves_existing_file",
+        "runtime::repository_generated_archive::rooted_tests::rooted_archive_refuses_symlink_ancestors_and_leaf_without_touching_target",
+        "runtime::repository_generated_archive::rooted_tests::rooted_archives_replace_on_retained_backing_without_touching_foreign_display_tree",
+        "runtime::repository_generated_archive::tests::aggregate_cap_and_cancellation_stop_extraction",
+        "runtime::repository_generated_archive::tests::general_tar_formats_share_empty_prefix_ordering_caps_and_path_rejection",
+        "runtime::repository_generated_archive::tests::gnu_long_name_header_is_applied_to_following_regular_entry",
+        "runtime::repository_generated_archive::tests::gzip_consumes_concatenated_members_and_validates_trailers_before_success",
+        "runtime::repository_generated_archive::tests::ordered_archives_replace_regular_files_and_preserve_executable_mode_and_mtime",
+        "runtime::repository_generated_archive::tests::oversized_xz_dictionary_is_rejected_before_extracting_a_tar_header",
+        "runtime::repository_generated_archive::tests::path_escape_links_and_file_directory_collisions_fail_closed",
+        "runtime::repository_generated_archive::tests::payload_padding_quota_refusal_preserves_existing_files_and_counts_discarded_entries",
+        "runtime::repository_generated_archive::tests::per_call_decoded_cap_counts_tar_headers_before_payload",
+        "runtime::repository_generated_archive::tests::scoped_generated_archives_count_ordered_replacements_and_all_decoded_bytes",
+        "runtime::repository_generated_archive::tests::scoped_xz_reserves_before_decoding_and_retires_on_codec_failure_and_cancellation",
+        "runtime::repository_generated_archive::tests::within_archive_duplicate_destination_is_rejected_but_prior_archive_is_replaceable",
+        "runtime::repository_root_io::tests::body_link_and_create_new_exact_plus_one_are_checked_before_mutation",
+        "runtime::repository_root_io::tests::callback_errors_cancellation_and_unwind_release_temporary_descriptors",
+        "runtime::repository_root_io::tests::capture_rejects_mutation_after_actual_bytes_and_digest",
+        "runtime::repository_root_io::tests::directory_entry_name_path_and_depth_bounds_precede_visitors",
+        "runtime::repository_root_io::tests::ensure_directory_preserves_mkdir_umask_and_existing_modes",
+        "runtime::repository_root_io::tests::lexical_paths_special_modes_and_hardlinks_refuse_without_truncation",
+        "runtime::repository_root_io::tests::literal_links_are_observed_and_unlinked_but_never_traversed",
+        "runtime::repository_root_io::tests::removed_display_never_falls_back_to_new_host_directory",
+        "runtime::repository_root_io::tests::renamed_root_and_foreign_display_preserve_actual_reads_and_mutations",
+        "runtime::repository_root_io::tests::archive_paths_beyond_delete_depth_remain_rooted_and_bounded"
+      ],
+      "elapsed_seconds": 0.04482294699982958,
+      "executable_sha256": "b09f139ad3498f5e8ed29fc918b322763d161717d76538460d264ecb544ed6c0",
+      "exit_code": 0,
+      "receipt": "owned-core-result-v2.json",
+      "receipt_sha256": "13b83b58380f8d9fcddd659c25bbb7497b2c1f59b89b4a41b832ad07d7125771",
+      "selected": 26
+    }
+  ],
+  "invariants": [
+    "Actual anchor Lstat; no fabricated Host ancestors or FD in DICE",
+    "Full namespace/root/path key equality, exact actual dependency Arcs and complete epochs",
+    "Internal links remain bounded; raw escape/reentry refused before normalization",
+    "Native File RAII, no-follow component/final opens, same-device checks, regular single-link validation before truncation",
+    "Bounded directory/readlink/read scratch and callback work; caller reserves command credits and supplies exclusive quiescence or sealed backing",
+    "Archive destination adapter shares existing decoder; no Host alias/proc reopen/tree copy in rooted path",
+    "mkdir honors current umask; actual requested file mode and mtime preserved",
+    "Deletion256 and process64 remain separate; archive/general-file paths may exceed256 within absolute4096; rooted local ceiling2048"
+  ],
+  "log_sha256": {
+    "archive-status.txt": "677313f46e2764dad73c5d5b69c68cbf51281d0d8eba1372d0c68ea2e6fecd8b",
+    "owned-build-v2.jsonl": "77c19ddcab5a188d08d4587bc7a7037ada11ff383f3589c73ab6e09bf2db08b4",
+    "owned-build-v2.stderr": "3deee09e8b87ba02672ca40bfb8f39f1dfb1d4bd63a1de73c3da8d6ebebb5cb4",
+    "owned-build.jsonl": "dbc19c49f8d34744eeaf7f3f0291ede9405b252a41727d52a6e8ad8fe60fd313",
+    "owned-build.stderr": "441bbe1b081a4d5a5ebb16869234f52143084cfa577fc0b5c32282c858748225",
+    "owned-core-preflight-v2.txt": "87486a3730622b41c21bb2cab9c6f5b8bb43036a806afe37c559957a46a1642b",
+    "owned-core-tests-v2.txt": "66d0752e04f7c9257a2f52908abb850077dae310e8533967c2c8c6c1c7bce210",
+    "owned-reapi-check.jsonl": "a05bf9968adc9f40c910ca586b8868938e3bcd7536adc6b3fc8f1c5a6ec0914a",
+    "owned-reapi-check.stderr": "c9042d713bb693818b8aee27480e50d594ad670d4b88f40de2943aeb7f91fbfa",
+    "owned-slug_workspace_v2-preflight.txt": "834fc777dc7bdfbac03e2206a8cb8363e65042e76d35d23cf4e8a30583106411",
+    "owned-slug_workspace_v2-tests.txt": "ab24d3c642b36bcb7a12ee6a0fe478cb18a2148b564291b6a42a56ed1d0d3a2e",
+    "plan-status.txt": "85a81875552e28d2a148288820d713a1b1f045ab65205dd9b5299bb13ed5f9f2",
+    "workspace-all-preflight.txt": "834fc777dc7bdfbac03e2206a8cb8363e65042e76d35d23cf4e8a30583106411",
+    "workspace-all-tests.txt": "c0dd68e0620fd4b89f262bfd6975ef34790c014984c18ed362cee61500f83ab9",
+    "workspace-build-v2.jsonl": "b24b7036df47b0ef5719fd59d1003024b61b0fa898538096acd13486f77e71bf",
+    "workspace-build-v2.stderr": "04ba52b4f857b00ae307d587f61c184681349fe7e2c9099304ca183a7d324bc1",
+    "workspace-preflight-v2.txt": "6d4caaec76e08c6a8363ad038b5be543413b76013c4e040ae18cc4cf81ff84cb",
+    "workspace-tests-v2.txt": "3a90fb4af89ea8f8baf887589bafcaa6b1fda0a28afc33eb3113e2671ef19e7d"
+  },
+  "new_anchored_resolution_tests": 7,
+  "new_root_io_tests": 10,
+  "new_rooted_archive_tests": 4,
+  "outcome": "Materialization-bounded resolution plus private FD-relative repository IO and shared rooted archive extraction; prerequisite for actual general repository execution in authentic Rust cquery.",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "precursor_core_runs": {
+    "normal_passed": 25,
+    "owned_passed": 25,
+    "status": "Pre-depth-correction evidence only; final cleanowned26 supersedes these for final source."
+  },
+  "preflight": "Every selected test batch was verified as present and nonignored before execution. Rebuilds refreshed preflight.",
+  "protected_archive_tests": 12,
+  "residual": "This is an inactive reusable implementation component, not public bootstrap or packet completion. Old adapter removal, actual originals, native process/source integration, full quota/confinement/lifecycle and equivalent-command memory gates remain.",
+  "review": {
+    "anchored_source": "independent reviewer ACCEPT; observed fixture pointer checks use authoritative same-transaction PathObservationKey value",
+    "core_archive_source": "independent reviewer ACCEPT including umask and archive-depth corrections",
+    "evidence": "independent final source-pin/compiled-artifact/preflight/raw-result join ACCEPT"
+  },
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/mod.rs": "71df35980c45b8f1dd159696ca7364b6faa0b254bd13e7a18b2512fb6d8e8edf",
+    "app/slug_core_v2/src/runtime/repository_generated_archive.rs": "6b1f913260b6ad33cc421a9f416796a9ecc9f676f8e7f1c4304e49545e431a4d",
+    "app/slug_core_v2/src/runtime/repository_generated_archive/destination.rs": "ea5eac99ab918cf77698cf968e2e6263dae9f6c0b19b24af002fbb756b8915f1",
+    "app/slug_core_v2/src/runtime/repository_generated_archive/rooted_tests.rs": "740638093d2b24a37256f492159d66711cdf451dac3d041e134d781de265daf2",
+    "app/slug_core_v2/src/runtime/repository_root_io.rs": "56720542da1cfecd5d81ed5731534cd7f4749fbf636a0393a854eacf0a50a30f",
+    "app/slug_core_v2/src/runtime/repository_root_io/linux.rs": "5d30dd9827a15dce35a57132fad9990bf40246abc2b4b33a7f29d326e0caf8fa",
+    "app/slug_core_v2/src/runtime/repository_root_io/tests.rs": "a6209eb57f2a5927cd11073991fd334be01f97d7a46bf8e990f28f20ee28fd7c",
+    "app/slug_core_v2/src/runtime/tests/repository_generated_archive_tests.rs": "fb18af50aa8fadcc4b39f2a6b495817ffa79a26b5dc20c2ec23d4bbe2e6ef211",
+    "app/slug_workspace_v2/src/lib.rs": "dfe5410826720fb70dc6ded59452d30ffa0ec8d2ab30700a139a1dd7133f214d",
+    "app/slug_workspace_v2/src/path_resolution.rs": "b343ff0bc753056fc79dac92954cf34f4cb524c820680dfcee052a0fc3396802",
+    "app/slug_workspace_v2/src/path_resolution/anchor.rs": "282ff6cbb2ce6f3db727a102528d8aa111a52a5ae8355e1a33fed2bce501b968",
+    "app/slug_workspace_v2/src/path_resolution/anchored_tests.rs": "d205615a5840ec5b0a6d2e0d2810fdae8af7f46dbb990d16f96bcb001a2415b2"
+  },
+  "source_view": "Final acceptance is clean954ae56f0 plus exactly the12pinned files. Inherited dirty source, unfinished protocol/new owner helpers and TARGET-only consumers are excluded.",
+  "status": "INACTIVE_FOUNDATIONS_ACCEPTED",
+  "workspace_suite": {
+    "ignored": 2,
+    "normal_and_clean_owned": true,
+    "passed": 96
+  }
+}

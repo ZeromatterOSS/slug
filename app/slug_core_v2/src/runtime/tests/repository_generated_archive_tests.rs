@@ -8,7 +8,7 @@ use slug_bzlmod_v2::GeneratedRepositoryArchiveFormat;
 
 use super::extract_selected_generated_archive;
 
-fn append_entry(
+pub(super) fn append_entry(
     builder: &mut tar::Builder<Vec<u8>>,
     path: &str,
     entry_type: tar::EntryType,
@@ -51,7 +51,7 @@ fn capture_bytes(compressed: &[u8]) -> tempfile::NamedTempFile {
     capture
 }
 
-fn archive_with_format(
+pub(super) fn archive_with_format(
     format: GeneratedRepositoryArchiveFormat,
     build: impl FnOnce(&mut tar::Builder<Vec<u8>>),
 ) -> tempfile::NamedTempFile {

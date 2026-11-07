@@ -52,6 +52,9 @@ mod repository_generated_archive;
 mod repository_host_input;
 mod repository_io;
 mod repository_process;
+#[cfg(target_os = "linux")]
+#[allow(dead_code)] // Inactive WP425 primitives; owners are integrated separately.
+mod repository_root_io;
 mod request_revision;
 mod root_apparent_repository_definition;
 mod root_apparent_repository_route;

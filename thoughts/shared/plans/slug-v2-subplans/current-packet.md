@@ -2,13 +2,18 @@
 
 Packet: WP-7-425-m7a-general-repository-process
 
-Status: INACTIVE_IMPLEMENTATION_READY; production execution remains gated.
+Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
 Baseline: d202a77e29b4fda077e69bc17ea4874c4635e22a.
 The [selected implementation design](wp1225-general-repository-workspace-design.md)
 owns the concrete protocol, rooted IO, quotas and file split.
 [Fixed backing evidence](wp1225-repository-root-backing-2026-11-07.json) proves
 three-launch rolling attachment and scaled same-backing quota shrink; it closes
 no production, confinement or public-command gate.
+[Inactive foundations](wp1225-rooted-foundations-acceptance-2026-11-07.json)
+implement anchored resolution and private rooted IO/shared archive extraction.
+The clean owned source view passes 96 workspace tests (two ignored) and all 26
+filesystem/archive guards. Native process/source integration remains inactive;
+immutable protocol and rooted delete/manifest consumers are unfinished candidates.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.
 

@@ -8,6 +8,10 @@
 
 //! Operational, observation-backed path resolution.
 
+mod anchor;
+#[cfg(test)]
+mod anchored_tests;
+
 use std::ffi::OsStr;
 use std::fmt;
 use std::path::Component;
@@ -16,6 +20,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
+pub use anchor::*;
 use async_trait::async_trait;
 use dice::DiceComputations;
 use dice::Key;
@@ -421,6 +426,7 @@ enum ResolutionCause {
     },
     Cycle(PathResolutionChain),
     InfiniteExpansion(PathResolutionChain),
+    AnchorEscape,
 }
 
 impl ResolutionCause {
@@ -430,6 +436,7 @@ impl ResolutionCause {
         requested_path: NormalizedAbsolutePath,
     ) -> PathResolutionError {
         match self {
+            Self::AnchorEscape => unreachable!("unanchored resolution has no anchor boundary"),
             Self::Observation { demand, error } => PathResolutionError::Observation {
                 namespace,
                 requested_path,
@@ -476,6 +483,7 @@ enum MachineStep {
 /// The pure state machine. Only the async adapter below performs DICE awaits.
 struct ResolutionMachine {
     namespace: PathObservationNamespace,
+    anchor: Option<MaterializationPathAnchor>,
     frames: Vec<ResolverFrame>,
 }
 
@@ -483,6 +491,7 @@ impl ResolutionMachine {
     fn new(namespace: PathObservationNamespace, requested_path: NormalizedAbsolutePath) -> Self {
         Self {
             namespace,
+            anchor: None,
             frames: vec![ResolverFrame::new(requested_path)],
         }
     }
@@ -503,9 +512,15 @@ impl ResolutionMachine {
                 .expect("resolution machine always has an active frame");
             match &mut frame.phase {
                 ResolverPhase::Begin => {
-                    if let Some((parent, basename)) = parent_and_basename(&frame.current_path) {
-                        frame.phase = ResolverPhase::AwaitParent { basename };
-                        return MachineStep::PushParent(parent);
+                    let at_anchor = self
+                        .anchor
+                        .as_ref()
+                        .is_some_and(|anchor| anchor.root() == &frame.current_path);
+                    if !at_anchor {
+                        if let Some((parent, basename)) = parent_and_basename(&frame.current_path) {
+                            frame.phase = ResolverPhase::AwaitParent { basename };
+                            return MachineStep::PushParent(parent);
+                        }
                     }
                     match frame.admit(frame.current_path.dupe()) {
                         RouteAdmission::Continue => {
@@ -607,6 +622,7 @@ impl ResolutionMachine {
         result: Arc<PathObservationResult>,
     ) -> Option<MachineStep> {
         let namespace = self.namespace;
+        let anchor = self.anchor.as_ref();
         let frame = self
             .frames
             .last_mut()
@@ -614,6 +630,18 @@ impl ResolutionMachine {
         match (frame.phase.clone(), result.as_ref()) {
             (ResolverPhase::AwaitLstat { real_path }, PathObservationResult::Lstat(result)) => {
                 match result {
+                    PathOperationResult::Present(lstat)
+                        if anchor.is_some_and(|anchor| anchor.root() == &real_path)
+                            && lstat.kind() != PathNodeKind::Directory =>
+                    {
+                        Some(MachineStep::Complete(Err(ResolutionCause::Observation {
+                            demand,
+                            error: PathObservationError::WrongKind {
+                                expected: PathNodeKind::Directory,
+                                actual: lstat.kind(),
+                            },
+                        })))
+                    }
                     PathOperationResult::Present(lstat)
                         if lstat.kind() == PathNodeKind::Symlink =>
                     {
@@ -649,7 +677,18 @@ impl ResolutionMachine {
                 PathObservationResult::ReadLink(result),
             ) => match result {
                 PathOperationResult::Present(target) => {
-                    let target_path = normalize_link_target(&physical_link, target.as_path());
+                    let target_path = if let Some(anchor) = anchor {
+                        match anchor.link_target(&physical_link, target.as_path()) {
+                            Ok(path) => path,
+                            Err(_) => {
+                                return Some(MachineStep::Complete(Err(
+                                    ResolutionCause::AnchorEscape,
+                                )));
+                            }
+                        }
+                    } else {
+                        normalize_link_target(&physical_link, target.as_path())
+                    };
                     frame.symlinks.push(ResolvedSymlink {
                         path: physical_link,
                         target: target.dupe(),
@@ -744,9 +783,11 @@ async fn drive_resolution(
     ctx: &mut DiceComputations<'_>,
     namespace: PathObservationNamespace,
     logical_path: NormalizedAbsolutePath,
+    anchor: Option<MaterializationPathAnchor>,
     mut captured: Option<&mut Vec<(PathObservationDemand, Arc<PathObservationResult>)>>,
-) -> Result<PathResult<ResolvedPath, PathResolutionError>, PathObservationEpochError> {
+) -> Result<PathResult<ResolvedPath, ResolutionCause>, PathObservationEpochError> {
     let mut machine = ResolutionMachine::new(namespace, logical_path.dupe());
+    machine.anchor = anchor;
     let mut next = None;
     loop {
         let step = next.take().unwrap_or_else(|| machine.transition());
@@ -777,9 +818,7 @@ async fn drive_resolution(
                         let MachineStep::Complete(result) = step else {
                             unreachable!("root-frame completion is terminal")
                         };
-                        return Ok(PathOutcome::Complete(result.map_err(|cause| {
-                            cause.with_outer_context(namespace, logical_path.dupe())
-                        })));
+                        return Ok(PathOutcome::Complete(result));
                     }
                     next = Some(step);
                 }
@@ -808,9 +847,14 @@ impl Key for ResolvedPathKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        drive_resolution(ctx, self.namespace, self.logical_path.dupe(), None)
+        drive_resolution(ctx, self.namespace, self.logical_path.dupe(), None, None)
             .await
             .expect("PathObservationKey result operation matches its demand")
+            .map(|result| {
+                result.map_err(|cause| {
+                    cause.with_outer_context(self.namespace, self.logical_path.dupe())
+                })
+            })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -843,6 +887,7 @@ impl Key for ResolvedPathObservationKey {
             ctx,
             self.namespace,
             self.logical_path.dupe(),
+            None,
             Some(&mut captured),
         )
         .await
@@ -850,6 +895,9 @@ impl Key for ResolvedPathObservationKey {
             Err(error) => PathOutcome::Complete(Err(error.into())),
             Ok(PathOutcome::Need(need)) => PathOutcome::Need(need),
             Ok(PathOutcome::Complete(result)) => {
+                let result = result.map_err(|cause| {
+                    cause.with_outer_context(self.namespace, self.logical_path.dupe())
+                });
                 PathOutcome::Complete(assemble_observed_resolution(result, captured))
             }
         }

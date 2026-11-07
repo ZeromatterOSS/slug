@@ -64,6 +64,13 @@ pub use path_observation::WindowsOptionPathLongNameOutcome;
 #[doc(hidden)]
 pub use path_observation::path_observation_shards;
 #[doc(hidden)]
+pub use path_resolution::AnchoredPathResolutionError;
+pub use path_resolution::AnchoredResolvedPathKey;
+pub use path_resolution::AnchoredResolvedPathObservationKey;
+pub use path_resolution::MaterializationPathAnchor;
+pub use path_resolution::MaterializationPathAnchorError;
+pub use path_resolution::ObservedAnchoredResolvedPath;
+#[doc(hidden)]
 pub use path_resolution::ObservedPathDirectoryListing;
 #[doc(hidden)]
 pub use path_resolution::ObservedPathFrontierError;

@@ -6,14 +6,11 @@
 use std::collections::HashSet;
 use std::fs::File;
 use std::fs::FileTimes;
-use std::fs::OpenOptions;
-use std::fs::{self};
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
 use std::path::Path;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
@@ -28,6 +25,10 @@ use super::repository_io::ArchiveMaterializationError;
 use super::repository_io::source_service::SourceCounter;
 use super::repository_io::source_service::SourceServiceScope;
 use super::repository_io::source_service::{self};
+
+mod destination;
+use destination::ArchiveDestination;
+use destination::PathDestination;
 
 const BLOCK: usize = 512;
 const CALL_DECODED_LIMIT: u64 = 512 * 1024 * 1024;
@@ -127,14 +128,55 @@ fn extract_with_format_and_limits(
     limits: DecodeLimits,
     scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
+    extract_with_destination_and_limits(
+        capture,
+        &PathDestination(root),
+        strip_prefix,
+        format,
+        active,
+        aggregate_decoded,
+        limits,
+        scope,
+    )
+}
+
+/// The decoder and decoded-byte limits are shared with the legacy archive lane.
+/// This entrypoint never interprets a display path as ambient Host authority.
+#[cfg(target_os = "linux")]
+#[allow(dead_code)] // Activated only with the complete general-workspace owner.
+pub(super) fn extract_generated_archive_at(
+    capture: &File,
+    root: &super::repository_root_io::RootIo<'_>,
+    strip_prefix: &str,
+    format: GeneratedRepositoryArchiveFormat,
+    active: &dyn Fn() -> bool,
+    aggregate_decoded: &mut u64,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
+    extract_with_destination_and_limits(
+        capture,
+        root,
+        strip_prefix,
+        format,
+        active,
+        aggregate_decoded,
+        GENERATED_DECODE_LIMITS,
+        scope,
+    )
+}
+
+fn extract_with_destination_and_limits(
+    capture: &File,
+    root: &dyn ArchiveDestination,
+    strip_prefix: &str,
+    format: GeneratedRepositoryArchiveFormat,
+    active: &dyn Fn() -> bool,
+    aggregate_decoded: &mut u64,
+    limits: DecodeLimits,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
     validate_strip_prefix(strip_prefix)?;
-    let root_metadata = fs::symlink_metadata(root)
-        .map_err(|error| materialization(format!("inspecting generated archive root: {error}")))?;
-    if !root_metadata.file_type().is_dir() {
-        return Err(materialization(
-            "generated archive root is not a real directory",
-        ));
-    }
+    root.validate_root()?;
     if *aggregate_decoded > limits.aggregate {
         return Err(materialization(
             "generated archives exceed aggregate decoded limit",
@@ -190,7 +232,7 @@ fn extract_with_format_and_limits(
 
 fn extract_tar(
     decoder: impl Read,
-    root: &Path,
+    root: &dyn ArchiveDestination,
     strip_prefix: &str,
     active: &dyn Fn() -> bool,
     aggregate_decoded: &mut u64,
@@ -314,27 +356,16 @@ fn extract_tar(
                     "generated tar repeats a stripped destination",
                 ));
             }
-            let destination = ensure_parent(root, path)?;
-            let destination = destination.join(path.rsplit('/').next().unwrap_or(path));
             match kind {
-                EntryKind::Directory => {
-                    ensure_directory(&destination, path)?;
-                }
+                EntryKind::Directory => root.ensure_directory(path)?,
                 EntryKind::Regular => {
-                    admit_regular_target(&destination, path)?;
-                    let mut output = OpenOptions::new()
-                        .write(true)
-                        .create(true)
-                        .truncate(true)
-                        .open(&destination)
-                        .map_err(|error| {
-                            materialization(format!("opening generated file {path}: {error}"))
-                        })?;
+                    root.admit_file_size(size)?;
+                    let mut output = root.open_regular(path)?;
                     tar.copy_exact(size, &mut output, path)?;
                     output.flush().map_err(|error| {
                         materialization(format!("flushing generated file {path}: {error}"))
                     })?;
-                    set_mode(&destination, mode | 0o400)?;
+                    root.set_mode(path, &output, mode | 0o400)?;
                     set_file_mtime(&output, &header, path)?;
                 }
             }
@@ -425,65 +456,6 @@ fn normalize_path(
         ));
     }
     Ok(Some(path.to_owned()))
-}
-
-fn ensure_parent(root: &Path, path: &str) -> Result<PathBuf, ArchiveMaterializationError> {
-    let mut parent = root.to_path_buf();
-    if let Some((parents, _)) = path.rsplit_once('/') {
-        for component in parents.split('/') {
-            parent.push(component);
-            ensure_directory(&parent, path)?;
-        }
-    }
-    Ok(parent)
-}
-
-fn ensure_directory(path: &Path, subject: &str) -> Result<(), ArchiveMaterializationError> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_dir() => Ok(()),
-        Ok(_) => Err(materialization(format!(
-            "generated tar file/directory collision at {subject}"
-        ))),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            fs::create_dir(path).map_err(|error| {
-                materialization(format!("creating generated directory {subject}: {error}"))
-            })
-        }
-        Err(error) => Err(materialization(format!(
-            "inspecting generated directory {subject}: {error}"
-        ))),
-    }
-}
-
-fn admit_regular_target(path: &Path, subject: &str) -> Result<(), ArchiveMaterializationError> {
-    match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_file() => Ok(()),
-        Ok(_) => Err(materialization(format!(
-            "generated tar file/directory collision at {subject}"
-        ))),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(materialization(format!(
-            "inspecting generated file {subject}: {error}"
-        ))),
-    }
-}
-
-#[cfg(unix)]
-fn set_mode(path: &Path, mode: u32) -> Result<(), ArchiveMaterializationError> {
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|error| {
-        materialization(format!(
-            "setting generated archive mode at {}: {error}",
-            path.display()
-        ))
-    })
-}
-
-#[cfg(not(unix))]
-fn set_mode(_path: &Path, _mode: u32) -> Result<(), ArchiveMaterializationError> {
-    Err(materialization(
-        "generated archive executable modes are unsupported on this platform",
-    ))
 }
 
 fn set_file_mtime(
@@ -713,3 +685,7 @@ fn materialization(message: impl Into<String>) -> ArchiveMaterializationError {
 #[cfg(test)]
 #[path = "tests/repository_generated_archive_tests.rs"]
 mod tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "repository_generated_archive/rooted_tests.rs"]
+mod rooted_tests;
