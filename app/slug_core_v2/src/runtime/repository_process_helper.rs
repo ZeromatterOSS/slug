@@ -67,12 +67,21 @@ fn send(plan: &RunPlan, kind: Kind, words: [u64; 8], rights: &[BorrowedFd<'_>]) 
     wire::send(control(), &frame, rights).map_err(|e| failure(8, e))
 }
 fn receive(plan: &RunPlan, kind: Kind, count: usize, deadline: Instant) -> Result<Vec<File>> {
+    receive_words(plan, kind, count, [0; 8], deadline)
+}
+fn receive_words(
+    plan: &RunPlan,
+    kind: Kind,
+    count: usize,
+    words: [u64; 8],
+    deadline: Instant,
+) -> Result<Vec<File>> {
     loop {
         match wire::receive(control()) {
             Ok((frame, files)) => {
                 if frame.kind != kind
                     || !frame.matches(plan)
-                    || frame.words != [0; 8]
+                    || frame.words != words
                     || files.len() != count
                 {
                     return Err(invalid(8));
@@ -221,20 +230,35 @@ fn run_checked(plan: &RunPlan) -> Result<()> {
             &[],
         )?;
     }
-    let mode = if plan.mode == RunMode::InitializeArchive {
+    let mode = if matches!(
+        plan.mode,
+        RunMode::InitializeArchive | RunMode::FinalizeArchive
+    ) {
         RepositoryWorkspaceMode::Archive
     } else {
         RepositoryWorkspaceMode::Process
     };
     backing_identity(root, mode).map_err(|_| invalid(6))?;
-    let successor = clone_from_attached_root(
-        root,
-        Path::new(plan.display.to_str().map_err(|_| invalid(7))?),
-        &resources,
-        &scope,
-        &|| true,
-    )
-    .map_err(|e| native(7, e))?;
+    let successor = if plan.mode.is_finalize() {
+        readonly::clone_readonly_from_attached_root(
+            root,
+            Path::new(plan.display.to_str().map_err(|_| invalid(7))?),
+            &resources,
+            &scope,
+            &|| true,
+        )
+        .map_err(|e| native(7, e))?
+        .into_clone()
+    } else {
+        clone_from_attached_root(
+            root,
+            Path::new(plan.display.to_str().map_err(|_| invalid(7))?),
+            &resources,
+            &scope,
+            &|| true,
+        )
+        .map_err(|e| native(7, e))?
+    };
     let a = successor.attached;
     let d = successor.detached;
     let n = successor.namespace;
@@ -250,6 +274,7 @@ fn run_checked(plan: &RunPlan) -> Result<()> {
             successor.owner.as_fd(),
         ],
     )?;
+    transfer_views(plan, &resources, &scope, deadline)?;
     receive(plan, Kind::Ack, 0, deadline)?;
     setup::finish_mounts(plan)?;
     setup::cwd(plan, root, &resources, &scope)?;
@@ -263,7 +288,7 @@ fn run_checked(plan: &RunPlan) -> Result<()> {
     setup::single_thread()?;
     setup::retire_privileges()?;
     setup::limits(plan.timeout_millis)?;
-    if plan.mode == RunMode::InitializeArchive {
+    if !plan.mode.has_payload() {
         let mut status = 0;
         let waited = unsafe { libc::waitpid(-1, &mut status, libc::__WALL | libc::WNOHANG) };
         if waited != -1 || io::Error::last_os_error().raw_os_error() != Some(libc::ECHILD) {
@@ -273,6 +298,65 @@ fn run_checked(plan: &RunPlan) -> Result<()> {
         return Ok(());
     }
     supervisor::execute(plan, deadline)
+}
+
+/// Trusted sequential handoff. Each temporary attachment is closed after its
+/// successor is sent; namespace attachment itself lasts until actual helper
+/// death. No payload can run until the parent validates the whole batch.
+fn transfer_views(
+    plan: &RunPlan,
+    resources: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+    deadline: Instant,
+) -> Result<()> {
+    for (slot, row) in plan.views.iter().enumerate() {
+        let mut words = [0; 8];
+        words[0] = slot as u64;
+        let mut files = receive_words(plan, Kind::ViewIncoming, 1, words, deadline)?;
+        let token = files.pop().ok_or_else(|| invalid(16))?;
+        let incoming = identity(&token).map_err(|e| native(16, e))?;
+        if incoming.device != row.device
+            || incoming.inode != row.inode
+            || incoming.mount != row.mount
+        {
+            return Err(invalid(16));
+        }
+        readonly::check_readonly(&token).map_err(|e| native(16, e))?;
+        let _owner_credit = resources.reserve(1024, 1, 0).map_err(|_| invalid(16))?;
+        let owner = current_owner(resources).map_err(|e| native(16, e))?;
+        let display = Path::new(row.display.to_str().map_err(|_| invalid(16))?);
+        let attached =
+            attach_in_owning_namespace(token, &owner, display, resources, scope, &|| true)
+                .map_err(|e| native(16, e))?;
+        let flags = readonly::check_readonly(&attached.file).map_err(|e| native(16, e))?;
+        let successor = readonly::clone_readonly_from_attached_root(
+            &attached.file,
+            display,
+            resources,
+            scope,
+            &|| true,
+        )
+        .map_err(|e| native(16, e))?
+        .into_clone();
+        let a = successor.attached;
+        let d = successor.detached;
+        send(
+            plan,
+            Kind::ViewSuccessor,
+            [
+                slot as u64,
+                a.device,
+                a.inode,
+                a.mount,
+                d.device,
+                d.inode,
+                d.mount,
+                flags,
+            ],
+            &[attached.file.as_fd(), successor.token.as_fd()],
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

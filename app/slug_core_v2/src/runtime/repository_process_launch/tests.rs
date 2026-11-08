@@ -16,6 +16,8 @@ use super::*;
 use crate::runtime::repository_physical_root::native_tests::reservation;
 use crate::runtime::repository_physical_root::process_owner::ProcessPlatform;
 use crate::runtime::repository_physical_root::process_owner::{self};
+#[path = "view_probe_tests.rs"]
+mod readonly_tests;
 fn platform() -> ProcessPlatform {
     ProcessPlatform::compiled_cli(
         std::env::var_os("SLUG_V2_BIN")

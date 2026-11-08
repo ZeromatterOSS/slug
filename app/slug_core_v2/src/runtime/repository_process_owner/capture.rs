@@ -82,6 +82,8 @@ impl Captures {
     pub(super) fn finish(
         self,
         code: i32,
+        mode: RunMode,
+        nonce: [u8; 16],
         request: Option<Arc<RepositoryWorkspaceRequest>>,
         root: RootIdentity,
         _proof: super::lifecycle::NamespaceReaped,
@@ -90,7 +92,12 @@ impl Captures {
             stdout: self.stdout,
             stderr: self.stderr,
             code,
-            binding: ReapedBinding { request, root },
+            binding: ReapedBinding {
+                request,
+                root,
+                mode,
+                nonce,
+            },
             credit: self.credit,
         }
     }
@@ -147,14 +154,29 @@ impl ReapedCapture {
 pub(in crate::runtime::repository_physical_root) struct ReapedBinding {
     request: Option<Arc<RepositoryWorkspaceRequest>>,
     root: RootIdentity,
+    mode: RunMode,
+    nonce: [u8; 16],
 }
 impl ReapedBinding {
+    pub(in crate::runtime::repository_physical_root) fn verify_attempt(
+        &self,
+        request: &RepositoryWorkspaceRequest,
+        root: RootIdentity,
+        nonce: &[u8; 16],
+    ) -> Result<(), PhysicalRootError> {
+        self.verify(request, root)?;
+        if &self.nonce != nonce {
+            return Err(PhysicalRootError::Reservation);
+        }
+        Ok(())
+    }
     pub(in crate::runtime::repository_physical_root) fn verify(
         &self,
         request: &RepositoryWorkspaceRequest,
         root: RootIdentity,
     ) -> Result<(), PhysicalRootError> {
-        if self.request.as_deref() != Some(request) || self.root != root {
+        if !self.mode.has_payload() || self.request.as_deref() != Some(request) || self.root != root
+        {
             return Err(PhysicalRootError::Reservation);
         }
         Ok(())
@@ -163,7 +185,17 @@ impl ReapedBinding {
         &self,
         root: RootIdentity,
     ) -> Result<(), PhysicalRootError> {
-        if self.request.is_some() || self.root != root {
+        if self.mode != RunMode::InitializeArchive || self.request.is_some() || self.root != root {
+            return Err(PhysicalRootError::Reservation);
+        }
+        Ok(())
+    }
+    pub(in crate::runtime::repository_physical_root) fn verify_finalize(
+        &self,
+        root: RootIdentity,
+        mode: RunMode,
+    ) -> Result<(), PhysicalRootError> {
+        if !mode.is_finalize() || self.mode != mode || self.request.is_some() || self.root != root {
             return Err(PhysicalRootError::Reservation);
         }
         Ok(())

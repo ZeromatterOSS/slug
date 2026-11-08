@@ -116,12 +116,12 @@ fn borrowed_plan_forecast_checks_exact_cap_plus_one_and_overflow() {
     // Length arithmetic operates on borrowed input lengths; no huge CString or
     // encoded allocation is needed to refuse an oversized semantic request.
     let mut exact = PlanForecast::new();
-    exact.item(wire::MAX_PLAN - 54 - 4).unwrap();
+    exact.item(wire::MAX_PLAN - 58 - 4).unwrap();
     assert_eq!(exact.bytes, wire::MAX_PLAN);
     assert!(matches!(exact.raw(1), Err(PhysicalRootError::Resource)));
     let mut plus_one = PlanForecast::new();
     assert!(matches!(
-        plus_one.item(wire::MAX_PLAN - 54 - 3),
+        plus_one.item(wire::MAX_PLAN - 58 - 3),
         Err(PhysicalRootError::Resource)
     ));
     let mut overflow = PlanForecast::new();
@@ -134,7 +134,11 @@ fn borrowed_plan_forecast_checks_exact_cap_plus_one_and_overflow() {
     mirror.item(3).unwrap();
     mirror.raw(24).unwrap();
     mirror.item(7).unwrap();
-    assert_eq!(mirror.bytes, 54 + 4 + 3 + 24 + 4 + 7);
+    assert_eq!(mirror.bytes, 58 + 4 + 3 + 24 + 4 + 7);
+    let mut view = PlanForecast::new();
+    view.item(9).unwrap();
+    view.raw(32).unwrap();
+    assert_eq!(view.bytes, 58 + 4 + 9 + 32);
 }
 
 #[test]

@@ -24,6 +24,13 @@ fn plan() -> RunPlan {
             mode: libc::S_IFDIR | 0o755,
             link: None,
         }],
+        views: vec![ViewEntry {
+            display: CString::new("/__slug_repositories__/source").unwrap(),
+            instance: 17,
+            device: 71,
+            inode: 1,
+            mount: 72,
+        }],
         nonce: [27; 16],
         index: 45,
         timeout_millis: 27000,
@@ -58,6 +65,8 @@ fn plan_roundtrip_preserves_literal_arguments_environment_and_mirror_identity() 
     assert_eq!(decoded.env[1].as_bytes(), b"EMPTY=");
     assert_eq!(decoded.mirrors[0].fd, 6);
     assert_eq!(decoded.index, 45);
+    assert_eq!(decoded.views[0].instance, 17);
+    assert_eq!(decoded.views[0].mount, 72);
 }
 #[test]
 fn plan_refuses_truncation_trailing_bytes_version_and_forged_counts() {
@@ -102,6 +111,8 @@ fn plan_path_scope_environment_roles_and_native_caps_fail_closed() {
     assert!(p.validate().is_err());
     p.argv.clear();
     p.env.clear();
+    p.views.clear();
+    p.cwd = p.display.clone();
     p.index = 0;
     assert!(p.validate().is_ok());
     p = plan();
@@ -113,6 +124,51 @@ fn plan_path_scope_environment_roles_and_native_caps_fail_closed() {
     p = plan();
     p.mirrors[0].fd = 7;
     assert!(p.validate().is_err());
+}
+
+#[test]
+fn readonly_batch_refuses_aliases_overlap_and_scaffold_overflow_before_encoding() {
+    let mut p = plan();
+    p.views[0].display = p.display.clone();
+    assert!(p.validate().is_err());
+    p = plan();
+    p.views.push(ViewEntry {
+        display: CString::new("/__slug_repositories__/other").unwrap(),
+        instance: p.views[0].instance,
+        device: 81,
+        inode: 1,
+        mount: 82,
+    });
+    assert!(p.validate().is_err());
+    p.views[1].instance += 1;
+    assert!(p.validate().is_ok());
+    p.views[1].display = CString::new("/__slug_repositories__/source/sub").unwrap();
+    assert!(p.validate().is_err());
+    p.views.clear();
+    for i in 0..MAX_VIEWS {
+        p.views.push(ViewEntry {
+            display: CString::new(format!("/__slug_repositories__/{i}/a/b/c")).unwrap(),
+            instance: i as u64 + 1,
+            device: i as u64 + 1,
+            inode: 1,
+            mount: i as u64 + 1,
+        });
+    }
+    assert!(p.validate().is_err());
+    p.views.pop();
+    assert!(p.validate().is_ok());
+    for mode in [RunMode::FinalizeArchive, RunMode::FinalizeProcess] {
+        p = plan();
+        p.mode = mode;
+        assert!(p.validate().is_err());
+        p.argv.clear();
+        p.env.clear();
+        p.views.clear();
+        p.index = 0;
+        p.cwd = p.display.clone();
+        assert!(p.validate().is_ok());
+        assert_eq!(RunPlan::decode(&p.encode().unwrap()).unwrap().mode, mode);
+    }
 }
 #[test]
 fn only_complete_immutable_memfd_plans_are_admitted() {

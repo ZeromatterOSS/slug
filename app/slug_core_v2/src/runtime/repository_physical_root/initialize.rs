@@ -5,7 +5,7 @@ use super::process_owner::ProcessPlatform;
 use super::process_owner::{self};
 use super::progress::command::RepositoryWorkspaceCommand;
 use super::*;
-fn platform() -> io::Result<ProcessPlatform> {
+pub(super) fn platform() -> io::Result<ProcessPlatform> {
     #[cfg(test)]
     {
         let image = std::env::var_os("SLUG_V2_BIN").ok_or_else(|| {
@@ -34,8 +34,14 @@ impl RepositoryWorkspaceCommand {
         active: &(dyn Fn() -> bool + Sync),
     ) -> Result<Self, PhysicalRootError> {
         self.check_initialization(&reservation, &claim, &resources, &scope, active)?;
-        let producer =
-            BootstrapLaunch::new_claimed(reservation, resources, scope.clone(), claim, active)?;
+        let producer = BootstrapLaunch::new_claimed_in_domain(
+            reservation,
+            resources,
+            scope.clone(),
+            claim,
+            self.mount_domain().cloned(),
+            active,
+        )?;
         let (builder, initial) = process_owner::run(producer, platform()?, active).await?;
         self.reserve_root(builder, initial, &scope, active)
     }

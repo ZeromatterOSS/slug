@@ -22,6 +22,8 @@ use slug_bzlmod_v2::RepositoryWorkspaceState;
 
 use super::*;
 
+#[path = "repository_mount_domain.rs"]
+pub(super) mod domain;
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 #[path = "repository_process_helper.rs"]
 pub(in crate::runtime) mod helper;
@@ -30,6 +32,8 @@ pub(in crate::runtime) mod helper;
 pub(super) mod launch;
 #[path = "repository_quota_transition.rs"]
 pub(super) mod quota;
+#[path = "repository_process_views.rs"]
+pub(super) mod readonly;
 
 const NS_GET_USERNS: libc::c_ulong = 0xb701;
 const NS_GET_NSTYPE: libc::c_ulong = 0xb703;
@@ -59,7 +63,7 @@ impl From<PhysicalRootError> for MountLeaseError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct NamespaceIdentity {
+pub(super) struct NamespaceIdentity {
     device: u64,
     inode: u64,
 }
@@ -316,6 +320,24 @@ impl InitialRepositoryMount {
         initial.check_binding(root, scope, active)?;
         Ok(initial)
     }
+    pub(super) fn into_clone_for_finalize(
+        self,
+        progress: &super::progress::RepositoryWorkspaceProgress,
+        domain: &Arc<domain::NativeMountDomain>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<AttachedMountClone, MountLeaseError> {
+        let root = progress.builder();
+        self.check_binding(root, scope, active)?;
+        domain.check_root(&root.reservation, &root.resources, scope, active)?;
+        domain.check_clone(&self.clone, scope, active)?;
+        if progress.transcript().reservation() != &root.reservation
+            || progress.transcript().current().mode() != RepositoryWorkspaceMode::Archive
+        {
+            return Err(MountLeaseError::Request);
+        }
+        Ok(self.clone)
+    }
     pub(super) fn check_binding(
         &self,
         root: &RepositoryPhysicalRootBuilder,
@@ -403,6 +425,35 @@ impl<'a> QuiescedMountCompletion<'a> {
     }
 }
 impl RepositoryMountLease {
+    pub(super) fn into_clone_for_finalize(
+        self,
+        progress: &super::progress::RepositoryWorkspaceProgress,
+        domain: &Arc<domain::NativeMountDomain>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<AttachedMountClone, MountLeaseError> {
+        let root = progress.builder();
+        domain.check_root(&root.reservation, &root.resources, scope, active)?;
+        domain.check_clone(&self.clone, scope, active)?;
+        if self.reservation != root.reservation
+            || progress.transcript().reservation() != &self.reservation
+            || self.index != progress.transcript().records().len()
+            || &self.predecessor != progress.transcript().current()
+            || progress.transcript().current().mode() != RepositoryWorkspaceMode::Process
+            || root.identity != self.root
+            || identity(&root.file)? != self.root
+            || !same_backing(self.clone.detached, self.root)
+            || !self
+                .clone
+                .backing
+                .as_ref()
+                .is_some_and(|backing| Arc::ptr_eq(backing, &root.backing))
+            || backing_identity(&root.file, RepositoryWorkspaceMode::Process)? != root.identity
+        {
+            return Err(MountLeaseError::Request);
+        }
+        Ok(self.clone)
+    }
     /// Native deterministic mutation has already captured the actual root and
     /// accepted precisely this next record. No child or usable alias is live.
     pub(super) fn advance_trusted(

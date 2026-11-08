@@ -29,6 +29,7 @@ fn mountinfo_paths_preserve_kernel_escapes_and_refuse_invalid_or_oversized_frame
 }
 fn plan(argv: &[&[u8]], env: &[&[u8]]) -> RunPlan {
     RunPlan {
+        views: Vec::new(),
         mode: RunMode::ContinueExecute,
         display: CString::new("/__slug_repositories__/test/root").unwrap(),
         workspace: CString::new("/workspace").unwrap(),

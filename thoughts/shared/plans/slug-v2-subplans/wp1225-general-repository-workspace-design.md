@@ -82,6 +82,59 @@ proc-magiclink alias or global replacement grants authority. Raw Host-path
 runfiles consumers refuse inaccessible roots; published runfiles use existing
 durable SourceBacking until a real alias has separate access/lifetime/ABA proof.
 
+### Selected repository process views
+
+Cross-repository visibility uses the command's common owning user namespace,
+with fresh mount/PID/net/IPC/UTS namespaces on each launch. The exclusive native
+command owns an optional credited `NativeMountDomain`: its first successfully
+reaped bootstrap seeds a checked CLOEXEC duplicate of the actual owning userns
+descriptor; later roots must match its workspace lease, original source scope,
+resource bank and namespace. No mutex spans launch. The descriptor-free source
+claim domain, backing, sealed data root and source readers never retain this
+setup authority. Native process-view controllers may retain sealed data roots;
+there is no reverse reference from data to controllers.
+
+`FinalizeArchive`/`FinalizeProcess` are trusted no-payload setup modes. They
+consume the current initial/rolling RW token, attach it in its actual owner
+context and mint a clone from that actual attachment. `mount_setattr` on the
+detached clone sets and attests per-mount RO/NOSUID/NODEV, preserving executable
+file modes and existing backing quotas. Finalization creates no Execute record,
+advances no operation index and never creates cwd content. A pending RO clone
+becomes a usable finalized view only after actual namespace/helper/monitor reap
+and the existing full-history, complete-tree, same-root materialization seal.
+
+A later setup consumes each selected RO token, attaches it at its stable display
+and mints/attests its RO successor while attached. Transfer is sequential: one
+incoming token FD, then two returned attached/token FDs per row; nonce, operation
+index and slot authenticate the private exchange. Root and every view successor
+must validate before the final payload ACK. Successors stay pending until actual
+reap; cancellation retains the entire command, batch and credits until cleanup
+establishes death. At most128 views fit the unchanged2MiB plan; the existing
+512-inode scaffold and transient descriptor allowances are forecast before any
+setup effects. No sealed-FD clone, Host alias, proc reopen, copying or keeper is
+an alternative source of mount authority.
+
+The physical prerequisite is inactive. Ordinary semantic Execute admits no
+foreign view until a pure selected-view manifest and full native selected-set
+admission are integrated together. A private test owner may drive actual helper
+read/execute/EROFS and successor reuse without publishing a semantic Execute
+result or accepted transcript. The eventual manifest contains full child-visible
+reservation/owner/instance/display/spec/final-state facts, not recursively nested
+upstream transcripts. Native admission independently authenticates full current
+request/result associations and closed seals before matching that projection,
+then rechecks at completion. Loading supplies the current-prefix declaration
+set; later discoveries do not rewrite an earlier Execute. Local/legacy sources
+without a proved post-profile view remain explicitly unsupported. These
+prerequisites close no original Loading, archive envelope, public Rust or
+equivalent-command memory gate.
+
+[Native process-view evidence](wp1225-native-process-views-acceptance-2026-11-08.json)
+records the inactive implementation and actual CLI proof: shared-domain roots,
+65MiB Archive source consumption with a writable Process executor, repeated RO
+renewal, stale-launch refusal before ACK, Process finalization and cancellation
+with the last source owner. Ordinary Execute still has no foreign views; the
+manifest and complete selected-set admission remain the next coupled boundary.
+
 ## Archive envelope and irreversible process transition
 
 The inactive physical-root owner consumes a producer-credited FD from trusted

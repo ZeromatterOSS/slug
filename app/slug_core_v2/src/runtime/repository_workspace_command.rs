@@ -7,6 +7,7 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 
 use super::super::mount_lease::InitialRepositoryMount;
 use super::super::mount_lease::RepositoryMountLease;
+use super::super::mount_lease::domain::NativeMountDomain;
 use super::super::mount_lease::quota::VerifiedProcessQuota;
 use super::*;
 
@@ -26,6 +27,7 @@ struct NativeRootSlot {
 /// No Clone, root FD, generic mutation callback or child result injection exists.
 pub(in crate::runtime) struct RepositoryWorkspaceCommand {
     roots: Vec<NativeRootSlot>,
+    mount_domain: Option<Arc<NativeMountDomain>>,
     epoch: CreditedEpoch,
     scope: Arc<SourceServiceScope>,
     resources: Arc<RepositoryRootResources>,
@@ -56,6 +58,7 @@ impl RepositoryWorkspaceCommand {
             .map_err(PhysicalRootError::Protocol)?;
         Ok(Self {
             roots: Vec::new(),
+            mount_domain: None,
             epoch: CreditedEpoch {
                 epoch,
                 _credit: credit,
@@ -68,6 +71,11 @@ impl RepositoryWorkspaceCommand {
     }
     pub(in crate::runtime) fn epoch(&self) -> &RepositoryWorkspaceEpoch {
         &self.epoch.epoch
+    }
+    pub(in crate::runtime::repository_physical_root) fn mount_domain(
+        &self,
+    ) -> Option<&Arc<NativeMountDomain>> {
+        self.mount_domain.as_ref()
     }
     fn check_scope(
         &self,
@@ -180,6 +188,19 @@ impl RepositoryWorkspaceCommand {
         initial
             .check_binding(&builder, scope, active)
             .map_err(PhysicalRootError::mount)?;
+        let domain = match &self.mount_domain {
+            Some(domain) => {
+                domain
+                    .check_root(&builder.reservation, &self.resources, scope, active)
+                    .map_err(PhysicalRootError::mount)?;
+                domain
+                    .check_initial(&builder, &initial, scope, active)
+                    .map_err(PhysicalRootError::mount)?;
+                domain.clone()
+            }
+            None => NativeMountDomain::from_initial(&builder, &initial, scope, active)
+                .map_err(PhysicalRootError::mount)?,
+        };
         let reservation = builder.reservation.clone();
         let root_mode = (RootIo::new(&builder.file, io_limits(builder.mode, &reservation))?
             .root_stat()?
@@ -208,6 +229,7 @@ impl RepositoryWorkspaceCommand {
             epoch,
             _credit: credit,
         };
+        self.mount_domain = Some(domain);
         Ok(self)
     }
     pub(in crate::runtime) fn request_at(
@@ -525,6 +547,10 @@ impl RepositoryWorkspaceCommand {
         Ok((self, root))
     }
 }
+
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+#[path = "repository_workspace_finalize.rs"]
+pub(in crate::runtime::repository_physical_root) mod finalize;
 
 pub(in crate::runtime::repository_physical_root) struct NativeProcessAdmission {
     selected: RepositoryWorkspaceProgress,

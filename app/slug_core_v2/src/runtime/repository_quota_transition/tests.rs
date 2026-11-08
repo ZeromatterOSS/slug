@@ -568,7 +568,9 @@ fn native_failure_after_quota_commit_poisoned_after_reap_keeps_guard_until_dispo
         transition.transfer(unsafe { BorrowedFd::borrow_raw(0) }, &[0; 16], &|| true),
         Err(PhysicalRootError::Mode)
     ));
-    assert_eq!(resources.snapshot().native_fds, 1);
+    // The poisoned transition retains the data FD and its exclusive command's
+    // domain FD until disposal; all usable rolling tokens have retired.
+    assert_eq!(resources.snapshot().native_fds, 2);
     assert_eq!(transition.builder().mode, RepositoryWorkspaceMode::Process);
     assert_eq!(
         facts(&transition.builder().file, RepositoryWorkspaceMode::Process)

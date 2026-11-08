@@ -35,6 +35,16 @@ pub(super) enum RunMode {
     InitializeArchive = 1,
     FirstExecute = 2,
     ContinueExecute = 3,
+    FinalizeArchive = 4,
+    FinalizeProcess = 5,
+}
+impl RunMode {
+    pub fn has_payload(self) -> bool {
+        matches!(self, Self::FirstExecute | Self::ContinueExecute)
+    }
+    pub fn is_finalize(self) -> bool {
+        matches!(self, Self::FinalizeArchive | Self::FinalizeProcess)
+    }
 }
 impl TryFrom<u8> for RunMode {
     type Error = io::Error;
@@ -43,12 +53,25 @@ impl TryFrom<u8> for RunMode {
             1 => Ok(Self::InitializeArchive),
             2 => Ok(Self::FirstExecute),
             3 => Ok(Self::ContinueExecute),
+            4 => Ok(Self::FinalizeArchive),
+            5 => Ok(Self::FinalizeProcess),
             _ => Err(invalid()),
         }
     }
 }
 pub(super) const MAX_MIRRORS: usize = 128;
 pub(super) const MAX_MIRROR_TEXT: usize = 64 * 1024;
+pub(super) const MAX_VIEWS: usize = 128;
+// Includes the scaffold root. Conservative component accounting permits no
+// setup allocation to exceed the existing512-inode private scaffold mount.
+const MAX_SCAFFOLD_COMPONENTS: usize = 511;
+pub(super) struct ViewEntry {
+    pub display: CString,
+    pub instance: u64,
+    pub device: u64,
+    pub inode: u64,
+    pub mount: u64,
+}
 pub(super) struct MirrorEntry {
     pub name: CString,
     pub fd: i32,
@@ -65,6 +88,7 @@ pub(super) struct RunPlan {
     pub argv: Vec<CString>,
     pub env: Vec<CString>,
     pub mirrors: Vec<MirrorEntry>,
+    pub views: Vec<ViewEntry>,
     pub nonce: [u8; 16],
     pub index: u64,
     pub timeout_millis: u64,
@@ -83,27 +107,60 @@ fn beneath(value: &[u8], parent: &[u8]) -> bool {
             .strip_prefix(parent)
             .is_some_and(|rest| rest.starts_with(b"/"))
 }
+fn display_components(value: &[u8]) -> io::Result<usize> {
+    if !absolute(value)
+        || value == RESERVED_PREFIX.as_bytes()
+        || !beneath(value, RESERVED_PREFIX.as_bytes())
+    {
+        return Err(invalid());
+    }
+    let components = value[RESERVED_PREFIX.len() + 1..]
+        .split(|b| *b == b'/')
+        .count();
+    if components > 16 {
+        return Err(invalid());
+    }
+    Ok(components)
+}
 impl RunPlan {
     pub fn validate(&self) -> io::Result<()> {
         let display = self.display.as_bytes();
-        if !absolute(display)
-            || display == RESERVED_PREFIX.as_bytes()
-            || !beneath(display, RESERVED_PREFIX.as_bytes())
-            || display[RESERVED_PREFIX.len() + 1..]
-                .split(|b| *b == b'/')
-                .count()
-                > 16
-            || !absolute(self.workspace.as_bytes())
+        let mut scaffold = display_components(display)?;
+        if !absolute(self.workspace.as_bytes())
             || !absolute(self.cwd.as_bytes())
             || !beneath(self.cwd.as_bytes(), display)
             || !(1..=27000).contains(&self.timeout_millis)
             || self.argv.len() > MAX_ITEMS
             || self.env.len() > MAX_ITEMS
-            || (self.mode == RunMode::InitializeArchive
+            || (!self.mode.has_payload()
                 && (!self.argv.is_empty() || !self.env.is_empty() || self.index != 0))
-            || (self.mode != RunMode::InitializeArchive && self.argv.is_empty())
+            || (self.mode.has_payload() && self.argv.is_empty())
+            || (!self.mode.has_payload() && self.cwd != self.display)
+            || self.views.len() > MAX_VIEWS
+            || (!self.mode.has_payload() && !self.views.is_empty())
         {
             return Err(invalid());
+        }
+        for (i, row) in self.views.iter().enumerate() {
+            let path = row.display.as_bytes();
+            scaffold = scaffold
+                .checked_add(display_components(path)?)
+                .filter(|n| *n <= MAX_SCAFFOLD_COMPONENTS)
+                .ok_or_else(invalid)?;
+            if row.instance == 0
+                || row.inode != 1
+                || row.mount == 0
+                || beneath(path, display)
+                || beneath(display, path)
+                || self.views[..i].iter().any(|prior| {
+                    prior.instance == row.instance
+                        || (prior.device == row.device && prior.inode == row.inode)
+                        || beneath(path, prior.display.as_bytes())
+                        || beneath(prior.display.as_bytes(), path)
+                })
+            {
+                return Err(invalid());
+            }
         }
         let mut names = Vec::new();
         names
@@ -212,6 +269,19 @@ impl RunPlan {
             bytes.extend_from_slice(&row.fd.to_le_bytes());
             item(&mut bytes, row.link.as_ref().map_or(&[], |v| v.as_bytes()))?;
         }
+        if bytes.len() > MAX_PLAN - 4 {
+            return Err(invalid());
+        }
+        bytes.extend_from_slice(&(self.views.len() as u32).to_le_bytes());
+        for row in &self.views {
+            item(&mut bytes, row.display.as_bytes())?;
+            if bytes.len() > MAX_PLAN - 32 {
+                return Err(invalid());
+            }
+            for number in [row.instance, row.device, row.inode, row.mount] {
+                bytes.extend_from_slice(&number.to_le_bytes());
+            }
+        }
         Ok(bytes)
     }
     pub fn decode(bytes: &[u8]) -> io::Result<Self> {
@@ -291,6 +361,21 @@ impl RunPlan {
                 fd,
             });
         }
+        let count = c.number()?;
+        if count > MAX_VIEWS || count > c.0.len() / 36 {
+            return Err(invalid());
+        }
+        let mut views = Vec::new();
+        views.try_reserve_exact(count).map_err(|_| invalid())?;
+        for _ in 0..count {
+            views.push(ViewEntry {
+                display: c.string()?,
+                instance: u64::from_le_bytes(c.take(8)?.try_into().unwrap()),
+                device: u64::from_le_bytes(c.take(8)?.try_into().unwrap()),
+                inode: u64::from_le_bytes(c.take(8)?.try_into().unwrap()),
+                mount: u64::from_le_bytes(c.take(8)?.try_into().unwrap()),
+            });
+        }
         let plan = Self {
             mode,
             nonce,
@@ -302,6 +387,7 @@ impl RunPlan {
             argv,
             env,
             mirrors,
+            views,
         };
         if !c.0.is_empty() {
             return Err(invalid());
@@ -362,6 +448,8 @@ pub(super) enum Kind {
     Done = 8,
     SetupError = 9,
     HelloAck = 10,
+    ViewIncoming = 11,
+    ViewSuccessor = 12,
 }
 impl TryFrom<u8> for Kind {
     type Error = io::Error;
@@ -377,6 +465,8 @@ impl TryFrom<u8> for Kind {
             8 => Ok(Self::Done),
             9 => Ok(Self::SetupError),
             10 => Ok(Self::HelloAck),
+            11 => Ok(Self::ViewIncoming),
+            12 => Ok(Self::ViewSuccessor),
             _ => Err(invalid()),
         }
     }

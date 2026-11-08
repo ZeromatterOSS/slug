@@ -346,6 +346,29 @@ impl ProcessQuotaTransition {
     ) -> Result<ProcessQuotaReady, PhysicalRootError> {
         self.into_ready()
     }
+    /// Physical transport probe only: retain the entire real admission and its
+    /// guards without accepting a semantic result, record, epoch or replay.
+    #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn into_native_probe_after_reap(
+        mut self,
+        capture: &super::super::process_owner::ReapedCapture,
+    ) -> Result<(NativeProcessAdmission, AttachedMountClone), PhysicalRootError> {
+        capture
+            .binding()
+            .verify(self.request(), self.builder().identity)?;
+        check(self.scope(), &|| true)?;
+        if self.poisoned || !self.confirmed || self.attempt.is_some() || self.inflight.is_some() {
+            return Err(PhysicalRootError::Mode);
+        }
+        let pending = self.pending.take().ok_or(PhysicalRootError::Mode)?;
+        if pending.request != *self.request()
+            || pending.root != self.builder().identity
+            || pending.reservation != *self.request().reservation()
+        {
+            return Err(PhysicalRootError::Reservation);
+        }
+        Ok((self.admission, pending.successor))
+    }
     // The general runner enters through into_ready_after_reap and retains its
     // exact capture proof. Fixed native tests call this private readiness-only
     // conversion after actual helper reap; it mints no completion receipt.

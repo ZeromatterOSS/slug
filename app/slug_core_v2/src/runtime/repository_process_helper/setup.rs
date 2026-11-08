@@ -451,14 +451,20 @@ fn devices() -> Result<()> {
 }
 
 pub(super) fn mountpoint(plan: &RunPlan) -> Result<()> {
+    mountpoint_at(&plan.display)?;
+    for row in &plan.views {
+        mountpoint_at(&row.display)?;
+    }
+    Ok(())
+}
+fn mountpoint_at(display: &CStr) -> Result<()> {
     let mut current = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(wire::RESERVED_PREFIX)
         .map_err(|e| failure(3, e))?;
-    let tail = plan
-        .display
-        .as_bytes()
+    let tail = display
+        .to_bytes()
         .strip_prefix(b"/__slug_repositories__/")
         .ok_or_else(|| invalid(3))?;
     for component in tail.split(|b| *b == b'/') {
@@ -652,7 +658,7 @@ pub(super) fn cwd(
     } else {
         suffix.strip_prefix(b"/").ok_or_else(|| invalid(14))?
     };
-    if plan.mode != RunMode::InitializeArchive {
+    if plan.mode.has_payload() {
         let _scratch = resources
             .reserve(IO_SCRATCH, 3, 0)
             .map_err(|_| invalid(14))?;

@@ -51,6 +51,26 @@ pub(super) trait ProcessLaunch: Send + 'static {
     fn root_identity(&self) -> Option<RootIdentity>;
     fn scope(&self) -> &Arc<SourceServiceScope>;
     fn resources(&self) -> &Arc<RepositoryRootResources>;
+    fn views(&self) -> &[wire::ViewEntry] {
+        &[]
+    }
+    fn transfer_view(
+        &mut self,
+        _slot: usize,
+        _socket: BorrowedFd<'_>,
+        _nonce: &[u8; 16],
+    ) -> Result<(), PhysicalRootError> {
+        Err(PhysicalRootError::Mode)
+    }
+    fn verify_view_successor(
+        &mut self,
+        _slot: usize,
+        _attached: File,
+        _token: File,
+        _words: [u64; 8],
+    ) -> Result<(), PhysicalRootError> {
+        Err(PhysicalRootError::Mode)
+    }
     fn namespace(&self) -> Result<Option<BorrowedFd<'_>>, PhysicalRootError>;
     fn transfer(
         &mut self,
@@ -80,6 +100,10 @@ const CONTROL_FDS: usize = 48 + wire::MAX_MIRRORS + 2;
 // Virtual allowances for plan/newroot/scaffold/tmp, minimal dev mount and
 // the bounded2048-entry Host-proc masking inventory. Not a kernel-RAM claim.
 const TEMP_BACKING: u64 = (2 + 1 + 1 + 16) * 1024 * 1024 + 4096 + 2048 * 4096;
+#[cfg(test)]
+pub(super) fn temporary_backing_for_test() -> u64 {
+    TEMP_BACKING
+}
 const TOTAL_TIME: Duration = Duration::from_secs(30);
 const CLEANUP_TIME: Duration = Duration::from_secs(3);
 
@@ -100,6 +124,8 @@ pub(super) struct ProcessPlatform {
     observer: Option<Arc<AtomicUsize>>,
     #[cfg(test)]
     hold_before_hello: bool,
+    #[cfg(test)]
+    hold_after_view_transfer: bool,
 }
 impl ProcessPlatform {
     pub(super) fn current() -> io::Result<Self> {
@@ -116,6 +142,8 @@ impl ProcessPlatform {
             observer: None,
             #[cfg(test)]
             hold_before_hello: false,
+            #[cfg(test)]
+            hold_after_view_transfer: false,
         })
     }
     /// Observation/gate only: no execution plan, payload bytes or policy is
@@ -130,6 +158,13 @@ impl ProcessPlatform {
         self.hold_before_hello = hold_before_hello;
         self
     }
+    /// Hold only after a real RO token has crossed SCM, before final ACK.
+    #[cfg(test)]
+    pub(super) fn observe_view_transfer_for_test(mut self, stage: Arc<AtomicUsize>) -> Self {
+        self.observer = Some(stage);
+        self.hold_after_view_transfer = true;
+        self
+    }
     #[cfg(test)]
     pub(super) fn compiled_cli(helper: PathBuf, bwrap: PathBuf) -> Self {
         Self {
@@ -138,6 +173,7 @@ impl ProcessPlatform {
             test_images: true,
             observer: None,
             hold_before_hello: false,
+            hold_after_view_transfer: false,
         }
     }
 }
@@ -185,7 +221,7 @@ fn plan<L: ProcessLaunch>(
         },
         None => None,
     };
-    if (launch.mode() == RunMode::InitializeArchive) != execute.is_none() {
+    if launch.mode().has_payload() != execute.is_some() {
         return Err(PhysicalRootError::Mode);
     }
     let cwd = execute.map_or(display, |e| e.working_directory().path_str().as_bytes());
@@ -221,6 +257,13 @@ fn plan<L: ProcessLaunch>(
         forecast.item(row.name.as_bytes().len())?;
         forecast.raw(24)?;
         forecast.item(row.link.as_ref().map_or(0, |l| l.as_bytes().len()))?;
+    }
+    if launch.views().len() > wire::MAX_VIEWS {
+        return Err(PhysicalRootError::Resource);
+    }
+    for view in launch.views() {
+        forecast.item(view.display.as_bytes().len())?;
+        forecast.raw(32)?;
     }
     // Native execution consumes the ORIGINAL source scope's remaining time;
     // the immutable requested timeout (e.g.600) is never rewritten or refreshed.
@@ -272,6 +315,19 @@ fn plan<L: ProcessLaunch>(
             Ok(())
         })?;
     }
+    let mut views = Vec::new();
+    views
+        .try_reserve_exact(launch.views().len())
+        .map_err(|_| PhysicalRootError::Resource)?;
+    for view in launch.views() {
+        views.push(wire::ViewEntry {
+            display: cstring(view.display.as_bytes())?,
+            instance: view.instance,
+            device: view.device,
+            inode: view.inode,
+            mount: view.mount,
+        });
+    }
     let plan = RunPlan {
         mode: launch.mode(),
         display: cstring(display)?,
@@ -280,6 +336,7 @@ fn plan<L: ProcessLaunch>(
         argv,
         env,
         mirrors,
+        views,
         nonce,
         index: launch.request().map_or(0, |r| r.index() as u64),
         timeout_millis,
@@ -389,6 +446,7 @@ enum Phase {
     Ready,
     Successor,
     AfterQuota,
+    Views(usize),
     Running,
     Done,
 }
@@ -560,12 +618,45 @@ fn drive<L: ProcessLaunch>(
                             frame.words,
                             quota.take(),
                         )?;
-                        wire::send(
-                            child.control.as_fd(),
-                            &Frame::new(Kind::Ack, frame.nonce, frame.index),
-                            &[],
-                        )?;
-                        phase = Phase::Running;
+                        if owner.views().is_empty() {
+                            wire::send(
+                                child.control.as_fd(),
+                                &Frame::new(Kind::Ack, frame.nonce, frame.index),
+                                &[],
+                            )?;
+                            phase = Phase::Running;
+                        } else {
+                            owner.transfer_view(0, child.control.as_fd(), &frame.nonce)?;
+                            view_transfer_gate(&platform, &stop, owner.scope())?;
+                            phase = Phase::Views(0);
+                        }
+                    }
+                    Kind::ViewSuccessor
+                        if matches!(phase, Phase::Views(_)) && rights.len() == 2 =>
+                    {
+                        let Phase::Views(slot) = phase else {
+                            unreachable!()
+                        };
+                        if frame.words[0] != slot as u64 || slot >= owner.views().len() {
+                            return Err(failure("foreign readonly view slot"));
+                        }
+                        let [attached, token]: [File; 2] = rights
+                            .try_into()
+                            .map_err(|_| failure("invalid view successor rights"))?;
+                        owner.verify_view_successor(slot, attached, token, frame.words)?;
+                        let next = slot + 1;
+                        if next == owner.views().len() {
+                            wire::send(
+                                child.control.as_fd(),
+                                &Frame::new(Kind::Ack, frame.nonce, frame.index),
+                                &[],
+                            )?;
+                            phase = Phase::Running;
+                        } else {
+                            owner.transfer_view(next, child.control.as_fd(), &frame.nonce)?;
+                            view_transfer_gate(&platform, &stop, owner.scope())?;
+                            phase = Phase::Views(next);
+                        }
                     }
                     Kind::Done
                         if phase == Phase::Running
@@ -608,6 +699,8 @@ fn drive<L: ProcessLaunch>(
                 .ok_or_else(|| failure("missing completed physical root"))?;
             let capture = driver.captures.take().unwrap().finish(
                 code.unwrap(),
+                owner.mode(),
+                driver.plan.as_ref().unwrap().nonce,
                 owner.request_owner(),
                 root,
                 proof,
@@ -654,6 +747,27 @@ fn drive<L: ProcessLaunch>(
     }
 }
 
+fn view_transfer_gate(
+    _platform: &ProcessPlatform,
+    _stop: &AtomicBool,
+    _scope: &Arc<SourceServiceScope>,
+) -> Result<(), PhysicalRootError> {
+    #[cfg(test)]
+    if _platform.hold_after_view_transfer {
+        if let Some(stage) = &_platform.observer {
+            stage.store(2, Ordering::Release);
+        }
+        loop {
+            if _stop.load(Ordering::Acquire) {
+                return Err(PhysicalRootError::Inactive);
+            }
+            _scope.check()?;
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[path = "repository_process_owner/tests.rs"]
 mod tests;
@@ -670,7 +784,7 @@ struct PlanForecast {
 }
 impl PlanForecast {
     fn new() -> Self {
-        Self { bytes: 54 }
+        Self { bytes: 58 }
     }
     fn raw(&mut self, bytes: usize) -> Result<(), PhysicalRootError> {
         self.bytes = self

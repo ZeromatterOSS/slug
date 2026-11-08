@@ -185,9 +185,11 @@ fn native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged() {
         )
         .unwrap();
     assert_eq!(command.epoch(), &epoch);
-    assert_eq!(bank.snapshot().native_fds, 3);
+    // Data FD, initial token/owner, and the command's separate domain owner.
+    assert_eq!(bank.snapshot().native_fds, 4);
     let (command, sealed) = command.seal_root(&selected, 1, &scope, &|| true).unwrap();
-    assert_eq!(bank.snapshot().native_fds, 1);
+    // Sealing retires the root's token; the command still owns its namespace.
+    assert_eq!(bank.snapshot().native_fds, 2);
     assert!(
         matches!(sealed.state().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.as_ref()==b"one")
     );

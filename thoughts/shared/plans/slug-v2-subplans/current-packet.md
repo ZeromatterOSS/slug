@@ -113,6 +113,12 @@ sealed backing without mount operations. The diagnostic's successful scaled
 byte/inode limits do not prove all kernel metadata RAM or the full archive
 workload envelope.
 
+[Native process-view proof](wp1225-native-process-views-acceptance-2026-11-08.json)
+accepts the inactive shared owning namespace, RO finalization and reap-bound
+renewal primitives. Full child-visible manifests and complete native selected-set
+admission must join ordinary Execute before cross-repository activation. The
+original Loading, full Archive/public Rust and equivalent-memory gates remain.
+
 Inactive protocol, anchored resolver, rooted observation/mutation and native
 reader candidates may proceed. Before untrusted activation, prove actual
 pre-payload lease transfer, full archive/process quota transition and retention
