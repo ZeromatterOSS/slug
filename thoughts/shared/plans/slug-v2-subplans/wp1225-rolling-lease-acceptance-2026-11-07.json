@@ -1,0 +1,213 @@
+{
+  "status": "INACTIVE_ROLLING_LEASE_ACCEPTED",
+  "date": "2026-11-07",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "61dd404916dfee91620791c39416ac94e8225558",
+  "source_view": "Five pinned Rust files: existing physical-root child wiring and four new mount-lease/fixture/test files. Existing deterministic progress/snapshot/native fixture reused unchanged.",
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/repository_physical_root.rs": "dd6df9197fe2a9c62ef4f733b933d607df14b5ab88ed02e6466712e14a1e32e7",
+    "app/slug_core_v2/src/runtime/repository_mount_lease.rs": "599fd2835c95fbcce411d70ce41067defe15f8a4720302d4401fdcc92f1d86ff",
+    "app/slug_core_v2/src/runtime/repository_mount_lease/native_fixture.rs": "a4ba23eb11608ecfbed3a6f817ee4023ae15e685974828f30442ff66caf3182f",
+    "app/slug_core_v2/src/runtime/repository_mount_lease/native_tests.rs": "22de0f8cc2bea707af3ab3f67b16bdb9763b9ffc9435f2b26a925f9b331cbf39",
+    "app/slug_core_v2/src/runtime/repository_mount_lease/tests.rs": "28c89391afc89f2d41bc6827d150d8368ab102dc8f39f45b3dff90d918820fb6"
+  },
+  "compatibility": {
+    "Slug-native": [
+      "Linear detached-token and owning-userns native authority with finite retained/FD credits",
+      "Actual attached-root clone, owning-namespace direct attachment and exact root/request/record association"
+    ],
+    "protected_existing": [
+      "Same-root snapshot, deterministic progress and source leases",
+      "Rooted deletion, physical quota attestation and source cancellation"
+    ],
+    "unsupported_or_inactive": [
+      "Production quiescence receipt construction and arbitrary execution",
+      "Common sequential owner/non-execute index advancement and Archive-to-Process quota transition",
+      "Root registry, InputImage/source transport and original Starlark activation",
+      "Single-thread/general-runner privilege retirement, untrusted confinement, archive exhaustion, public bootstrap and whole-command memory fit"
+    ]
+  },
+  "design_review": "Independent design ACCEPT for linear consuming mount attempt/pending successor, explicit trusted provenance, no production completion constructor and borrowing accepted-record receipt.",
+  "behavior": [
+    "Only checked actually attached root can mint a successor clone via open_tree; owning mountns userns relation checked using NS_GET_USERNS/NS_GET_NSTYPE and namespace identity",
+    "Incoming token consumed by direct move_mount in its actual owning user namespace; attached and detached mount IDs distinguished while original pinned root retains same dev/inode backing",
+    "Full reservation/root/index/predecessor and Execute operation bind each attempt; request retained guard includes full immutable ownership",
+    "No Clone/raw-FD source surface; setup namespace borrow belongs only to exclusive attempt; transfer consumes token on success or uncertain error",
+    "Authenticated bounded SCM_RIGHTS transfers install only prepaid finite rights; pending successor unusable until exact borrowing completion after actual reap/snapshot/record acceptance",
+    "No production quiescent-completion constructor; metadata cannot establish detached creation/history and does not replace trusted setup provenance",
+    "Actual fixed three-launch chain returns successor before ACK and fixed write; parent independently verifies prior bytes before ACK, reaps child, snapshots original FD and accepts record before next begin",
+    "Fixed-write test thread fchdir then retires setup/root/token/userns/control authority; FD1 redirected to devnull, close_range retires FD3+, capabilities and ambient cleared and NNP verified before relative write",
+    "Capability assertions concern fixed-write thread only; trusted libtest may retain privileged threads, so no process-wide/untrusted confinement claim",
+    "Actual foreign Host display tree remains unchanged across later attachments; index/predecessor/refusal/revocation checks and final native/backing/retained cleanup discriminate ownership",
+    "Retained-bank shortage at pending acceptance rejects with payload owner still armed, closes successor token/userns and returns all tested credits after final root release"
+  ],
+  "compile_gates": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 51.11321672200029,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "-p",
+        "slug_reapi_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 13.231013046000044,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "preflight_and_test_runs": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--exact",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_depth_exact_plus_one_and_missing_ancestor_are_bounded",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_frontier_credits_release_on_success_refusal_and_cancellation",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_rejects_hardlinks_special_nodes_and_invalid_demands_before_mutation",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_unlinks_internal_and_escaping_literal_links_without_traversal",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_uses_original_descriptor_with_absent_and_foreign_display",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_work_exact_plus_one_accumulates_across_the_complete_tree",
+        "runtime::repository_filesystem_progress::deletion::tests::delete_walk_returns_actual_presence_and_refuses_non_directory_or_symlink_ancestors",
+        "runtime::repository_filesystem_progress::deletion::tests::delete_work_limits_accumulate_without_refund_and_cancellation_stops_io",
+        "runtime::repository_filesystem_progress::deletion::tests::scoped_delete_frontier_credit_releases_on_success_error_and_cancellation",
+        "runtime::repository_physical_root::mount_lease::tests::cancelled_or_inactive_setup_closes_consumed_input_before_any_allocation",
+        "runtime::repository_physical_root::mount_lease::tests::mint_rejects_host_directory_before_clone_and_releases_all_credits",
+        "runtime::repository_physical_root::seal::verification_tests::complete_tree_verification_rejects_extra_root_and_nested_children",
+        "runtime::repository_physical_root::seal::verification_tests::complete_tree_verification_rejects_mode_and_equivalent_literal_link_changes",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_cancellation_and_mutation_during_old_body_comparison_release_all_storage",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_completion_rejects_foreign_owner_and_failed_protocol_without_orphaning_credit",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_limits_include_root_all_paths_literal_targets_and_total_bodies",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_process_entry_depth_and_absolute_path_limits_do_not_lower_archive_lane",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_rejects_special_hardlinked_and_escaping_literal_nodes_without_following",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_retained_descriptor_ignores_absent_and_foreign_display_tree",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_samples_actual_changes_deletions_modes_links_and_reuses_only_observed_equal_body",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_streams_beyond_source_filebytes_cap_and_admits_size_before_allocating",
+        "runtime::repository_physical_root::tests::ordinary_host_directories_and_regular_files_cannot_become_physical_roots",
+        "runtime::repository_physical_root::tests::resource_policy_and_bank_control_require_positive_exact_credits",
+        "runtime::repository_physical_root::tests::resource_reservation_checks_all_domains_atomically_and_releases_on_last_owner",
+        "runtime::repository_physical_root::tests::scope_refusal_precedes_inactive_authority_and_allocations",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 25,
+      "elapsed_seconds": 0.488570387999971,
+      "executable_sha256": "9e0e6d5a6f9bc314a0987857f819afca04484437befaf0f41288f8bec485e7f0",
+      "preflight_exit_code": 0
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--ignored",
+        "--exact",
+        "runtime::repository_physical_root::mount_lease::native_tests::native_pending_accept_credit_shortage_retires_successor_and_payload_owners",
+        "runtime::repository_physical_root::mount_lease::native_tests::native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record",
+        "runtime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release",
+        "runtime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits",
+        "runtime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root",
+        "runtime::repository_physical_root::progress::tests::native_ordered_progress_samples_replays_and_seals_without_host_path",
+        "runtime::repository_physical_root::progress::tests::native_progress_refusals_retire_the_entire_generation",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 7,
+      "elapsed_seconds": 0.46441166099975817,
+      "executable_sha256": "9e0e6d5a6f9bc314a0987857f819afca04484437befaf0f41288f8bec485e7f0"
+    }
+  ],
+  "native_evidence": {
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::mount_lease::native_tests::native_pending_accept_credit_shortage_retires_successor_and_payload_owners",
+      "runtime::repository_physical_root::mount_lease::native_tests::native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record",
+      "runtime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release",
+      "runtime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits",
+      "runtime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root",
+      "runtime::repository_physical_root::progress::tests::native_ordered_progress_samples_replays_and_seals_without_host_path",
+      "runtime::repository_physical_root::progress::tests::native_progress_refusals_retire_the_entire_generation",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper",
+      "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper"
+    ],
+    "preflight_listing": "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper: test\nruntime::repository_physical_root::mount_lease::native_tests::native_pending_accept_credit_shortage_retires_successor_and_payload_owners: test\nruntime::repository_physical_root::mount_lease::native_tests::native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record: test\nruntime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper: test\nruntime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release: test\nruntime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits: test\nruntime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root: test\nruntime::repository_physical_root::progress::tests::native_ordered_progress_samples_replays_and_seals_without_host_path: test\nruntime::repository_physical_root::progress::tests::native_progress_refusals_retire_the_entire_generation: test\n\n9 tests, 0 benchmarks\n",
+    "socket_capability": "AF_UNIX SOCK_SEQPACKET confirmed before invocation",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+    "umask": "0002",
+    "qualification": "Fixed trusted Rust payloads only. Actual owning-namespace handoff, authority retirement, original-root snapshot and linear acceptance; no general runner/confinement/quota-transition or whole-command memory proof."
+  },
+  "kernel": "7.2.7-ogc1.1.fc44.x86_64",
+  "native_authority_qualification": "Actual fixed-write thread clears effective/permitted/inheritable and ambient capabilities plus NNP after setup FD retirement. Trusted libtest infrastructure may retain other privileged threads. This is neither single-threaded general native setup nor untrusted process confinement.",
+  "evidence_reuse": "The unchanged Bzlmod27 protocol slice and prior deterministic progress acceptance remain committed in61dd40491. This chunk refreshes25Core ordinary and7native parents against its rebuilt artifact, including all prior5native parents.",
+  "selected_scope": {
+    "core_ordinary": 25,
+    "new_mount_ordinary": 2,
+    "protected_core_ordinary": 23,
+    "explicit_ignored_native_parents": 7,
+    "new_mount_native_parents": 2,
+    "protected_native_parents": 5,
+    "internal_ignored_helpers_selected_only_by_parents": 2,
+    "passed_parent_tests": 32,
+    "failed": 0
+  },
+  "compile_json_sha256": {
+    "rolling-owner-before-drop-correction.jsonl": "fcb32498c1709bea987a1fbc3516a49ee60cd56a1fd9d5d3592c62d69c211dfb",
+    "rolling-owner.jsonl": "ebe45fc742d49d8ea427ef96c433e1a040302c8fec069d959c5919a41b17c7ce",
+    "rolling-dependents.jsonl": "c2420af3d6a91613273501c898c92fae6e3300536496bb84d7d65ef9ea738c09"
+  },
+  "raw_test_output_sha256": {
+    "ordinary": {
+      "stdout": "9a4cd10be7f039969c53c5652ecbab0843865833f23f3aecd8be3c69711a613d",
+      "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native": {
+      "stdout": "4feb7457f339cfd9e578785576b8ec6621b13901d0a9f920bcb979508341fb03",
+      "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "corrections": [
+    "Pending acceptance grows successor retained guard before moving credit-bearing owner, keeping request/reservation paid on failure",
+    "Fixed native helper retires setup descriptors and fixed-write thread privilege before writes; receipt precisely qualifies per-thread assertions"
+  ],
+  "final_review": "Independent final source/correction, five source pins, actual artifact/preflight,32tests including three-launch/shortage gates, dependent checks and precise fixed-thread privilege qualification review ACCEPT.",
+  "static_gates": [
+    "Pinned rustfmt",
+    "git diff --check",
+    "scripts/v2_archive_status.sh",
+    "python3 scripts/v2_plan_status.py",
+    "Changed plan links resolve"
+  ],
+  "residual": "Inactive rolling native primitive and trusted fixture acceptance only. No common progress integration, archive quota transition, generic child/descendant quiescence producer or production execution is activated. General runner must supply its own complete lifecycle/confinement proof. No public-command or equivalent-memory gate closes.",
+  "fixture_growth_checkpoint": {
+    "baseline": "d202a77e29b4fda077e69bc17ea4874c4635e22a",
+    "changed_test_or_fixture_files": 15,
+    "added_text_lines": 6382,
+    "deleted_text_lines": 2,
+    "assessment": "One active capability packet; reuse existing bounded native fixture transport and actual snapshot kernels. New native fixture contains only fixed trusted Rust payloads; no copied ruleset or persisted bulk dataset. Ordinary fixtures generate finite ephemeral trees. Distinct admission, rolling and resource-failure discriminators retained."
+  }
+}

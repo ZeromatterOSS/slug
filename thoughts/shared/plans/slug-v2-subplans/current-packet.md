@@ -20,9 +20,11 @@ untrusted execution, full archive exhaustion or whole-command memory fit.
 Inactive native progress now covers actual ordered File/Template/Read/Exists/
 Delete mutations and complete credited tree snapshots; see the
 [mutable-progress receipt](wp1225-mutable-progress-acceptance-2026-11-07.json).
-Archive capture, Execute and rolling lease transfer remain the native progress
-frontier, followed by selected physical-root registry and InputImage/native
-source transport, then
+The [rolling-lease receipt](wp1225-rolling-lease-acceptance-2026-11-07.json)
+adds an inactive linear token primitive and fixed Rust three-launch handoff proof.
+Archive capture, Execute/common rolling-lease integration and quota transition
+remain the native progress frontier, followed by selected physical-root registry
+and InputImage/native source transport, then
 by original Loading/process activation under the complete gates below. Existing
 production routes remain replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.

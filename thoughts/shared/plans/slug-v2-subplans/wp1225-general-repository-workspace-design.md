@@ -49,8 +49,23 @@ ATTACHED root before cap drop/payload. Current token is consumed, never reused.
 Core authenticates/owns next token but cannot launch it until current child and
 descendants quiesce, complete snapshot and current record acceptance. Exclusive
 progress capability controls token rollover; sources gain no mount authority.
-No detached-anchor cloning or mount pool is used; the fixed probe demonstrates
-this chain. Pre-untrusted-exec transfer and adversarial lifecycle remain to prove.
+The inactive linear native primitive binds the complete reservation, operation
+index, predecessor and original backing. Pending successors expose no usable
+lease before a borrowing quiescent-completion receipt; no production receipt
+constructor exists. Native descriptor/retained credits follow every consuming
+transition and retire after their actual descriptors and immutable payloads.
+
+No detached-anchor cloning or mount pool is used. The fixed Rust three-launch
+gate exercises owning-namespace attachment, pre-write successor transfer, setup
+FD retirement, actual reap, original-root snapshot and accepted record before
+the next lease becomes usable. The fixed-write thread clears effective/permitted/
+inheritable/ambient capabilities and sets no-new-privileges; trusted libtest
+infrastructure may retain other privileged threads. General-runner privilege
+retirement and untrusted confinement remain production gates. The fixture does
+not prove detached creation from fstat facts alone: trusted setup provenance
+remains explicit. Common native
+progress integration, non-execute index advancement, quota transition,
+pre-untrusted-exec transfer and adversarial lifecycle remain to prove.
 Adoption transfers the SAME root Arc; sealed roots cannot mutate. Native source
 leases/readers retain it until the last user closes; Arc clones duplicate no FD.
 

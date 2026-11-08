@@ -22,6 +22,8 @@ use super::path_observation::rooted::RootedObservationError;
 use super::repository_root_io::RootIo;
 use super::repository_root_io::RootIoLimits;
 
+#[path = "repository_mount_lease.rs"]
+mod mount_lease;
 #[path = "repository_workspace_progress.rs"]
 mod progress;
 mod reader;

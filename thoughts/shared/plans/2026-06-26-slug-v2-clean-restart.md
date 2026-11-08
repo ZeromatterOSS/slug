@@ -44,9 +44,10 @@ delete/manifest consumers, immutable workspace protocol and borrowed rooted
 source observations are accepted. Closed physical-root attestation, complete
 sealing and source-lease ownership are also accepted with fixed native evidence.
 Inactive consuming native progress and actual complete credited snapshots now
-cover ordered File/Template/Read/Exists/Delete. Archive/Execute, rolling lease
-transfer, selected root registry and source/transport integration remain the
-implementation frontier under the selected design.
+cover ordered File/Template/Read/Exists/Delete. An inactive linear rolling-lease
+primitive also has fixed Rust three-launch handoff evidence. Archive/Execute,
+common lease integration/quota transition, selected root registry and source/
+transport integration remain the implementation frontier under the selected design.
 Production activation still requires full confinement, lifecycle, archive quota,
 actual-original and public integration gates; see the
 [current packet](./slug-v2-subplans/current-packet.md).
