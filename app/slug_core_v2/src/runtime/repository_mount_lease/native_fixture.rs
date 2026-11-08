@@ -665,14 +665,14 @@ fn trusted_rolling_mount_helper() {
         );
     } else {
         let (bytes, mut fds) = wait_packet(1, 3).unwrap();
-        assert_eq!(bytes.len(), 33);
-        assert_eq!(&bytes[..8], TRANSFER_MAGIC);
-        assert_eq!(bytes[8], 1);
-        assert_eq!(&bytes[9..25], &nonce);
+        let incoming = crate::runtime::repository_process_wire::Frame::decode(&bytes).unwrap();
         assert_eq!(
-            u64::from_le_bytes(bytes[25..33].try_into().unwrap()),
-            request_index
+            incoming.kind,
+            crate::runtime::repository_process_wire::Kind::Incoming
         );
+        assert_eq!(incoming.nonce, nonce);
+        assert_eq!(incoming.index, request_index);
+        assert_eq!(incoming.words, [0; 8]);
         assert_eq!(fds.len(), 3);
         let owner = File::from(fds.pop().unwrap());
         let token = File::from(fds.pop().unwrap());

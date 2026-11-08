@@ -19,6 +19,17 @@ selected behavior, classification and activation gates. Slug stays Rust-native.
 
 Anchors: StarlarkBaseExternalContext.java1898-1911,1938-2075; Param.java78/94; StarlarkExecutionResult.java60-99,132-149,179-276. The exact Java exception message and process-wrapper diagnostics are not stable portable Rust promises; declared output and interruption classes need actual discriminators.
 
+The inactive Linux runner's executable lookup is explicitly Slug-native:
+absolute/relative-with-slash argv0 executes literally after selecting cwd; a bare
+filename searches the complete effective payload PATH (empty segments mean cwd),
+with absent PATH defaulting to `/bin:/usr/bin`. There is no implicit shell fallback
+for ENOEXEC. Pinned `Command.java169-205` documents absolute, bare-name PATH and
+cwd-relative forms, while `JavaSubprocessFactory.java161-178` delegates actual
+lookup to ProcessBuilder. This source alone does not prove modified/removed PATH
+or ENOEXEC corner parity with JDK startup behavior. Those corners retain the
+explicit native classification; literal argument bytes and effective child
+environment remain required. No JVM performs any Slug semantic work.
+
 ## Paths and sequential state
 
 `path(x)` accepts String/Label/Path. A Path input returns that same Path. Relative String resolves under repository directory; Label goes through actual source resolution and can restart. Path string/repr denotes the actual absolute path. `get_child(*strings)` joins paths on ANY path, not just generated paths; zero arguments returns equivalent path. `dirname` and exists operate on the denoted path. exists does not implicitly watch it. read accepts String/Label/Path, defaults watch='auto', rejects directory, reads raw bytes as Latin1. Under working directory, auto does not watch (avoids dependency cycles), explicit watch='yes' is rejected. External reads need the normal observed/watch contract; `watch='no'` must not become a false complete freshness certificate.

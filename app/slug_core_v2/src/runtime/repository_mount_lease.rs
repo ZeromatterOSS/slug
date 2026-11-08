@@ -3,9 +3,9 @@
 //! an incoming descriptor is detached or establish its creation history.
 //!
 //! Immutable requests/records bind structural identity, never native authority.
-//! There is deliberately no production constructor for quiescent completion:
-//! general process reap/snapshot/record acceptance and non-execute advancement
-//! still belong to the future common native progress owner.
+//! The closed native runner binds actual reap to the exact request/root before
+//! snapshot/record acceptance; deterministic progress alone cannot mint it.
+//! The command owns every usable token and advances trusted mutation records.
 use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;
@@ -22,6 +22,12 @@ use slug_bzlmod_v2::RepositoryWorkspaceState;
 
 use super::*;
 
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+#[path = "repository_process_helper.rs"]
+pub(in crate::runtime) mod helper;
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+#[path = "repository_process_launch.rs"]
+pub(super) mod launch;
 #[path = "repository_quota_transition.rs"]
 pub(super) mod quota;
 
@@ -29,7 +35,6 @@ const NS_GET_USERNS: libc::c_ulong = 0xb701;
 const NS_GET_NSTYPE: libc::c_ulong = 0xb703;
 const CLONE: u32 = 1;
 const MOVE_FROM_EMPTY: u32 = 4;
-const TRANSFER_MAGIC: &[u8; 8] = b"SLUG425I";
 
 #[derive(Debug)]
 pub(super) enum MountLeaseError {
@@ -372,16 +377,87 @@ pub(super) struct PendingMountLease {
     successor: AttachedMountClone,
 }
 
-/// Intentionally has no production constructor. The future general native
-/// owner must mint it only after child/descendant reap, actual bounded snapshot
-/// and exact immutable record acceptance. Test drivers use the same sequence.
+/// Constructed only from a closed request/root-bound reap proof and actual
+/// native progress after bounded snapshot/immutable record acceptance. Fixed
+/// primitive test drivers exercise the same sequence with their actual reaper.
 #[derive(Debug)]
 pub(super) struct QuiescedMountCompletion<'record> {
     record: &'record RepositoryWorkspaceRecord,
     root: RootIdentity,
 }
 
+impl<'a> QuiescedMountCompletion<'a> {
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn from_reaped_record(
+        progress: &'a super::progress::RepositoryWorkspaceProgress,
+        proof: &super::process_owner::ReapedBinding,
+    ) -> Result<Self, PhysicalRootError> {
+        let record = progress
+            .transcript()
+            .records()
+            .last()
+            .ok_or(PhysicalRootError::Snapshot)?;
+        let root = progress.builder().identity;
+        proof.verify(record.request(), root)?;
+        Ok(Self { record, root })
+    }
+}
 impl RepositoryMountLease {
+    /// Native deterministic mutation has already captured the actual root and
+    /// accepted precisely this next record. No child or usable alias is live.
+    pub(super) fn advance_trusted(
+        mut self,
+        progress: &super::progress::RepositoryWorkspaceProgress,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, MountLeaseError> {
+        check(scope, active)?;
+        let root = progress.builder();
+        let transcript = progress.transcript();
+        let record = transcript
+            .records()
+            .last()
+            .ok_or(MountLeaseError::Completion)?;
+        if record.request().reservation() != &self.reservation
+            || record.request().index() != self.index
+            || record.request().predecessor() != &self.predecessor
+            || matches!(
+                record.request().operation(),
+                RepositoryWorkspaceOperation::Execute(_)
+            )
+            || root.identity != self.root
+            || identity(&root.file)? != self.root
+            || transcript.records().len()
+                != self
+                    .index
+                    .checked_add(1)
+                    .ok_or(MountLeaseError::Completion)?
+            || !self
+                .clone
+                .backing
+                .as_ref()
+                .is_some_and(|backing| Arc::ptr_eq(backing, &root.backing))
+            || backing_identity(&root.file, RepositoryWorkspaceMode::Process)? != root.identity
+        {
+            return Err(MountLeaseError::Completion);
+        }
+        self.clone
+            .credit
+            .bytes
+            .try_grow(
+                record
+                    .next()
+                    .retained_storage_bytes()
+                    .map_err(|_| PhysicalRootError::Resource)?,
+            )
+            .map_err(|_| PhysicalRootError::Resource)?;
+        self.index = self
+            .index
+            .checked_add(1)
+            .ok_or(MountLeaseError::Completion)?;
+        self.predecessor = record.next().clone();
+        Ok(self)
+    }
     fn validate_request(
         &self,
         root: &RepositoryPhysicalRootBuilder,
@@ -632,8 +708,6 @@ impl PendingMountLease {
     }
 }
 
-#[repr(C, align(8))]
-struct TransferControl([u8; 32]);
 fn send_incoming(
     socket: BorrowedFd<'_>,
     root: &File,
@@ -642,42 +716,20 @@ fn send_incoming(
     nonce: &[u8; 16],
     index: usize,
 ) -> Result<(), MountLeaseError> {
-    let mut bytes = [0; 33];
-    bytes[..8].copy_from_slice(TRANSFER_MAGIC);
-    bytes[8] = 1;
-    bytes[9..25].copy_from_slice(nonce);
-    bytes[25..].copy_from_slice(
-        &u64::try_from(index)
-            .map_err(|_| MountLeaseError::Request)?
-            .to_le_bytes(),
+    use std::os::fd::AsFd;
+
+    use crate::runtime::repository_process_wire::Frame;
+    use crate::runtime::repository_process_wire::Kind;
+    let frame = Frame::new(
+        Kind::Incoming,
+        *nonce,
+        u64::try_from(index).map_err(|_| MountLeaseError::Request)?,
     );
-    let mut control = TransferControl([0; 32]);
-    let mut iov = libc::iovec {
-        iov_base: bytes.as_mut_ptr().cast(),
-        iov_len: bytes.len(),
-    };
-    let mut message: libc::msghdr = unsafe { std::mem::zeroed() };
-    message.msg_iov = &mut iov;
-    message.msg_iovlen = 1;
-    message.msg_control = control.0.as_mut_ptr().cast();
-    message.msg_controllen = unsafe { libc::CMSG_SPACE(12) } as usize;
-    unsafe {
-        let header = libc::CMSG_FIRSTHDR(&message);
-        (*header).cmsg_level = libc::SOL_SOCKET;
-        (*header).cmsg_type = libc::SCM_RIGHTS;
-        (*header).cmsg_len = libc::CMSG_LEN(12) as usize;
-        let data = libc::CMSG_DATA(header).cast::<i32>();
-        std::ptr::write_unaligned(data, root.as_raw_fd());
-        std::ptr::write_unaligned(data.add(1), token.as_raw_fd());
-        std::ptr::write_unaligned(data.add(2), owner.as_raw_fd());
-    }
-    let sent = unsafe { libc::sendmsg(socket.as_raw_fd(), &message, libc::MSG_NOSIGNAL) };
-    if sent < 0 {
-        return Err(io::Error::last_os_error().into());
-    }
-    if sent as usize != bytes.len() {
-        return Err(MountLeaseError::Consumed);
-    }
+    crate::runtime::repository_process_wire::send(
+        socket,
+        &frame,
+        &[root.as_fd(), token.as_fd(), owner.as_fd()],
+    )?;
     Ok(())
 }
 

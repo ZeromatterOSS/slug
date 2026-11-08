@@ -353,6 +353,7 @@ const UNCONDITIONAL: &[libc::c_long] = &[
     libc::SYS_restart_syscall,
     libc::SYS_fork,
     libc::SYS_vfork,
+    libc::SYS_setsid, // Session changes remain inside the PID1-owned namespace.
     libc::SYS_execve,
     libc::SYS_execveat,
     libc::SYS_wait4,

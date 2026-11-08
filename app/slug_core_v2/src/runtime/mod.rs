@@ -62,6 +62,9 @@ mod repository_process;
 ))]
 mod repository_process_policy;
 #[cfg(target_os = "linux")]
+#[allow(dead_code)] // Inactive until the owning general runner is integrated.
+mod repository_process_wire;
+#[cfg(target_os = "linux")]
 #[allow(dead_code)] // Inactive WP425 primitives; owners are integrated separately.
 mod repository_root_io;
 mod request_revision;
@@ -578,4 +581,32 @@ mod source_observation_surface_tests {
         }
         let _: fn(_, _, _, _, _, _) = inspect;
     }
+}
+
+/// Runs the closed repository helper ABI before CLI/runtime initialization.
+/// The marker grants no authority: the helper validates PID1, sealed plan,
+/// anonymous control and owning-namespace capabilities before setup.
+#[doc(hidden)]
+pub fn repository_process_helper_main() -> Option<i32> {
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    {
+        let mut args = std::env::args_os();
+        let _ = args.next();
+        if args.next().as_deref()
+            == Some(std::ffi::OsStr::new(
+                repository_process_wire::HELPER_ARGUMENT,
+            ))
+        {
+            return Some(if args.next().is_none() {
+                repository_physical_root::run_process_helper()
+            } else {
+                125
+            });
+        }
+    }
+    None
 }

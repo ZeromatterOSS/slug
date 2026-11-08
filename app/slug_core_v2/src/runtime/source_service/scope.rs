@@ -218,6 +218,27 @@ pub(in crate::runtime) struct SourceServiceScope {
     offline_archives: [Option<Arc<super::OfflineArchiveBacking>>; 5],
 }
 impl SourceServiceScope {
+    /// Private helper bookkeeping only. The parent retains the original command
+    /// scope and prepays helper storage; this scope grants no source acquisition
+    /// or semantic admission and cannot reset the parent's invocation counters.
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    pub(in crate::runtime) fn for_repository_helper(
+        workspace: NormalizedAbsolutePath,
+        work_deadline: Instant,
+        cleanup_deadline: Instant,
+    ) -> Result<Arc<Self>, SourceServiceError> {
+        Self::new(
+            workspace,
+            work_deadline,
+            cleanup_deadline,
+            SourceServiceLimits::default(),
+        )
+    }
+
     pub(super) fn new(
         workspace: NormalizedAbsolutePath,
         work_deadline: Instant,

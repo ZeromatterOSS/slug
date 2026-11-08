@@ -6,6 +6,7 @@ use slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits;
 use slug_workspace_v2::NormalizedAbsolutePath;
 
 use super::super::mount_lease::InitialRepositoryMount;
+use super::super::mount_lease::RepositoryMountLease;
 use super::super::mount_lease::quota::VerifiedProcessQuota;
 use super::*;
 
@@ -17,6 +18,7 @@ struct NativeRootSlot {
     reservation: Arc<RepositoryWorkspaceReservation>,
     progress: Option<RepositoryWorkspaceProgress>,
     initial: Option<InitialRepositoryMount>,
+    lease: Option<RepositoryMountLease>,
 }
 
 /// Created fresh once by the native command lifecycle, never from an imported
@@ -177,6 +179,7 @@ impl RepositoryWorkspaceCommand {
             reservation,
             progress: Some(progress),
             initial: Some(initial),
+            lease: None,
         });
         self.epoch = CreditedEpoch {
             epoch,
@@ -276,6 +279,13 @@ impl RepositoryWorkspaceCommand {
         } else {
             progress.apply(request, scope, active)?
         };
+        if let Some(lease) = self.roots[slot].lease.take() {
+            self.roots[slot].lease = Some(
+                lease
+                    .advance_trusted(&progress, scope, active)
+                    .map_err(PhysicalRootError::mount)?,
+            );
+        }
         self.roots[slot].progress = Some(progress);
         self.publish(slot)?;
         Ok(self)
@@ -284,8 +294,44 @@ impl RepositoryWorkspaceCommand {
     /// command prevents another root from spending its Process-domain history
     /// budget while setup or a child is in flight.
     pub(in crate::runtime::repository_physical_root) fn admit_first_execute(
+        self,
+        request: RepositoryWorkspaceRequest,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<NativeProcessAdmission, PhysicalRootError> {
+        self.admit_native_execute(request, RepositoryWorkspaceMode::Archive, scope, active)
+    }
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(in crate::runtime::repository_physical_root) fn admit_execute(
+        self,
+        request: RepositoryWorkspaceRequest,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<super::super::mount_lease::launch::ExecuteDecision, PhysicalRootError> {
+        self.check_scope(scope, active)?;
+        let slot = self.root_slot(request.reservation())?;
+        self.compare_transcript(slot)?;
+        let progress = self.roots[slot].progress.as_ref().unwrap();
+        if progress
+            .transcript()
+            .replay(&request)
+            .map_err(PhysicalRootError::Protocol)?
+            .is_some()
+        {
+            return Ok(super::super::mount_lease::launch::ExecuteDecision::Replay(
+                self,
+            ));
+        }
+        let mode = progress.builder.mode;
+        let admission = self.admit_native_execute(request, mode, scope, active)?;
+        Ok(super::super::mount_lease::launch::ExecuteDecision::Launch(
+            super::super::mount_lease::launch::ExecuteLaunch::new(admission, active)?,
+        ))
+    }
+    fn admit_native_execute(
         mut self,
         request: RepositoryWorkspaceRequest,
+        mode: RepositoryWorkspaceMode,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<NativeProcessAdmission, PhysicalRootError> {
@@ -293,9 +339,16 @@ impl RepositoryWorkspaceCommand {
         let slot = self.root_slot(request.reservation())?;
         self.compare_transcript(slot)?;
         let root = self.roots[slot].progress.as_ref().unwrap();
-        if root.builder.mode != RepositoryWorkspaceMode::Archive
-            || root.transcript().current().mode() != RepositoryWorkspaceMode::Archive
-            || self.roots[slot].initial.is_none()
+        if root.builder.mode != mode
+            || root.transcript().current().mode() != mode
+            || match mode {
+                RepositoryWorkspaceMode::Archive => {
+                    self.roots[slot].initial.is_none() || self.roots[slot].lease.is_some()
+                }
+                RepositoryWorkspaceMode::Process => {
+                    self.roots[slot].lease.is_none() || self.roots[slot].initial.is_some()
+                }
+            }
             || request.index() != root.transcript().records().len()
             || !matches!(
                 request.operation(),
@@ -332,9 +385,7 @@ impl RepositoryWorkspaceCommand {
         }
         drop(expected);
         let _scratch = self.resources.reserve(IO_SCRATCH, 3, 0)?;
-        if backing_identity(&root.builder.file, RepositoryWorkspaceMode::Archive)?
-            != root.builder.identity
-        {
+        if backing_identity(&root.builder.file, mode)? != root.builder.identity {
             return Err(PhysicalRootError::RootIdentity);
         }
         let io = RootIo::new(
@@ -342,21 +393,21 @@ impl RepositoryWorkspaceCommand {
             io_limits(RepositoryWorkspaceMode::Process, &root.builder.reservation),
         )?;
         seal::verify(&io, root.transcript().current(), scope, active)?;
-        if backing_identity(&root.builder.file, RepositoryWorkspaceMode::Archive)?
-            != root.builder.identity
-        {
+        if backing_identity(&root.builder.file, mode)? != root.builder.identity {
             return Err(PhysicalRootError::RootIdentity);
         }
         check(scope, active)?;
         let selected = self.roots[slot].progress.take().unwrap();
-        let initial = self.roots[slot].initial.take().unwrap();
+        let initial = self.roots[slot].initial.take();
+        let lease = self.roots[slot].lease.take();
         Ok(NativeProcessAdmission {
             selected,
-            initial: Some(initial),
+            initial,
+            lease,
             request: Arc::new(request),
             slot,
             command: self,
-            quota_confirmed: false,
+            quota_confirmed: mode == RepositoryWorkspaceMode::Process,
             _credit: credit,
         })
     }
@@ -371,6 +422,7 @@ impl RepositoryWorkspaceCommand {
         let slot = self.root_slot(reservation)?;
         self.compare_transcript(slot)?;
         drop(self.roots[slot].initial.take());
+        drop(self.roots[slot].lease.take());
         let root = self.roots[slot]
             .progress
             .take()
@@ -383,6 +435,7 @@ impl RepositoryWorkspaceCommand {
 pub(in crate::runtime::repository_physical_root) struct NativeProcessAdmission {
     selected: RepositoryWorkspaceProgress,
     initial: Option<InitialRepositoryMount>,
+    lease: Option<RepositoryMountLease>,
     request: Arc<RepositoryWorkspaceRequest>,
     slot: usize,
     command: RepositoryWorkspaceCommand,
@@ -390,6 +443,61 @@ pub(in crate::runtime::repository_physical_root) struct NativeProcessAdmission {
     _credit: resources::ResourceCredit,
 }
 impl NativeProcessAdmission {
+    pub(in crate::runtime::repository_physical_root) fn begin_rolling(
+        &mut self,
+        active: &dyn Fn() -> bool,
+    ) -> Result<super::super::mount_lease::RepositoryMountAttempt, PhysicalRootError> {
+        if !self.quota_confirmed || self.initial.is_some() {
+            return Err(PhysicalRootError::Mode);
+        }
+        self.lease
+            .take()
+            .ok_or(PhysicalRootError::Mode)?
+            .begin(
+                &self.selected.builder,
+                self.request.as_ref().clone(),
+                &self.command.scope,
+                active,
+            )
+            .map_err(PhysicalRootError::mount)
+    }
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(in crate::runtime::repository_physical_root) fn finish_reaped(
+        mut self,
+        pending: super::super::mount_lease::PendingMountLease,
+        capture: super::super::process_owner::ReapedCapture,
+    ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
+        if !self.quota_confirmed || self.initial.is_some() || self.lease.is_some() {
+            return Err(PhysicalRootError::Mode);
+        }
+        let scope = self.command.scope.clone();
+        check(&scope, &|| true)?;
+        capture
+            .binding()
+            .verify(&self.request, self.selected.builder.identity)?;
+        let (result, reap_binding, output_credit) = capture.into_result();
+        let progress = self.selected.complete_snapshot(
+            self.request.as_ref().clone(),
+            RepositoryWorkspaceResult::Execute(result),
+            &scope,
+            &|| true,
+        )?;
+        let lease = pending
+            .accept(
+                super::super::mount_lease::QuiescedMountCompletion::from_reaped_record(
+                    &progress,
+                    &reap_binding,
+                )?,
+                &scope,
+                &|| true,
+            )
+            .map_err(PhysicalRootError::mount)?;
+        self.command.roots[self.slot].progress = Some(progress);
+        self.command.roots[self.slot].lease = Some(lease);
+        self.command.publish(self.slot)?;
+        drop(output_credit);
+        Ok(self.command)
+    }
     pub(in crate::runtime::repository_physical_root) fn builder(
         &self,
     ) -> &RepositoryPhysicalRootBuilder {
@@ -446,6 +554,14 @@ pub(in crate::runtime::repository_physical_root) struct PendingFirstExecute {
     admission: NativeProcessAdmission,
 }
 impl PendingFirstExecute {
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(in crate::runtime::repository_physical_root) fn finish_reaped(
+        self,
+        pending: super::super::mount_lease::PendingMountLease,
+        capture: super::super::process_owner::ReapedCapture,
+    ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
+        self.admission.finish_reaped(pending, capture)
+    }
     pub(in crate::runtime::repository_physical_root) fn builder(
         &self,
     ) -> &RepositoryPhysicalRootBuilder {

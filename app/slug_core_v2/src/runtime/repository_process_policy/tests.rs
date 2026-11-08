@@ -165,6 +165,7 @@ const ZERO_ARGUMENT_ALLOWED: &[i32] = &[
     107, // geteuid
     108, // getegid
     110, // getppid
+    112, // setsid: namespace-wide cleanup is independent of sessions/groups
     115, // getgroups
     118, // getresuid
     120, // getresgid
@@ -433,6 +434,7 @@ fn clone_admits_ordinary_fork_vfork_threads_and_rejects_each_other_bit() {
 
 #[test]
 fn signals_cannot_target_pid1_or_groups_and_check_every_scalar_half() {
+    assert_eq!(evaluate_arch(112, 0xc000003e, [0; 6]), PERMIT);
     for nr in [libc::SYS_kill, libc::SYS_tkill, libc::SYS_tgkill] {
         let args = if nr == libc::SYS_tgkill {
             [2, 3, 15, 0, 0, 0]

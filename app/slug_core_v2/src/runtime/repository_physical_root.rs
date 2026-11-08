@@ -1,7 +1,8 @@
 //! Inactive, closed Linux physical-root ownership. Trusted native setup selects
 //! this exact root and excludes every external writer before factory/seal.
 //! Filesystem verification does not prove descendant death or mount provenance.
-//! No mount, ambient-path, proc-reopen, registry or production activation occurs.
+//! This owner exposes no ambient-path/proc/registry mutation or activation.
+//! Trusted setup and process lifecycle stay in closed native child leaves.
 use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;
@@ -26,6 +27,9 @@ use super::repository_root_io::RootIoLimits;
 mod archive;
 #[path = "repository_mount_lease.rs"]
 mod mount_lease;
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+#[path = "repository_process_owner.rs"]
+mod process_owner;
 #[path = "repository_workspace_progress.rs"]
 mod progress;
 mod reader;
@@ -396,3 +400,8 @@ mod native_fixture;
 mod native_tests;
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+pub(super) fn run_process_helper() -> i32 {
+    mount_lease::helper::run()
+}

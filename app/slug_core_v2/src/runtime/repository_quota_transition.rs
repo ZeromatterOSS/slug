@@ -158,6 +158,15 @@ pub(in crate::runtime::repository_physical_root) struct ProcessQuotaReady {
     owner: PendingFirstExecute,
 }
 impl ProcessQuotaReady {
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn finish_reaped(
+        self,
+        capture: super::super::process_owner::ReapedCapture,
+    ) -> Result<super::super::progress::command::RepositoryWorkspaceCommand, PhysicalRootError>
+    {
+        self.owner.finish_reaped(self.pending_mount, capture)
+    }
+
     pub(in crate::runtime::repository_physical_root) fn builder(
         &self,
     ) -> &RepositoryPhysicalRootBuilder {
@@ -219,6 +228,12 @@ impl ProcessQuotaTransition {
             poisoned: false,
             _credit: credit,
         })
+    }
+    pub(super) fn scope(&self) -> &Arc<SourceServiceScope> {
+        self.admission.scope()
+    }
+    pub(super) fn request_owner(&self) -> Arc<RepositoryWorkspaceRequest> {
+        self.admission.request_owner()
     }
     pub(in crate::runtime::repository_physical_root) fn builder(
         &self,
@@ -324,9 +339,16 @@ impl ProcessQuotaTransition {
         self.confirmed = true;
         Ok(())
     }
-    // This conversion is intentionally private until the general runner owns a
-    // real reaping capability. The fixed native test calls it only after launch
-    // has actually reaped its helper; no process completion receipt is minted.
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn into_ready_after_reap(
+        self,
+        _proof: &super::super::process_owner::ReapedCapture,
+    ) -> Result<ProcessQuotaReady, PhysicalRootError> {
+        self.into_ready()
+    }
+    // The general runner enters through into_ready_after_reap and retains its
+    // exact capture proof. Fixed native tests call this private readiness-only
+    // conversion after actual helper reap; it mints no completion receipt.
     fn into_ready(mut self) -> Result<ProcessQuotaReady, PhysicalRootError> {
         if self.poisoned || !self.confirmed {
             return Err(PhysicalRootError::Mode);

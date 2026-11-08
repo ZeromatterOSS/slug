@@ -28,11 +28,15 @@ accounting, and shared backing-credit lifetime through root and token owners.
 The [command/quota receipt](wp1225-quota-command-acceptance-2026-11-07.json)
 adds a consuming whole-command owner, strict epoch publication and first-Execute
 history/tree admission, actual same-backing Process quota shrink and atomic shared
-credit reduction. A static default-deny Linux syscall policy also passes pure
-interpreter checks. These remain inactive: general runner completion back into
-the command, pre-untrusted-exec setup, full confinement and lifecycle are the
-next frontier, followed by selected physical-root registry and InputImage/native
-source transport, then original Loading/process activation under the gates below. Existing
+credit reduction. The [owned-runner receipt](wp1225-owned-runner-acceptance-2026-11-07.json)
+adds actual early Rust CLI PID1 setup, installed payload/supervisor policies,
+bounded capture, namespace-wide reap and closed completion back into the command.
+Native gates cover sequential arbitrary argv, env/cwd/nonzero effects, exact
+replay, Process-token mutation, confined Host/proc/device/socket/FD access,
+resources, detached closed-stdio writers, drop/deadline/overflow and exec failure.
+These remain inactive. Selected physical-root registry, cross-repository read
+views and InputImage/native source transport are the next frontier, followed by
+original Loading/process activation under the complete gates below. Existing
 production routes remain replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)

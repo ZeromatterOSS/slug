@@ -1,7 +1,7 @@
 //! Closed, consuming deterministic mutation of one inactive general workspace.
 //! Trusted setup must exclude all other writers. There is no process-result
 //! injection seam: archive capture uses its closed verified native owner;
-//! Execute remains gated on the general native process owner. Every error
+//! Execute enters only through the separate whole-command process owner. Every error
 //! retires this entire generation, including partial writes.
 use std::path::Path;
 
@@ -69,6 +69,10 @@ impl RepositoryWorkspaceProgress {
             scope: scope.clone(),
             _control: control,
         })
+    }
+
+    pub(super) fn builder(&self) -> &RepositoryPhysicalRootBuilder {
+        &self.builder
     }
 
     pub(super) fn transcript(&self) -> &RepositoryWorkspaceTranscript {

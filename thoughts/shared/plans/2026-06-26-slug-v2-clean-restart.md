@@ -48,11 +48,12 @@ cover ordered File/Template/Read/Exists/Delete. An inactive linear rolling-lease
 primitive also has fixed Rust three-launch handoff evidence. Verified archive
 handoff and shared root/token backing credits are integrated in the inactive
 owner. Consuming command/epoch admission and actual same-backing Process quota
-shrink are now accepted inactive, alongside a pure static syscall policy.
-General runner completion, full confinement/lifecycle, selected root registry and
-source/transport integration remain the implementation frontier. Production
-activation still requires full archive-envelope, actual-original and public
-integration gates; see the
+shrink are accepted inactive. The owned general runner now also has actual early
+Rust CLI PID1, installed confinement, all-child completion and failure/drop proof.
+Selected root registry, cross-repository read views and source/transport
+integration remain the implementation frontier. Production activation still
+requires full archive-envelope, original Starlark, public integration and
+matching-command memory gates; see the
 [current packet](./slug-v2-subplans/current-packet.md).
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,

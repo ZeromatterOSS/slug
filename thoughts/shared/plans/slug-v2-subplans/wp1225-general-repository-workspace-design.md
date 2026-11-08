@@ -51,8 +51,9 @@ descendants quiesce, complete snapshot and current record acceptance. Exclusive
 progress capability controls token rollover; sources gain no mount authority.
 The inactive linear native primitive binds the complete reservation, operation
 index, predecessor and original backing. Pending successors expose no usable
-lease before a borrowing quiescent-completion receipt; no production receipt
-constructor exists. Native descriptor/retained credits follow every consuming
+lease before a borrowing quiescent-completion receipt. The owned runner alone
+joins an opaque exact-request/root-bound reaped capture to actual native progress
+and constructs this receipt. Native descriptor/retained credits follow every consuming
 transition and retire after their actual descriptors and immutable payloads.
 
 No detached-anchor cloning or mount pool is used. The fixed Rust three-launch
@@ -63,10 +64,11 @@ inheritable/ambient capabilities and sets no-new-privileges; trusted libtest
 infrastructure may retain other privileged threads. General-runner privilege
 retirement and untrusted confinement remain production gates. The fixture does
 not prove detached creation from fstat facts alone: trusted setup provenance
-remains explicit. The command/quota owner below integrates initial admission and
-same-backing shrink. General completion/next-token return to the command,
-non-execute advancement of an accepted Process token, pre-untrusted-exec transfer
-and adversarial lifecycle remain to prove.
+remains explicit. The command/quota and owned runner below integrate initial
+admission, same-backing shrink, pre-payload handoff, general completion/next-token
+return and trusted non-execute advancement. The actual CLI proof covers full
+helper-process capability retirement and representative confinement/lifecycle;
+the older fixed libtest fixture alone still makes none of those claims.
 Adoption transfers the SAME root Arc; sealed roots cannot mutate. Native source
 leases/readers retain it until the last user closes; Arc clones duplicate no FD.
 
@@ -115,9 +117,9 @@ kernels and samples the complete actual tree before accepting each new record.
 Exact completed prefix requests replay without rewinding the current tree. It
 retains invocation-wide deletion and decoded-archive counters; all errors,
 cancellation and partial mutations consume the entire mutable generation.
-Archive uses the closed verified native capture handoff below. Execute remains
-unsupported until the general native runner is integrated. There is no generic
-mutation or process-result callback.
+Archive uses the closed verified native capture handoff below. Execute consumes
+the whole command through the owned runner below. There is no generic mutation
+or immutable process-result injection callback.
 
 Actual capture records directories, modes, bodies, deletions and admitted literal
 internal links under the selected Archive/Process envelope. A prior same-path
@@ -147,10 +149,10 @@ there is no orphan retry registry or cleanup-success claim for that path. Truste
 capture creation excludes outstanding writers until retirement. Complete actual
 snapshot and prepaid transcript completion still follow every successful decode.
 
-Trusted setup still excludes all other writers. Snapshot equality does not prove
-descendant death or absence of write aliases. Registry association, general
-rolling-token completion, confinement and production activation remain separate
-packet gates.
+Trusted deterministic setup excludes other writers. Snapshot equality alone
+never proves descendant death or absence of write aliases; Execute requires the
+owned runner's exact quiescence capability before capture. Registry association,
+cross-repository read views and production activation remain packet gates.
 
 Legacy plain archive behavior remains 512 MiB/call, 1 GiB cumulative DECODED,
 with its existing bounds. Select general-root Archive mode with **tmpfs size=
@@ -204,8 +206,9 @@ reduction with no fallible operation after that update. No expansion or rollback
 exists. Failure after commit and before ACK reaps the helper before poisoning
 and retiring transition authority, retaining the original root in the consumed
 command until disposal. The ready value is closed pending first-Execute
-ownership, not a generic process result or quiescence constructor. General
-Execute capture/completion and return to the command remain unimplemented.
+ownership, not a generic process result or quiescence constructor. Only the
+owned runner below can consume it with an actual bound reaped capture, complete
+the snapshot/record and return the command with its accepted next token.
 
 Fixed Rust native checks cover the real2GiB/262144→64MiB/8192 remount,
 unchanged root identity, shared-credit release, failure after commit, page
@@ -349,15 +352,98 @@ constrain clone flags, initially refuse clone3/socketpair. Unknown ABI/x32 and
 syscalls refuse. Trusted setup consumes root/userns/mount/filter/status/control
 FDs; payload inherits ONLY0/1/2. Reuse closefrom/reaper tests, prove detached
 writers closing stdio dead before capture. Exact allowlist/setup binding and
-actual socket/device/FD/nested-mount tests remain PREACTIVATION gates.
+actual socket/device/FD/nested-mount evidence must stay paired with the installed
+profile. The owned-runner receipt supplies its current discriminators; later
+registry/read-view changes require their corresponding boundary tests.
 
 The inactive `repository_process_policy` leaf now emits one static
 LinuxReadOnlyHostV1 cBPF artifact for64-bit Linux x86_64, with strict architecture,
 x32 and argument-width checks, default EPERM, restricted process/signal/control
 operations and clone3 ENOSYS fallback. Thirteen independent literal-UAPI
-interpreter/verifier tests cover emitted decisions and control flow. There is no
-installer, launch path or caller-selectable policy. Actual installation together
-with full mount/FD/device/socket/descendant confinement remains required.
+interpreter/verifier tests cover emitted decisions and control flow. The closed
+helper below installs it for every payload, with no caller-selectable profile.
+Uniform setsid is admitted; PID1/group signals remain denied and namespace
+cleanup is independent of sessions.
+
+### Owned general runner contract
+
+The inactive [owned runner](wp1225-owned-runner-acceptance-2026-11-07.json) uses
+the actual Rust CLI image's exact internal helper
+entry before ordinary CLI/Tokio/DICE initialization. A private native platform
+owner chooses the current trusted Slug image and trusted bwrap installation;
+payload argv cannot select either. Alternate compiled CLI/launcher paths are
+test-only and require artifact provenance. Pinned Host/image descriptors may
+select those setup mounts/images through proc FD paths; this grants no proc
+reopen/alias route for workspace roots or source data. Trusted installation
+excludes external image writers; descriptor pinning prevents path replacement,
+not in-place modification of an otherwise writable image.
+
+One prepaid owning Rust worker thread starts before any native child. It owns
+the complete command, root/backing/lease, plan, captures and control credits until
+actual cleanup. Async cancellation only sets its cancellation flag; dropping a
+caller cannot drop native authority. Thread creation failure precedes launch.
+The helper is actual PID1 (`bwrap --as-pid-1`), checks single-thread entry, and
+sends its own pidfd over an anonymous Unix seqpacket channel. Parent stores that
+exact kernel handle and ACKs HELLO before any root creation/transfer is allowed.
+No numeric PID reopening is used. Before this ACK, no selected repository root
+authority may reach the helper;
+trusted Host/image/plan/control/status descriptors and setup-userns authority may
+already be inherited. Their credits survive until exact helper death or trusted
+terminal monitor status plus owned monitor reap. Monitor termination alone never
+proves namespace death.
+
+New general roots occupy component-bounded descendants of the declared virtual
+`/__slug_repositories__` prefix, reserved before Starlark sees path text. The
+namespace explicitly masks that Host prefix. A fresh bounded tmpfs root mirrors
+at most128 pinned Host top-level entries/64KiB names and literal targets, with
+actual identity checks before READY. Every Host binding is recursively
+RO/nosuid/nodev/private. Fresh private proc is identified by actual mount identity;
+bounded escaped mountinfo parsing finds and masks all other Host procfs directory
+views, including `/run/host/proc`. Uncovered proc-file binds refuse setup. The
+private proc stays RO/nosuid/nodev/noexec. Minimal devices are exactly null, zero,
+random and urandom, checked by type/device number; nodev is cleared only there.
+Root and reserved scaffold each have1MiB/512 charged-unit quotas, and temporary
+storage has16MiB/4096. Device tmpfs has4KiB capacity and exactly four readonly
+device mounts; no separate16-inode quota is claimed. A prepaid28MiB+4KiB virtual
+allowance covers plan/root/scaffold/tmp/dev plus up to2048 tiny4KiB proc masks. Final scaffold is RO while the selected same-backing root
+and temporary mount remain the declared writable storage. No Host mkdir occurs.
+
+A sealed immutable2MiB plan on FD4 contains actual argv, complete effective env,
+cwd, setup role, nonce/index and pinned mirror facts. Parent forecasts the plan
+from borrowed semantic data before CString allocation, prepays8MiB encoded/
+decoded/table overlap plus separate2MiB memfd storage and FD peaks. Control uses
+FD3; payload semantic output uses independent prepaid1MiB streams. Typed fixed
+frames have exact ancillary counts and correlation, never a semantic digest
+substitute. Initialized Archive setup has no fabricated Execute request/result.
+First Execute uses the current quota admission; later Execute consumes the
+accepted rolling token. After successor+quota verification/ACK, rooted cwd
+creation precedes payload and enters the actual next snapshot.
+
+Trusted setup temporarily retains SYS_ADMIN and SETPCAP, then retires every
+bounding/effective/permitted/inheritable/ambient capability and sets no-new-privs
+before fork. Hard and soft limits become min(inherited soft and hard,512MiB AS,
+64 processes,64 FDs,64MiB file size,8MiB stack,remaining<=27s CPU), with core size0. Shared UID
+pressure/E2BIG/EAGAIN are infrastructure refusals; caps never widen automatically.
+These per-process/virtual limits and native allowances do not prove aggregate
+RSS or equivalent-command fit. The actual native profile gate proves fork
+exhaustion below64 children after capability retirement, without a root exemption.
+
+Payload alone installs LinuxReadOnlyHostV1. A trusted CLOEXEC exec-error pipe
+closes atomically before successful payload code, leaving only0/1/2; it separates
+failed exec from a real exit127. PID1 remains nondumpable, closes capture writers,
+and installs a distinct minimal cleanup policy. It retains main raw status,
+kills every remaining namespace member, and waits with __WALL to ECHILD before
+DONE. Parent additionally requires PID1 death, owned monitor reap and stream EOF.
+Fatal/cancel paths signal the pinned PID1 and await actual namespace teardown;
+no cleanup deadline permits refund of a possibly live root. Caller cancellation
+or the original scope/30s deadline returns an error while the already-owned worker
+retains every field through cleanup or exceptional quarantine. No new cleanup
+thread or runtime is created. The opaque reaped
+capture binds the full executed request and original physical root. Completion
+then verifies/captures the actual tree, accepts the immutable record and next
+mount token, and republishes the original command epoch. Deterministic mutations
+advance a Process token only through their actual accepted native progress.
+Registry/cross-repository read views and original activation remain later gates.
 
 | Owner | Files under app/ (new leaves explicitly named) |
 | --- | --- |
@@ -372,8 +458,8 @@ with full mount/FD/device/socket/descendant confinement remains required.
 Pinned API/source anchors are retained in the linked source contract. Reviewed protocol,
 anchored resolver and rooted observer candidates can be authored inactive before
 complete syscall proof once root accepts design; no unconfined execution follows.
-Remaining gates: pre-payload lease transfer, archive envelope/inode and exact/+1 caps,
-full confinement/lifecycle, A/B same-name distinct-instance source/digest/image/
+Remaining gates: full Archive envelope/inode workload, selected physical-root
+registry and cross-repository read views, A/B same-name distinct-instance source/digest/image/
 REAPI reads, generalSource certificate restore, unrelated originals plus existing
 GCC/Homebrew through SAME route, warm Host freshness, selected event replay,
 independent final diff review and appropriate owner/direct-dependent checks.
