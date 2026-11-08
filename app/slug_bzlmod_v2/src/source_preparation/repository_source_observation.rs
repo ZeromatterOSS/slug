@@ -357,31 +357,46 @@ async fn resolve_source_path(
             Ok(PathOutcome::Need(need)) => {
                 ControlFlow::Break(SourcePreparationOutcome::path_need(need))
             }
-            Ok(PathOutcome::Complete(Err(error))) => {
-                ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
-            }
-            Ok(PathOutcome::Complete(Ok(value))) => match value.result() {
-                Ok(resolved) => {
-                    ControlFlow::Continue((resolved.clone(), value.observations().dupe()))
-                }
-                Err(error) => {
-                    let projected = match error {
-                        AnchoredPathResolutionError::Resolution(error) => {
-                            project_resolution_error(repo_relative_path, error.clone())
-                        }
-                        AnchoredPathResolutionError::EscapesAnchor { .. } => {
-                            RepositorySourceFileError::InvalidMaterializedPath {
-                                repo_relative_path,
-                            }
-                        }
-                    };
+            Ok(PathOutcome::Complete(Err(error))) => match mode {
+                HostRepositoryObservationMode::Legacy => {
                     ControlFlow::Break(source_observation_complete(
                         key,
-                        Err(HostRepositorySourceObservationErrorKind::Request(projected)),
-                        value.observations().dupe(),
+                        Err(HostRepositorySourceObservationErrorKind::RequestCompute(
+                            error.to_string().into(),
+                        )),
+                        PathObservationEpoch::empty(),
                     ))
                 }
+                HostRepositoryObservationMode::Observed => {
+                    ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
+                }
             },
+            Ok(PathOutcome::Complete(Ok(value))) => {
+                let observations = match mode {
+                    HostRepositoryObservationMode::Legacy => PathObservationEpoch::empty(),
+                    HostRepositoryObservationMode::Observed => value.observations().dupe(),
+                };
+                match value.result() {
+                    Ok(resolved) => ControlFlow::Continue((resolved.clone(), observations)),
+                    Err(error) => {
+                        let projected = match error {
+                            AnchoredPathResolutionError::Resolution(error) => {
+                                project_resolution_error(repo_relative_path, error.clone())
+                            }
+                            AnchoredPathResolutionError::EscapesAnchor { .. } => {
+                                RepositorySourceFileError::InvalidMaterializedPath {
+                                    repo_relative_path,
+                                }
+                            }
+                        };
+                        ControlFlow::Break(source_observation_complete(
+                            key,
+                            Err(HostRepositorySourceObservationErrorKind::Request(projected)),
+                            observations,
+                        ))
+                    }
+                }
+            }
             Err(error) => ControlFlow::Break(source_observation_complete(
                 key,
                 Err(HostRepositorySourceObservationErrorKind::RequestCompute(

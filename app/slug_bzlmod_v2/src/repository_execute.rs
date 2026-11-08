@@ -182,6 +182,16 @@ impl RepositoryExecuteResult {
         self.return_code
     }
 
+    /// Share captured bytes with current operation events without a body copy.
+    #[doc(hidden)]
+    pub fn stdout_arc(&self) -> &Arc<[u8]> {
+        &self.stdout
+    }
+    #[doc(hidden)]
+    pub fn stderr_arc(&self) -> &Arc<[u8]> {
+        &self.stderr
+    }
+
     pub fn stdout(&self) -> &[u8] {
         &self.stdout
     }

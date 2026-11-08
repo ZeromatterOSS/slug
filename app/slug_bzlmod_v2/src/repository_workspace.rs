@@ -4,6 +4,8 @@
 //! Names, quotas, Host volatility and infrastructure refusal are Slug-native.
 
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -13,12 +15,15 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathObservationInstanceId;
 
 use crate::HostSelectedExtensionOwner;
+use crate::RepoSpec;
 
+mod demand;
 mod operation;
 mod read_views;
 mod sequence;
 mod state;
 
+pub use demand::*;
 pub use operation::*;
 pub use read_views::*;
 pub use sequence::*;
@@ -98,16 +103,47 @@ impl RepositoryWorkspaceRetentionLimits {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, PartialEq, Eq, Allocative)]
 pub struct RepositoryWorkspaceReservation {
     workspace: NormalizedAbsolutePath,
     owner: Arc<HostSelectedExtensionOwner>,
     repository: CanonicalRepoName,
     ordinal: usize,
+    expected_repo_spec: Arc<RepoSpec>,
     display_root: NormalizedAbsolutePath,
     instance: PathObservationInstanceId,
     lease: u64,
     limits: RepositoryWorkspaceRetentionLimits,
+}
+
+impl fmt::Debug for RepositoryWorkspaceReservation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RepositoryWorkspaceReservation")
+            .field("workspace", &self.workspace)
+            .field("owner", &self.owner)
+            .field("repository", &self.repository)
+            .field("ordinal", &self.ordinal)
+            .field("expected_repo_spec", &"<redacted>")
+            .field("display_root", &self.display_root)
+            .field("instance", &self.instance)
+            .field("lease", &self.lease)
+            .field("limits", &self.limits)
+            .finish()
+    }
+}
+
+impl Hash for RepositoryWorkspaceReservation {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Routing only. RepoSpec has full structural Eq but deliberately no Hash.
+        self.workspace.hash(state);
+        self.owner.hash(state);
+        self.repository.hash(state);
+        self.ordinal.hash(state);
+        self.display_root.hash(state);
+        self.instance.hash(state);
+        self.lease.hash(state);
+        self.limits.hash(state);
+    }
 }
 
 impl RepositoryWorkspaceReservation {
@@ -117,6 +153,7 @@ impl RepositoryWorkspaceReservation {
         owner: Arc<HostSelectedExtensionOwner>,
         repository: CanonicalRepoName,
         ordinal: usize,
+        expected_repo_spec: Arc<RepoSpec>,
         display_root: NormalizedAbsolutePath,
         instance: PathObservationInstanceId,
         lease: u64,
@@ -133,11 +170,13 @@ impl RepositoryWorkspaceReservation {
         {
             return Err(RepositoryWorkspaceError::InvalidReservation);
         }
+        expected_repo_spec.workspace_retained_storage_bytes()?;
         Ok(Self {
             workspace,
             owner,
             repository,
             ordinal,
+            expected_repo_spec,
             display_root,
             instance,
             lease,
@@ -155,6 +194,9 @@ impl RepositoryWorkspaceReservation {
     }
     pub fn ordinal(&self) -> usize {
         self.ordinal
+    }
+    pub fn expected_repo_spec(&self) -> &Arc<RepoSpec> {
+        &self.expected_repo_spec
     }
     pub fn display_root(&self) -> &NormalizedAbsolutePath {
         &self.display_root
@@ -178,7 +220,10 @@ impl RepositoryWorkspaceReservation {
 
     fn metadata(&self) -> Result<usize, RepositoryWorkspaceError> {
         add(
-            array_bytes::<Self>(1)?,
+            add(
+                array_bytes::<Self>(1)?,
+                self.expected_repo_spec.workspace_retained_storage_bytes()?,
+            )?,
             add(
                 self.repository.retained_capacity_bytes(),
                 add(

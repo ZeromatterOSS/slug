@@ -102,7 +102,9 @@ pub fn run(argv: Vec<String>) -> i32 {
         print!("{stdout}");
     }
     if !stderr.is_empty() {
-        eprint!("{stderr}");
+        if super::write_stderr(&stderr).is_err() {
+            return 2;
+        }
     }
     exit_code
 }
@@ -138,7 +140,9 @@ fn run_daemon_query(
                 print!("{}", response.stdout);
             }
             if !response.stderr.is_empty() {
-                eprint!("{}", response.stderr);
+                if super::write_stderr(&response.stderr).is_err() {
+                    return 2;
+                }
             }
             response.exit_code
         }

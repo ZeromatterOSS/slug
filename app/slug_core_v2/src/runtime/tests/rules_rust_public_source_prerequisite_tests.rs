@@ -72,6 +72,12 @@ fn native_kind(error: &NativeDemandSessionError) -> &'static str {
         NativeDemandSessionError::ExecuteInternalNonProgress => "execute_nonprogress",
         NativeDemandSessionError::ExecuteEnvironmentMismatch => "execute_environment_mismatch",
         NativeDemandSessionError::RepositoryExecute(_) => "repository_execute",
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        NativeDemandSessionError::RepositoryWorkspace(_) => "repository_workspace",
         NativeDemandSessionError::ArchiveInternalNonProgress => "archive_internal_non_progress",
         NativeDemandSessionError::RepositoryFilesystem(_) => "repository_archive",
         NativeDemandSessionError::ArchiveTranscript(_) => "filesystem_transcript",

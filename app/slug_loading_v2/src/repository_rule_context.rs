@@ -77,8 +77,10 @@ use crate::starlark_label::StarlarkLabel;
 
 mod archive;
 mod deletion;
+mod exec_result;
 mod filesystem;
 mod repository_metadata;
+mod workspace;
 pub use repository_metadata::RepositoryMetadata;
 use repository_metadata::classify_repository_return;
 use repository_metadata::new_repository_metadata;
@@ -95,6 +97,8 @@ pub(crate) struct RepositoryRuleInvocationInput {
     homebrew_template_guard: bool,
     execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>,
     execute_transcript: RepositoryExecuteTranscript,
+    workspace: Option<workspace::WorkspaceInput>,
+    prepared_host_reads: SmallMap<NormalizedAbsolutePath, Arc<[u8]>>,
 }
 
 impl RepositoryRuleInvocationInput {
@@ -162,7 +166,32 @@ impl RepositoryRuleInvocationInput {
             homebrew_template_guard: false,
             execute_owner: None,
             execute_transcript: RepositoryExecuteTranscript::empty(),
+            workspace: None,
+            prepared_host_reads: SmallMap::new(),
         })
+    }
+
+    pub(crate) fn with_workspace(
+        mut self,
+        epoch: slug_bzlmod_v2::RepositoryWorkspaceEpoch,
+        demand: slug_bzlmod_v2::RepositoryWorkspaceReservationDemand,
+        selected: slug_bzlmod_v2::RepositoryMaterializationResultEpoch,
+    ) -> Result<Self, RepositoryRuleInvocationError> {
+        self.workspace = Some(workspace::WorkspaceInput::new(epoch, demand, selected)?);
+        self.homebrew_template_guard = false;
+        Ok(self)
+    }
+
+    pub(crate) fn with_host_reads(
+        mut self,
+        reads: SmallMap<NormalizedAbsolutePath, Arc<[u8]>>,
+    ) -> Self {
+        self.prepared_host_reads = reads;
+        self
+    }
+
+    pub(crate) fn has_workspace(&self) -> bool {
+        self.workspace.is_some()
     }
 
     pub(crate) fn with_filesystem_operations(
@@ -496,14 +525,15 @@ impl RepositoryRuleHostObservation {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, HomebrewTemplateEnvironment, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ExecuteArgument, ExecuteOptions, ExecuteLimit, ExecuteNeed(Arc<RepositoryExecuteRequest>), ExecuteReplay, FilesystemExecuteMix, DeleteArgument, ArchiveArgument, ArchiveAuth, FilesystemLimit, FilesystemNeed(Arc<RepositoryFilesystemRequest>), FilesystemReplay, ArchiveOptions, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
+pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), HostReadNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, HomebrewTemplateEnvironment, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ExecuteArgument, ExecuteOptions, ExecuteLimit, ExecuteNeed(Arc<RepositoryExecuteRequest>), ExecuteReplay, FilesystemExecuteMix, Workspace(slug_bzlmod_v2::RepositoryWorkspaceError), WorkspaceNeed(Arc<slug_bzlmod_v2::RepositoryWorkspaceOperationDemand>), WorkspaceReplay, WorkspaceUnsupported, DeleteArgument, ArchiveArgument, ArchiveAuth, FilesystemLimit, FilesystemNeed(Arc<RepositoryFilesystemRequest>), FilesystemReplay, ArchiveOptions, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
 
 #[rustfmt::skip]
-pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) metadata: RepositoryMetadata, pub(crate) filesystem_realization: Option<RepositoryFilesystemRealization>, pub(crate) dynamic_environment: Arc<[CompactString]>, pub(crate) execute_transcript: RepositoryExecuteTranscript }
+pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) metadata: RepositoryMetadata, pub(crate) filesystem_realization: Option<RepositoryFilesystemRealization>, pub(crate) dynamic_environment: Arc<[CompactString]>, pub(crate) execute_transcript: RepositoryExecuteTranscript, pub(crate) workspace_realization: Option<slug_bzlmod_v2::RepositoryWorkspaceRealization> }
 
 pub(crate) struct RepositoryRuleInvocationAttempt {
     pub(crate) result: Result<RepositoryRuleInvocation, RepositoryRuleInvocationError>,
     pub(crate) environment_enumerated: bool,
+    pub(crate) general_events: Option<slug_events_v2::EventBatch>,
 }
 
 #[rustfmt::skip]
@@ -536,10 +566,10 @@ pub(crate) type PreparedRepositoryLabelSources = SmallMap<RepositoryLabelPathAdd
 pub(crate) enum RepositoryWhichCandidate { Executable, Miss }
 
 #[rustfmt::skip] #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-enum RepositoryStarlarkPath { Label { address: RepositoryLabelPathAddress, path: HostRepositoryLabelPathValue }, Which(HostRepositoryLabelPathValue), Host { path: NormalizedAbsolutePath, exists: bool }, Generated { repository: CompactString, relative: CompactString, present: Arc<Mutex<GeneratedPathFacts>> } }
+enum RepositoryStarlarkPath { Workspace { absolute: NormalizedAbsolutePath, relative: CompactString, replay: Arc<Mutex<workspace::WorkspaceReplay>> }, Label { address: RepositoryLabelPathAddress, path: HostRepositoryLabelPathValue }, Which(HostRepositoryLabelPathValue), Host { path: NormalizedAbsolutePath, exists: bool }, Generated { repository: CompactString, relative: CompactString, present: Arc<Mutex<GeneratedPathFacts>> } }
 
 #[rustfmt::skip] #[derive(Debug, ProvidesStaticType)]
-pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_sources: PreparedRepositoryLabelSources, prepared_which: PreparedRepositoryWhichCandidates, prepared_host_paths: PreparedRepositoryHostPaths, generated_repository: CompactString, generated_present: Arc<Mutex<GeneratedPathFacts>>, filesystem_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, filesystem_transcript: RepositoryFilesystemTranscript, filesystem_lease_nonce: Option<u64>, filesystem_call_index: RefCell<usize>, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, environment_enumerated: Arc<AtomicBool>, execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, execute_transcript: RepositoryExecuteTranscript, execute_call_index: RefCell<usize>, error: RefCell<Option<RepositoryRuleInvocationError>> }
+pub(crate) struct RepositoryRuleInvocationState { general_events: RefCell<Vec<slug_events_v2::EvaluationEvent>>, workspace: Option<Arc<Mutex<workspace::WorkspaceReplay>>>, prepared_host_reads: SmallMap<NormalizedAbsolutePath, Arc<[u8]>>, bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_sources: PreparedRepositoryLabelSources, prepared_which: PreparedRepositoryWhichCandidates, prepared_host_paths: PreparedRepositoryHostPaths, generated_repository: CompactString, generated_present: Arc<Mutex<GeneratedPathFacts>>, filesystem_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, filesystem_transcript: RepositoryFilesystemTranscript, filesystem_lease_nonce: Option<u64>, filesystem_call_index: RefCell<usize>, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, environment_enumerated: Arc<AtomicBool>, execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, execute_transcript: RepositoryExecuteTranscript, execute_call_index: RefCell<usize>, error: RefCell<Option<RepositoryRuleInvocationError>> }
 
 #[derive(Debug, Allocative)]
 struct GeneratedPathFacts {
@@ -559,14 +589,20 @@ fn normalized_generated_path(base: &str, input: &str) -> Option<CompactString> {
 
 #[rustfmt::skip]
 impl RepositoryRuleInvocationState {
-    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_sources: &PreparedRepositoryLabelSources, prepared_which: &PreparedRepositoryWhichCandidates, prepared_host_paths: &PreparedRepositoryHostPaths, input: &RepositoryRuleInvocationInput) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_sources: prepared_sources.clone(), prepared_which: prepared_which.clone(), prepared_host_paths: prepared_host_paths.clone(), generated_repository: input.name.clone(), generated_present: Arc::new(Mutex::new(GeneratedPathFacts { present: SmallSet::from_iter([CompactString::new("")]), archive_seen: false, refused: false })), filesystem_owner: input.filesystem_owner.clone(), filesystem_transcript: input.filesystem_transcript.clone(), filesystem_lease_nonce: input.filesystem_lease_nonce, filesystem_call_index: RefCell::new(0), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), environment_enumerated: Arc::new(AtomicBool::new(false)), execute_owner: input.execute_owner.clone(), execute_transcript: input.execute_transcript.clone(), execute_call_index: RefCell::new(0), error: RefCell::new(None) } }
+    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_sources: &PreparedRepositoryLabelSources, prepared_which: &PreparedRepositoryWhichCandidates, prepared_host_paths: &PreparedRepositoryHostPaths, input: &RepositoryRuleInvocationInput) -> Self { Self { prepared_host_reads: input.prepared_host_reads.clone(), general_events: RefCell::new(Vec::new()), workspace: input.workspace.as_ref().map(|input| Arc::new(Mutex::new(workspace::WorkspaceReplay::new(input)))), bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_sources: prepared_sources.clone(), prepared_which: prepared_which.clone(), prepared_host_paths: prepared_host_paths.clone(), generated_repository: input.name.clone(), generated_present: Arc::new(Mutex::new(GeneratedPathFacts { present: SmallSet::from_iter([CompactString::new("")]), archive_seen: false, refused: false })), filesystem_owner: input.filesystem_owner.clone(), filesystem_transcript: input.filesystem_transcript.clone(), filesystem_lease_nonce: input.filesystem_lease_nonce, filesystem_call_index: RefCell::new(0), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), environment_enumerated: Arc::new(AtomicBool::new(false)), execute_owner: input.execute_owner.clone(), execute_transcript: input.execute_transcript.clone(), execute_call_index: RefCell::new(0), error: RefCell::new(None) } }
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> { eval.extra.and_then(|extra| extra.downcast_ref::<Self>()).ok_or_else(|| anyhow::anyhow!("repository_ctx is outside repository-rule execution")) }
     pub(crate) fn bzl(&self) -> &BzlEvaluationContext { &self.bzl }
-    fn generated_path(&self, input: &str) -> Result<RepositoryStarlarkPath, RepositoryRuleInvocationError> { let relative = normalized_generated_path("", input).ok_or(RepositoryRuleInvocationError::LabelPathArgument)?; Ok(RepositoryStarlarkPath::Generated { repository: self.generated_repository.clone(), relative, present: self.generated_present.clone() }) }
+    fn generated_path(&self, input: &str) -> Result<RepositoryStarlarkPath, RepositoryRuleInvocationError> { if self.workspace.is_some() { return workspace::path(self, input); } let relative = normalized_generated_path("", input).ok_or(RepositoryRuleInvocationError::LabelPathArgument)?; Ok(RepositoryStarlarkPath::Generated { repository: self.generated_repository.clone(), relative, present: self.generated_present.clone() }) }
     fn host_path(&self, input: &str) -> Result<RepositoryStarlarkPath, RepositoryRuleInvocationError> {
+        if self.workspace.is_some() {
+            if let Ok(path) = workspace::path(self, input) { return Ok(path); }
+        }
         let raw = Path::new(input);
         let normalized = NormalizedAbsolutePath::new(raw)
             .map_err(|_| RepositoryRuleInvocationError::PathArgument)?;
+        if self.workspace.is_some() && normalized.as_path().starts_with("/__slug_repositories__") {
+            return Err(RepositoryRuleInvocationError::WorkspaceUnsupported);
+        }
         if normalized.as_path() != raw {
             return Err(RepositoryRuleInvocationError::PathArgument);
         }
@@ -590,7 +626,8 @@ impl RepositoryRuleInvocationState {
             Some(RepositoryFilesystemRealization::new(self.filesystem_lease_nonce.ok_or(RepositoryRuleInvocationError::FilesystemReplay)?, owner.clone(), *ordinal, self.filesystem_transcript.for_owner(owner, *ordinal), plan.clone()).map_err(|_| RepositoryRuleInvocationError::FilesystemReplay)?)
         };
         let mut dynamic_environment = self.dynamic_environment.borrow().clone(); dynamic_environment.sort(); dynamic_environment.dedup();
-        Ok(RepositoryRuleInvocation { plan, metadata: RepositoryMetadata::nonreproducible(), filesystem_realization, dynamic_environment: dynamic_environment.into(), execute_transcript: self.execute_owner.as_ref().map_or_else(RepositoryExecuteTranscript::empty, |(owner, ordinal)| self.execute_transcript.for_owner(owner, *ordinal)) })
+        let workspace_realization = self.workspace.as_ref().map(|replay| replay.lock().expect("workspace replay poisoned").finish()).transpose()?;
+        Ok(RepositoryRuleInvocation { workspace_realization, plan, metadata: RepositoryMetadata::nonreproducible(), filesystem_realization, dynamic_environment: dynamic_environment.into(), execute_transcript: self.execute_owner.as_ref().map_or_else(RepositoryExecuteTranscript::empty, |(owner, ordinal)| self.execute_transcript.for_owner(owner, *ordinal)) })
     }
 
 }
@@ -598,7 +635,7 @@ impl RepositoryRuleInvocationState {
 #[rustfmt::skip] fn existing_repository_path<'v>(value: Value<'v>) -> Option<Value<'v>> { RepositoryStarlarkPath::from_value(value).map(|_| value) }
 
 #[rustfmt::skip] impl RepositoryStarlarkPath {
-    fn text(&self) -> String { match self { Self::Label { path, .. } | Self::Which(path) => path.path_str().to_owned(), Self::Host { path, .. } => path.as_path().to_str().expect("repository Host paths originate from Unicode Starlark text").to_owned(), Self::Generated { repository, relative, .. } => format!("@@{repository}//{relative}") } }
+    fn text(&self) -> String { match self { Self::Workspace { absolute, .. } => absolute.as_path().to_str().expect("Unicode workspace path").to_owned(), Self::Label { path, .. } | Self::Which(path) => path.path_str().to_owned(), Self::Host { path, .. } => path.as_path().to_str().expect("repository Host paths originate from Unicode Starlark text").to_owned(), Self::Generated { repository, relative, .. } => format!("@@{repository}//{relative}") } }
     fn label_address(&self) -> Option<&RepositoryLabelPathAddress> { match self { Self::Label { address, .. } => Some(address), _ => None } }
 }
 
@@ -615,9 +652,10 @@ starlark::starlark_simple_value!(RepositoryStarlarkPath);
 impl<'v> StarlarkValue<'v> for RepositoryStarlarkPath {
     fn collect_str(&self, collector: &mut String) { collector.push_str(&self.text()); }
     fn collect_repr(&self, collector: &mut String) { collector.push_str(&StarlarkStr::repr(&self.text())); }
-    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> { match self { Self::Label { path, .. } | Self::Which(path) => { 0u8.hash(hasher); path.path().hash(hasher); }, Self::Generated { repository, relative, .. } => { 1u8.hash(hasher); repository.hash(hasher); relative.hash(hasher); }, Self::Host { path, .. } => { 2u8.hash(hasher); path.hash(hasher); } } Ok(()) }
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> { match self { Self::Workspace { absolute, replay, .. } => { 3u8.hash(hasher); absolute.hash(hasher); replay.lock().unwrap().reservation().instance().hash(hasher); }, Self::Label { path, .. } | Self::Which(path) => { 0u8.hash(hasher); path.path().hash(hasher); }, Self::Generated { repository, relative, .. } => { 1u8.hash(hasher); repository.hash(hasher); relative.hash(hasher); }, Self::Host { path, .. } => { 2u8.hash(hasher); path.hash(hasher); } } Ok(()) }
     fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
         Ok(Self::from_value(other).is_some_and(|other| match (self, other) {
+            (Self::Workspace { absolute: a, replay: ar, .. }, Self::Workspace { absolute: b, replay: br, .. }) => a == b && Arc::ptr_eq(ar, br),
             (Self::Label { path: left, .. } | Self::Which(left), Self::Label { path: right, .. } | Self::Which(right)) => left.path() == right.path(),
             (Self::Generated { repository: left_repo, relative: left, .. }, Self::Generated { repository: right_repo, relative: right, .. }) => left_repo == right_repo && left == right,
             (Self::Host { path: left, .. }, Self::Host { path: right, .. }) => left == right,
@@ -626,6 +664,20 @@ impl<'v> StarlarkValue<'v> for RepositoryStarlarkPath {
     }
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match (name, self) {
+            ("dirname", Self::Workspace { absolute, replay, .. }) => {
+                let facts = replay.lock().unwrap(); let root = facts.reservation().display_root().clone(); drop(facts);
+                let parent = absolute.as_path().parent()?;
+                if !parent.starts_with(root.as_path()) { replay.lock().expect("workspace replay poisoned").error = Some(RepositoryRuleInvocationError::WorkspaceUnsupported); return None; }
+                Some(heap.alloc_simple(Self::Workspace { absolute: NormalizedAbsolutePath::new(parent).ok()?, relative: parent.strip_prefix(root.as_path()).ok()?.to_str()?.into(), replay: replay.clone() }))
+            },
+            ("exists", Self::Workspace { relative, replay, .. }) => {
+                let mut facts = replay.lock().unwrap();
+                match facts.replay(slug_bzlmod_v2::RepositoryWorkspaceOperation::Exists(relative.clone())) {
+                    Ok(slug_bzlmod_v2::RepositoryWorkspaceResult::Exists(exists)) => Some(Value::new_bool(exists)),
+                    Ok(_) => { facts.error = Some(RepositoryRuleInvocationError::WorkspaceReplay); None },
+                    Err(error) => { facts.error = Some(error); None },
+                }
+            },
             ("dirname", Self::Which(value)) => {
                 let Some(parent) = value.path().as_path().parent() else { return Some(Value::new_none()); };
                 let path = NormalizedAbsolutePath::new(parent.to_path_buf()).expect("the parent of a normalized absolute path is normalized");
@@ -645,8 +697,8 @@ impl<'v> StarlarkValue<'v> for RepositoryStarlarkPath {
         }
     }
     fn dir_attr(&self) -> Vec<String> {
-        let mut attributes = matches!(self, Self::Generated { .. } | Self::Host { .. }).then(|| vec!["exists".to_owned()]).unwrap_or_default();
-        if matches!(self, Self::Which(_) | Self::Host { exists: true, .. }) { attributes.push("dirname".to_owned()); }
+        let mut attributes = matches!(self, Self::Workspace { .. } | Self::Generated { .. } | Self::Host { .. }).then(|| vec!["exists".to_owned()]).unwrap_or_default();
+        if matches!(self, Self::Workspace { .. } | Self::Which(_) | Self::Host { exists: true, .. }) { attributes.push("dirname".to_owned()); }
         attributes
     }
     fn get_methods() -> Option<&'static Methods> {
@@ -659,6 +711,18 @@ impl<'v> StarlarkValue<'v> for RepositoryStarlarkPath {
     fn get_child<'v>(this: Value<'v>, #[starlark(args)] relative_paths: UnpackTuple<String>, eval: &mut Evaluator<'v, '_, '_>) -> anyhow::Result<Value<'v>> {
         let Some(path) = RepositoryStarlarkPath::from_value(this) else { return Err(anyhow::anyhow!("invalid path receiver")); };
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if state.workspace.is_some() {
+            if relative_paths.items.is_empty() { return Ok(this); }
+            let mut joined = Path::new(&path.text()).to_path_buf();
+            for child in relative_paths.items { joined.push(child); }
+            let text = joined.to_str().ok_or_else(|| state.fail(RepositoryRuleInvocationError::PathArgument))?;
+            let value = if let Ok(own) = workspace::path(state, text) { own } else {
+                if matches!(path,RepositoryStarlarkPath::Label { path,.. } if path.namespace()!=PathObservationNamespace::Host) { return Err(state.fail(RepositoryRuleInvocationError::WorkspaceUnsupported)); }
+                if matches!(path,RepositoryStarlarkPath::Workspace { .. }) { return Err(state.fail(RepositoryRuleInvocationError::WorkspaceUnsupported)); }
+                state.host_path(text).map_err(|error| state.fail(error))?
+            };
+            return Ok(eval.heap().alloc_simple(value));
+        }
         let RepositoryStarlarkPath::Generated { repository, relative, present } = path else { return Err(state.fail(RepositoryRuleInvocationError::LabelPathArgument)); };
         if relative_paths.items.is_empty() { return Ok(this); }
         let mut joined = relative.clone();
@@ -910,18 +974,44 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         }
         let label = StarlarkLabel::from_value(path).ok_or_else(|| state.fail(RepositoryRuleInvocationError::LabelPathArgument))?;
         let address = RepositoryLabelPathAddress::from_label(label.canonical());
+        if let Some(replay) = &state.workspace {
+            let resolved = workspace::resolve_label(state,&address).map_err(|error| state.fail(error))?;
+            let instance = replay.lock().unwrap().reservation().instance();
+            if resolved.namespace() == PathObservationNamespace::Materialization(instance) {
+                return Ok(eval.heap().alloc_simple(workspace::path(state,resolved.path_str()).map_err(|error| state.fail(error))?));
+            }
+            return Ok(eval.heap().alloc_simple(RepositoryStarlarkPath::Label { address, path: resolved }));
+        }
         let Some(path) = state.prepared_paths.get(&address) else { return Err(state.fail(RepositoryRuleInvocationError::LabelPathNeed(address))); };
+        workspace::register(state, path, Some(address.repo())).map_err(|error| state.fail(error))?;
         Ok(eval.heap().alloc_simple(RepositoryStarlarkPath::Label { address, path: path.clone() }))
     }
 
     fn read<'v>(
         this: Value<'v>,
         #[starlark(require = pos)] path: Value<'v>,
+        #[starlark(default = "auto")] watch: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
         RepositoryRuleContext::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if state.workspace.is_some() {
+            if !matches!(watch, "auto" | "no" | "yes") {
+                return Err(state.fail(RepositoryRuleInvocationError::ReadArgument));
+            }
+            if watch == "yes" && workspace::own_relative(state, path).is_ok() {
+                return Err(state.fail(RepositoryRuleInvocationError::ReadArgument));
+            }
+            let (_, bytes) = workspace::read_bytes(state, path)?;
+            if bytes.len() > MAX_READ_BYTES {
+                return Err(state.fail(RepositoryRuleInvocationError::ReadLimit));
+            }
+            return Ok(eval.heap().alloc(latin1_text(&bytes)));
+        }
+        if watch != "auto" {
+            return Err(state.fail(RepositoryRuleInvocationError::ReadArgument));
+        }
         let label = StarlarkLabel::from_value(path)
             .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ReadArgument))?;
         let address = RepositoryLabelPathAddress::from_label(label.canonical());
@@ -944,11 +1034,45 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] template: Value<'v>,
         #[starlark(default = SmallMap::new())] substitutions: SmallMap<String, String>,
         #[starlark(default = true)] executable: bool,
+        #[starlark(default = "auto")] watch_template: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let context = RepositoryRuleContext::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if state.workspace.is_some() {
+            if !matches!(watch_template, "auto" | "no" | "yes")
+                || (watch_template == "yes" && workspace::own_relative(state, template).is_ok())
+            {
+                return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
+            }
+            let destination =
+                workspace::own_relative(state, path).map_err(|error| state.fail(error))?;
+            let (source, source_body) = workspace::read_bytes(state, template)?;
+            let converted =
+                latin1_substitutions(&substitutions).map_err(|error| state.fail(error))?;
+            let body = replace_template_bytes(source_body.to_vec(), &converted)
+                .map_err(|error| state.fail(error))?;
+            let substitutions = substitutions
+                .into_iter()
+                .map(|(k, v)| (CompactString::from(k), CompactString::from(v)))
+                .collect();
+            workspace::replay(
+                state,
+                slug_bzlmod_v2::RepositoryWorkspaceOperation::Template {
+                    path: destination,
+                    body: body.into(),
+                    mode: if executable { 0o755 } else { 0o644 },
+                    source,
+                    source_body,
+                    substitutions,
+                },
+            )?;
+            return Ok(NoneType);
+        }
+        if watch_template != "auto" {
+            return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
+        }
         if context.input.homebrew_template_guard
             && context.snapshot.get("HOMEBREW_RUBY_PATH").is_some()
         {
@@ -1004,6 +1128,9 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         RepositoryRuleContext::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if state.workspace.is_some() {
+            return Err(state.fail(RepositoryRuleInvocationError::WorkspaceUnsupported));
+        }
         let Some(RepositoryStarlarkPath::Label { address, path }) =
             RepositoryStarlarkPath::from_value(target)
         else {
@@ -1047,6 +1174,18 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
             .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
         let _ = legacy_utf8;
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if state.workspace.is_some() {
+            let path = workspace::own_relative(state, path).map_err(|error| state.fail(error))?;
+            workspace::replay(
+                state,
+                slug_bzlmod_v2::RepositoryWorkspaceOperation::File {
+                    path,
+                    body: Arc::from(content.as_bytes()),
+                    mode: if executable { 0o755 } else { 0o644 },
+                },
+            )?;
+            return Ok(NoneType);
+        }
         let Some(path) = path.unpack_str() else {
             return Err(state.fail(RepositoryRuleInvocationError::PathArgument));
         };
@@ -1186,18 +1325,32 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
     fn execute<'v>(
         this: Value<'v>,
         #[starlark(require = pos)] arguments: Value<'v>,
-        #[starlark(require = named, default = 600)] timeout: i32,
-        #[starlark(require = named, default = SmallMap::new())] environment: SmallMap<
-            String,
-            String,
-        >,
-        #[starlark(require = named, default = true)] quiet: bool,
-        #[starlark(require = named, default = "")] working_directory: &str,
+        #[starlark(default = 600)] timeout: Value<'v>,
+        #[starlark(default = AllocDict::EMPTY)] environment: Value<'v>,
+        #[starlark(default = true)] quiet: bool,
+        #[starlark(default = "")] working_directory: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
         let context = RepositoryRuleContext::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if state.workspace.is_some() {
+            return workspace::execute(
+                state,
+                context,
+                arguments,
+                timeout,
+                environment,
+                quiet,
+                working_directory,
+                eval.heap(),
+            );
+        }
+        let timeout = timeout
+            .unpack_i32()
+            .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteOptions))?;
+        let environment = DictRef::from_value(environment)
+            .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteOptions))?;
         if *state.filesystem_call_index.borrow() > 0 {
             return Err(state.fail(RepositoryRuleInvocationError::FilesystemExecuteMix));
         }
@@ -1307,15 +1460,37 @@ pub(crate) fn invoke_repository_rule_with_host_paths(
             input,
             environment_enumerated: state.environment_enumerated.clone(),
         });
+    struct GeneralPrintCapture<'a>(&'a RepositoryRuleInvocationState);
+    impl PrintHandler for GeneralPrintCapture<'_> {
+        fn println(&self, location: starlark::PrintLocation, text: &str) -> starlark::Result<()> {
+            let (file, line, column) = location.into_parts();
+            self.0.general_events.borrow_mut().push(
+                slug_events_v2::EvaluationEvent::StarlarkPrint {
+                    location: slug_events_v2::StarlarkSourceLocation::new(file, line, column),
+                    text: text.into(),
+                },
+            );
+            Ok(())
+        }
+    }
+    let general_print = GeneralPrintCapture(&state);
     let returned = {
         let mut evaluator = Evaluator::new(&invocation_module);
-        if let Some(print_handler) = print_handler {
+        if state.workspace.is_some() {
+            evaluator.set_print_handler(&general_print);
+        } else if let Some(print_handler) = print_handler {
             evaluator.set_print_handler(print_handler);
         }
         evaluator.extra = Some(&state);
         evaluator.eval_function(implementation.to_value(), &[context], &[])
     };
-    let context_error = if state
+    let workspace_error = state
+        .workspace
+        .as_ref()
+        .and_then(|replay| replay.lock().unwrap().error.take());
+    let context_error = if workspace_error.is_some() {
+        workspace_error
+    } else if state
         .generated_present
         .lock()
         .expect("generated path state mutex poisoned")
@@ -1345,16 +1520,27 @@ pub(crate) fn invoke_repository_rule_with_host_paths(
             &result,
             Err(RepositoryRuleInvocationError::LabelPathNeed(_))
                 | Err(RepositoryRuleInvocationError::HostPathNeed(_))
+                | Err(RepositoryRuleInvocationError::HostReadNeed(_))
                 | Err(RepositoryRuleInvocationError::RepositorySourceNeed(_))
                 | Err(RepositoryRuleInvocationError::WhichNeed(_))
                 | Err(RepositoryRuleInvocationError::ExecuteNeed(_))
                 | Err(RepositoryRuleInvocationError::FilesystemNeed(_))
+                | Err(RepositoryRuleInvocationError::WorkspaceNeed(_))
         ) {
         Err(RepositoryRuleInvocationError::ExecuteReplay)
     } else {
         result
     };
     RepositoryRuleInvocationAttempt {
+        general_events: state.workspace.as_ref().map(|_| {
+            slug_events_v2::EventBatch::from_events(
+                state
+                    .general_events
+                    .borrow_mut()
+                    .drain(..)
+                    .collect::<Vec<_>>(),
+            )
+        }),
         result,
         environment_enumerated: state.environment_enumerated.load(Ordering::Relaxed),
     }
@@ -1362,6 +1548,7 @@ pub(crate) fn invoke_repository_rule_with_host_paths(
 
 #[cfg(test)]
 mod tests {
+    mod workspace_tests;
     use std::path::PathBuf;
 
     use slug_bzlmod_v2::RepositoryEnvironmentEntry;
@@ -2902,14 +3089,30 @@ def implementation(ctx):
             ),
             Err(RepositoryRuleInvocationError::ReadArgument)
         ));
-        assert!(matches!(
+        assert_eq!(
             invoke_prepared(
-                "def implementation(ctx):\n    ctx.read(Label('@@dep+//pkg:source'), watch='auto')\n",
+                "def implementation(ctx):\n    ctx.file('x', ctx.read(Label('@@dep+//pkg:source'), watch='auto'))\n",
                 &paths,
                 &ascii
-            ),
-            Err(RepositoryRuleInvocationError::Evaluation(_))
-        ));
+            )
+            .unwrap()
+            .plan
+            .effects()[0]
+            .content(),
+            b"ok"
+        );
+        for watch in ["yes", "no", "invalid"] {
+            assert!(matches!(
+                invoke_prepared(
+                    &format!(
+                        "def implementation(ctx):\n    ctx.read(Label('@@dep+//pkg:source'), watch='{watch}')\n"
+                    ),
+                    &paths,
+                    &ascii
+                ),
+                Err(RepositoryRuleInvocationError::ReadArgument)
+            ));
+        }
     }
 
     #[test]
@@ -3096,7 +3299,7 @@ def implementation(ctx):
         ));
         assert!(matches!(
             run("ctx.execute([cc, '-v'], 600)"),
-            Err(RepositoryRuleInvocationError::Evaluation(_))
+            Err(RepositoryRuleInvocationError::ExecuteArgument)
         ));
     }
 

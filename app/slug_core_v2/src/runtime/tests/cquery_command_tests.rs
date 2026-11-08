@@ -247,7 +247,10 @@ fn cquery_executables_direct_filter_and_kind_match_full() {
     let filtered = run("filter(':(root|direct|leaf)$', deps(//:root))");
     let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
     assert_eq!(filtered.label_stdout(), full.label_stdout());
-    assert_eq!(filtered.starlark_label_stdout(), full.starlark_label_stdout());
+    assert_eq!(
+        filtered.starlark_label_stdout(),
+        full.starlark_label_stdout()
+    );
     assert_eq!(
         filtered.label_kind_stdout().unwrap(),
         full.label_kind_stdout().unwrap()
@@ -573,9 +576,18 @@ fn cquery_set_empty_and_count_preflight() {
 }
 
 cquery_set_output_test!(cquery_set_union_set_and_let, |run, labels| {
-    assert_eq!(labels(run("//pkg:bin union //pkg:lib")), ["//pkg:bin", "//pkg:lib"]);
-    assert_eq!(labels(run("set(//pkg:bin //pkg:lib //pkg:bin)")), ["//pkg:bin", "//pkg:lib"]);
-    assert_eq!(labels(run("let x = //pkg:bin in $x union //pkg:lib")), ["//pkg:bin", "//pkg:lib"]);
+    assert_eq!(
+        labels(run("//pkg:bin union //pkg:lib")),
+        ["//pkg:bin", "//pkg:lib"]
+    );
+    assert_eq!(
+        labels(run("set(//pkg:bin //pkg:lib //pkg:bin)")),
+        ["//pkg:bin", "//pkg:lib"]
+    );
+    assert_eq!(
+        labels(run("let x = //pkg:bin in $x union //pkg:lib")),
+        ["//pkg:bin", "//pkg:lib"]
+    );
 });
 
 cquery_set_output_test!(cquery_set_intersect_and_except, |run, labels| {
@@ -583,17 +595,39 @@ cquery_set_output_test!(cquery_set_intersect_and_except, |run, labels| {
     assert_eq!(labels(run("//pkg:bin except //pkg:lib")), ["//pkg:bin"]);
 });
 
-cquery_set_output_test!(cquery_set_exact_prefix_and_missing_filters, |run, labels| {
-    assert_eq!(labels(run("filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))")), ["//pkg:bin"]);
-    assert_eq!(labels(run("filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))")), ["//pkg:lib", "//pkg:bin"]);
-    assert!(run("filter('^//missing:', set(//pkg:lib //pkg:bin))").is_empty());
-});
+cquery_set_output_test!(
+    cquery_set_exact_prefix_and_missing_filters,
+    |run, labels| {
+        assert_eq!(
+            labels(run(
+                "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))"
+            )),
+            ["//pkg:bin"]
+        );
+        assert_eq!(
+            labels(run("filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))")),
+            ["//pkg:lib", "//pkg:bin"]
+        );
+        assert!(run("filter('^//missing:', set(//pkg:lib //pkg:bin))").is_empty());
+    }
+);
 
-cquery_set_output_test!(cquery_set_default_counted_and_filtered_some, |run, labels| {
-    assert_eq!(labels(run("some(set(//pkg:lib //pkg:bin))")), ["//pkg:lib"]);
-    assert_eq!(labels(run("some(set(//pkg:lib //pkg:bin //pkg:lib), 2)")), ["//pkg:lib", "//pkg:bin"]);
-    assert_eq!(labels(run("some(filter('^//pkg:bin$', set(//pkg:lib //pkg:bin)), 10)")), ["//pkg:bin"]);
-});
+cquery_set_output_test!(
+    cquery_set_default_counted_and_filtered_some,
+    |run, labels| {
+        assert_eq!(labels(run("some(set(//pkg:lib //pkg:bin))")), ["//pkg:lib"]);
+        assert_eq!(
+            labels(run("some(set(//pkg:lib //pkg:bin //pkg:lib), 2)")),
+            ["//pkg:lib", "//pkg:bin"]
+        );
+        assert_eq!(
+            labels(run(
+                "some(filter('^//pkg:bin$', set(//pkg:lib //pkg:bin)), 10)"
+            )),
+            ["//pkg:bin"]
+        );
+    }
+);
 
 #[test]
 fn cquery_some_empty_zero_and_negative_errors() {
@@ -1015,9 +1049,7 @@ impl CqueryObservedFixture {
         let command_policy = configured_test_command_policy(workspace.path());
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            configured_test_module(
-                "print(\"MODULE_EVENT\")\nmodule(name = \"observed_cquery\")\n",
-            ),
+            configured_test_module("print(\"MODULE_EVENT\")\nmodule(name = \"observed_cquery\")\n"),
         )
         .unwrap();
         fs::write(
@@ -1075,9 +1107,7 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
 #[test]
 fn cquery_observed_cold_warm_events_and_epoch_reuse() {
     let fixture = CqueryObservedFixture::new();
-    let run = |expression: &str| {
-        fixture.run(expression).unwrap()
-    };
+    let run = |expression: &str| fixture.run(expression).unwrap();
 
     let cold = run("deps(//:root)");
     assert!(cold.terminal_for_test().as_ref().is_ok());
@@ -1194,6 +1224,9 @@ async fn cquery_observed_compute_cancellation_discards_child_events_and_recovers
             .filter_map(|event| match event {
                 EvaluationEvent::StarlarkPrint { text, .. } => Some(text),
                 EvaluationEvent::Diagnostic { .. } => None,
+                EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                    panic!("unexpected repository output in text-only fixture")
+                }
             })
             .collect::<Vec<_>>()
     };

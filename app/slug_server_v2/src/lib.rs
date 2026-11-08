@@ -360,7 +360,7 @@ impl Daemon {
                             invalidated,
                         );
                         launch_path.replace(path);
-                        TerminalOutput::new(outcome.exit_code, String::new(), outcome.stderr)
+                        TerminalOutput::from_bytes(outcome.exit_code, String::new(), outcome.stderr)
                     } else {
                         let argv_json = argv
                             .iter()
@@ -873,7 +873,7 @@ fn cquery_error_json(
 pub struct BuildResult {
     pub exit_code: i32,
     pub stdout: String,
-    pub stderr: String,
+    pub stderr: Vec<u8>,
     pub invalidated_files: usize,
 }
 
@@ -894,7 +894,7 @@ impl BuildResult {
         Self {
             exit_code: 2,
             stdout: String::new(),
-            stderr: build_error_json(kind, message, invalidated_files),
+            stderr: build_error_json(kind, message, invalidated_files).into_bytes(),
             invalidated_files,
         }
     }
@@ -905,7 +905,7 @@ impl BuildResult {
 pub struct QueryResult {
     pub exit_code: i32,
     pub stdout: String,
-    pub stderr: String,
+    pub stderr: Vec<u8>,
     pub invalidated_files: usize,
 }
 
@@ -920,7 +920,7 @@ fn aquery_error_result(exit_code: i32, message: &str, invalidated_files: usize) 
     QueryResult {
         exit_code,
         stdout: String::new(),
-        stderr: aquery_error_json(message, invalidated_files),
+        stderr: aquery_error_json(message, invalidated_files).into_bytes(),
         invalidated_files,
     }
 }
@@ -932,7 +932,7 @@ fn cquery_error_result(message: &str, invalidated_files: usize) -> QueryResult {
         stderr: format!(
             "{{\"error\":\"cquery_runtime_error\",\"command\":\"cquery\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
             json_escape(message),
-        ),
+        ).into_bytes(),
         invalidated_files,
     }
 }
@@ -945,13 +945,13 @@ fn cquery_error_result_for_terminal(
         Some(stderr) => QueryResult {
             exit_code: error.exit_code(),
             stdout: String::new(),
-            stderr,
+            stderr: stderr.into_bytes(),
             invalidated_files,
         },
         None => QueryResult {
             exit_code: error.exit_code(),
             stdout: String::new(),
-            stderr: cquery_error_json(error, invalidated_files),
+            stderr: cquery_error_json(error, invalidated_files).into_bytes(),
             invalidated_files,
         },
     }
@@ -965,7 +965,7 @@ impl QueryResult {
             stderr: format!(
                 "{{\"error\":\"query_runtime_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}\n",
                 json_escape(message),
-            ),
+            ).into_bytes(),
             invalidated_files: 0,
         }
     }
@@ -974,7 +974,7 @@ impl QueryResult {
         Self {
             exit_code: error.exit_code,
             stdout: String::new(),
-            stderr: query_error_json(error, invalidated_files),
+            stderr: query_error_json(error, invalidated_files).into_bytes(),
             invalidated_files,
         }
     }

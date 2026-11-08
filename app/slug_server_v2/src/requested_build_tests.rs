@@ -73,7 +73,7 @@ fn dispatch(daemon: &mut Daemon, request: BuildRequest) -> DaemonResponse {
 }
 
 fn terminal(response: &DaemonResponse) -> serde_json::Value {
-    serde_json::from_str(response.stderr.lines().last().unwrap()).unwrap()
+    serde_json::from_str(stderr_text(&response.stderr).lines().last().unwrap()).unwrap()
 }
 
 #[test]
@@ -178,13 +178,11 @@ fn error_recovery(analysis: bool) {
             assert_eq!(terminal(&response)["reapi_actions"], 0);
         }
         assert_eq!(
-            response
-                .stderr
+            stderr_text(&response.stderr)
                 .lines()
                 .filter(|line| line.starts_with("DEBUG:"))
                 .collect::<Vec<_>>(),
-            expected
-                .stderr
+            stderr_text(&expected.stderr)
                 .lines()
                 .filter(|line| line.starts_with("DEBUG:"))
                 .collect::<Vec<_>>(),
@@ -249,8 +247,8 @@ fn remote_policy_round_trips_and_rejects_unsupported_options_without_secrets() {
         let response = dispatch(&mut daemon, workspace.request(&["//:empty"], &config));
         assert_eq!(response.exit_code, 2);
         assert_eq!(terminal(&response)["error"], "build_runtime_error");
-        assert!(!response.stderr.contains(secret));
-        assert!(!response.stderr.contains("DEBUG:"));
+        assert!(!stderr_text(&response.stderr).contains(secret));
+        assert!(!stderr_text(&response.stderr).contains("DEBUG:"));
     }
     let mut raw = serde_json::to_value(DaemonRequest::Build(
         workspace.request(&["//:empty"], &remote_execute()),
@@ -259,14 +257,14 @@ fn remote_policy_round_trips_and_rejects_unsupported_options_without_secrets() {
     raw["request"]["remote"]["headers"] = serde_json::json!(secret);
     let response = handle_request(&mut daemon, &raw.to_string());
     assert_eq!(terminal(&response)["error"], "daemon_parse_error");
-    assert!(!response.stderr.contains(secret));
+    assert!(!stderr_text(&response.stderr).contains(secret));
     let result = daemon.build(
         &[target("//:empty")],
         &remote_disabled(),
         &[format!("--remote_header=authorization={secret}")],
     );
-    assert!(!result.stderr.contains(secret));
-    assert!(result.stderr.contains("--remote_header=<redacted>"));
+    assert!(!stderr_text(&result.stderr).contains(secret));
+    assert!(stderr_text(&result.stderr).contains("--remote_header=<redacted>"));
 }
 
 #[test]
@@ -287,4 +285,8 @@ fn malformed_or_empty_targets_reject_the_entire_request_before_runtime() {
         terminal(&handle_request(&mut daemon, old))["error"],
         "daemon_parse_error"
     );
+}
+
+fn stderr_text(bytes: &[u8]) -> &str {
+    std::str::from_utf8(bytes).expect("this fixture expects text-only stderr")
 }

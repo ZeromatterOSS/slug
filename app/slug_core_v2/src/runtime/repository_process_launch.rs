@@ -47,6 +47,17 @@ impl SelectedExecuteLaunch {
 }
 impl ProcessLaunch for SelectedExecuteLaunch {
     type Output = RepositoryWorkspaceCommand;
+    #[cfg(test)]
+    fn process_probe(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceProcessProbe> {
+        self.root.process_probe()
+    }
+    fn retirement_observer(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceRetirementObserver> {
+        self.root.retirement_observer()
+    }
     fn mode(&self) -> RunMode {
         self.root.mode()
     }
@@ -205,6 +216,23 @@ fn received_successor(
 }
 impl ProcessLaunch for ExecuteLaunch {
     type Output = RepositoryWorkspaceCommand;
+    #[cfg(test)]
+    fn process_probe(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceProcessProbe> {
+        match self {
+            Self::First(quota) => quota.process_probe(),
+            Self::Continue { admission, .. } => admission.process_probe(),
+        }
+    }
+    fn retirement_observer(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceRetirementObserver> {
+        Some(match self {
+            Self::First(quota) => quota.retirement_observer(),
+            Self::Continue { admission, .. } => admission.retirement_observer(),
+        })
+    }
     fn mode(&self) -> RunMode {
         match self {
             Self::First(_) => RunMode::FirstExecute,
@@ -366,9 +394,27 @@ pub(in crate::runtime::repository_physical_root) struct BootstrapLaunch {
     scope: Arc<SourceServiceScope>,
     backing: Arc<RepositoryRootBacking>,
     domain: Option<Arc<NativeMountDomain>>,
+    retirement: Option<super::super::progress::command::RepositoryWorkspaceRetirementObserver>,
+    #[cfg(test)]
+    process_probe: Option<super::super::progress::command::RepositoryWorkspaceProcessProbe>,
     _credit: resources::ResourceCredit,
 }
 impl BootstrapLaunch {
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) fn with_process_probe(
+        mut self,
+        probe: Option<super::super::progress::command::RepositoryWorkspaceProcessProbe>,
+    ) -> Self {
+        self.process_probe = probe;
+        self
+    }
+    pub(in crate::runtime::repository_physical_root) fn with_retirement_observer(
+        mut self,
+        observer: super::super::progress::command::RepositoryWorkspaceRetirementObserver,
+    ) -> Self {
+        self.retirement = Some(observer);
+        self
+    }
     pub(in crate::runtime::repository_physical_root) fn new_claimed(
         reservation: Arc<RepositoryWorkspaceReservation>,
         resources: Arc<RepositoryRootResources>,
@@ -436,12 +482,26 @@ impl BootstrapLaunch {
             scope,
             backing,
             domain,
+            retirement: None,
+            #[cfg(test)]
+            process_probe: None,
             _credit: credit,
         })
     }
 }
 impl ProcessLaunch for BootstrapLaunch {
     type Output = (RepositoryPhysicalRootBuilder, InitialRepositoryMount);
+    #[cfg(test)]
+    fn process_probe(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceProcessProbe> {
+        self.process_probe.clone()
+    }
+    fn retirement_observer(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceRetirementObserver> {
+        self.retirement.clone()
+    }
     fn mode(&self) -> RunMode {
         RunMode::InitializeArchive
     }
@@ -511,7 +571,7 @@ impl ProcessLaunch for BootstrapLaunch {
         {
             return Err(PhysicalRootError::Snapshot);
         }
-        let builder = RepositoryPhysicalRootBuilder::from_quiescent_tmpfs_with_backing(
+        let mut builder = RepositoryPhysicalRootBuilder::from_quiescent_tmpfs_with_backing(
             self.root.take().ok_or(PhysicalRootError::Mode)?,
             self.reservation.clone(),
             RepositoryWorkspaceMode::Archive,
@@ -520,13 +580,20 @@ impl ProcessLaunch for BootstrapLaunch {
             &self.scope,
             &|| true,
         )?;
-        let seed = InitialRepositoryMount::bind(
+        builder.retirement = self
+            .retirement
+            .as_ref()
+            .map(|observer| observer.worker_guard());
+        let mut seed = InitialRepositoryMount::bind(
             &builder,
             self.successor.take().ok_or(PhysicalRootError::Mode)?,
             &self.scope,
             &|| true,
         )
         .map_err(PhysicalRootError::mount)?;
+        if let Some(observer) = &self.retirement {
+            seed = seed.with_retirement_guard(observer.worker_guard());
+        }
         drop(capture);
         Ok((builder, seed))
     }
@@ -557,6 +624,17 @@ impl FinalizeLaunch {
     }
 }
 impl ProcessLaunch for FinalizeLaunch {
+    #[cfg(test)]
+    fn process_probe(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceProcessProbe> {
+        self.admission.process_probe()
+    }
+    fn retirement_observer(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceRetirementObserver> {
+        Some(self.admission.retirement_observer())
+    }
     type Output = (
         RepositoryWorkspaceCommand,
         SealedWorkspaceMaterialization,

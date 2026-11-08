@@ -504,6 +504,8 @@ mod guest_namespace;
 mod input_image_bridge;
 #[path = "path_inputs.rs"]
 mod path_inputs;
+#[path = "repository_workspace_driver.rs"]
+mod repository_workspace_driver;
 #[path = "runtime_sources.rs"]
 mod runtime_sources;
 #[path = "selected_label_data.rs"]
@@ -525,6 +527,12 @@ pub struct WorkspaceRuntime {
     // Native streaming work never enters prepared DICE values. One workspace-
     // shared finite bank survives every in-flight reader/job that retains it.
     source_readers: Arc<super::native_source_access::NativeReaderResources>,
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    general_workspaces: Option<repository_workspace_driver::GeneralWorkspaceRuntime>,
     scratch_resources: slug_bzlmod_v2::SelectedScratchResources,
     // Retained now so the request-projection packet cannot accidentally create
     // a second process owner at observation time.
@@ -871,6 +879,8 @@ struct NativeDemandSessionState {
 #[allow(dead_code)]
 struct NativeDemandSessionOwner {
     state: Mutex<NativeDemandSessionState>,
+    #[cfg(test)]
+    workspace_stage: Mutex<&'static str>,
 }
 
 #[allow(dead_code)]
@@ -904,6 +914,12 @@ pub(in crate::runtime) enum NativeDemandSessionError {
     ArchiveTranscript(slug_bzlmod_v2::RepositoryFilesystemTranscriptError),
     ExecuteEnvironmentMismatch,
     RepositoryExecute(super::repository_process::RepositoryProcessError),
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    RepositoryWorkspace(super::repository_physical_root::PhysicalRootError),
     ExecuteTranscript(slug_bzlmod_v2::RepositoryExecuteTranscriptError),
     RevisionInternalNonProgress,
     Revision(RequestRevisionError),
@@ -928,7 +944,65 @@ impl fmt::Display for NativeDemandSessionError {
             Self::Busy => f.write_str("another workspace command is already active"),
             Self::LeaseTokenExhausted => f.write_str("workspace command lease tokens exhausted"),
             Self::StaleLease => f.write_str("workspace command lease is stale"),
-            Self::Repository(_) => f.write_str("repository session failed"),
+            Self::Repository(error) => {
+                #[cfg(test)]
+                {
+                    use super::repository_io::RepositorySessionError as E;
+                    if let E::SourceService(error) = error {
+                        return write!(f, "repository session failed (source_service: {error})");
+                    }
+                    if let E::NativeWorkspace(message) = error {
+                        // Only fixed observation-frontier categories are exposed;
+                        // arbitrary native error payloads remain redacted.
+                        if matches!(
+                            message.as_ref(),
+                            "missing physical selection domain"
+                                | "physical observation storage overflow"
+                                | "physical observation association differs"
+                                | "physical observation path limit"
+                                | "physical demand refused before IO"
+                                | "physical batch refused before IO"
+                                | "physical path escapes anchor"
+                                | "physical path exceeds root bounds"
+                                | "physical observation requires original scope"
+                                | "physical root observation refused"
+                                | "mixed native observation epoch refused"
+                                | "physical observation association changed"
+                        ) {
+                            return write!(
+                                f,
+                                "repository session failed (native_workspace: {message})"
+                            );
+                        }
+                    }
+                    let code = match error {
+                        E::Busy => "busy",
+                        E::StaleToken { .. } => "stale_token",
+                        E::TokenExhausted => "token_exhausted",
+                        E::InstanceExhausted => "instance_exhausted",
+                        E::WrongWorkspace => "wrong_workspace",
+                        E::KindMismatch => "kind_mismatch",
+                        E::ConflictingRequest(_) => "conflicting_request",
+                        E::NonSuccessSelection(_) => "non_success_selection",
+                        E::UnknownSelection(_) => "unknown_selection",
+                        E::DuplicateSelection(_) => "duplicate_selection",
+                        E::InvalidValidation(_) => "invalid_validation",
+                        E::ValidationAlreadyStarted => "validation_already_started",
+                        E::ValidationIncomplete => "validation_incomplete",
+                        E::InvalidRetainedRoot(_) => "invalid_retained_root",
+                        E::NativeObservation(_) => "native_observation",
+                        E::NativeWorkspace(_) => "native_workspace",
+                        E::InvalidImageAuthority => "invalid_image_authority",
+                        E::SourceService(_) => unreachable!(),
+                    };
+                    write!(f, "repository session failed ({code})")
+                }
+                #[cfg(not(test))]
+                {
+                    let _ = error;
+                    f.write_str("repository session failed")
+                }
+            }
             Self::SourceService(error) => write!(f, "source service failed: {error}"),
             Self::ConflictingRepository(repository) => {
                 write!(f, "conflicting repository requests for {repository}")
@@ -971,6 +1045,12 @@ impl fmt::Display for NativeDemandSessionError {
                 f.write_str("repository execution environment changed before launch")
             }
             Self::RepositoryExecute(error) => write!(f, "{error}"),
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            Self::RepositoryWorkspace(error) => write!(f, "repository workspace: {error:?}"),
             Self::ArchiveInternalNonProgress => {
                 f.write_str("repository archive preparation made no progress")
             }
@@ -1032,6 +1112,7 @@ enum NativeDemandProgress {
     Paths,
     Executes,
     Archives,
+    Workspaces,
 }
 
 #[allow(dead_code)]
@@ -1052,6 +1133,12 @@ struct NativeDemandCommand<'a> {
     repository_results: RepositoryMaterializationResultEpoch,
     // Immutable facts only. A globally fresh lease precedes graph/prepared reuse.
     workspace_epoch: slug_bzlmod_v2::RepositoryWorkspaceEpoch,
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    workspace_progress: Option<repository_workspace_driver::NativeWorkspaceProgress>,
     execute_transcript: RepositoryExecuteTranscript,
     filesystem_transcript: RepositoryFilesystemTranscript,
     filesystem_progress: super::repository_filesystem_progress::RepositoryFilesystemProgress,
@@ -2604,6 +2691,8 @@ impl NativeDemandSessionOwner {
             repository: RepositoryMaterializationGeneration(0),
         };
         Self {
+            #[cfg(test)]
+            workspace_stage: Mutex::new("not_started"),
             state: Mutex::new(NativeDemandSessionState {
                 next_lease: 1,
                 phase: NativeDemandLeasePhase::Idle,
@@ -2633,6 +2722,20 @@ impl NativeDemandSessionOwner {
                 trace: Vec::new(),
             }),
         }
+    }
+    #[cfg(test)]
+    fn mark_workspace_stage(&self, stage: &'static str) {
+        *self
+            .workspace_stage
+            .lock()
+            .expect("workspace stage mutex poisoned") = stage;
+    }
+    #[cfg(test)]
+    fn workspace_stage(&self) -> &'static str {
+        *self
+            .workspace_stage
+            .lock()
+            .expect("workspace stage mutex poisoned")
     }
 
     fn acquire(
@@ -6327,6 +6430,12 @@ impl WorkspaceRuntime {
             image_resources,
             source_readers: super::native_source_access::new_reader_resources()
                 .context("creating native source reader work bank")?,
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            general_workspaces: None,
             scratch_resources,
             workspace,
             process_host,
@@ -6495,6 +6604,9 @@ impl WorkspaceRuntime {
                 "fresh workspace epoch: {error:?}"
             ))
         })?;
+        #[cfg(test)]
+        self.native_demand_sessions
+            .mark_workspace_stage("preflight");
         let preflight = match self.repository_materializer.preflight_native(
             repository_session,
             prior.selected.unscoped_paths().iter().cloned(),
@@ -6520,6 +6632,24 @@ impl WorkspaceRuntime {
                 &prior.repository_environment_frontier,
             );
         let download_results = prior.download_results.clone();
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        let workspace_progress = match repository_workspace_driver::NativeWorkspaceProgress::new(
+            self,
+            repository_session,
+        ) {
+            Ok(progress) => progress,
+            Err(error) => {
+                self.repository_materializer
+                    .discard(repository_session)
+                    .map_err(NativeDemandSessionError::Repository)?;
+                self.native_demand_sessions.close(lease)?;
+                return Err(error);
+            }
+        };
         Ok(NativeDemandPreflight {
             command: NativeDemandCommand {
                 runtime: self,
@@ -6542,6 +6672,12 @@ impl WorkspaceRuntime {
                 scratch_metadata: None,
                 repository_results: preflight.repository_results().clone(),
                 workspace_epoch,
+                #[cfg(all(
+                    target_os = "linux",
+                    target_arch = "x86_64",
+                    target_pointer_width = "64"
+                ))]
+                workspace_progress,
                 execute_transcript: RepositoryExecuteTranscript::empty(),
                 filesystem_transcript: RepositoryFilesystemTranscript::empty(),
                 filesystem_progress: Default::default(),
@@ -6639,6 +6775,8 @@ impl WorkspaceRuntime {
                 };
                 finish_probe_phase!(attempt_phase);
                 begin_probe_phase!(root_phase, self, RootCompute);
+                #[cfg(test)]
+                self.native_demand_sessions.mark_workspace_stage("graph");
                 let root_outcome = attempt_root.compute(&mut transaction).await?;
                 finish_probe_phase!(root_phase);
                 match &root_outcome {
@@ -7933,7 +8071,8 @@ impl NativeDemandCommand<'_> {
             self.lease.0,
             self.execute_transcript.dupe(),
         ));
-        data.data.set(self.workspace_epoch.dupe());
+        data.data.set(self.current_workspace_epoch().dupe());
+        data.data.set(self.runtime.repository_workspace_policy());
         if let Some(capture) = &self.workspace_status {
             super::workspace_status_inputs::install(&mut data, capture);
         }
@@ -7981,9 +8120,10 @@ impl NativeDemandCommand<'_> {
         inject_repository_workspace_epoch(
             updater,
             &self.runtime.workspace,
-            self.workspace_epoch.dupe(),
+            self.current_workspace_epoch().dupe(),
         )
-        .map_err(NativeDemandSessionError::Injection)
+        .map_err(NativeDemandSessionError::Injection)?;
+        Ok(())
     }
 
     fn progress(
@@ -7998,6 +8138,9 @@ impl NativeDemandCommand<'_> {
         needs: &slug_bzlmod_v2::SourcePreparationNeeds,
     ) -> Result<NativeDemandProgress, NativeDemandSessionError> {
         self.validate_source_progress(needs)?;
+        if let Some(progress) = self.progress_general_workspace(needs)? {
+            return Ok(progress);
+        }
         // Validate every archive descriptor before any mixed-frontier I/O.
         self.check_source_scope()?;
         for request in needs.repository_filesystem_operations().values() {
@@ -8033,7 +8176,7 @@ impl NativeDemandCommand<'_> {
             let mut new_requests = Vec::new();
             for request in repository_needs {
                 match self.issued_requests.get(&request.id) {
-                    Some(known) if known.as_ref() != request.as_ref() => {
+                    Some(known) if !self.repository_requests_equal(known, &request)? => {
                         return Err(NativeDemandSessionError::ConflictingRepository(
                             request.id.canonical_repo.clone(),
                         ));
@@ -8044,7 +8187,7 @@ impl NativeDemandCommand<'_> {
                         // changed exact request is permitted to replace it
                         // once; after issuance, another changed request above
                         // is a strict conflict.
-                        Some(known) if known.as_ref() == request.as_ref() => {}
+                        Some(known) if self.repository_requests_equal(known, &request)? => {}
                         Some(_) | None => new_requests.push(request),
                     },
                 }
@@ -8054,8 +8197,11 @@ impl NativeDemandCommand<'_> {
             }
             for request in new_requests {
                 self.repository_results =
-                    if let RepositoryMaterializationKind::GeneratedFilesystemEffects(realization) =
-                        &request.kind
+                    if let RepositoryMaterializationKind::GeneralWorkspace(_) = &request.kind {
+                        self.finish_general_workspace(request.clone())?
+                    } else if let RepositoryMaterializationKind::GeneratedFilesystemEffects(
+                        realization,
+                    ) = &request.kind
                     {
                         let materializer = &self.runtime.repository_materializer;
                         let session = self.repository_session;
@@ -8193,6 +8339,10 @@ impl NativeDemandCommand<'_> {
         }
 
         if let Some(path_needs) = needs.path_observations() {
+            #[cfg(test)]
+            self.runtime
+                .native_demand_sessions
+                .mark_workspace_stage("path_observation");
             begin_probe_phase!(need_phase, self.runtime, NeedPath);
             let new_demands = path_needs
                 .demands()
@@ -8364,6 +8514,9 @@ impl NativeDemandCommand<'_> {
 
     fn discard_in_place(&mut self) -> Result<(), NativeDemandSessionError> {
         self.runtime.wait_source_idle()?;
+        // Process cancellation may have returned while its owning worker is
+        // still proving namespace death. Never restore/discard/close early.
+        self.retire_general_workspace()?;
         #[cfg(test)]
         if self
             .runtime
@@ -8483,6 +8636,10 @@ impl NativeDemandCommand<'_> {
         ),
         NativeDemandSessionError,
     > {
+        #[cfg(test)]
+        self.runtime
+            .native_demand_sessions
+            .mark_workspace_stage("selection");
         let repository_results = self
             .runtime
             .repository_materializer
@@ -8976,6 +9133,19 @@ impl<'a> NativeDemandAbortGuard<'a> {
                 "prepared native snapshot reached acceptance before publication"
             )));
         }
+        if let Err(error) = self
+            .command
+            .as_mut()
+            .expect("native command is armed")
+            .retire_general_workspace()
+        {
+            return self.abort(error);
+        }
+        #[cfg(test)]
+        self.command()
+            .runtime
+            .native_demand_sessions
+            .mark_workspace_stage("acceptance");
         let materializer_accept = {
             let command = self.command();
             command.runtime.repository_materializer.accept(
@@ -9340,6 +9510,12 @@ fn inject_native_demand_snapshot(
 ) -> anyhow::Result<()> {
     let workspace = NormalizedAbsolutePath::new(runtime.workspace.clone())
         .context("normalizing native-demand workspace")?;
+    updater
+        .changed_to(vec![(
+            slug_bzlmod_v2::RepositoryWorkspaceExecutionPolicyKey::new(workspace.clone()),
+            runtime.repository_workspace_policy(),
+        )])
+        .context("injecting repository workspace execution policy")?;
     super::workspace_status_inputs::inject(updater, &workspace, workspace_status)?;
     inject_root_module_request_inputs(
         updater,
@@ -9588,7 +9764,9 @@ mod tests {
         WorkspaceRuntime::new(workspace, ProcessHostOwner::native())
     }
 
-    fn configured_test_command_policy(workspace: &Path) -> BzlmodCommandPolicyKey {
+    pub(in crate::runtime::dice) fn configured_test_command_policy(
+        workspace: &Path,
+    ) -> BzlmodCommandPolicyKey {
         let platforms = workspace.join(".slug_test_builtin/platforms");
         fs::create_dir_all(platforms.join("host")).unwrap();
         fs::write(
@@ -9609,13 +9787,13 @@ mod tests {
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap()
     }
 
-    fn configured_test_module(source: &str) -> String {
+    pub(in crate::runtime::dice) fn configured_test_module(source: &str) -> String {
         format!(
             "{source}bazel_dep(name = \"platforms\", version = \"1.0.0\")\nlocal_path_override(module_name = \"platforms\", path = \".slug_test_builtin/platforms\")\n"
         )
     }
 
-    mod general_repository_archive_tests {
+    pub(in crate::runtime::dice) mod general_repository_archive_tests {
         include!("tests/general_repository_archive_tests.rs");
     }
 
@@ -10192,6 +10370,9 @@ mod tests {
                 EvaluationEvent::Diagnostic { .. } => {
                     unreachable!("diagnostic events are not produced by this packet")
                 }
+                EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                    unreachable!("process output is not produced by this legacy fixture")
+                }
             })
             .collect()
     }
@@ -10205,6 +10386,9 @@ mod tests {
                 EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => {
                     unreachable!("diagnostic events are not produced by this packet")
+                }
+                EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                    unreachable!("process output is not produced by this legacy fixture")
                 }
             })
             .collect()

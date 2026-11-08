@@ -179,6 +179,17 @@ impl ProcessQuotaReady {
     }
 }
 impl ProcessQuotaTransition {
+    #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn process_probe(
+        &self,
+    ) -> Option<super::super::progress::command::RepositoryWorkspaceProcessProbe> {
+        self.admission.process_probe()
+    }
+    pub(super) fn retirement_observer(
+        &self,
+    ) -> super::super::progress::command::RepositoryWorkspaceRetirementObserver {
+        self.admission.retirement_observer()
+    }
     pub(in crate::runtime::repository_physical_root) fn new(
         mut admission: NativeProcessAdmission,
         active: &dyn Fn() -> bool,

@@ -11,7 +11,6 @@
  */
 
 use std::fmt;
-use std::fmt::Write as _;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::Weak;
@@ -163,7 +162,7 @@ pub struct AcceptedCommand<T> {
 pub struct TerminalOutput {
     exit_code: i32,
     stdout: String,
-    stderr: String,
+    stderr: Vec<u8>,
 }
 
 /// A projected command that still owns its accepted value and selected events.
@@ -180,7 +179,7 @@ pub struct PublishedCommand<T> {
     terminal: T,
     exit_code: i32,
     stdout: String,
-    stderr: String,
+    stderr: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -415,32 +414,40 @@ impl CommandOutputBuffer {
         &self.batches
     }
 
-    fn render_stderr(self) -> String {
+    fn render_stderr(self) -> Vec<u8> {
         #[cfg(windows)]
-        const LINE_SEPARATOR: &str = "\r\n";
+        const LINE_SEPARATOR: &[u8] = b"\r\n";
         #[cfg(not(windows))]
-        const LINE_SEPARATOR: &str = "\n";
-
-        let mut stderr = String::new();
+        const LINE_SEPARATOR: &[u8] = b"\n";
+        let mut stderr = Vec::new();
         for batch in self.batches.iter() {
             for event in batch.events() {
                 let text = match event {
                     EvaluationEvent::StarlarkPrint { location, text } => {
-                        write!(&mut stderr, "DEBUG: {location}: ")
-                            .expect("formatting into a String is infallible");
+                        std::io::Write::write_fmt(&mut stderr, format_args!("DEBUG: {location}: "))
+                            .expect("writing into a Vec is infallible");
                         text
                     }
                     EvaluationEvent::Diagnostic { level, text } => {
-                        stderr.push_str(match level {
-                            EvaluationDiagnosticLevel::Warning => "WARNING: ",
-                            EvaluationDiagnosticLevel::Error => "ERROR: ",
+                        stderr.extend_from_slice(match level {
+                            EvaluationDiagnosticLevel::Warning => b"WARNING: ",
+                            EvaluationDiagnosticLevel::Error => b"ERROR: ",
                         });
                         text
                     }
+                    EvaluationEvent::RepositoryExecuteOutput {
+                        stdout,
+                        stderr: bytes,
+                        ..
+                    } => {
+                        stderr.extend_from_slice(stdout);
+                        stderr.extend_from_slice(bytes);
+                        continue;
+                    }
                 };
-                stderr.push_str(text);
+                stderr.extend_from_slice(text.as_bytes());
                 if !text.ends_with('\n') {
-                    stderr.push_str(LINE_SEPARATOR);
+                    stderr.extend_from_slice(LINE_SEPARATOR);
                 }
             }
         }
@@ -492,6 +499,9 @@ impl<T> fmt::Debug for AcceptedCommand<T> {
 
 impl TerminalOutput {
     pub fn new(exit_code: i32, stdout: String, stderr: String) -> Self {
+        Self::from_bytes(exit_code, stdout, stderr.into_bytes())
+    }
+    pub fn from_bytes(exit_code: i32, stdout: String, stderr: Vec<u8>) -> Self {
         Self {
             exit_code,
             stdout,
@@ -519,7 +529,7 @@ impl<T> CommandOutput<T> {
                 },
         } = self;
         let mut stderr = events.render_stderr();
-        stderr.push_str(&terminal_stderr);
+        stderr.extend_from_slice(&terminal_stderr);
         PublishedCommand {
             terminal,
             exit_code,
@@ -530,7 +540,7 @@ impl<T> CommandOutput<T> {
 }
 
 impl<T> PublishedCommand<T> {
-    pub fn into_parts(self) -> (T, i32, String, String) {
+    pub fn into_parts(self) -> (T, i32, String, Vec<u8>) {
         (self.terminal, self.exit_code, self.stdout, self.stderr)
     }
 }
@@ -1231,6 +1241,47 @@ mod tests {
     }
 
     #[test]
+    fn publication_preserves_binary_output_between_prints_without_newlines() {
+        let batch = EventBatch::from_events([
+            EvaluationEvent::StarlarkPrint {
+                location: slug_events_v2::StarlarkSourceLocation::new(Arc::from("test.bzl"), 1, 1),
+                text: "before".into(),
+            },
+            EvaluationEvent::RepositoryExecuteOutput {
+                command_lease: 11,
+                operation_index: 7,
+                stdout: Arc::from([0xff, 0]),
+                stderr: Arc::from([0x80, b'\r']),
+            },
+            EvaluationEvent::StarlarkPrint {
+                location: slug_events_v2::StarlarkSourceLocation::new(Arc::from("test.bzl"), 2, 1),
+                text: "after".into(),
+            },
+        ]);
+        let output = AcceptedCommand::new(
+            (),
+            CommandOutputBuffer {
+                batches: Arc::from([batch]),
+            },
+        )
+        .project(|_| TerminalOutput::from_bytes(0, String::new(), vec![0xfe, 0]))
+        .publish()
+        .into_parts()
+        .3;
+        #[cfg(windows)]
+        let newline = b"\r\n".as_slice();
+        #[cfg(not(windows))]
+        let newline = b"\n".as_slice();
+        let mut expected = b"DEBUG: test.bzl:1:1: before".to_vec();
+        expected.extend_from_slice(newline);
+        expected.extend_from_slice(&[0xff, 0, 0x80, b'\r']);
+        expected.extend_from_slice(b"DEBUG: test.bzl:2:1: after");
+        expected.extend_from_slice(newline);
+        expected.extend_from_slice(&[0xfe, 0]);
+        assert_eq!(output, expected);
+    }
+
+    #[test]
     fn publication_consumes_events_in_order_before_terminal_stderr() {
         let terminal: Arc<str> = Arc::from("terminal-value");
         let identity = terminal.clone();
@@ -1271,6 +1322,7 @@ mod tests {
         let published = projected.publish();
         assert_eq!(format!("{published:?}"), "PublishedCommand(..)");
         let (terminal, exit_code, stdout, stderr) = published.into_parts();
+        let stderr = String::from_utf8(stderr).expect("text-only fixture stderr");
 
         #[cfg(windows)]
         let separator = "\r\n";
@@ -1302,6 +1354,7 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
         )
         .project(|_| TerminalOutput::new(2, String::new(), "exact".into()));
         let (terminal, exit_code, stdout, stderr) = projected.publish().into_parts();
+        let stderr = String::from_utf8(stderr).expect("text-only fixture stderr");
         let terminal_error = terminal.unwrap_err();
         assert!(Arc::ptr_eq(&terminal_error, &identity));
         assert_eq!(exit_code, 2);
@@ -1581,6 +1634,9 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
                 EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => {
                     unreachable!("diagnostic events are not produced by this packet")
+                }
+                EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                    unreachable!("process output is not produced by this fixture")
                 }
             })
             .collect()

@@ -229,12 +229,14 @@ pub fn run(argv: Vec<String>) -> i32 {
     emit_output(exit_code, stdout, stderr)
 }
 
-fn emit_output(code: i32, stdout: String, stderr: String) -> i32 {
+fn emit_output(code: i32, stdout: String, stderr: Vec<u8>) -> i32 {
     if !stdout.is_empty() {
         print!("{stdout}");
     }
     if !stderr.is_empty() {
-        eprint!("{stderr}");
+        if super::write_stderr(&stderr).is_err() {
+            return 2;
+        }
     }
     code
 }
@@ -354,7 +356,9 @@ fn run_daemon_build(
                 print!("{}", response.stdout);
             }
             if !response.stderr.is_empty() {
-                eprint!("{}", response.stderr);
+                if super::write_stderr(&response.stderr).is_err() {
+                    return 2;
+                }
             }
             response.exit_code
         }

@@ -23,6 +23,15 @@ use slug_commands_v2::CommandParseError;
 use slug_commands_v2::CommandPlaceholderError;
 use slug_core_v2::error::json_escape;
 
+/// Forward accepted event/terminal bytes without text conversion. A failed
+/// partial write is an output failure; callers must not launch a run payload.
+pub(crate) fn write_stderr(bytes: &[u8]) -> std::io::Result<()> {
+    write_stderr_to(&mut std::io::stderr().lock(), bytes)
+}
+fn write_stderr_to(output: &mut impl std::io::Write, bytes: &[u8]) -> std::io::Result<()> {
+    output.write_all(bytes)
+}
+
 pub fn dispatch<I, S>(args: I) -> i32
 where
     I: IntoIterator<Item = S>,
@@ -170,6 +179,42 @@ fn serve_daemon(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn binary_stderr_retries_partial_writes_and_propagates_delivery_failure() {
+        struct Partial {
+            bytes: Vec<u8>,
+            fail_after: Option<usize>,
+        }
+        impl std::io::Write for Partial {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                if self.fail_after == Some(self.bytes.len()) {
+                    return Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
+                }
+                let count = bytes.len().min(1);
+                self.bytes.extend_from_slice(&bytes[..count]);
+                Ok(count)
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut complete = Partial {
+            bytes: Vec::new(),
+            fail_after: None,
+        };
+        write_stderr_to(&mut complete, &[0xff, 0, 0x80]).unwrap();
+        assert_eq!(complete.bytes, [0xff, 0, 0x80]);
+        let mut failed = Partial {
+            bytes: Vec::new(),
+            fail_after: Some(1),
+        };
+        assert_eq!(
+            write_stderr_to(&mut failed, &[0xff, 0]).unwrap_err().kind(),
+            std::io::ErrorKind::BrokenPipe
+        );
+        assert_eq!(failed.bytes, [0xff]);
+    }
 
     #[test]
     fn unknown_command_is_structured() {

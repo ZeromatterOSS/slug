@@ -134,6 +134,7 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
                     reservation.owner().clone(),
                     reservation.repository().clone(),
                     reservation.ordinal().checked_add(1).unwrap(),
+                    reservation.expected_repo_spec().clone(),
                     reservation.display_root().clone(),
                     reservation.instance(),
                     reservation.lease(),

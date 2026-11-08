@@ -184,22 +184,15 @@ fn generation_with_adoption_spec(
         repo_spec: terminal_spec,
         kind: RepositoryMaterializationKind::GeneralWorkspace(realization),
     });
-    let (command, sealed) = command
-        .seal_for_materialization(request.clone(), scope, &|| true)
-        .unwrap();
-    let adopted = materializer.adopt_workspace(
-        token,
-        &ticket,
-        RepositoryMaterializationGeneration(1),
-        sealed,
-        scope,
-    );
-    drop(command);
-    drop(ticket);
+    let sealed = command.seal_for_materialization(request.clone(), scope, &|| true);
     if foreign_spec {
-        assert!(
-            matches!(adopted, Err(crate::runtime::repository_io::RepositorySessionError::NativeWorkspace(message)) if message.as_ref() == "native workspace reservation refused")
-        );
+        assert!(matches!(
+            sealed,
+            Err(PhysicalRootError::Protocol(
+                slug_bzlmod_v2::RepositoryWorkspaceError::ForeignReservation
+            ))
+        ));
+        drop(ticket);
         assert_eq!(
             (
                 resources.snapshot().native_fds,
@@ -210,6 +203,16 @@ fn generation_with_adoption_spec(
         materializer.discard(token).unwrap();
         return None;
     }
+    let (command, sealed) = sealed.unwrap();
+    let adopted = materializer.adopt_workspace(
+        token,
+        &ticket,
+        RepositoryMaterializationGeneration(1),
+        sealed,
+        scope,
+    );
+    drop(command);
+    drop(ticket);
     let results = adopted.unwrap();
     let roots = materializer
         .pin_selected_roots(token, std::slice::from_ref(&request), &results, readers)
@@ -680,8 +683,8 @@ fn native_claimed_registry_sources_keep_same_display_instances_separate_and_read
 }
 
 #[test]
-#[ignore = "actual compiled CLI claimed root/foreign-spec adoption proof; finite native supervisor and SLUG_V2_BIN required"]
-fn native_adoption_rejects_foreign_spec_after_actual_history_seal_and_releases_root() {
+#[ignore = "actual compiled CLI claimed root/foreign-spec seal refusal proof; finite native supervisor and SLUG_V2_BIN required"]
+fn native_seal_rejects_foreign_spec_after_actual_history_and_releases_root() {
     let temporary = tempfile::tempdir().unwrap();
     let workspace = NormalizedAbsolutePath::new(temporary.path()).unwrap();
     let deadline = Instant::now() + Duration::from_secs(26);

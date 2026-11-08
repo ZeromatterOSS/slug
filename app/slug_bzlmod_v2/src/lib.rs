@@ -383,8 +383,6 @@ pub use repository_filesystem::RepositoryFilesystemTranscript;
 #[doc(hidden)]
 pub use repository_filesystem::RepositoryFilesystemTranscriptError;
 #[doc(hidden)]
-pub use repository_workspace::*;
-#[doc(hidden)]
 pub use repository_host_input::NeedRepositoryEnvironmentNames;
 #[doc(hidden)]
 pub use repository_host_input::RepositoryEnvironmentCanonicalError;
@@ -414,6 +412,8 @@ pub use repository_label_path::HostRepositoryLabelPathSource;
 pub use repository_label_path::HostRepositoryLabelPathValue;
 pub use repository_label_path::ObservedHostRepositoryLabelPath;
 pub use repository_label_path::RepositoryLabelPathAddress;
+#[doc(hidden)]
+pub use repository_workspace::*;
 pub use resolution::DevDependencyMode;
 pub use resolution::ModuleDirectiveOwner;
 pub use resolution::ModuleKey;
@@ -777,6 +777,7 @@ pub use source_preparation::SourcePreparationResult;
 pub use source_preparation::host_canonical_repository_source_input;
 #[doc(hidden)]
 pub use source_preparation::host_canonical_repository_source_input_with_filesystem_realization;
+pub use source_preparation::host_canonical_repository_source_input_with_workspace_realization;
 #[doc(hidden)]
 pub use source_preparation::host_repository_materialization_request;
 #[doc(hidden)]

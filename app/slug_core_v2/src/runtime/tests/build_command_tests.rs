@@ -1484,6 +1484,9 @@ probe = rule(implementation = _impl)
         .map(|event| match event {
             EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
             EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+            EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                panic!("unexpected repository output in text-only fixture")
+            }
         })
         .collect::<Vec<_>>();
     assert_eq!(
@@ -1597,6 +1600,9 @@ async fn build_command_root_terminal_closure_retains_reused_and_clears_retry_onl
             .map(|event| match event {
                 EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+                EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                    panic!("unexpected repository output in text-only fixture")
+                }
             })
             .collect::<Vec<_>>();
         assert_eq!(texts, expected);
@@ -3745,6 +3751,9 @@ async fn neutral_rule_and_filegroup_use_one_observed_family_and_child_events() {
         .filter_map(|event| match event {
             EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()),
             EvaluationEvent::Diagnostic { .. } => None,
+            EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                panic!("unexpected repository output in text-only fixture")
+            }
         })
         .collect::<Vec<_>>();
     assert_eq!(texts, ["MODULE", "BZL", "BUILD", "ANALYSIS"]);

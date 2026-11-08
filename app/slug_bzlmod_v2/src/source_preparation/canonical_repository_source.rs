@@ -28,6 +28,8 @@ pub enum HostCanonicalRepositorySourceInputError {
     MissingGeneratedFilesystemRealization,
     ExtraneousGeneratedFilesystemRealization,
     MismatchedGeneratedFilesystemRealization,
+    MismatchedGeneratedWorkspaceRealization,
+    ExtraneousGeneratedWorkspaceRealization,
     Projection(RepositoryMaterializationError),
 }
 
@@ -89,6 +91,49 @@ pub fn host_canonical_repository_source_input(
     generated_plan: Option<GeneratedRepositoryFileEffectPlan>,
 ) -> Result<HostCanonicalRepositorySourceInput, HostCanonicalRepositorySourceInputError> {
     host_canonical_repository_source_input_with_filesystem_realization(route, generated_plan, None)
+}
+
+/// Project the original callable's complete workspace history. The reservation
+/// binds the full pre-evaluation Spec; no authored-plan fallback is available.
+pub fn host_canonical_repository_source_input_with_workspace_realization(
+    route: Arc<HostCanonicalRepositoryRoute>,
+    realization: crate::RepositoryWorkspaceRealization,
+) -> Result<HostCanonicalRepositorySourceInput, HostCanonicalRepositorySourceInputError> {
+    let view = route.view();
+    let Some(seed) = view.generated_effect_seed() else {
+        return Err(
+            HostCanonicalRepositorySourceInputError::ExtraneousGeneratedWorkspaceRealization,
+        );
+    };
+    let reservation = realization.reservation();
+    let repo_spec = view
+        .repo_spec()
+        .ok_or(HostCanonicalRepositorySourceInputError::MissingRepositorySpecification)?;
+    if seed.owner() != reservation.owner()
+        || seed.ordinal() != reservation.ordinal()
+        || view.workspace() != reservation.workspace()
+        || view.canonical_repo() != reservation.repository()
+        || repo_spec != reservation.expected_repo_spec().as_ref()
+    {
+        return Err(
+            HostCanonicalRepositorySourceInputError::MismatchedGeneratedWorkspaceRealization,
+        );
+    }
+    let request = RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: view.workspace().dupe(),
+            canonical_repo: view.canonical_repo().clone(),
+        },
+        repo_spec: repo_spec.clone(),
+        kind: RepositoryMaterializationKind::GeneralWorkspace(realization),
+    };
+    request.validate_general_workspace_binding().map_err(|_| {
+        HostCanonicalRepositorySourceInputError::MismatchedGeneratedWorkspaceRealization
+    })?;
+    Ok(HostCanonicalRepositorySourceInput {
+        route,
+        disposition: HostRepositoryMaterializationDisposition::Request(Arc::new(request)),
+    })
 }
 
 /// Project the natural generated producer's terminal archive binding. A plan
@@ -264,6 +309,7 @@ impl HostRepositorySourceRoute {
                     RepositoryMaterializationKind::Immutable
                         | RepositoryMaterializationKind::GeneratedFileEffects(_)
                         | RepositoryMaterializationKind::GeneratedFilesystemEffects(_)
+                        | RepositoryMaterializationKind::GeneralWorkspace(_)
                 ),
                 HostRepositorySourceInputDispositionView::Builtin(_) => false,
             },
@@ -449,6 +495,95 @@ mod tests {
             )
             .unwrap(),
         )
+    }
+
+    #[test]
+    fn original_workspace_projection_requires_full_natural_binding_even_without_operations() {
+        let owner = Arc::new(HostSelectedExtensionOwner::testing("+original"));
+        let HostRepositorySourceRoute::Canonical(input) =
+            generated_route(owner.clone(), "+original+repo")
+        else {
+            unreachable!()
+        };
+        let route = input.route;
+        let spec = route.view().repo_spec().unwrap().clone();
+        let realization = |ordinal, expected_spec| {
+            let reservation = Arc::new(
+                crate::RepositoryWorkspaceReservation::new(
+                    route.view().workspace().clone(),
+                    owner.clone(),
+                    route.view().canonical_repo().clone(),
+                    ordinal,
+                    Arc::new(expected_spec),
+                    NormalizedAbsolutePath::new("/__slug_repositories__/v1/original").unwrap(),
+                    PathObservationInstanceId::new(71),
+                    9,
+                    crate::RepositoryWorkspaceRetentionLimits::new(
+                        128,
+                        16 * 1024 * 1024,
+                        1024 * 1024 * 1024,
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            );
+            crate::RepositoryWorkspaceTranscript::new(reservation, 0o755)
+                .unwrap()
+                .realize(0)
+                .unwrap()
+        };
+        let projected = host_canonical_repository_source_input_with_workspace_realization(
+            route.clone(),
+            realization(0, spec.clone()),
+        )
+        .unwrap();
+        let HostRepositorySourceInputDispositionView::Request(request) =
+            projected.view().disposition()
+        else {
+            unreachable!()
+        };
+        assert!(matches!(
+            request.kind,
+            RepositoryMaterializationKind::GeneralWorkspace(_)
+        ));
+        assert!(
+            HostRepositorySourceRoute::Canonical(projected.clone()).is_immutable_materialization()
+        );
+        assert_eq!(
+            host_canonical_repository_source_input_with_workspace_realization(
+                route.clone(),
+                realization(1, spec.clone())
+            )
+            .unwrap_err(),
+            HostCanonicalRepositorySourceInputError::MismatchedGeneratedWorkspaceRealization
+        );
+        let mut changed = spec;
+        let mut attributes = (*changed.attributes).clone();
+        attributes.insert(
+            "different".into(),
+            OverrideAttributeValue::String("value".into()),
+        );
+        changed.attributes = Arc::new(attributes);
+        assert_eq!(
+            host_canonical_repository_source_input_with_workspace_realization(
+                route.clone(),
+                realization(0, changed.clone())
+            )
+            .unwrap_err(),
+            HostCanonicalRepositorySourceInputError::MismatchedGeneratedWorkspaceRealization
+        );
+        let mut forged = request.as_ref().clone();
+        forged.repo_spec = changed;
+        assert!(
+            RepositoryMaterializationResultEpoch::new(
+                route.view().workspace().clone(),
+                [RepositoryMaterializationEpochEntry {
+                    request: Arc::new(forged),
+                    result: RepositoryMaterializationResult::SpecError("foreign binding".into())
+                }]
+            )
+            .is_err()
+        );
     }
 
     #[test]

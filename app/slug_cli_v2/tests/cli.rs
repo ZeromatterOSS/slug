@@ -63,6 +63,27 @@ fn assert_slug_cquery_label(stdout: &[u8], label: &str) -> String {
     stdout.to_owned()
 }
 
+// Reuse the verified authentic registry and archive mirror for configured CLI
+// fixtures. The smoke's authored MODULE/BUILD files remain its semantic input.
+fn configured_cli_fixture(name: &str) -> std::path::PathBuf {
+    let destination = scratch(name).join("fixture");
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tools/v2_oracle/configured_cli_fixture.py");
+    let output = Command::new("python3")
+        .arg(script)
+        .arg("assemble")
+        .arg("--output")
+        .arg(&destination)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    destination
+}
+
+fn configured_cli_registry_arg(assembly: &std::path::Path) -> String {
+    format!("--registry=file://{}", assembly.join("registry").display())
+}
+
 fn fixture_workspace(name: &str) -> FixtureWorkspace {
     FixtureWorkspace::new(name).unwrap()
 }
@@ -770,6 +791,7 @@ fn recursive_action_fixture_reports_all_three_actions_without_execution() {
         TerminalOutput::new(0, String::new(), String::new())
     });
     let (_terminal, exit_code, stdout, stderr) = projected.publish().into_parts();
+    let stderr = String::from_utf8(stderr).expect("text-only fixture stderr");
 
     assert_eq!(exit_code, 0);
     assert!(stdout.is_empty());
@@ -809,6 +831,10 @@ fn build_file_loading_fixture_reaches_package_loading_before_analysis() {
 
 #[test]
 fn typed_build_activation_publishes_cold_events_without_warm_daemon_replay() {
+    let inputs = configured_cli_fixture(
+        "typed_build_activation_publishes_cold_events_without_warm_daemon_replay",
+    );
+    let registry = configured_cli_registry_arg(&inputs);
     let workspace = scratch("typed-build-activation");
     let package = workspace.join("pkg");
     write(
@@ -835,6 +861,7 @@ fn typed_build_activation_publishes_cold_events_without_warm_daemon_replay() {
     let one_shot = slug()
         .current_dir(&workspace)
         .args(["build", "//pkg:probe"])
+        .arg(&registry)
         .output()
         .unwrap();
     assert_eq!(one_shot.status.code(), Some(2), "{one_shot:?}");
@@ -853,6 +880,7 @@ fn typed_build_activation_publishes_cold_events_without_warm_daemon_replay() {
         let daemon = slug()
             .current_dir(&workspace)
             .args([output_base_arg.as_str(), "build", "//pkg:probe"])
+            .arg(&registry)
             .output()
             .unwrap();
         assert_eq!(daemon.status.code(), Some(2), "{daemon:?}");
@@ -872,6 +900,7 @@ fn typed_build_activation_publishes_cold_events_without_warm_daemon_replay() {
     let missing = slug()
         .current_dir(&workspace)
         .args(["build", "//pkg:missing"])
+        .arg(&registry)
         .output()
         .unwrap();
     assert_eq!(missing.status.code(), Some(2), "{missing:?}");
@@ -937,10 +966,15 @@ fn missing_build_target_is_structured_parse_error() {
 
 #[test]
 fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
+    let inputs = configured_cli_fixture(
+        "cquery_label_and_starlark_modes_match_success_and_missing_contracts",
+    );
+    let registry = configured_cli_registry_arg(&inputs);
     let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
     let default = slug()
         .current_dir(&workspace)
         .args(["cquery", "//parent:parent"])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(default.status.success(), "{default:?}");
@@ -950,6 +984,7 @@ fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
     let label = slug()
         .current_dir(&workspace)
         .args(["cquery", "//parent:parent", "--output=label"])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(label.status.success(), "{label:?}");
@@ -965,7 +1000,12 @@ fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
         "--output=starlark",
         "--starlark:expr=str(target.label)",
     ];
-    let success = slug().current_dir(&workspace).args(args).output().unwrap();
+    let success = slug()
+        .current_dir(&workspace)
+        .args(args)
+        .arg(&registry)
+        .output()
+        .unwrap();
     assert!(success.status.success(), "{success:?}");
     assert_eq!(success.stdout, b"@@//parent:parent\n");
     assert!(success.stderr.is_empty());
@@ -978,6 +1018,7 @@ fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
             "--output=starlark",
             "--starlark:expr=str(target.label)",
         ])
+        .arg(&registry)
         .output()
         .unwrap();
     assert_eq!(missing.status.code(), Some(1));
@@ -2021,6 +2062,10 @@ fn query_prints_text_labels_in_auto_and_full_order() {
 
 #[test]
 fn typed_query_activation_publishes_cold_events_without_warm_daemon_replay() {
+    let inputs = configured_cli_fixture(
+        "typed_query_activation_publishes_cold_events_without_warm_daemon_replay",
+    );
+    let registry = configured_cli_registry_arg(&inputs);
     let workspace = scratch("typed-query-activation");
     let package = workspace.join("pkg");
     write(
@@ -2046,6 +2091,7 @@ fn typed_query_activation_publishes_cold_events_without_warm_daemon_replay() {
     let one_shot = slug()
         .current_dir(&workspace)
         .args(["query", "//pkg:probe"])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(one_shot.status.success(), "{one_shot:?}");
@@ -2059,6 +2105,7 @@ fn typed_query_activation_publishes_cold_events_without_warm_daemon_replay() {
         let daemon = slug()
             .current_dir(&workspace)
             .args(["query", &output_base_arg, "deps(//pkg:probe)"])
+            .arg(&registry)
             .output()
             .unwrap();
         assert!(daemon.status.success(), "{daemon:?}");
@@ -2074,6 +2121,7 @@ fn typed_query_activation_publishes_cold_events_without_warm_daemon_replay() {
     let missing = slug()
         .current_dir(&workspace)
         .args(["query", "//pkg:missing"])
+        .arg(&registry)
         .output()
         .unwrap();
     assert_eq!(missing.status.code(), Some(7), "{missing:?}");
@@ -2093,6 +2141,7 @@ fn typed_query_activation_publishes_cold_events_without_warm_daemon_replay() {
     let syntax = slug()
         .current_dir(&workspace)
         .args(["query", "deps("])
+        .arg(&registry)
         .output()
         .unwrap();
     assert_eq!(syntax.status.code(), Some(2), "{syntax:?}");
@@ -5256,25 +5305,11 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
 "#;
 
     fn workspace() -> std::path::PathBuf {
-        let destination = scratch("configured-action-conflicts").join("fixture");
-        let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tools/v2_oracle/configured_cli_fixture.py");
-        let output = Command::new("python3")
-            .arg(script)
-            .arg("assemble")
-            .arg("--output")
-            .arg(&destination)
-            .output()
-            .unwrap();
-        assert!(output.status.success(), "{output:?}");
-        destination.join("workspace")
+        configured_cli_fixture("configured-action-conflicts").join("workspace")
     }
 
     fn registry_flag(workspace: &std::path::Path) -> String {
-        format!(
-            "--registry=file://{}",
-            workspace.parent().unwrap().join("registry").display()
-        )
+        configured_cli_registry_arg(workspace.parent().unwrap())
     }
 
     fn run(

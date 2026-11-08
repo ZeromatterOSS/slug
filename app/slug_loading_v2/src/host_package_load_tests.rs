@@ -791,6 +791,9 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
         .map(|event| match event {
             EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
             EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+            EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                panic!("unexpected repository process output")
+            }
         })
         .collect()
 }

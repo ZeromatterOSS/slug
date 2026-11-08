@@ -148,7 +148,7 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
     for (command, valid) in active_requests {
         assert!(!format!("{valid:?}").contains(secret));
         let response = handle_request(&mut daemon, &serde_json::to_string(&valid).unwrap());
-        assert!(!response.stderr.contains(secret));
+        assert!(!stderr_text(&response.stderr).contains(secret));
         let forwarded = daemon.take_forwarded_repository_environments_for_test();
         assert_eq!(forwarded.len(), 1, "{command}: {response:?}");
         assert_eq!(forwarded[0].get("A").unwrap().as_ref(), secret);
@@ -157,7 +157,7 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
 
     let empty = request(Vec::new());
     let response = handle_request(&mut daemon, &serde_json::to_string(&empty).unwrap());
-    assert!(!response.stderr.contains(secret));
+    assert!(!stderr_text(&response.stderr).contains(secret));
     let forwarded = daemon.take_forwarded_repository_environments_for_test();
     assert_eq!(forwarded.len(), 1);
     assert!(forwarded[0].is_empty());
@@ -189,12 +189,8 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
             &serde_json::to_string(&request(invalid)).unwrap(),
         );
         assert_eq!(response.exit_code, 2);
-        assert!(
-            response
-                .stderr
-                .contains("repository_environment_request_error")
-        );
-        assert!(!response.stderr.contains(secret));
+        assert!(stderr_text(&response.stderr).contains("repository_environment_request_error"));
+        assert!(!stderr_text(&response.stderr).contains(secret));
         assert!(
             daemon
                 .take_forwarded_repository_environments_for_test()
@@ -312,7 +308,10 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             inputs.3,
             CommandConfigurationOverlay::default(),
         );
-        assert!(!result.stderr.contains("build_runtime_error"), "{result:?}");
+        assert!(
+            !stderr_text(&result.stderr).contains("build_runtime_error"),
+            "{result:?}"
+        );
     }
     assert_eq!(daemon.take_forwarded_bzlmod_inputs_for_test(), expected);
 
@@ -342,7 +341,10 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             inputs.3,
         );
         assert_eq!(result.exit_code, 2, "{result:?}");
-        assert!(result.stderr.contains("aquery_runtime_error"), "{result:?}");
+        assert!(
+            stderr_text(&result.stderr).contains("aquery_runtime_error"),
+            "{result:?}"
+        );
     }
     assert_eq!(daemon.take_forwarded_bzlmod_inputs_for_test(), expected);
 }
@@ -368,14 +370,14 @@ fn aquery_wire_revalidates_the_raw_expression_scope() {
 
     let invalid = handle_request(&mut daemon, &request("deps(//pkg:probe, 1)"));
     assert_eq!(invalid.exit_code, 2);
-    assert!(invalid.stderr.contains("aquery_request_error"));
+    assert!(stderr_text(&invalid.stderr).contains("aquery_request_error"));
     assert_eq!(invalid.invalidated_files, 0);
 
     for expression in ["//pkg:probe", "deps(//pkg:probe)"] {
         let valid = handle_request(&mut daemon, &request(expression));
         assert_eq!(valid.exit_code, 2);
-        assert!(valid.stderr.contains("aquery_runtime_error"));
-        assert!(!valid.stderr.contains("aquery_request_error"));
+        assert!(stderr_text(&valid.stderr).contains("aquery_runtime_error"));
+        assert!(!stderr_text(&valid.stderr).contains("aquery_request_error"));
     }
 }
 
@@ -406,7 +408,7 @@ fn first_build_invalidates_zero_files() {
     let mut daemon = Daemon::new(&workspace).unwrap();
     let result = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
     assert_eq!(result.invalidated_files, 0);
-    assert!(result.stderr.contains("\"invalidated_files\":0"));
+    assert!(stderr_text(&result.stderr).contains("\"invalidated_files\":0"));
 }
 
 #[test]
@@ -426,9 +428,9 @@ fn daemon_analysis_boundary_redacts_repository_environment_argv() {
         &[format!("--repo_env=TOKEN={secret}")],
     );
     assert_eq!(result.exit_code, 2, "{result:?}");
-    assert!(!result.stderr.contains(secret), "{result:?}");
+    assert!(!stderr_text(&result.stderr).contains(secret), "{result:?}");
     assert!(
-        result.stderr.contains("--repo_env=<redacted>"),
+        stderr_text(&result.stderr).contains("--repo_env=<redacted>"),
         "{result:?}"
     );
 }
@@ -468,7 +470,10 @@ fn retained_daemon_restores_c0_after_root_setting_c1_without_source_invalidation
     let restored = run(&mut daemon, None);
     for result in [&c0, &c1, &restored] {
         assert_eq!(result.invalidated_files, 0, "{result:?}");
-        assert!(!result.stderr.contains("build_runtime_error"), "{result:?}");
+        assert!(
+            !stderr_text(&result.stderr).contains("build_runtime_error"),
+            "{result:?}"
+        );
     }
 
     let mut markers = fs::read_dir(workspace.join("bazel-out/.slug-configurations"))
@@ -664,10 +669,10 @@ exec_parent = rule(implementation = _exec_parent, subrules = [exec_probe])
         assert_ne!(result.exit_code, 0, "{result:?}");
         assert_eq!(result.invalidated_files, 0, "{result:?}");
     }
-    assert!(target_c0.stderr.contains("fragment-mode=fastbuild"));
-    assert!(exec_c0.stderr.contains("fragment-mode=opt"));
-    assert!(target_c1.stderr.contains("fragment-mode=dbg"));
-    assert!(exec_c1.stderr.contains("fragment-mode=fastbuild"));
+    assert!(stderr_text(&target_c0.stderr).contains("fragment-mode=fastbuild"));
+    assert!(stderr_text(&exec_c0.stderr).contains("fragment-mode=opt"));
+    assert!(stderr_text(&target_c1.stderr).contains("fragment-mode=dbg"));
+    assert!(stderr_text(&exec_c1.stderr).contains("fragment-mode=fastbuild"));
     assert_eq!(target_restored.stderr, target_c0.stderr);
     assert_eq!(exec_restored.stderr, exec_c0.stderr);
 }
@@ -734,16 +739,15 @@ subject = rule(implementation = _rule, subrules = [probe])
         assert!(result.stdout.is_empty(), "{result:?}");
     }
     assert!(
-        initial.stderr.contains("rule implementation ran"),
+        stderr_text(&initial.stderr).contains("rule implementation ran"),
         "{initial:?}"
     );
     assert!(
-        selected
-            .stderr
+        stderr_text(&selected.stderr)
             .contains("does not provide any admitted provider alternative"),
         "{selected:?}"
     );
-    assert!(!selected.stderr.contains("implementation ran"));
+    assert!(!stderr_text(&selected.stderr).contains("implementation ran"));
     assert_eq!(restored.stderr, initial.stderr);
 }
 
@@ -879,12 +883,15 @@ fn retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay()
 
     let cold = daemon.build(&targets, &remote_disabled(), &[]);
     assert_eq!(cold.exit_code, 2, "{cold:?}");
-    assert!(cold.stderr.starts_with(&cold_events), "{cold:?}");
+    assert!(
+        stderr_text(&cold.stderr).starts_with(&cold_events),
+        "{cold:?}"
+    );
     assert_eq!(cold.invalidated_files, 0);
 
     let warm = daemon.build(&targets, &remote_disabled(), &[]);
     assert_eq!(warm.exit_code, 2, "{warm:?}");
-    assert!(!warm.stderr.contains("DEBUG:"), "{warm:?}");
+    assert!(!stderr_text(&warm.stderr).contains("DEBUG:"), "{warm:?}");
     assert_eq!(warm.invalidated_files, 0);
 
     write(
@@ -894,7 +901,7 @@ fn retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay()
     let changed = daemon.build(&targets, &remote_disabled(), &[]);
     assert_eq!(changed.exit_code, 2, "{changed:?}");
     assert!(
-        changed.stderr.starts_with(&format!(
+        stderr_text(&changed.stderr).starts_with(&format!(
             "DEBUG: {}:2:6: BUILD_CHANGED\n",
             workspace.join("pkg/BUILD.bazel").display()
         )),
@@ -905,7 +912,7 @@ fn retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay()
     let warm_after_change = daemon.build(&targets, &remote_disabled(), &[]);
     assert_eq!(warm_after_change.exit_code, 2, "{warm_after_change:?}");
     assert!(
-        !warm_after_change.stderr.contains("DEBUG:"),
+        !stderr_text(&warm_after_change.stderr).contains("DEBUG:"),
         "{warm_after_change:?}"
     );
     assert_eq!(warm_after_change.invalidated_files, 0);
@@ -925,9 +932,7 @@ fn missing_loaded_bzl_is_absent_then_create_is_observed_without_a_key_panic() {
     let mut daemon = Daemon::new(&workspace).unwrap();
     let missing = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
     assert!(
-        missing
-            .stderr
-            .contains("cannot load '//pkg:defs.bzl': no such file"),
+        stderr_text(&missing.stderr).contains("cannot load '//pkg:defs.bzl': no such file"),
         "{missing:?}"
     );
 
@@ -938,10 +943,10 @@ fn missing_loaded_bzl_is_absent_then_create_is_observed_without_a_key_panic() {
     let created = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
     assert_eq!(created.invalidated_files, 1);
     assert!(
-        !created.stderr.contains("build_runtime_error"),
+        !stderr_text(&created.stderr).contains("build_runtime_error"),
         "{created:?}"
     );
-    assert!(created.stderr.contains("dice_starlark_package_loading"));
+    assert!(stderr_text(&created.stderr).contains("dice_starlark_package_loading"));
 }
 
 #[test]
@@ -961,18 +966,16 @@ fn transitive_missing_bzl_reports_the_deepest_label_and_recovers() {
     let mut daemon = Daemon::new(&workspace).unwrap();
     let missing = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
     assert!(
-        missing
-            .stderr
-            .contains("cannot load '//pkg:missing.bzl': no such file"),
+        stderr_text(&missing.stderr).contains("cannot load '//pkg:missing.bzl': no such file"),
         "{missing:?}"
     );
-    assert!(!missing.stderr.contains("cannot load '//pkg:defs.bzl'"));
+    assert!(!stderr_text(&missing.stderr).contains("cannot load '//pkg:defs.bzl'"));
 
     write(&package.join("missing.bzl"), "NAME = \"probe\"\n");
     let created = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
     assert_eq!(created.invalidated_files, 1);
     assert!(
-        !created.stderr.contains("build_runtime_error"),
+        !stderr_text(&created.stderr).contains("build_runtime_error"),
         "{created:?}"
     );
 }
@@ -988,7 +991,10 @@ fn retained_runtime_switches_from_build_bazel_to_build_fallback() {
 
     let mut daemon = Daemon::new(&workspace).unwrap();
     let first = daemon.build(&[target("//pkg:primary")], &remote_disabled(), &[]);
-    assert!(!first.stderr.contains("build_runtime_error"), "{first:?}");
+    assert!(
+        !stderr_text(&first.stderr).contains("build_runtime_error"),
+        "{first:?}"
+    );
 
     fs::remove_file(&primary).unwrap();
     write(
@@ -998,10 +1004,10 @@ fn retained_runtime_switches_from_build_bazel_to_build_fallback() {
     let fallback = daemon.build(&[target("//pkg:fallback")], &remote_disabled(), &[]);
     assert_eq!(fallback.invalidated_files, 2);
     assert!(
-        !fallback.stderr.contains("build_runtime_error"),
+        !stderr_text(&fallback.stderr).contains("build_runtime_error"),
         "{fallback:?}"
     );
-    assert!(fallback.stderr.contains("dice_starlark_package_loading"));
+    assert!(stderr_text(&fallback.stderr).contains("dice_starlark_package_loading"));
 }
 
 #[test]
@@ -1064,7 +1070,7 @@ fn retained_daemon_strict_test_suite_toggle_is_request_local_and_invalidates_no_
     assert!(strict.stdout.is_empty(), "{strict:?}");
     assert_eq!(strict.invalidated_files, 0);
     assert!(
-        strict.stderr.contains(
+        stderr_text(&strict.stderr).contains(
             "The label '//pkg:plain' in the test_suite '//pkg:suite' does not refer to a test or test_suite rule!"
         ),
         "{strict:?}"
@@ -1263,9 +1269,9 @@ fn label_kind_completes_cross_package_depth_boundaries_without_changing_standard
     assert_eq!(broken.exit_code, 7, "{broken:?}");
     assert!(broken.stdout.is_empty(), "{broken:?}");
     assert!(
-        broken.stderr.contains("\"error\":\"query_error\"")
-            && broken.stderr.contains("this is not valid Starlark")
-            && broken.stderr.contains("Evaluation of query"),
+        stderr_text(&broken.stderr).contains("\"error\":\"query_error\"")
+            && stderr_text(&broken.stderr).contains("this is not valid Starlark")
+            && stderr_text(&broken.stderr).contains("Evaluation of query"),
         "{broken:?}"
     );
 
@@ -1328,7 +1334,7 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     let response = DaemonResponse {
         exit_code: 2,
         stdout: String::new(),
-        stderr: "{\"error\":\"analysis_not_implemented\"}".to_owned(),
+        stderr: b"{\"error\":\"analysis_not_implemented\"}".to_vec(),
         invalidated_files: 3,
         run_launch_plan: None,
     };
@@ -1336,7 +1342,7 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
         serde_json::from_str(&serde_json::to_string(&response).unwrap()).unwrap();
     assert_eq!(response.exit_code, 2);
     assert!(response.stdout.is_empty());
-    assert_eq!(response.stderr, "{\"error\":\"analysis_not_implemented\"}");
+    assert_eq!(response.stderr, b"{\"error\":\"analysis_not_implemented\"}");
     assert_eq!(response.invalidated_files, 3);
 }
 
@@ -1388,7 +1394,7 @@ fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
     let response = DaemonResponse {
         exit_code: 0,
         stdout: String::new(),
-        stderr: String::new(),
+        stderr: Vec::new(),
         invalidated_files: 1,
         run_launch_plan: Some(plan.clone()),
     };
@@ -1493,12 +1499,8 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     );
     assert_eq!(undefined.exit_code, 2, "{undefined:?}");
     assert!(undefined.stdout.is_empty());
-    assert!(undefined.stderr.contains("cquery_request_error"));
-    assert!(
-        undefined
-            .stderr
-            .contains("undefined query variable '$late'")
-    );
+    assert!(stderr_text(&undefined.stderr).contains("cquery_request_error"));
+    assert!(stderr_text(&undefined.stderr).contains("undefined query variable '$late'"));
     assert_eq!(undefined.invalidated_files, 0);
     let unsupported = handle_request(
         &mut daemon,
@@ -1506,7 +1508,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     );
     assert_eq!(unsupported.exit_code, 2, "{unsupported:?}");
     assert!(unsupported.stdout.is_empty());
-    assert!(unsupported.stderr.contains("cquery_request_error"));
+    assert!(stderr_text(&unsupported.stderr).contains("cquery_request_error"));
     assert_eq!(unsupported.invalidated_files, 0);
     let empty_starlark = handle_request(
         &mut daemon,
@@ -1534,11 +1536,8 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     assert_eq!(graph_non_deps.exit_code, 2, "{graph_non_deps:?}");
     assert!(graph_non_deps.stdout.is_empty(), "{graph_non_deps:?}");
     assert!(
-        graph_non_deps
-            .stderr
-            .contains("\"error\":\"cquery_request_error\"")
-            && graph_non_deps
-                .stderr
+        stderr_text(&graph_non_deps.stderr).contains("\"error\":\"cquery_request_error\"")
+            && stderr_text(&graph_non_deps.stderr)
                 .contains("graph output requires a top-level deps()"),
         "{graph_non_deps:?}"
     );
@@ -1630,7 +1629,10 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         );
         let invalid = handle_request(&mut daemon, &request);
         assert_eq!(invalid.exit_code, 2, "{invalid:?}");
-        assert!(invalid.stderr.contains("invalid Slug regex"), "{invalid:?}");
+        assert!(
+            stderr_text(&invalid.stderr).contains("invalid Slug regex"),
+            "{invalid:?}"
+        );
     }
     for (depth, present) in [("0", true), ("1", true), ("'-1'", false)] {
         let request = format!(
@@ -1742,7 +1744,7 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
     assert_eq!(missing.exit_code, 1, "{missing:?}");
     assert!(missing.stdout.is_empty());
     assert_eq!(missing.invalidated_files, 0);
-    assert!(missing.stderr.contains("ERROR: Skipping '//pkg:missing'"));
+    assert!(stderr_text(&missing.stderr).contains("ERROR: Skipping '//pkg:missing'"));
     let recovery = run(&mut daemon, "//pkg:probe");
     assert_eq!(recovery.exit_code, 0, "{recovery:?}");
     assert_eq!(recovery.stdout, "@@//pkg:probe\n");
@@ -1886,7 +1888,7 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
         "{missing_before_regex:?}"
     );
     assert!(missing_before_regex.stdout.is_empty());
-    assert!(missing_before_regex.stderr.contains("//pkg:missing"));
+    assert!(stderr_text(&missing_before_regex.stderr).contains("//pkg:missing"));
 
     let malformed = run(
         &mut daemon,
@@ -1895,7 +1897,7 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
     );
     assert_eq!(malformed.exit_code, 2, "{malformed:?}");
     assert!(malformed.stdout.is_empty());
-    assert!(malformed.stderr.contains("invalid Slug regex"));
+    assert!(stderr_text(&malformed.stderr).contains("invalid Slug regex"));
 
     let unsupported = run(
         &mut daemon,
@@ -1904,7 +1906,7 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
     );
     assert_eq!(unsupported.exit_code, 2, "{unsupported:?}");
     assert!(unsupported.stdout.is_empty());
-    assert!(unsupported.stderr.contains("not a Starlark rule"));
+    assert!(stderr_text(&unsupported.stderr).contains("not a Starlark rule"));
 
     write(&definitions, &definition("beta_rule"));
     let changed = run(
@@ -2000,11 +2002,7 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
     let arity = run(&mut daemon, "siblings()", CqueryOutput::StarlarkLabel);
     assert_eq!(arity.exit_code, 2, "{arity:?}");
     assert!(arity.stdout.is_empty());
-    assert!(
-        arity
-            .stderr
-            .contains("too few arguments to function 'siblings'")
-    );
+    assert!(stderr_text(&arity.stderr).contains("too few arguments to function 'siblings'"));
 
     let missing = run(
         &mut daemon,
@@ -2013,8 +2011,8 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
     );
     assert_eq!(missing.exit_code, 1, "{missing:?}");
     assert!(missing.stdout.is_empty());
-    assert!(missing.stderr.contains("//pkg:missing"));
-    assert!(!missing.stderr.contains("siblings() not supported"));
+    assert!(stderr_text(&missing.stderr).contains("//pkg:missing"));
+    assert!(!stderr_text(&missing.stderr).contains("siblings() not supported"));
 
     write(&definitions, executable);
     let nonempty = run(
@@ -2025,8 +2023,7 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
     assert_eq!(nonempty.exit_code, 1, "{nonempty:?}");
     assert!(nonempty.stdout.is_empty());
     assert!(
-        nonempty
-            .stderr
+        stderr_text(&nonempty.stderr)
             .contains("\"message\":\"siblings() not supported for post analysis queries\"")
     );
     assert_eq!(nonempty.invalidated_files, 1);
@@ -2039,8 +2036,7 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
     assert_eq!(nested.exit_code, 1, "{nested:?}");
     assert!(nested.stdout.is_empty());
     assert!(
-        nested
-            .stderr
+        stderr_text(&nested.stderr)
             .contains("\"message\":\"siblings() not supported for post analysis queries\"")
     );
     assert_eq!(nested.invalidated_files, 0);
@@ -2130,11 +2126,7 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
     );
     assert_eq!(arity.exit_code, 2, "{arity:?}");
     assert!(arity.stdout.is_empty());
-    assert!(
-        arity
-            .stderr
-            .contains("too few arguments to function 'visible'")
-    );
+    assert!(stderr_text(&arity.stderr).contains("too few arguments to function 'visible'"));
 
     let missing = run(
         &mut daemon,
@@ -2143,16 +2135,15 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
     );
     assert_eq!(missing.exit_code, 1, "{missing:?}");
     assert!(missing.stdout.is_empty());
-    assert!(missing.stderr.contains("//pkg:missing"));
-    assert!(!missing.stderr.contains("visible() is not supported"));
+    assert!(stderr_text(&missing.stderr).contains("//pkg:missing"));
+    assert!(!stderr_text(&missing.stderr).contains("visible() is not supported"));
 
     write(&definitions, executable);
     let nonvacuous = run(&mut daemon, expression, CqueryOutput::StarlarkLabel);
     assert_eq!(nonvacuous.exit_code, 1, "{nonvacuous:?}");
     assert!(nonvacuous.stdout.is_empty());
     assert!(
-        nonvacuous
-            .stderr
+        stderr_text(&nonvacuous.stderr)
             .contains("\"message\":\"visible() is not supported on configured targets\"")
     );
     assert_eq!(nonvacuous.invalidated_files, 1);
@@ -2161,7 +2152,7 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
     assert_eq!(warm.exit_code, 1, "{warm:?}");
     assert!(warm.stdout.is_empty());
     assert!(
-        warm.stderr
+        stderr_text(&warm.stderr)
             .contains("\"message\":\"visible() is not supported on configured targets\"")
     );
     assert_eq!(warm.invalidated_files, 0);
@@ -2206,13 +2197,13 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
     let buildfiles = run(&mut daemon, "buildfiles(//pkg:probe)", CqueryOutput::Label);
     assert_eq!(buildfiles.exit_code, 1, "{buildfiles:?}");
     assert!(buildfiles.stdout.is_empty());
-    assert!(buildfiles.stderr.contains(expected));
+    assert!(stderr_text(&buildfiles.stderr).contains(expected));
     assert_eq!(buildfiles.invalidated_files, 0);
 
     let loadfiles_empty = run(&mut daemon, "loadfiles(set())", CqueryOutput::StarlarkLabel);
     assert_eq!(loadfiles_empty.exit_code, 1, "{loadfiles_empty:?}");
     assert!(loadfiles_empty.stdout.is_empty());
-    assert!(loadfiles_empty.stderr.contains(expected));
+    assert!(stderr_text(&loadfiles_empty.stderr).contains(expected));
     assert_eq!(loadfiles_empty.invalidated_files, 0);
 
     for expression in [
@@ -2224,18 +2215,17 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
         let result = run(&mut daemon, expression, CqueryOutput::StarlarkLabel);
         assert_eq!(result.exit_code, 1, "{expression}: {result:?}");
         assert!(result.stdout.is_empty());
-        assert!(result.stderr.contains(expected), "{expression}: {result:?}");
+        assert!(
+            stderr_text(&result.stderr).contains(expected),
+            "{expression}: {result:?}"
+        );
         assert_eq!(result.invalidated_files, 0, "{expression}: {result:?}");
     }
 
     let arity = run(&mut daemon, "buildfiles()", CqueryOutput::StarlarkLabel);
     assert_eq!(arity.exit_code, 2, "{arity:?}");
     assert!(arity.stdout.is_empty());
-    assert!(
-        arity
-            .stderr
-            .contains("too few arguments to function 'buildfiles'")
-    );
+    assert!(stderr_text(&arity.stderr).contains("too few arguments to function 'buildfiles'"));
 
     let missing = run(
         &mut daemon,
@@ -2244,8 +2234,8 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
     );
     assert_eq!(missing.exit_code, 1, "{missing:?}");
     assert!(missing.stdout.is_empty());
-    assert!(missing.stderr.contains("//pkg:missing"));
-    assert!(!missing.stderr.contains(expected));
+    assert!(stderr_text(&missing.stderr).contains("//pkg:missing"));
+    assert!(!stderr_text(&missing.stderr).contains(expected));
 
     let analysis = run(
         &mut daemon,
@@ -2254,8 +2244,8 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
     );
     assert_eq!(analysis.exit_code, 2, "{analysis:?}");
     assert!(analysis.stdout.is_empty());
-    assert!(analysis.stderr.contains("not a Starlark rule"));
-    assert!(!analysis.stderr.contains(expected));
+    assert!(stderr_text(&analysis.stderr).contains("not a Starlark rule"));
+    assert!(!stderr_text(&analysis.stderr).contains(expected));
 
     fs::remove_file(&build).unwrap();
     let deleted = run(
@@ -2265,8 +2255,8 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
     );
     assert_eq!(deleted.exit_code, 2, "{deleted:?}");
     assert!(deleted.stdout.is_empty());
-    assert!(deleted.stderr.contains("pkg"));
-    assert!(!deleted.stderr.contains(expected));
+    assert!(stderr_text(&deleted.stderr).contains("pkg"));
+    assert!(!stderr_text(&deleted.stderr).contains(expected));
     assert_eq!(deleted.invalidated_files, 1);
 
     write(&build, build_contents);
@@ -2277,7 +2267,7 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
     );
     assert_eq!(recreated.exit_code, 1, "{recreated:?}");
     assert!(recreated.stdout.is_empty());
-    assert!(recreated.stderr.contains(expected));
+    assert!(stderr_text(&recreated.stderr).contains(expected));
     assert_eq!(recreated.invalidated_files, 1);
 }
 
@@ -2313,10 +2303,9 @@ fn retained_cquery_missing_executable_recovers_after_rule_edit() {
     assert_eq!(missing.exit_code, 1, "{missing:?}");
     assert!(missing.stdout.is_empty());
     assert_eq!(missing.invalidated_files, 0);
-    assert!(missing.stderr.contains("cquery_runtime_error"));
+    assert!(stderr_text(&missing.stderr).contains("cquery_runtime_error"));
     assert!(
-        missing
-            .stderr
+        stderr_text(&missing.stderr)
             .contains("The rule 'probe' is executable. It needs to create an executable File")
     );
 
@@ -2408,8 +2397,8 @@ fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidatio
     assert_eq!(first.exit_code, 1, "{first:?}");
     assert!(first.stdout.is_empty());
     assert_eq!(first.invalidated_files, 0);
-    assert!(first.stderr.contains("cquery_runtime_error"));
-    assert!(first.stderr.contains("argument set is empty"));
+    assert!(stderr_text(&first.stderr).contains("cquery_runtime_error"));
+    assert!(stderr_text(&first.stderr).contains("argument set is empty"));
 
     write(
         &workspace.join("pkg/BUILD.bazel"),
@@ -2419,18 +2408,14 @@ fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidatio
     assert_eq!(after_edit.exit_code, 1, "{after_edit:?}");
     assert!(after_edit.stdout.is_empty());
     assert_eq!(after_edit.invalidated_files, 1);
-    assert!(after_edit.stderr.contains("cquery_runtime_error"));
-    assert!(after_edit.stderr.contains("argument set is empty"));
+    assert!(stderr_text(&after_edit.stderr).contains("cquery_runtime_error"));
+    assert!(stderr_text(&after_edit.stderr).contains("argument set is empty"));
 
     let invalid = run(&mut daemon, "some(//pkg:missing, 2147483648)");
     assert_eq!(invalid.exit_code, 2, "{invalid:?}");
     assert!(invalid.stdout.is_empty());
     assert_eq!(invalid.invalidated_files, 0);
-    assert!(
-        invalid
-            .stderr
-            .contains("expected an integer literal: '2147483648'")
-    );
+    assert!(stderr_text(&invalid.stderr).contains("expected an integer literal: '2147483648'"));
 }
 
 #[test]
@@ -2615,7 +2600,10 @@ fn malformed_bzlmod_protocol_input_is_request_local() {
     ] {
         let malformed = handle_request(&mut daemon, request);
         assert_eq!(malformed.exit_code, expected_exit);
-        assert!(malformed.stderr.contains(expected_error), "{malformed:?}");
+        assert!(
+            stderr_text(&malformed.stderr).contains(expected_error),
+            "{malformed:?}"
+        );
 
         let recovered = handle_request(
             &mut daemon,
@@ -2705,7 +2693,7 @@ fn retained_daemon_query_publishes_cold_events_without_warm_replay() {
         assert_eq!(result.exit_code, 0, "{result:?}");
         assert_eq!(result.stdout, "//pkg:probe\n");
         if index == 0 {
-            assert_eq!(result.stderr, expected);
+            assert_eq!(stderr_text(&result.stderr), expected);
         } else {
             assert!(result.stderr.is_empty(), "{result:?}");
         }
@@ -2720,7 +2708,7 @@ fn retained_daemon_query_publishes_cold_events_without_warm_replay() {
     assert_eq!(changed.exit_code, 0, "{changed:?}");
     assert_eq!(changed.stdout, "//pkg:probe\n");
     assert_eq!(
-        changed.stderr,
+        stderr_text(&changed.stderr),
         format!(
             "DEBUG: {}:2:6: BUILD_CHANGED\n",
             workspace.join("pkg/BUILD.bazel").display()
@@ -2755,8 +2743,10 @@ fn retained_daemon_direct_external_query_replays_only_changed_external_build() {
     let first = daemon.query("@dep//:target.txt", QueryOrder::Auto);
     assert_eq!(first.exit_code, 0, "{first:?}");
     assert_eq!(first.stdout, "@dep//:target.txt\n");
-    let module_index = first.stderr.find("MODULE_EVENT").unwrap();
-    let build_index = first.stderr.find("EXTERNAL_BUILD_EVENT").unwrap();
+    let module_index = stderr_text(&first.stderr).find("MODULE_EVENT").unwrap();
+    let build_index = stderr_text(&first.stderr)
+        .find("EXTERNAL_BUILD_EVENT")
+        .unwrap();
     assert!(module_index < build_index, "{first:?}");
     assert_eq!(first.invalidated_files, 0);
 
@@ -2775,10 +2765,13 @@ fn retained_daemon_direct_external_query_replays_only_changed_external_build() {
     assert_eq!(edited.exit_code, 0, "{edited:?}");
     assert_eq!(edited.stdout, "@dep//:edited.txt\n");
     assert!(
-        edited.stderr.contains("EXTERNAL_BUILD_EDITED"),
+        stderr_text(&edited.stderr).contains("EXTERNAL_BUILD_EDITED"),
         "{edited:?}"
     );
-    assert!(!edited.stderr.contains("MODULE_EVENT"), "{edited:?}");
+    assert!(
+        !stderr_text(&edited.stderr).contains("MODULE_EVENT"),
+        "{edited:?}"
+    );
     assert_eq!(edited.invalidated_files, 2);
 }
 
@@ -2822,39 +2815,46 @@ fn retained_daemon_build_observes_direct_external_exported_sources() {
     let cold = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
     assert_eq!(cold.exit_code, 0, "{cold:?}");
     assert!(cold.stdout.is_empty(), "{cold:?}");
-    assert_eq!(cold.stderr.matches("ROOT_EVENT").count(), 1, "{cold:?}");
     assert_eq!(
-        cold.stderr.matches("DEP_BUILD_EVENT").count(),
+        stderr_text(&cold.stderr).matches("ROOT_EVENT").count(),
         1,
         "{cold:?}"
     );
-    let root_event = cold.stderr.find("ROOT_EVENT").unwrap();
-    let build_event = cold.stderr.find("DEP_BUILD_EVENT").unwrap();
-    let terminal_start = cold.stderr.find("{\"success\":true").unwrap();
+    assert_eq!(
+        stderr_text(&cold.stderr).matches("DEP_BUILD_EVENT").count(),
+        1,
+        "{cold:?}"
+    );
+    let root_event = stderr_text(&cold.stderr).find("ROOT_EVENT").unwrap();
+    let build_event = stderr_text(&cold.stderr).find("DEP_BUILD_EVENT").unwrap();
+    let terminal_start = stderr_text(&cold.stderr).find("{\"success\":true").unwrap();
     assert!(
         root_event < build_event && build_event < terminal_start,
         "{cold:?}"
     );
-    assert!(cold.stderr.ends_with(&terminal(0)), "{cold:?}");
-    assert!(!cold.stderr.contains("reapi"), "{cold:?}");
+    assert!(
+        stderr_text(&cold.stderr).ends_with(&terminal(0)),
+        "{cold:?}"
+    );
+    assert!(!stderr_text(&cold.stderr).contains("reapi"), "{cold:?}");
 
     let warm = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
     assert_eq!(warm.exit_code, 0, "{warm:?}");
     assert!(warm.stdout.is_empty(), "{warm:?}");
-    assert_eq!(warm.stderr, terminal(0));
+    assert_eq!(stderr_text(&warm.stderr), terminal(0));
 
     write(&source, "two\n");
     let edited = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
     assert_eq!(edited.exit_code, 0, "{edited:?}");
     assert!(edited.stdout.is_empty(), "{edited:?}");
-    assert_eq!(edited.stderr, terminal(1));
+    assert_eq!(stderr_text(&edited.stderr), terminal(1));
 
     fs::remove_file(&source).unwrap();
     let absent = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
     assert_eq!(absent.exit_code, 2, "{absent:?}");
     assert!(absent.stdout.is_empty(), "{absent:?}");
     assert_eq!(
-        absent.stderr,
+        stderr_text(&absent.stderr),
         "{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"@@dep+//:target.txt: missing input file '@@dep+//:target.txt'\",\"runtime_mode\":\"daemon\",\"invalidated_files\":1}\n"
     );
 
@@ -2862,34 +2862,37 @@ fn retained_daemon_build_observes_direct_external_exported_sources() {
     let directory = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
     assert_eq!(directory.exit_code, 0, "{directory:?}");
     assert!(directory.stdout.is_empty(), "{directory:?}");
-    assert_eq!(directory.stderr, terminal(0));
+    assert_eq!(stderr_text(&directory.stderr), terminal(0));
 
     fs::remove_dir(&source).unwrap();
     write(&source, "three\n");
     let recreated = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
     assert_eq!(recreated.exit_code, 0, "{recreated:?}");
     assert!(recreated.stdout.is_empty(), "{recreated:?}");
-    assert_eq!(recreated.stderr, terminal(1));
+    assert_eq!(stderr_text(&recreated.stderr), terminal(1));
 
     let root = daemon.build(&[target("//:root.txt")], &remote_disabled(), &[]);
     assert_eq!(root.exit_code, 0, "{root:?}");
     assert!(root.stdout.is_empty(), "{root:?}");
-    assert_eq!(root.stderr, terminal(0));
+    assert_eq!(stderr_text(&root.stderr), terminal(0));
 
     let unchanged = daemon.build(&[target("@dep//:files")], &remote_disabled(), &[]);
     assert_eq!(unchanged.exit_code, 2, "{unchanged:?}");
-    assert!(unchanged.stderr.contains("not an exported source file"));
+    assert!(stderr_text(&unchanged.stderr).contains("not an exported source file"));
 
     let rule = daemon.build(&[target("@dep//rulepkg:rule")], &remote_disabled(), &[]);
     assert_eq!(rule.exit_code, 2, "{rule:?}");
-    assert!(rule.stderr.contains("not an exported source file"));
-    assert!(!rule.stderr.contains("ANALYSIS_MUST_NOT_RUN"), "{rule:?}");
+    assert!(stderr_text(&rule.stderr).contains("not an exported source file"));
+    assert!(
+        !stderr_text(&rule.stderr).contains("ANALYSIS_MUST_NOT_RUN"),
+        "{rule:?}"
+    );
 
     let mut remote_execute = remote_disabled();
     remote_execute.executor = Some("grpc://must-not-run".to_owned());
     let remote_source = daemon.build(&[target("@dep//:target.txt")], &remote_execute, &[]);
     assert_eq!(remote_source.exit_code, 0, "{remote_source:?}");
-    let evidence: serde_json::Value = serde_json::from_str(&remote_source.stderr).unwrap();
+    let evidence: serde_json::Value = serde_json::from_slice(&remote_source.stderr).unwrap();
     assert_eq!(evidence["completed_boundary"], "reapi_native_execution");
     assert_eq!(evidence["reapi_actions"], 0);
     assert_eq!(evidence["materialized_outputs"], serde_json::json!([]));
@@ -2936,26 +2939,40 @@ fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
     assert_eq!(cold.exit_code, 7, "{cold:?}");
     assert!(cold.stdout.is_empty(), "{cold:?}");
     assert!(
-        cold.stderr.contains("DEBUG:") && cold.stderr.contains("ROOT_EVENT"),
+        stderr_text(&cold.stderr).contains("DEBUG:")
+            && stderr_text(&cold.stderr).contains("ROOT_EVENT"),
         "{cold:?}"
     );
-    assert_eq!(cold.stderr.matches("ROOT_EVENT").count(), 1, "{cold:?}");
-    assert!(cold.stderr.contains("\"error\":\"unsupported_feature\""));
-    assert!(cold.stderr.contains("/dep/cycle/b.MODULE.bazel:2:1"));
-    assert!(cold.stderr.contains("/dep/MODULE.bazel:3:1"));
-    assert!(cold.stderr.ends_with(&terminal(0)), "{cold:?}");
-    assert!(!cold.stderr.contains("DEP_EVENT"), "{cold:?}");
-    assert!(!cold.stderr.contains("A_EVENT"), "{cold:?}");
-    assert!(!cold.stderr.contains("B_EVENT"), "{cold:?}");
-    assert!(!cold.stderr.contains("BUILD_EVENT"), "{cold:?}");
-    assert!(!cold.stderr.contains("Evaluation of query"), "{cold:?}");
+    assert_eq!(
+        stderr_text(&cold.stderr).matches("ROOT_EVENT").count(),
+        1,
+        "{cold:?}"
+    );
+    assert!(stderr_text(&cold.stderr).contains("\"error\":\"unsupported_feature\""));
+    assert!(stderr_text(&cold.stderr).contains("/dep/cycle/b.MODULE.bazel:2:1"));
+    assert!(stderr_text(&cold.stderr).contains("/dep/MODULE.bazel:3:1"));
+    assert!(
+        stderr_text(&cold.stderr).ends_with(&terminal(0)),
+        "{cold:?}"
+    );
+    assert!(!stderr_text(&cold.stderr).contains("DEP_EVENT"), "{cold:?}");
+    assert!(!stderr_text(&cold.stderr).contains("A_EVENT"), "{cold:?}");
+    assert!(!stderr_text(&cold.stderr).contains("B_EVENT"), "{cold:?}");
+    assert!(
+        !stderr_text(&cold.stderr).contains("BUILD_EVENT"),
+        "{cold:?}"
+    );
+    assert!(
+        !stderr_text(&cold.stderr).contains("Evaluation of query"),
+        "{cold:?}"
+    );
     assert_eq!(cold.invalidated_files, 0);
 
     let build = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
     assert_eq!(build.exit_code, 7, "{build:?}");
     assert!(build.stdout.is_empty(), "{build:?}");
     assert_eq!(
-        build.stderr,
+        stderr_text(&build.stderr),
         format!(
             "{{\"error\":\"unsupported_feature\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}\n",
             slug_core_v2::error::json_escape(&message),
@@ -2965,13 +2982,13 @@ fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
     let warm = daemon.query("buildfiles(@dep//:target.txt)", QueryOrder::Auto);
     assert_eq!(warm.exit_code, 7, "{warm:?}");
     assert!(warm.stdout.is_empty(), "{warm:?}");
+    assert!(stderr_text(&warm.stderr).starts_with("{\"error\":\"unsupported_feature\""));
+    assert_eq!(stderr_text(&warm.stderr), terminal(0));
+    assert!(!stderr_text(&warm.stderr).contains("DEBUG:"), "{warm:?}");
     assert!(
-        warm.stderr
-            .starts_with("{\"error\":\"unsupported_feature\"")
+        !stderr_text(&warm.stderr).contains("Evaluation of query"),
+        "{warm:?}"
     );
-    assert_eq!(warm.stderr, terminal(0));
-    assert!(!warm.stderr.contains("DEBUG:"), "{warm:?}");
-    assert!(!warm.stderr.contains("Evaluation of query"), "{warm:?}");
     assert_eq!(warm.invalidated_files, 0);
 
     write(
@@ -2982,7 +2999,11 @@ fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
     assert_eq!(recovered.exit_code, 0, "{recovered:?}");
     assert_eq!(recovered.stdout, "@dep//:target.txt\n");
     for event in ["DEP_EVENT", "A_EVENT", "B_EVENT", "BUILD_EVENT"] {
-        assert_eq!(recovered.stderr.matches(event).count(), 1, "{recovered:?}");
+        assert_eq!(
+            stderr_text(&recovered.stderr).matches(event).count(),
+            1,
+            "{recovered:?}"
+        );
     }
     assert_eq!(recovered.invalidated_files, 1);
 
@@ -2995,15 +3016,14 @@ fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
     let reintroduced = daemon.query("loadfiles(@dep//:target.txt)", QueryOrder::Auto);
     assert_eq!(reintroduced.exit_code, 7, "{reintroduced:?}");
     assert!(reintroduced.stdout.is_empty(), "{reintroduced:?}");
+    assert!(stderr_text(&reintroduced.stderr).contains("\"error\":\"unsupported_feature\""));
+    assert_eq!(stderr_text(&reintroduced.stderr), terminal(1));
     assert!(
-        reintroduced
-            .stderr
-            .contains("\"error\":\"unsupported_feature\"")
+        !stderr_text(&reintroduced.stderr).contains("DEBUG:"),
+        "{reintroduced:?}"
     );
-    assert_eq!(reintroduced.stderr, terminal(1));
-    assert!(!reintroduced.stderr.contains("DEBUG:"), "{reintroduced:?}");
     assert!(
-        !reintroduced.stderr.contains("Evaluation of query"),
+        !stderr_text(&reintroduced.stderr).contains("Evaluation of query"),
         "{reintroduced:?}"
     );
     assert_eq!(reintroduced.invalidated_files, 1);
@@ -3018,10 +3038,10 @@ fn daemon_query_preflight_error_has_one_terminal_newline() {
     assert_eq!(result.exit_code, 2, "{result:?}");
     assert!(result.stdout.is_empty());
     assert_eq!(
-        result.stderr,
+        stderr_text(&result.stderr),
         "{\"error\":\"query_runtime_error\",\"command\":\"query\",\"message\":\"output format 'unsupported' is not supported by loading query\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}\n"
     );
-    assert_eq!(result.stderr.lines().count(), 1);
+    assert_eq!(stderr_text(&result.stderr).lines().count(), 1);
     assert_eq!(result.invalidated_files, 0);
 }
 
@@ -3529,7 +3549,7 @@ fn cquery_distdirs_round_trip_defaults_and_normalize_per_request() {
     let malformed = r#"{"kind":"cquery","request":{"expression":"//:probe","output":"label","distdirs":"archives"}}"#;
     let response = handle_request(&mut daemon, malformed);
     assert_eq!(response.exit_code, 2);
-    assert!(response.stderr.contains("daemon_parse_error"));
+    assert!(stderr_text(&response.stderr).contains("daemon_parse_error"));
     assert!(daemon.take_forwarded_archive_distdirs_for_test().is_empty());
     let _response = handle_request(&mut daemon, &wire(Vec::new()));
     assert!(
@@ -3537,4 +3557,8 @@ fn cquery_distdirs_round_trip_defaults_and_normalize_per_request() {
             .paths()
             .is_empty()
     );
+}
+
+fn stderr_text(bytes: &[u8]) -> &str {
+    std::str::from_utf8(bytes).expect("this fixture expects text-only stderr")
 }

@@ -19,6 +19,201 @@ fn anchor(instance: u64, root: &str) -> MaterializationPathAnchor {
 
 type Entry = (PathObservationDemand, PathObservationResult);
 
+fn listing(anchor: &MaterializationPathAnchor, value: &str) -> Entry {
+    (
+        PathObservationDemand::new(
+            anchor.namespace(),
+            path(value),
+            PathObservationOperation::DirectoryEntries,
+        ),
+        PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+            PathDirectoryEntries::new([crate::PathDirectoryEntry::new(
+                crate::PathDirectoryName::new("child").unwrap(),
+                crate::PathDirectoryEntryKind::File,
+            )]),
+        )),
+    )
+}
+
+async fn anchored_listing(
+    anchor: MaterializationPathAnchor,
+    requested: &str,
+    script: Vec<Entry>,
+) -> ObservedPathDirectoryListing {
+    let key = PathDirectoryListingObservationKey::new_anchored(anchor.dupe(), requested).unwrap();
+    let plain = PathDirectoryListingKey::new_anchored(anchor.dupe(), requested).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut tx = dice.updater().commit().await;
+    for prefix in 0..=script.len() {
+        let mut updater = tx.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::new(script[..prefix].iter().cloned()).unwrap(),
+            )])
+            .unwrap();
+        tx = updater.commit().await;
+        let value = tx.compute(&key).await.unwrap();
+        let operational = tx.compute(&plain).await.unwrap();
+        if prefix < script.len() {
+            let PathOutcome::Need(need) = &value else {
+                panic!("premature listing at {prefix}")
+            };
+            assert_eq!(need.demands(), &[script[prefix].0.dupe()]);
+            assert!(
+                need.demands()
+                    .iter()
+                    .all(|demand| demand.namespace() == anchor.namespace()
+                        && demand.path().as_path().starts_with(anchor.root().as_path()))
+            );
+            assert!(!PathDirectoryListingObservationKey::validity(&value));
+            assert!(!PathDirectoryListingObservationKey::equality(
+                &value, &value
+            ));
+            let PathOutcome::Need(plain_need) = operational else {
+                panic!("premature plain listing")
+            };
+            assert_eq!(plain_need.demands(), need.demands());
+        } else {
+            let PathOutcome::Complete(Ok(observed)) = value else {
+                panic!("listing did not complete")
+            };
+            let PathOutcome::Complete(plain_result) = operational else {
+                panic!("plain listing incomplete")
+            };
+            assert_eq!(&plain_result, observed.result());
+            assert_eq!(observed.observations().observations().len(), script.len());
+            for (demand, _) in &script {
+                let PathOutcome::Complete(authoritative) = tx
+                    .compute(&PathObservationKey::new(demand.dupe()))
+                    .await
+                    .unwrap()
+                else {
+                    panic!("dependency lost")
+                };
+                assert!(Arc::ptr_eq(
+                    &authoritative,
+                    observed.observations().observations().get(demand).unwrap()
+                ));
+            }
+            return observed;
+        }
+    }
+    unreachable!()
+}
+
+#[tokio::test]
+async fn anchored_directory_listing_stops_at_root_and_follows_only_internal_links() {
+    let a = anchor(101, "/absent/parent/repo");
+    let value = anchored_listing(
+        a.dupe(),
+        "/absent/parent/repo/alias",
+        vec![
+            lstat(&a, "/absent/parent/repo", Some(PathNodeKind::Directory)),
+            lstat(&a, "/absent/parent/repo/alias", Some(PathNodeKind::Symlink)),
+            link(&a, "/absent/parent/repo/alias", "dir"),
+            lstat(&a, "/absent/parent/repo/dir", Some(PathNodeKind::Directory)),
+            listing(&a, "/absent/parent/repo/dir"),
+        ],
+    )
+    .await;
+    assert!(
+        matches!(value.result(), Ok(PathDirectoryListing::Present(entries)) if entries.entries().len()==1)
+    );
+}
+
+#[tokio::test]
+async fn anchored_directory_listing_refuses_escape_without_outside_demand() {
+    let a = anchor(102, "/absent/parent/repo");
+    let value = anchored_listing(
+        a.dupe(),
+        "/absent/parent/repo/link",
+        vec![
+            lstat(&a, "/absent/parent/repo", Some(PathNodeKind::Directory)),
+            lstat(&a, "/absent/parent/repo/link", Some(PathNodeKind::Symlink)),
+            link(&a, "/absent/parent/repo/link", "../outside"),
+        ],
+    )
+    .await;
+    let expected = PathDirectoryListingError::EscapesAnchor {
+        logical_path: path("/absent/parent/repo/link"),
+        anchor: a.dupe(),
+    };
+    assert_eq!(value.result(), &Err(expected.clone()));
+    assert_ne!(
+        expected,
+        PathDirectoryListingError::EscapesAnchor {
+            logical_path: path("/absent/parent/repo/link"),
+            anchor: anchor(103, "/absent/parent/repo"),
+        }
+    );
+}
+
+#[tokio::test]
+async fn anchored_directory_listing_preserves_missing_and_wrong_kind() {
+    let a = anchor(104, "/absent/repo");
+    let missing = anchored_listing(
+        a.dupe(),
+        "/absent/repo",
+        vec![lstat(&a, "/absent/repo", None)],
+    )
+    .await;
+    assert_eq!(missing.result(), &Ok(PathDirectoryListing::Missing));
+    let wrong = anchored_listing(
+        a.dupe(),
+        "/absent/repo",
+        vec![lstat(&a, "/absent/repo", Some(PathNodeKind::RegularFile))],
+    )
+    .await;
+    assert_eq!(
+        wrong.result(),
+        &Err(PathDirectoryListingError::Observation {
+            logical_path: path("/absent/repo"),
+            operation: PathObservationOperation::Lstat,
+            error: PathObservationError::WrongKind {
+                expected: PathNodeKind::Directory,
+                actual: PathNodeKind::RegularFile,
+            },
+        })
+    );
+    let descendant = anchored_listing(
+        a.dupe(),
+        "/absent/repo/file",
+        vec![
+            lstat(&a, "/absent/repo", Some(PathNodeKind::Directory)),
+            lstat(&a, "/absent/repo/file", Some(PathNodeKind::RegularFile)),
+        ],
+    )
+    .await;
+    assert_eq!(
+        descendant.result(),
+        &Err(PathDirectoryListingError::WrongKind {
+            logical_path: path("/absent/repo/file"),
+            expected: PathNodeKind::Directory,
+            actual: PathNodeKind::RegularFile,
+        })
+    );
+}
+
+#[test]
+fn anchored_directory_listing_identity_and_raw_membership_are_explicit() {
+    let a = anchor(105, "/repo");
+    let b = anchor(106, "/repo");
+    let anchored = PathDirectoryListingKey::new_anchored(a.dupe(), "/repo/dir").unwrap();
+    assert_ne!(
+        anchored,
+        PathDirectoryListingKey::new_anchored(b, "/repo/dir").unwrap()
+    );
+    assert_ne!(
+        anchored,
+        PathDirectoryListingKey::new(a.namespace(), path("/repo/dir"))
+    );
+    for outside in ["/repo-other", "/repo/../repo/dir", "relative"] {
+        assert!(PathDirectoryListingKey::new_anchored(a.dupe(), outside).is_err());
+        assert!(PathDirectoryListingObservationKey::new_anchored(a.dupe(), outside).is_err());
+    }
+}
+
 fn lstat(anchor: &MaterializationPathAnchor, value: &str, kind: Option<PathNodeKind>) -> Entry {
     (
         PathObservationDemand::new(

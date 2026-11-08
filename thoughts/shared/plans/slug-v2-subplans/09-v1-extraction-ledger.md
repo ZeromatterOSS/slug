@@ -65,6 +65,18 @@ pool/cache, semantic hash shortcut or cap increase is introduced. Derived DICE
 equality is unchanged; component proof does not establish completed-command fit.
 See [selected-view admission evidence](wp1225-selected-view-admission-acceptance-2026-11-08.json).
 
+Original Loading integration shares full expected Spec Arcs in reservations,
+uses Arc-backed typed Need maps and resource-free original replay state, and
+retains one native bank across command lifetimes. Selected declaration arrays
+are transient Need data; source histories do not become transcript fields.
+Result/output events share existing captured Arcs, while current publication
+owns its binary output buffer. Credited retirement observers outlive command
+control where necessary and grant no root access. No donor import, global cache,
+new interner or dependency is introduced. These ownership checks do not prove
+whole-workload memory reduction or fit. Anchored listing keys retain the full
+semantic anchor without a descriptor or mutable owner; unanchored keys retain
+None. See the [original Loading join evidence](wp1225-original-loading-acceptance-2026-11-08.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

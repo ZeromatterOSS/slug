@@ -373,6 +373,80 @@ results may cut off semantic projections only AFTER actual sample; old physical
 instance authority stays distinct. Untracked Host helper changes before warm
 reuse must cause a new sample. Keep source/mapping/env/certificate dependencies.
 
+### Original Loading candidate join
+
+The [scoped acceptance receipt](wp1225-original-loading-acceptance-2026-11-08.json)
+records the original-to-native fixture and affected owner/CLI regressions. It
+does not activate the policy or close public Rust, physical CAS/runfiles, archive
+envelope or matching-command memory gates.
+
+The inactive original route observes a workspace-scoped execution policy before
+route/prepared reuse under both variants. Its ordinary DICE key computes
+Disabled unless Core explicitly injects the trusted policy; attempt, acceptance
+and restoration inject the current policy. LinuxReadOnlyHostV1 applies uniformly
+to original repository-rule invocations and never falls back to a GCC/Homebrew
+runner on refusal. Trusted test construction currently requires the already
+installed Diagnostic scope and one workspace-retained native bank. Native
+production still has no per-command source scope and cannot enable this route.
+Default activation remains gated below.
+
+Enabled evaluation demands the fresh workspace observation before loading the
+original definition or returning a prepared effect, including zero-Execute
+rules. The reservation binds its expected full RepoSpec before exposing absolute
+Path text. Stable spelling and conflict-slot identity exclude Spec; full equality
+and bounded storage include it. A stale same-slot Spec refuses rather than
+creating another reservation. Typed reservation Needs initialize the actual
+claimed root outside DICE; operation Needs carry the exact request and an
+independent canonical set of current selected request/result associations.
+Generic repository path, file-read and directory-listing producers preserve the
+materialization anchor. Anchored listing keys include that complete anchor in
+identity and reject escapes explicitly; resolution never asks the native reader
+to observe ancestors above the selected root. Host and legacy unanchored routes
+keep their existing resolution behavior.
+
+One invocation cursor starts at the transcript's initial State and replays each
+exact record into that record's next State. File/read/exists/template/delete/
+archive/Execute share the cursor; terminal projection rejects unused records and
+carries the complete realization into GeneralWorkspace without authored-plan
+postapplication. Own Labels resolve through the bound root before terminal
+materialization, avoiding a self-cycle. Foreign typed paths retain their real
+namespace and producer association. Declared sources start empty on every
+retry and enter only when the original actually accesses the typed value;
+later prepared values cannot expand an earlier Execute manifest. Unbridged
+Local/legacy sources and cross-root symlink operations refuse explicitly. Foreign
+Materialization Label get_child/dirname also remain unimplemented; above-anchor
+own dirname refuses rather than returning a false missing-parent value.
+They remain required integration work before original GCC/Homebrew replacement.
+
+quiet=False contributes a binary completion-output event at its replay position,
+sharing captured result Arcs. stdout precedes stderr with no inserted newline or
+text conversion. Its command lease and operation index preserve same-command
+retry deduplication while equal bytes from a fresh actual command still deliver.
+Need attempts discard their provisional batch. A consistent completed
+invocation, including a later original Starlark error, retains interleaved
+prints/output; source/environment consistency and publication failures suppress
+unverified capture. Complete alone is not an output guarantee. quiet=True and file-only
+print suppression retain existing selected-event behavior. Events, publication,
+daemon responses and CLI stderr use one byte channel; text diagnostics become
+UTF8 bytes at their producer boundary. The JSON stderr wire field is a byte array,
+with no compatibility shim. The daemon now has a Slug-native 64 MiB serialized
+frame limit, including newline, on a previously unbounded protocol. It may also
+refuse large ordinary query output with General disabled. Counting precedes
+response-sized allocation; exact/+1, byte expansion and bounded error framing
+are separate from completed-command memory acceptance.
+
+Native command retirement is independent of immutable data leases. The last
+command field, bootstrap mutable builder and seed token, and standalone/renewed
+finalized views retain credited retirement guards; a worker guard spans actual
+work, oneshot delivery and failed-result disposal.
+The driver drops its mutable command before awaiting the original cleanup
+deadline, then restores observations/discards/closes the demand lease only after
+all mutable worker/result custody retires. Deadline or exceptional quarantine
+keeps the session Open/Busy with no restoration, early refund, cleanup-success
+claim or late publication. Credits may release after actual later retirement.
+No cleanup thread is spawned from Drop, and resource-bank counts are not used
+as a substitute for actual worker retirement.
+
 ## Anchored source IO and native transport
 
 Add immutable selected MaterializationPathAnchor and anchored ResolvedPath key:

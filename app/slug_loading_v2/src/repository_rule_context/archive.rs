@@ -104,8 +104,19 @@ pub(super) fn replay_archive<'v>(
     effect: GeneratedRepositoryArchiveEffect,
     heap: Heap<'v>,
 ) -> anyhow::Result<Value<'v>> {
-    let result =
-        filesystem::replay_operation(state, RepositoryFilesystemOperation::Archive(effect))?;
+    let result = if state.workspace.is_some() {
+        match workspace::replay(
+            state,
+            slug_bzlmod_v2::RepositoryWorkspaceOperation::Archive(effect),
+        )? {
+            slug_bzlmod_v2::RepositoryWorkspaceResult::Archive(result) => {
+                RepositoryFilesystemResult::Archive(result)
+            }
+            _ => return Err(state.fail(RepositoryRuleInvocationError::WorkspaceReplay)),
+        }
+    } else {
+        filesystem::replay_operation(state, RepositoryFilesystemOperation::Archive(effect))?
+    };
     state
         .generated_present
         .lock()

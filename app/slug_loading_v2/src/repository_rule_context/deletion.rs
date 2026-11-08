@@ -29,6 +29,16 @@ pub(super) fn delete(
     state: &RepositoryRuleInvocationState,
     value: Value<'_>,
 ) -> anyhow::Result<bool> {
+    if state.workspace.is_some() {
+        let path = workspace::own_relative(state, value).map_err(|error| state.fail(error))?;
+        return match workspace::replay(
+            state,
+            slug_bzlmod_v2::RepositoryWorkspaceOperation::Delete(path),
+        )? {
+            slug_bzlmod_v2::RepositoryWorkspaceResult::Delete(value) => Ok(value),
+            _ => Err(state.fail(RepositoryRuleInvocationError::WorkspaceReplay)),
+        };
+    }
     let path = deletion_path(&state.generated_repository, &state.generated_present, value)
         .map_err(|error| state.fail(error))?;
     let operation = RepositoryFilesystemOperation::delete(path.clone())

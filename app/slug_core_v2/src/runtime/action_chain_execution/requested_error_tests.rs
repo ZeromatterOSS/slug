@@ -178,6 +178,7 @@ fn error_repair_error(analysis_error: bool, publish: bool) {
             (code, stdout, stderr.clone()),
             (expected_code, expected_stdout, expected_stderr)
         );
+        let stderr = String::from_utf8(stderr).expect("text-only fixture stderr");
         if (analysis_error && iteration == 1) || (!analysis_error && iteration == 0) {
             assert!(
                 stderr.contains("REQUESTED_LOADING"),

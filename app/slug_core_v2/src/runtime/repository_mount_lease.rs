@@ -311,6 +311,8 @@ pub(super) fn attach_in_owning_namespace(
 #[derive(Debug)]
 pub(super) struct InitialRepositoryMount {
     clone: AttachedMountClone,
+    _control: resources::ResourceCredit,
+    retirement: Option<super::progress::command::RepositoryWorkspaceRetirementGuard>,
 }
 impl InitialRepositoryMount {
     pub(super) fn bind(
@@ -319,9 +321,25 @@ impl InitialRepositoryMount {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Self, MountLeaseError> {
-        let initial = Self { clone };
+        let control = root.resources.reserve(
+            std::mem::size_of::<Self>() - std::mem::size_of::<AttachedMountClone>(),
+            0,
+            0,
+        )?;
+        let initial = Self {
+            clone,
+            _control: control,
+            retirement: None,
+        };
         initial.check_binding(root, scope, active)?;
         Ok(initial)
+    }
+    pub(super) fn with_retirement_guard(
+        mut self,
+        guard: super::progress::command::RepositoryWorkspaceRetirementGuard,
+    ) -> Self {
+        self.retirement = Some(guard);
+        self
     }
     pub(super) fn into_clone_for_finalize(
         self,

@@ -59,6 +59,7 @@ use crate::dependency_cycle::compute_guarded;
 #[rustfmt::skip] use slug_workspace_v2::{NormalizedAbsolutePath, ObservedPathFrontierError, PathNodeKind, PathObservationEpoch, PathObservationNamespace, PathOutcome, PathResolutionError, ResolvedPath, ResolvedPathKey, ResolvedPathObservationKey, ResolvedPathState};
 use starlark::PrintHandler;
 use starlark::PrintLocation;
+use starlark_map::small_map::SmallMap;
 
 use crate::HostCanonicalRepositoryLoadRouteError;
 use crate::HostCanonicalRepositoryLoadRouteKey;
@@ -80,6 +81,8 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 #[rustfmt::skip] use crate::repository_rule_context::{PreparedRepositoryHostPaths, PreparedRepositoryLabelPaths, PreparedRepositoryLabelSources, PreparedRepositoryWhichCandidates, RepositoryRuleHostObservation, RepositoryRuleInvocationError, RepositoryRuleInvocationInput, RepositoryWhichCandidate};
 use crate::repository_rule_context::invoke_repository_rule_with_host_paths;
 
+mod general;
+
 struct RepositoryEffectLimits;
 // Pinned rules_cc 0.2.17 unix_cc_configure.bzl:68-87,332-417 can probe
 // 13 distinct tools, each within repository_ctx.which's 64-candidate limit.
@@ -94,6 +97,7 @@ pub struct HostSelectedRepositoryFileEffect {
     plan: GeneratedRepositoryFileEffectPlan,
     metadata: crate::repository_rule_context::RepositoryMetadata,
     filesystem_realization: Option<RepositoryFilesystemRealization>,
+    workspace_realization: Option<slug_bzlmod_v2::RepositoryWorkspaceRealization>,
 }
 
 impl HostSelectedRepositoryFileEffect {
@@ -103,6 +107,10 @@ impl HostSelectedRepositoryFileEffect {
 
     pub fn filesystem_realization(&self) -> Option<&RepositoryFilesystemRealization> {
         self.filesystem_realization.as_ref()
+    }
+
+    pub fn workspace_realization(&self) -> Option<&slug_bzlmod_v2::RepositoryWorkspaceRealization> {
+        self.workspace_realization.as_ref()
     }
 
     pub fn metadata(&self) -> &crate::repository_rule_context::RepositoryMetadata {
@@ -1451,6 +1459,9 @@ fn terminal_repository_rule_invocation_error(
         RepositoryRuleInvocationError::ExecuteLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute exceeds the admitted per-command call limit".into() },
         RepositoryRuleInvocationError::ExecuteReplay => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute prepared transcript differs from this invocation".into() },
         RepositoryRuleInvocationError::FilesystemExecuteMix => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute and filesystem mutations cannot share an invocation before a unified physical execution owner is supported".into() },
+        RepositoryRuleInvocationError::Workspace(error) => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: error.to_string().into() },
+        RepositoryRuleInvocationError::WorkspaceReplay => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository workspace transcript differs from this invocation".into() },
+        RepositoryRuleInvocationError::WorkspaceUnsupported => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository workspace API/source capability is unsupported".into() },
         RepositoryRuleInvocationError::DeleteArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.delete requires a normalized non-root relative string or this repository generated path".into() },
         RepositoryRuleInvocationError::ArchiveArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract arguments are outside the supported SHA-pinned archive surface".into() },
         RepositoryRuleInvocationError::ArchiveAuth => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract auth is unsupported".into() },
@@ -1479,10 +1490,12 @@ fn terminal_repository_rule_invocation_error(
         }
         RepositoryRuleInvocationError::LabelPathNeed(_)
         | RepositoryRuleInvocationError::HostPathNeed(_)
+        | RepositoryRuleInvocationError::HostReadNeed(_)
         | RepositoryRuleInvocationError::RepositorySourceNeed(_)
         | RepositoryRuleInvocationError::WhichNeed(_)
         | RepositoryRuleInvocationError::ExecuteNeed(_)
-        | RepositoryRuleInvocationError::FilesystemNeed(_) => unreachable!(),
+        | RepositoryRuleInvocationError::FilesystemNeed(_)
+        | RepositoryRuleInvocationError::WorkspaceNeed(_) => unreachable!(),
     }
 }
 
@@ -1510,6 +1523,7 @@ async fn invoke_repository_rule_with_label_paths(
     let mut prepared_sources = PreparedRepositoryLabelSources::new();
     let mut prepared_which = PreparedRepositoryWhichCandidates::new();
     let mut prepared_host_paths = PreparedRepositoryHostPaths::new();
+    let mut prepared_host_reads = SmallMap::new();
     let epoch_hint = ctx
         .per_transaction_data()
         .data
@@ -1525,15 +1539,16 @@ async fn invoke_repository_rule_with_label_paths(
     let mut prepared_filesystem_operations = RepositoryFilesystemTranscript::empty();
     let mut filesystem_nonce = None;
     let mut prepared_execute = RepositoryExecuteTranscript::empty();
-    if epoch_hint
-        .as_ref()
-        .and_then(RepositoryExecuteEpoch::transcript)
-        .is_some_and(|transcript| {
-            transcript
-                .records_for(&key.owner, key.ordinal)
-                .next()
-                .is_some()
-        })
+    if !input.has_workspace()
+        && epoch_hint
+            .as_ref()
+            .and_then(RepositoryExecuteEpoch::transcript)
+            .is_some_and(|transcript| {
+                transcript
+                    .records_for(&key.owner, key.ordinal)
+                    .next()
+                    .is_some()
+            })
     {
         prepared_execute = verified_execute_transcript(
             ctx,
@@ -1555,26 +1570,37 @@ async fn invoke_repository_rule_with_label_paths(
             &prepared_sources,
             &prepared_which,
             &prepared_host_paths,
-            input
-                .clone()
-                .with_execute(key.owner.clone(), key.ordinal, prepared_execute.clone())
-                .with_filesystem_operations(
-                    key.owner.clone(),
-                    key.ordinal,
-                    prepared_filesystem_operations.clone(),
-                )
-                .with_filesystem_lease_nonce(filesystem_nonce),
+            if input.has_workspace() {
+                input.clone().with_host_reads(prepared_host_reads.clone())
+            } else {
+                input
+                    .clone()
+                    .with_execute(key.owner.clone(), key.ordinal, prepared_execute.clone())
+                    .with_filesystem_operations(
+                        key.owner.clone(),
+                        key.ordinal,
+                        prepared_filesystem_operations.clone(),
+                    )
+                    .with_filesystem_lease_nonce(filesystem_nonce)
+            },
             platform.clone(),
             transaction.snapshot().dupe(),
             capture.as_ref().map(|capture| capture as &dyn PrintHandler),
         );
+        let capture = attempt
+            .general_events
+            .map(|events| InvocationPrintCapture {
+                events: RefCell::new(events.events().to_vec()),
+            })
+            .or(capture);
         if attempt.environment_enumerated {
             verify_enumerated_environment(ctx, key, certificate, transaction, &observations)
                 .await?;
         }
         match attempt.result {
             Ok(invocation) => {
-                if invocation.filesystem_realization.is_none()
+                if !input.has_workspace()
+                    && invocation.filesystem_realization.is_none()
                     && filesystem_epoch_hint
                         .as_ref()
                         .and_then(RepositoryFilesystemEpoch::transcript)
@@ -1605,6 +1631,11 @@ async fn invoke_repository_rule_with_label_paths(
                     ));
                 }
                 return Ok((invocation, capture, observations));
+            }
+            Err(RepositoryRuleInvocationError::WorkspaceNeed(demand)) => {
+                return Err(SourcePreparationOutcome::Need(
+                    SourcePreparationNeeds::repository_workspace_operation(demand),
+                ));
             }
             Err(RepositoryRuleInvocationError::LabelPathNeed(address)) => {
                 if prepared_paths.contains_key(&address)
@@ -1638,6 +1669,24 @@ async fn invoke_repository_rule_with_label_paths(
                 .await?;
                 observations = next_observations;
                 prepared_paths.insert(address, value);
+            }
+            Err(RepositoryRuleInvocationError::HostReadNeed(path)) => {
+                if prepared_host_reads.contains_key(&path)
+                    || prepared_host_reads.len() == RepositoryEffectLimits::HOST_PATHS
+                {
+                    return Err(complete_effect_error(
+                        host_input_error(
+                            certificate,
+                            key.ordinal,
+                            "repository_ctx.read repeated or exceeded Host path limit",
+                        ),
+                        observations,
+                    ));
+                }
+                let (bytes, next) =
+                    general::read_host(ctx, key, certificate, path, mode, observations).await?;
+                observations = next;
+                prepared_host_reads.insert(bytes.0, bytes.1);
             }
             Err(RepositoryRuleInvocationError::HostPathNeed(path)) => {
                 if prepared_host_paths.contains_key(&path)
@@ -1792,6 +1841,10 @@ async fn compute_effect(
     key: &HostSelectedRepositoryFileEffectKey,
     mode: EffectMode,
 ) -> EffectDriver {
+    let workspace_epoch = match general::fence(ctx, key).await {
+        Ok(epoch) => epoch,
+        Err(outcome) => return outcome,
+    };
     let (certificate, observations) = match mode {
         EffectMode::Legacy => match compute_guarded(
             ctx,
@@ -1857,6 +1910,15 @@ async fn compute_effect(
         );
     };
     let repository = repository.clone();
+    let workspace_demand = match &workspace_epoch {
+        Some(epoch) => {
+            match general::reservation(key, &certificate, &repository, epoch, &observations) {
+                Ok(demand) => Some(demand),
+                Err(outcome) => return outcome,
+            }
+        }
+        None => None,
+    };
     let label = match definition_label(&certificate, key.ordinal, &repository) {
         Ok(label) => label,
         Err(error) => return complete_effect_error(error, observations),
@@ -1884,7 +1946,8 @@ async fn compute_effect(
         Err(error) => return complete_effect_error(error, observations),
     };
     let (canonical_name, spec) = repository.spec_parts();
-    let homebrew_template_owner = repository.generated_name() == "local_config_cc"
+    let homebrew_template_owner = workspace_epoch.is_none()
+        && repository.generated_name() == "local_config_cc"
         && repository.call().definition.defining_label.to_string()
             == "@@rules_cc+//cc/private/toolchain:cc_configure.bzl"
         && repository.call().definition.exported_name == "cc_autoconf";
@@ -1982,7 +2045,26 @@ async fn compute_effect(
                 );
             }
         };
-    let input = if homebrew_template_owner {
+    let input = if let (Some(epoch), Some(demand)) = (workspace_epoch, workspace_demand) {
+        if let Err(outcome) =
+            verify_enumerated_environment(ctx, key, &certificate, &transaction, &observations).await
+        {
+            return outcome;
+        }
+        let selected = match general::selected_epoch(ctx, key, &certificate, &observations).await {
+            Ok(epoch) => epoch,
+            Err(outcome) => return outcome,
+        };
+        match input.with_workspace(epoch, demand, selected) {
+            Ok(input) => input,
+            Err(error) => {
+                return complete_effect_error(
+                    terminal_repository_rule_invocation_error(&certificate, key.ordinal, error),
+                    observations,
+                );
+            }
+        }
+    } else if homebrew_template_owner {
         input.with_homebrew_template_guard()
     } else {
         input
@@ -2049,6 +2131,7 @@ async fn compute_effect(
         ),
         metadata: invocation.metadata.clone(),
         filesystem_realization: invocation.filesystem_realization.clone(),
+        workspace_realization: invocation.workspace_realization.clone(),
         plan: invocation.into_plan(),
     });
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
@@ -2114,9 +2197,15 @@ impl Key for HostSelectedRepositoryFileEffectObservationKey {
 }
 
 #[cfg(test)]
+pub(crate) async fn workspace_owner_for_test() -> Arc<HostSelectedExtensionOwner> {
+    tests::workspace_owner_for_test().await
+}
+
+#[cfg(test)]
 mod tests {
     mod archive_replay_tests;
     mod filesystem_replay_tests;
+    mod general_workspace_tests;
     use std::path::Path;
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -2464,6 +2553,12 @@ cc_autoconf = repository_rule(
             panic!("selected demand must complete")
         };
         demand.as_ref().as_ref().unwrap().owner().clone()
+    }
+
+    pub(super) async fn workspace_owner_for_test() -> Arc<HostSelectedExtensionOwner> {
+        let dice = crate::canonical_repository_route_tests::tests::builtin_graph_dice();
+        let mut transaction = transaction_untracked(&dice, MODULE, EXTENSION, true).await;
+        owner(&mut transaction).await
     }
 
     async fn owner(transaction: &mut dice::DiceTransaction) -> Arc<HostSelectedExtensionOwner> {

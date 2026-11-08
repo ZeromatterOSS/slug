@@ -51,6 +51,15 @@ pub(super) trait ProcessLaunch: Send + 'static {
     fn root_identity(&self) -> Option<RootIdentity>;
     fn scope(&self) -> &Arc<SourceServiceScope>;
     fn resources(&self) -> &Arc<RepositoryRootResources>;
+    fn retirement_observer(
+        &self,
+    ) -> Option<super::progress::command::RepositoryWorkspaceRetirementObserver> {
+        None
+    }
+    #[cfg(test)]
+    fn process_probe(&self) -> Option<super::progress::command::RepositoryWorkspaceProcessProbe> {
+        None
+    }
     fn bind_attempt(&mut self, _nonce: &[u8; 16]) -> Result<(), PhysicalRootError> {
         Ok(())
     }
@@ -383,6 +392,11 @@ pub(super) async fn run<L: ProcessLaunch>(
     active: &(dyn Fn() -> bool + Sync),
 ) -> Result<L::Output, PhysicalRootError> {
     check(launch.scope(), active)?;
+    #[cfg(test)]
+    let platform = match launch.process_probe() {
+        Some(probe) => platform.observe_for_test(probe.stage, probe.hold_before_hello),
+        None => platform,
+    };
     let credit = launch
         .resources()
         .reserve(CONTROL_BYTES, CONTROL_FDS, TEMP_BACKING)?;
@@ -391,12 +405,17 @@ pub(super) async fn run<L: ProcessLaunch>(
     let (send, mut receive) = tokio::sync::oneshot::channel();
     let scope = launch.scope().clone();
     let deadline = Instant::now() + TOTAL_TIME;
+    let worker_retirement = launch
+        .retirement_observer()
+        .map(|observer| observer.worker_guard());
     std::thread::Builder::new()
         .name("slug-repository-owner".into())
         .stack_size(THREAD_STACK)
         .spawn(move || {
             let result = drive(launch, platform, stop, credit);
             let _ = send.send(result);
+            // A refused receiver drops the complete output before this guard.
+            drop(worker_retirement);
         })
         .map_err(PhysicalRootError::Io)?;
     loop {

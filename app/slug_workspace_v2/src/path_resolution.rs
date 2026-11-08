@@ -1232,6 +1232,10 @@ pub enum PathDirectoryListingError {
     InfiniteExpansion {
         logical_path: NormalizedAbsolutePath,
     },
+    EscapesAnchor {
+        logical_path: NormalizedAbsolutePath,
+        anchor: MaterializationPathAnchor,
+    },
 }
 
 impl PathDirectoryListingError {
@@ -1241,7 +1245,8 @@ impl PathDirectoryListingError {
             | Self::InconsistentState { logical_path, .. }
             | Self::WrongKind { logical_path, .. }
             | Self::Cycle { logical_path }
-            | Self::InfiniteExpansion { logical_path } => logical_path,
+            | Self::InfiniteExpansion { logical_path }
+            | Self::EscapesAnchor { logical_path, .. } => logical_path,
         }
     }
 
@@ -1315,11 +1320,22 @@ impl PathDirectoryListingError {
                 },
             ) => left_path == right_path,
             (
+                Self::EscapesAnchor {
+                    logical_path: left_path,
+                    anchor: left_anchor,
+                },
+                Self::EscapesAnchor {
+                    logical_path: right_path,
+                    anchor: right_anchor,
+                },
+            ) => left_path == right_path && left_anchor == right_anchor,
+            (
                 Self::Observation { .. }
                 | Self::InconsistentState { .. }
                 | Self::WrongKind { .. }
                 | Self::Cycle { .. }
-                | Self::InfiniteExpansion { .. },
+                | Self::InfiniteExpansion { .. }
+                | Self::EscapesAnchor { .. },
                 _,
             ) => false,
         }
@@ -1381,6 +1397,7 @@ impl ObservedPathDirectoryListing {
 pub struct PathDirectoryListingKey {
     namespace: PathObservationNamespace,
     logical_path: NormalizedAbsolutePath,
+    anchor: Option<MaterializationPathAnchor>,
 }
 
 impl PathDirectoryListingKey {
@@ -1388,7 +1405,20 @@ impl PathDirectoryListingKey {
         Self {
             namespace,
             logical_path,
+            anchor: None,
         }
+    }
+
+    pub fn new_anchored(
+        anchor: MaterializationPathAnchor,
+        logical_path: impl AsRef<Path>,
+    ) -> Result<Self, MaterializationPathAnchorError> {
+        let checked = AnchoredResolvedPathKey::new(anchor, logical_path)?;
+        Ok(Self {
+            namespace: checked.anchor().namespace(),
+            logical_path: checked.logical_path().dupe(),
+            anchor: Some(checked.anchor().dupe()),
+        })
     }
 
     pub const fn namespace(&self) -> PathObservationNamespace {
@@ -1419,6 +1449,13 @@ impl PathDirectoryListingObservationKey {
     pub fn new(namespace: PathObservationNamespace, logical_path: NormalizedAbsolutePath) -> Self {
         Self(PathDirectoryListingKey::new(namespace, logical_path))
     }
+
+    pub fn new_anchored(
+        anchor: MaterializationPathAnchor,
+        logical_path: impl AsRef<Path>,
+    ) -> Result<Self, MaterializationPathAnchorError> {
+        PathDirectoryListingKey::new_anchored(anchor, logical_path).map(Self)
+    }
 }
 
 impl fmt::Display for PathDirectoryListingObservationKey {
@@ -1444,9 +1481,35 @@ async fn compute_directory_listing(
     ctx: &mut DiceComputations<'_>,
     namespace: PathObservationNamespace,
     logical_path: &NormalizedAbsolutePath,
+    anchor: Option<&MaterializationPathAnchor>,
     observed_mode: bool,
 ) -> ObservedDirectoryListingOutcome {
-    let (resolved, mut observations) = if observed_mode {
+    let (resolved, mut observations) = if let Some(anchor) = anchor {
+        let key = AnchoredResolvedPathObservationKey::new(anchor.dupe(), logical_path.as_path())
+            .expect("anchored directory-listing constructor validates membership");
+        match dice_invariant(ctx.compute(&key).await) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(observed)) => (
+                observed.result().clone().map_err(|error| match error {
+                    AnchoredPathResolutionError::Resolution(error) => {
+                        PathDirectoryListingError::from_resolution(logical_path.dupe(), error)
+                    }
+                    AnchoredPathResolutionError::EscapesAnchor { anchor, .. } => {
+                        PathDirectoryListingError::EscapesAnchor {
+                            logical_path: logical_path.dupe(),
+                            anchor,
+                        }
+                    }
+                }),
+                if observed_mode {
+                    observed.observations().dupe()
+                } else {
+                    PathObservationEpoch::empty()
+                },
+            ),
+        }
+    } else if observed_mode {
         match dice_invariant(
             ctx.compute(&ResolvedPathObservationKey::new(
                 namespace,
@@ -1456,7 +1519,12 @@ async fn compute_directory_listing(
         ) {
             PathOutcome::Need(need) => return PathOutcome::Need(need),
             PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
-            PathOutcome::Complete(Ok(observed)) => (observed.result, observed.observations),
+            PathOutcome::Complete(Ok(observed)) => (
+                observed.result.map_err(|error| {
+                    PathDirectoryListingError::from_resolution(logical_path.dupe(), error)
+                }),
+                observed.observations,
+            ),
         }
     } else {
         match dice_invariant(
@@ -1464,18 +1532,17 @@ async fn compute_directory_listing(
                 .await,
         ) {
             PathOutcome::Need(need) => return PathOutcome::Need(need),
-            PathOutcome::Complete(result) => (result, PathObservationEpoch::empty()),
+            PathOutcome::Complete(result) => (
+                result.map_err(|error| {
+                    PathDirectoryListingError::from_resolution(logical_path.dupe(), error)
+                }),
+                PathObservationEpoch::empty(),
+            ),
         }
     };
     let resolved = match resolved {
         Err(error) => {
-            return complete_directory_listing(
-                Err(PathDirectoryListingError::from_resolution(
-                    logical_path.dupe(),
-                    error,
-                )),
-                observations,
-            );
+            return complete_directory_listing(Err(error), observations);
         }
         Ok(resolved) => resolved,
     };
@@ -1557,7 +1624,15 @@ impl Key for PathDirectoryListingKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        match compute_directory_listing(ctx, self.namespace, &self.logical_path, false).await {
+        match compute_directory_listing(
+            ctx,
+            self.namespace,
+            &self.logical_path,
+            self.anchor.as_ref(),
+            false,
+        )
+        .await
+        {
             PathOutcome::Need(need) => PathOutcome::Need(need),
             PathOutcome::Complete(Ok(observed)) => PathOutcome::Complete(observed.result),
             PathOutcome::Complete(Err(error)) => {
@@ -1584,7 +1659,14 @@ impl Key for PathDirectoryListingObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        compute_directory_listing(ctx, self.0.namespace, &self.0.logical_path, true).await
+        compute_directory_listing(
+            ctx,
+            self.0.namespace,
+            &self.0.logical_path,
+            self.0.anchor.as_ref(),
+            true,
+        )
+        .await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

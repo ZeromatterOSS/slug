@@ -127,6 +127,7 @@ use crate::repository_ignore::RepositoryIgnoreMatcher;
 
 mod canonical_repository_source;
 pub use canonical_repository_source::*;
+mod anchored_repository_path;
 mod repository_source_observation;
 #[cfg(test)]
 use repository_source_observation::HostRepositorySourceObservationErrorKind;
@@ -191,6 +192,18 @@ pub struct SourcePreparationNeeds {
         Arc<SmallMap<crate::RepositoryExecuteCallId, Arc<crate::RepositoryExecuteRequest>>>,
     repository_filesystem_operations:
         Arc<SmallMap<crate::RepositoryFilesystemCallId, Arc<crate::RepositoryFilesystemRequest>>>,
+    workspace_reservations: Arc<
+        SmallMap<
+            Arc<RepositoryWorkspaceStableKey>,
+            Arc<crate::RepositoryWorkspaceReservationDemand>,
+        >,
+    >,
+    workspace_operations: Arc<
+        SmallMap<
+            crate::RepositoryWorkspaceOperationId,
+            Arc<crate::RepositoryWorkspaceOperationDemand>,
+        >,
+    >,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -209,6 +222,12 @@ pub enum SourcePreparationNeedsError {
     },
     ConflictingRepositoryFilesystem {
         id: crate::RepositoryFilesystemCallId,
+    },
+    ConflictingWorkspaceReservation {
+        key: Arc<RepositoryWorkspaceStableKey>,
+    },
+    ConflictingWorkspaceOperation {
+        id: crate::RepositoryWorkspaceOperationId,
     },
 }
 
@@ -243,6 +262,8 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -260,6 +281,8 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -273,6 +296,8 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -288,6 +313,8 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -304,6 +331,8 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(selected_extension_downloads),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -319,6 +348,8 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(repository_executes),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -333,8 +364,66 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(repository_filesystem_operations),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
         }
+    }
+
+    pub fn repository_workspace_reservation(
+        demand: Arc<crate::RepositoryWorkspaceReservationDemand>,
+    ) -> Self {
+        let mut workspace_reservations = SmallMap::new();
+        workspace_reservations.insert(demand.key().clone(), demand);
+        Self {
+            scratch_elf_metadata: None,
+            root_module_bootstrap: None,
+            repository_environment: None,
+            path_observations: None,
+            repository_materializations: Arc::new(SmallMap::new()),
+            selected_extension_downloads: Arc::new(SmallMap::new()),
+            repository_executes: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(workspace_reservations),
+            workspace_operations: Arc::new(SmallMap::new()),
+        }
+    }
+    pub fn repository_workspace_operation(
+        demand: Arc<crate::RepositoryWorkspaceOperationDemand>,
+    ) -> Self {
+        let mut workspace_operations = SmallMap::new();
+        workspace_operations.insert(
+            crate::RepositoryWorkspaceOperationId::new(demand.request()),
+            demand,
+        );
+        Self {
+            scratch_elf_metadata: None,
+            root_module_bootstrap: None,
+            repository_environment: None,
+            path_observations: None,
+            repository_materializations: Arc::new(SmallMap::new()),
+            selected_extension_downloads: Arc::new(SmallMap::new()),
+            repository_executes: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(workspace_operations),
+        }
+    }
+    pub fn workspace_reservations(
+        &self,
+    ) -> &SmallMap<
+        Arc<RepositoryWorkspaceStableKey>,
+        Arc<crate::RepositoryWorkspaceReservationDemand>,
+    > {
+        &self.workspace_reservations
+    }
+    pub fn workspace_operations(
+        &self,
+    ) -> &SmallMap<
+        crate::RepositoryWorkspaceOperationId,
+        Arc<crate::RepositoryWorkspaceOperationDemand>,
+    > {
+        &self.workspace_operations
     }
 
     pub fn root_module_bootstrap_request(&self) -> Option<&RootModuleBootstrapRequest> {
@@ -355,6 +444,8 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -505,6 +596,50 @@ impl SourcePreparationNeeds {
             }
             Arc::new(repository_filesystem_operations)
         };
+        let workspace_reservations = if let Some(shared) =
+            shared_no_op_need_map(&self.workspace_reservations, &other.workspace_reservations)
+        {
+            shared
+        } else {
+            let mut requests = (*self.workspace_reservations).clone();
+            for (key, request) in other.workspace_reservations.iter() {
+                match requests.get(key) {
+                    Some(existing) if existing == request => {}
+                    Some(_) => {
+                        return Err(
+                            SourcePreparationNeedsError::ConflictingWorkspaceReservation {
+                                key: key.clone(),
+                            },
+                        );
+                    }
+                    None => {
+                        requests.insert(key.clone(), request.clone());
+                    }
+                }
+            }
+            Arc::new(requests)
+        };
+        let workspace_operations = if let Some(shared) =
+            shared_no_op_need_map(&self.workspace_operations, &other.workspace_operations)
+        {
+            shared
+        } else {
+            let mut requests = (*self.workspace_operations).clone();
+            for (id, request) in other.workspace_operations.iter() {
+                match requests.get(id) {
+                    Some(existing) if existing == request => {}
+                    Some(_) => {
+                        return Err(SourcePreparationNeedsError::ConflictingWorkspaceOperation {
+                            id: id.clone(),
+                        });
+                    }
+                    None => {
+                        requests.insert(id.clone(), request.clone());
+                    }
+                }
+            }
+            Arc::new(requests)
+        };
         let root_module_bootstrap =
             match (&self.root_module_bootstrap, &other.root_module_bootstrap) {
                 (Some(left), Some(right)) if left == right => Some(left.dupe()),
@@ -523,6 +658,8 @@ impl SourcePreparationNeeds {
                 || !selected_extension_downloads.is_empty()
                 || !repository_executes.is_empty()
                 || !repository_filesystem_operations.is_empty()
+                || !workspace_reservations.is_empty()
+                || !workspace_operations.is_empty()
         );
         Ok(Self {
             scratch_elf_metadata,
@@ -533,6 +670,8 @@ impl SourcePreparationNeeds {
             selected_extension_downloads,
             repository_executes,
             repository_filesystem_operations,
+            workspace_reservations,
+            workspace_operations,
         })
     }
 }
@@ -736,9 +875,10 @@ impl RepositoryMaterializationResultEpoch {
                     canonical_repo,
                 });
             }
-            if matches!(&entry.request.kind,RepositoryMaterializationKind::GeneralWorkspace(realization)
-                if realization.reservation().workspace()!=&entry.request.id.workspace
-                || realization.reservation().repository()!=&entry.request.id.canonical_repo)
+            if matches!(
+                &entry.request.kind,
+                RepositoryMaterializationKind::GeneralWorkspace(_)
+            ) && entry.request.validate_general_workspace_binding().is_err()
                 || !result_kind_matches(&entry.request.kind, &entry.result)
             {
                 return Err(
@@ -824,6 +964,15 @@ impl RepositoryMaterializationResultEpoch {
             }
         }
         Ok(found)
+    }
+
+    /// Borrow a current producer-owned association; path text never creates one.
+    #[doc(hidden)]
+    pub fn entry_for_repository(
+        &self,
+        repository: &CanonicalRepoName,
+    ) -> Option<&RepositoryMaterializationEpochEntry> {
+        self.entries.get(repository)
     }
 
     fn get(
@@ -6152,7 +6301,19 @@ async fn finish_host_repository_path_resolution(
     namespace: PathObservationNamespace,
     requested_path: NormalizedAbsolutePath,
     repo_relative_path: Arc<PathBuf>,
+    anchor: Option<&slug_workspace_v2::MaterializationPathAnchor>,
 ) -> HostRepositoryPathDriverOutcome {
+    if let Some(anchor) = anchor {
+        return anchored_repository_path::resolve(
+            ctx,
+            mode,
+            namespace,
+            requested_path,
+            repo_relative_path,
+            anchor,
+        )
+        .await;
+    }
     match mode {
         HostRepositoryObservationMode::Legacy => {
             match ctx
@@ -6293,8 +6454,15 @@ async fn drive_host_repository_path(
             );
         }
     };
-    finish_host_repository_path_resolution(ctx, mode, namespace, requested_path, repo_relative_path)
-        .await
+    finish_host_repository_path_resolution(
+        ctx,
+        mode,
+        namespace,
+        requested_path,
+        repo_relative_path,
+        materialization.path_anchor(),
+    )
+    .await
 }
 
 type HostRepositoryDirectoryListingProjection = (
@@ -6317,6 +6485,12 @@ fn project_directory_listing_error(
     error: PathDirectoryListingError,
 ) -> HostRepositoryDirectoryListingError {
     match error {
+        PathDirectoryListingError::EscapesAnchor { .. } => {
+            HostRepositoryDirectoryListingError::new(
+                directory,
+                HostRepositoryDirectoryListingErrorKind::InvalidMaterializedPath,
+            )
+        }
         PathDirectoryListingError::Observation { operation, .. } => {
             HostRepositoryDirectoryListingError::new(
                 directory,
@@ -6498,11 +6672,34 @@ async fn drive_repository_directory_listing_from_disposition(
             );
         }
     };
+    let (plain, observed) = match materialization.path_anchor() {
+        Some(anchor) => {
+            let plain =
+                PathDirectoryListingKey::new_anchored(anchor.dupe(), requested_path.as_path());
+            let observed = PathDirectoryListingObservationKey::new_anchored(
+                anchor.dupe(),
+                requested_path.as_path(),
+            );
+            match (plain, observed) {
+                (Ok(plain), Ok(observed)) => (plain, observed),
+                _ => {
+                    return host_repository_directory_listing_complete(
+                        Err(HostRepositoryDirectoryListingError::new(
+                            directory.dupe(),
+                            HostRepositoryDirectoryListingErrorKind::InvalidMaterializedPath,
+                        )),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+            }
+        }
+        None => (
+            PathDirectoryListingKey::new(namespace, requested_path.dupe()),
+            PathDirectoryListingObservationKey::new(namespace, requested_path),
+        ),
+    };
     match mode {
-        HostRepositoryObservationMode::Legacy => match ctx
-            .compute(&PathDirectoryListingKey::new(namespace, requested_path))
-            .await
-        {
+        HostRepositoryObservationMode::Legacy => match ctx.compute(&plain).await {
             Ok(PathOutcome::Need(need)) => SourcePreparationOutcome::path_need(need),
             Ok(PathOutcome::Complete(result)) => host_repository_directory_listing_complete(
                 result.map_err(|error| project_directory_listing_error(directory.dupe(), error)),
@@ -6516,13 +6713,7 @@ async fn drive_repository_directory_listing_from_disposition(
                 PathObservationEpoch::empty(),
             ),
         },
-        HostRepositoryObservationMode::Observed => match ctx
-            .compute(&PathDirectoryListingObservationKey::new(
-                namespace,
-                requested_path,
-            ))
-            .await
-        {
+        HostRepositoryObservationMode::Observed => match ctx.compute(&observed).await {
             Ok(child) => finish_observed_host_repository_directory_listing(child, directory.dupe()),
             Err(_) => host_repository_directory_listing_complete(
                 Err(HostRepositoryDirectoryListingError::new(
@@ -6945,44 +7136,74 @@ async fn drive_repository_source_file(
             observations,
         );
     };
-    let (resolved, observations) = match mode {
-        HostRepositoryObservationMode::Legacy => {
-            match ctx
-                .compute(&ResolvedPathKey::new(namespace, requested_path))
-                .await
-            {
-                Ok(PathOutcome::Need(need)) => return SourcePreparationOutcome::path_need(need),
-                Ok(PathOutcome::Complete(result)) => (result, observations),
-                Err(error) => {
-                    return repository_source_resolution_compute_error(
-                        repo_relative_path,
-                        Arc::from(error.to_string()),
-                        observations,
-                    );
+    let (resolved, observations) = if let Some(anchor) = materialization.path_anchor() {
+        match finish_host_repository_path_resolution(
+            ctx,
+            mode,
+            namespace,
+            requested_path,
+            repo_relative_path.dupe(),
+            Some(anchor),
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok((result, path_observations))) => {
+                let merged = match merge_path_observations(&observations, &path_observations) {
+                    Ok(merged) => merged,
+                    Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                };
+                match result {
+                    Ok(path) => (Ok(path.0), merged),
+                    Err(error) => return repository_source_file_complete(Err(error), merged),
                 }
             }
         }
-        HostRepositoryObservationMode::Observed => {
-            let outcome = match ctx
-                .compute(&ResolvedPathObservationKey::new(namespace, requested_path))
-                .await
-            {
-                Ok(outcome) => outcome,
-                Err(error) => {
-                    return repository_source_resolution_compute_error(
-                        repo_relative_path,
-                        Arc::from(error.to_string()),
-                        observations,
-                    );
+    } else {
+        match mode {
+            HostRepositoryObservationMode::Legacy => {
+                match ctx
+                    .compute(&ResolvedPathKey::new(namespace, requested_path))
+                    .await
+                {
+                    Ok(PathOutcome::Need(need)) => {
+                        return SourcePreparationOutcome::path_need(need);
+                    }
+                    Ok(PathOutcome::Complete(result)) => (result, observations),
+                    Err(error) => {
+                        return repository_source_resolution_compute_error(
+                            repo_relative_path,
+                            Arc::from(error.to_string()),
+                            observations,
+                        );
+                    }
                 }
-            };
-            match finish_observed_repository_source_resolution(
-                outcome,
-                &observations,
-                repo_relative_path.dupe(),
-            ) {
-                ControlFlow::Continue(resolved) => (Ok(resolved.0), resolved.1),
-                ControlFlow::Break(outcome) => return outcome,
+            }
+            HostRepositoryObservationMode::Observed => {
+                let outcome = match ctx
+                    .compute(&ResolvedPathObservationKey::new(namespace, requested_path))
+                    .await
+                {
+                    Ok(outcome) => outcome,
+                    Err(error) => {
+                        return repository_source_resolution_compute_error(
+                            repo_relative_path,
+                            Arc::from(error.to_string()),
+                            observations,
+                        );
+                    }
+                };
+                match finish_observed_repository_source_resolution(
+                    outcome,
+                    &observations,
+                    repo_relative_path.dupe(),
+                ) {
+                    ControlFlow::Continue(resolved) => (Ok(resolved.0), resolved.1),
+                    ControlFlow::Break(outcome) => return outcome,
+                }
             }
         }
     };

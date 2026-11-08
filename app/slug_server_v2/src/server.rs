@@ -12,7 +12,6 @@
 //! persists across requests so DICE state survives between builds.
 
 use std::fmt;
-use std::io::BufRead;
 use std::io::Write;
 use std::os::unix::net::UnixListener;
 use std::os::unix::net::UnixStream;
@@ -367,13 +366,15 @@ pub enum DaemonRequest {
 pub struct DaemonResponse {
     pub exit_code: i32,
     pub stdout: String,
-    pub stderr: String,
+    pub stderr: Vec<u8>,
     pub invalidated_files: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_launch_plan: Option<RunLaunchPlan>,
 }
 
 pub type BuildResponse = DaemonResponse;
+
+mod frame;
 
 /// Run the daemon server on the given Unix socket path. Blocks until a
 /// `shutdown` request is received or the process is killed.
@@ -403,11 +404,11 @@ pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyh
             return Ok(());
         }
         let response = handle_request(&mut daemon, &line);
-        let json = serde_json::to_string(&response).unwrap_or_else(|_| {
-            r#"{"exit_code":2,"stdout":"","stderr":"{\"error\":\"daemon_serialize_error\"}","invalidated_files":0}"#.to_string()
-        });
-        if write!(stream, "{json}\n").is_err() {
-            // Client disconnected; ignore.
+        let Ok(json) = frame::response(&response, frame::MAX_FRAME_BYTES) else {
+            continue;
+        };
+        if stream.write_all(&json).is_err() {
+            // Client disconnected; the single-frame connection is retired.
         }
     }
     Ok(())
@@ -422,7 +423,8 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 stdout: String::new(),
                 stderr:
                     "{\"error\":\"daemon_parse_error\",\"message\":\"malformed daemon request\"}\n"
-                        .to_owned(),
+                        .to_owned()
+                        .into_bytes(),
                 invalidated_files: 0,
                 run_launch_plan: None,
             };
@@ -538,7 +540,8 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     return DaemonResponse {
                         exit_code: error.exit_code,
                         stdout: String::new(),
-                        stderr: format!("{{\"error\":\"query_error\",\"message\":\"{}\"}}", error),
+                        stderr: format!("{{\"error\":\"query_error\",\"message\":\"{}\"}}", error)
+                            .into_bytes(),
                         invalidated_files: 0,
                         run_launch_plan: None,
                     };
@@ -585,7 +588,8 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                         stderr: format!(
                             "{{\"error\":\"aquery_request_error\",\"message\":\"{}\"}}",
                             slug_core_v2::error::json_escape(&error)
-                        ),
+                        )
+                        .into_bytes(),
                         invalidated_files: 0,
                         run_launch_plan: None,
                     };
@@ -629,7 +633,8 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     stderr: format!(
                         "{{\"error\":\"cquery_request_error\",\"message\":\"{}\"}}",
                         slug_core_v2::error::json_escape(&error)
-                    ),
+                    )
+                    .into_bytes(),
                     invalidated_files: 0,
                     run_launch_plan: None,
                 };
@@ -712,7 +717,8 @@ fn run_request_error(message: &str) -> DaemonResponse {
         stderr: format!(
             "{{\"error\":\"run_request_error\",\"message\":\"{}\"}}",
             slug_core_v2::error::json_escape(message),
-        ),
+        )
+        .into_bytes(),
         invalidated_files: 0,
         run_launch_plan: None,
     }
@@ -722,7 +728,7 @@ fn build_request_error(message: &str) -> DaemonResponse {
     DaemonResponse {
         exit_code: 2,
         stdout: String::new(),
-        stderr: super::build_error_json("build_request_error", message, 0),
+        stderr: super::build_error_json("build_request_error", message, 0).into_bytes(),
         invalidated_files: 0,
         run_launch_plan: None,
     }
@@ -735,7 +741,8 @@ fn malformed_bzlmod_response(error: String) -> DaemonResponse {
         stderr: format!(
             "{{\"error\":\"bzlmod_request_error\",\"message\":\"{}\"}}",
             slug_core_v2::error::json_escape(&error)
-        ),
+        )
+        .into_bytes(),
         invalidated_files: 0,
         run_launch_plan: None,
     }
@@ -748,7 +755,8 @@ fn malformed_repository_environment_response(error: String) -> DaemonResponse {
         stderr: format!(
             "{{\"error\":\"repository_environment_request_error\",\"message\":\"{}\"}}",
             slug_core_v2::error::json_escape(&error)
-        ),
+        )
+        .into_bytes(),
         invalidated_files: 0,
         run_launch_plan: None,
     }
@@ -759,12 +767,7 @@ fn build_remote_config(request: &BuildRequest) -> RemoteConfig {
 }
 
 fn read_line(stream: &mut UnixStream) -> anyhow::Result<String> {
-    let mut reader = std::io::BufReader::new(stream);
-    let mut line = String::new();
-    reader
-        .read_line(&mut line)
-        .context("reading daemon request line")?;
-    Ok(line.trim().to_string())
+    frame::read_line(stream, frame::MAX_FRAME_BYTES)
 }
 
 /// Send a build request to a running daemon and return the response.
@@ -774,9 +777,14 @@ pub fn send_build_request(
 ) -> anyhow::Result<BuildResponse> {
     let mut stream = UnixStream::connect(socket_path)
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
-    let json = serde_json::to_string(&DaemonRequest::Build(request.clone()))
-        .context("serializing build request for daemon")?;
-    write!(stream, "{json}\n").context("sending build request to daemon")?;
+    let json = frame::encode(
+        &DaemonRequest::Build(request.clone()),
+        frame::MAX_FRAME_BYTES,
+    )
+    .context("serializing build request for daemon")?;
+    stream
+        .write_all(&json)
+        .context("sending build request to daemon")?;
     let line = read_line(&mut stream)?;
     decode_response(&line, "build", false)
 }
@@ -786,9 +794,11 @@ pub fn send_run_request(
 ) -> anyhow::Result<DaemonResponse> {
     let mut stream = UnixStream::connect(socket_path)
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
-    let json = serde_json::to_string(&DaemonRequest::Run(request.clone()))
+    let json = frame::encode(&DaemonRequest::Run(request.clone()), frame::MAX_FRAME_BYTES)
         .context("serializing run request for daemon")?;
-    write!(stream, "{json}\n").context("sending run request to daemon")?;
+    stream
+        .write_all(&json)
+        .context("sending run request to daemon")?;
     let line = read_line(&mut stream)?;
     decode_response(&line, "run", true)
 }
@@ -800,17 +810,22 @@ pub fn send_query_request(
 ) -> anyhow::Result<DaemonResponse> {
     let mut stream = UnixStream::connect(socket_path)
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
-    let json = serde_json::to_string(&DaemonRequest::Query(QueryRequest {
-        expression: request.expression.clone(),
-        order_output: request.order_output.clone(),
-        output: request.output.clone(),
-        graph_factored: request.graph_factored,
-        strict_test_suite: request.strict_test_suite,
-        bzlmod: request.bzlmod.clone(),
-        repository_environment: request.repository_environment.clone(),
-    }))
+    let json = frame::encode(
+        &DaemonRequest::Query(QueryRequest {
+            expression: request.expression.clone(),
+            order_output: request.order_output.clone(),
+            output: request.output.clone(),
+            graph_factored: request.graph_factored,
+            strict_test_suite: request.strict_test_suite,
+            bzlmod: request.bzlmod.clone(),
+            repository_environment: request.repository_environment.clone(),
+        }),
+        frame::MAX_FRAME_BYTES,
+    )
     .context("serializing query request for daemon")?;
-    write!(stream, "{json}\n").context("sending query request to daemon")?;
+    stream
+        .write_all(&json)
+        .context("sending query request to daemon")?;
     let line = read_line(&mut stream)?;
     decode_response(&line, "query", false)
 }
@@ -821,13 +836,18 @@ pub fn send_aquery_request(
 ) -> anyhow::Result<DaemonResponse> {
     let mut stream = UnixStream::connect(socket_path)
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
-    let json = serde_json::to_string(&DaemonRequest::Aquery(AqueryRequest {
-        expression: request.expression.clone(),
-        bzlmod: request.bzlmod.clone(),
-        repository_environment: request.repository_environment.clone(),
-    }))
+    let json = frame::encode(
+        &DaemonRequest::Aquery(AqueryRequest {
+            expression: request.expression.clone(),
+            bzlmod: request.bzlmod.clone(),
+            repository_environment: request.repository_environment.clone(),
+        }),
+        frame::MAX_FRAME_BYTES,
+    )
     .context("serializing aquery request for daemon")?;
-    write!(stream, "{json}\n").context("sending aquery request to daemon")?;
+    stream
+        .write_all(&json)
+        .context("sending aquery request to daemon")?;
     let line = read_line(&mut stream)?;
     decode_response(&line, "aquery", false)
 }
@@ -838,18 +858,23 @@ pub fn send_cquery_request(
 ) -> anyhow::Result<DaemonResponse> {
     let mut stream = UnixStream::connect(socket_path)
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
-    let json = serde_json::to_string(&DaemonRequest::Cquery(CqueryRequest {
-        expression: request.expression.clone(),
-        include_implicit: request.include_implicit,
-        include_tool: request.include_tool,
-        output: request.output,
-        configuration_overlay: request.configuration_overlay.clone(),
-        distdirs: request.distdirs.clone(),
-        bzlmod: request.bzlmod.clone(),
-        repository_environment: request.repository_environment.clone(),
-    }))
+    let json = frame::encode(
+        &DaemonRequest::Cquery(CqueryRequest {
+            expression: request.expression.clone(),
+            include_implicit: request.include_implicit,
+            include_tool: request.include_tool,
+            output: request.output,
+            configuration_overlay: request.configuration_overlay.clone(),
+            distdirs: request.distdirs.clone(),
+            bzlmod: request.bzlmod.clone(),
+            repository_environment: request.repository_environment.clone(),
+        }),
+        frame::MAX_FRAME_BYTES,
+    )
     .context("serializing cquery request for daemon")?;
-    write!(stream, "{json}\n").context("sending cquery request to daemon")?;
+    stream
+        .write_all(&json)
+        .context("sending cquery request to daemon")?;
     let line = read_line(&mut stream)?;
     decode_response(&line, "cquery", false)
 }

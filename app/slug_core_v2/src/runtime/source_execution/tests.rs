@@ -231,6 +231,7 @@ fn accepted_source_execution_and_retry_publish_one_current_result_and_event_stre
             .project(|_| crate::runtime::TerminalOutput::new(0, String::new(), String::new()))
             .publish();
         let (published, _, _, stderr) = published.into_parts();
+        let stderr = String::from_utf8(stderr).expect("text-only fixture stderr");
         assert_eq!(stderr.matches("execution-event").count(), 1);
         let attempts = if matches!(behavior, Behavior::Normal) {
             1

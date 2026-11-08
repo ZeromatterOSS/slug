@@ -1112,6 +1112,9 @@ mod tests {
                 EvaluationEvent::Diagnostic { .. } => {
                     unreachable!("diagnostic events are not produced by this packet")
                 }
+                EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                    unreachable!("process output is not produced by this fixture")
+                }
             })
             .collect::<Vec<_>>();
         assert!(events.is_empty());

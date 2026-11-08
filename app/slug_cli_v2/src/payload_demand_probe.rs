@@ -62,7 +62,7 @@ fn authentic_sentinel_demand() {
     let (_, exit_code, stdout, stderr) = published.into_parts();
     terminal_release.finish();
     println!("native publication exit={exit_code}\n{stdout}");
-    eprintln!("{stderr}");
+    crate::commands::write_stderr(&stderr).expect("native probe stderr delivery");
     assert_eq!(exit_code, 0, "native evaluation/publication failed");
     println!("SLUG_SENTINEL_NATIVE_SUCCESS_PUBLISHED_0");
 }

@@ -105,7 +105,9 @@ pub fn run(argv: Vec<String>) -> i32 {
         .publish();
     let (_terminal, exit_code, stdout, stderr) = published.into_parts();
     print!("{stdout}");
-    eprint!("{stderr}");
+    if super::write_stderr(&stderr).is_err() {
+        return 2;
+    }
     exit_code
 }
 
@@ -145,7 +147,9 @@ fn run_daemon(
     ) {
         Ok(response) => {
             print!("{}", response.stdout);
-            eprint!("{}", response.stderr);
+            if super::write_stderr(&response.stderr).is_err() {
+                return 2;
+            }
             response.exit_code
         }
         Err(error) => emit_error(&error.to_string(), "daemon"),

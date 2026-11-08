@@ -10,7 +10,7 @@ use super::*;
 // Complete the unchanged builtin bazel_tools MODULE using the same unrelated
 // Local declarations as source_input_tests. These modules supply no callbacks;
 // the archive rules below still execute their actual authored Starlark.
-const BUILTIN_MODULE_PREREQUISITES: &[(&str, &str)] = &[
+pub(in crate::runtime::dice) const BUILTIN_MODULE_PREREQUISITES: &[(&str, &str)] = &[
     ("rules_license", "1.0.0"),
     ("buildozer", "8.5.1"),
     ("zlib", "1.3.1.bcr.5"),

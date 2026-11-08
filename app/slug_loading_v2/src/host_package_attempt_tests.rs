@@ -345,6 +345,9 @@ fn events(terminal: &HostPackageAttemptTerminal) -> Vec<&str> {
         .map(|event| match event {
             EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
             EvaluationEvent::Diagnostic { .. } => panic!("unexpected diagnostic event"),
+            EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                panic!("unexpected repository process output")
+            }
         })
         .collect()
 }

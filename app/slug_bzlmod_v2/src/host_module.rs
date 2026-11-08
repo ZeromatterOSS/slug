@@ -2992,6 +2992,9 @@ mod tests {
             .map(|event| match event {
                 EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+                EvaluationEvent::RepositoryExecuteOutput { .. } => {
+                    panic!("unexpected repository process output")
+                }
             })
             .collect()
     }

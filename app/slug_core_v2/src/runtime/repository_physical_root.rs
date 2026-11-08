@@ -33,6 +33,7 @@ mod process_owner;
 #[path = "repository_workspace_progress.rs"]
 mod progress;
 pub(in crate::runtime) use progress::command::RepositoryWorkspaceCommand;
+pub(in crate::runtime) use progress::command::RepositoryWorkspaceRetirementObserver;
 mod image;
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 mod initialize;
@@ -190,6 +191,9 @@ pub(in crate::runtime) struct RepositoryPhysicalRootBuilder {
     resources: Arc<RepositoryRootResources>,
     backing: Arc<RepositoryRootBacking>,
     credit: resources::ResourceCredit,
+    // A bootstrap result may remain queued after the awaiting future cancels.
+    // Mutable authority and its credits retire before this counted guard.
+    retirement: Option<progress::command::RepositoryWorkspaceRetirementGuard>,
 }
 
 /// Sealed same-root owner. Arc cloning creates no descriptor. Field order closes
@@ -290,6 +294,7 @@ impl RepositoryPhysicalRootBuilder {
             resources,
             backing: incoming.backing,
             credit,
+            retirement: None,
         };
         let _scratch = owner.resources.reserve(IO_SCRATCH, 0, 0)?;
         owner.identity = backing_identity(&owner.file, mode)?;

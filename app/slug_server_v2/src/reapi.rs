@@ -183,7 +183,7 @@ fn run_reapi_run_build(
             );
             ReapiBuildOutcome {
                 exit_code: 0,
-                stderr,
+                stderr: stderr.into_bytes(),
             }
         }
         Ok(_) => ReapiBuildOutcome {
@@ -191,7 +191,7 @@ fn run_reapi_run_build(
             stderr: format!(
                 "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"message\":\"no executable actions were declared\",\"runtime_mode\":\"{}\",\"invalidated_files\":{}}}\n",
                 runtime_mode, invalidated_files,
-            ),
+            ).into_bytes(),
         },
         Err(error) => ReapiBuildOutcome::error(runtime_mode, invalidated_files, &error),
     }
@@ -237,7 +237,7 @@ pub fn run_reapi_executable(
 #[derive(Debug, Clone)]
 pub struct ReapiBuildOutcome {
     pub exit_code: i32,
-    pub stderr: String,
+    pub stderr: Vec<u8>,
 }
 
 impl ReapiBuildOutcome {
@@ -249,7 +249,7 @@ impl ReapiBuildOutcome {
                 json_escape(message),
                 runtime_mode,
                 invalidated_files,
-            ),
+            ).into_bytes(),
         }
     }
 }
@@ -377,7 +377,7 @@ empty(name = "empty")
                             "daemon",
                             0,
                         );
-                        slug_core_v2::runtime::TerminalOutput::new(
+                        slug_core_v2::runtime::TerminalOutput::from_bytes(
                             outcome.exit_code,
                             String::new(),
                             outcome.stderr,
@@ -397,6 +397,7 @@ empty(name = "empty")
                 })
                 .publish();
             let (_, code, _, stderr) = published.into_parts();
+            let stderr = String::from_utf8(stderr).expect("text-only fixture stderr");
             assert_eq!(code, 2);
             if rejected {
                 assert!(

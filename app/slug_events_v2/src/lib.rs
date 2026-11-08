@@ -60,7 +60,7 @@ impl fmt::Display for StarlarkSourceLocation {
 }
 
 /// One evaluation-local event captured for later command-owned publication.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Clone, PartialEq, Eq, Allocative)]
 pub enum EvaluationEvent {
     StarlarkPrint {
         location: StarlarkSourceLocation,
@@ -70,6 +70,43 @@ pub enum EvaluationEvent {
         level: EvaluationDiagnosticLevel,
         text: CompactString,
     },
+    /// Completion-batch forwarding to the current terminal stderr. Captured
+    /// result allocations are shared; no UTF-8/Latin-1 conversion is performed.
+    RepositoryExecuteOutput {
+        command_lease: u64,
+        operation_index: usize,
+        stdout: Arc<[u8]>,
+        stderr: Arc<[u8]>,
+    },
+}
+
+impl fmt::Debug for EvaluationEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StarlarkPrint { location, text } => f
+                .debug_struct("StarlarkPrint")
+                .field("location", location)
+                .field("text", text)
+                .finish(),
+            Self::Diagnostic { level, text } => f
+                .debug_struct("Diagnostic")
+                .field("level", level)
+                .field("text", text)
+                .finish(),
+            Self::RepositoryExecuteOutput {
+                command_lease,
+                operation_index,
+                stdout,
+                stderr,
+            } => f
+                .debug_struct("RepositoryExecuteOutput")
+                .field("command_lease", command_lease)
+                .field("operation_index", operation_index)
+                .field("stdout_bytes", &stdout.len())
+                .field("stderr_bytes", &stderr.len())
+                .finish(),
+        }
+    }
 }
 
 /// An immutable ordered batch of evaluation events.
@@ -126,6 +163,40 @@ mod tests {
             level,
             text: CompactString::new(text),
         }
+    }
+
+    #[test]
+    fn repository_output_shares_binary_bodies_and_retains_operation_order() {
+        let stdout: Arc<[u8]> = Arc::from([0xff, 0, 0x80]);
+        let stderr: Arc<[u8]> = Arc::from([0xfe, b'\r']);
+        let event = EvaluationEvent::RepositoryExecuteOutput {
+            command_lease: 11,
+            operation_index: 3,
+            stdout: stdout.clone(),
+            stderr: stderr.clone(),
+        };
+        let batch = EventBatch::from_events([print("before"), event.clone(), print("after")]);
+        assert_eq!(batch.events()[1], event);
+        let EvaluationEvent::RepositoryExecuteOutput {
+            stdout: actual,
+            stderr: error,
+            ..
+        } = &batch.events()[1]
+        else {
+            panic!("missing output")
+        };
+        assert!(Arc::ptr_eq(actual, &stdout));
+        assert!(Arc::ptr_eq(error, &stderr));
+        assert_ne!(
+            event,
+            EvaluationEvent::RepositoryExecuteOutput {
+                command_lease: 11,
+                operation_index: 4,
+                stdout,
+                stderr
+            }
+        );
+        assert!(!format!("{batch:?}").contains("255"));
     }
 
     #[test]

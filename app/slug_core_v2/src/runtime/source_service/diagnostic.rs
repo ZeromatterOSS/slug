@@ -301,14 +301,12 @@ impl NativeDemandCommand<'_> {
                     SourceServiceError::ForeignScope,
                 ));
             }
-            if self
-                .issued_requests
-                .get(&request.id)
-                .is_some_and(|known| known.as_ref() != request.as_ref())
-            {
-                return Err(NativeDemandSessionError::ConflictingRepository(
-                    request.id.canonical_repo.clone(),
-                ));
+            if let Some(known) = self.issued_requests.get(&request.id) {
+                if !self.repository_requests_equal(known, request)? {
+                    return Err(NativeDemandSessionError::ConflictingRepository(
+                        request.id.canonical_repo.clone(),
+                    ));
+                }
             }
         }
         for request in needs.selected_extension_downloads().values() {

@@ -263,9 +263,9 @@ fn native_runfiles_warnings_are_selected_once_and_restore_after_removal() {
         assert_eq!(
             stderr,
             if warning && index != 1 {
-                expected.as_str()
+                expected.as_bytes()
             } else {
-                ""
+                b"".as_slice()
             }
         );
     }

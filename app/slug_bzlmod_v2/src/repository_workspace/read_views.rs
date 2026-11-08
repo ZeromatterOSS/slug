@@ -68,6 +68,9 @@ impl RepositoryWorkspaceReadView {
     ) -> Result<Self, RepositoryWorkspaceError> {
         repo_spec.workspace_retained_storage_bytes()?;
         state.retained_metadata_bytes()?;
+        if &repo_spec != state.reservation().expected_repo_spec().as_ref() {
+            return Err(RepositoryWorkspaceError::ForeignReservation);
+        }
         Ok(Self { repo_spec, state })
     }
     pub(super) fn try_eq_with_states<E>(

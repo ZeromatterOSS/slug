@@ -45,10 +45,15 @@ image seams; their SourceArtifact metadata helper does not activate original
 Loading. Non-Linux native source reading/upload is explicitly unsupported;
 pure metadata remains portable. Cross-repository manifests and full native
 selected-view admission now join ordinary semantic Execute in the inactive owner.
-Original Loading-to-GeneralWorkspace integration is the next frontier, including public
-physical-source CAS/runfiles proof under that selection route and the complete
-activation gates below. Existing production process routes remain
-replacement-required. The selected design links owner
+The [original Loading join receipt](wp1225-original-loading-acceptance-2026-11-08.json)
+adds the inactive policy/Need/replay route, actual original cquery with two fresh
+commands and normal process records, same-root adoption, anchored generic source
+producers, binary output delivery and command retirement through queued results
+and bootstrap/payload cancellation. Trusted construction still requires a
+Diagnostic source scope. Production per-command source scope and selected-source
+bridges are the next frontier, followed by original-route physical CAS/runfiles
+proof and the complete activation gates below. Existing production process routes
+remain replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.

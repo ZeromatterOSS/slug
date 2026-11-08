@@ -234,13 +234,15 @@ impl GeneralWorkspaceSession {
 pub(in crate::runtime) struct ReservedRepositoryWorkspace {
     token: RepositorySessionToken,
     reservation: Arc<RepositoryWorkspaceReservation>,
-    repo_spec: Arc<RepoSpec>,
     claim: Arc<SourceRootClaim>,
     _credit: ResourceCredit,
 }
 impl ReservedRepositoryWorkspace {
     pub(in crate::runtime) fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
         &self.reservation
+    }
+    pub(in crate::runtime) fn repo_spec(&self) -> &Arc<RepoSpec> {
+        self.reservation.expected_repo_spec()
     }
     pub(in crate::runtime) fn claim(&self) -> &Arc<SourceRootClaim> {
         &self.claim
@@ -370,6 +372,7 @@ impl RepositoryMaterializer {
                 key.owner().clone(),
                 key.repository().clone(),
                 key.ordinal(),
+                repo_spec,
                 claim.display.clone(),
                 instance,
                 general.lease,
@@ -386,7 +389,6 @@ impl RepositoryMaterializer {
         Ok(ReservedRepositoryWorkspace {
             token,
             reservation,
-            repo_spec,
             claim,
             _credit: credit,
         })
@@ -407,7 +409,7 @@ impl RepositoryMaterializer {
         let RepositoryMaterializationKind::GeneralWorkspace(realization) = &request.kind else {
             return Err(RepositorySessionError::KindMismatch);
         };
-        if &request.repo_spec != ticket.repo_spec.as_ref()
+        if &request.repo_spec != ticket.repo_spec().as_ref()
             || request.id.workspace != self.workspace
             || request.id.canonical_repo != *ticket.reservation.repository()
             || realization.reservation() != &ticket.reservation
@@ -657,6 +659,7 @@ mod tests {
             .reserve_workspace(token, key.clone(), expected.clone(), &scope)
             .unwrap();
         assert_eq!(first.reservation().lease(), early);
+        assert!(Arc::ptr_eq(first.repo_spec(), &expected));
         assert!(first.claim().matches_reservation(first.reservation()));
         assert!(
             actor

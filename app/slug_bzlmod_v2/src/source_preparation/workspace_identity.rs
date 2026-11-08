@@ -203,6 +203,21 @@ fn map_bytes<K, V>(
 }
 
 impl RepositoryMaterializationRequest {
+    /// The independent terminal selection must match the pre-evaluation binding.
+    #[doc(hidden)]
+    pub fn validate_general_workspace_binding(&self) -> Result<(), RepositoryWorkspaceError> {
+        let RepositoryMaterializationKind::GeneralWorkspace(realization) = &self.kind else {
+            return Err(RepositoryWorkspaceError::InvalidOperation);
+        };
+        let reservation = realization.reservation();
+        if self.id.workspace != *reservation.workspace()
+            || self.id.canonical_repo != *reservation.repository()
+            || &self.repo_spec != reservation.expected_repo_spec().as_ref()
+        {
+            return Err(RepositoryWorkspaceError::ForeignReservation);
+        }
+        Ok(())
+    }
     /// Compare complete current selected facts while letting Core bound actual
     /// state/body work. Non-general kinds retain their ordinary full equality.
     #[doc(hidden)]
@@ -239,6 +254,7 @@ impl RepositoryMaterializationRequest {
     pub fn general_workspace_storage_partition(
         &self,
     ) -> Result<crate::RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
+        self.validate_general_workspace_binding()?;
         let RepositoryMaterializationKind::GeneralWorkspace(realization) = &self.kind else {
             return Err(RepositoryWorkspaceError::InvalidOperation);
         };
@@ -351,6 +367,7 @@ mod tests {
                     owner(),
                     CanonicalRepoName::new("repo").unwrap(),
                     0,
+                    Arc::new(spec(SmallMap::new())),
                     NormalizedAbsolutePath::new("/__slug_repositories__/test").unwrap(),
                     PathObservationInstanceId::new(instance),
                     lease,

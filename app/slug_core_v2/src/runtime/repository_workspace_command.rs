@@ -11,6 +11,85 @@ use super::super::mount_lease::domain::NativeMountDomain;
 use super::super::mount_lease::quota::VerifiedProcessQuota;
 use super::*;
 
+struct RetirementState {
+    owners: std::sync::Mutex<usize>,
+    changed: std::sync::Condvar,
+    _credit: resources::ResourceCredit,
+}
+#[derive(Clone)]
+pub(in crate::runtime) struct RepositoryWorkspaceRetirementObserver {
+    state: Arc<RetirementState>,
+}
+pub(in crate::runtime::repository_physical_root) struct RepositoryWorkspaceRetirementGuard {
+    state: Arc<RetirementState>,
+}
+#[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
+#[derive(Clone)]
+pub(in crate::runtime::repository_physical_root) struct RepositoryWorkspaceProcessProbe {
+    pub(in crate::runtime::repository_physical_root) stage: Arc<std::sync::atomic::AtomicUsize>,
+    pub(in crate::runtime::repository_physical_root) hold_before_hello: bool,
+}
+impl std::fmt::Debug for RepositoryWorkspaceRetirementGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RepositoryWorkspaceRetirementGuard")
+            .finish_non_exhaustive()
+    }
+}
+impl RepositoryWorkspaceRetirementObserver {
+    pub(in crate::runtime::repository_physical_root) fn worker_guard(
+        &self,
+    ) -> RepositoryWorkspaceRetirementGuard {
+        let mut owners = self
+            .state
+            .owners
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        *owners = owners
+            .checked_add(1)
+            .expect("bounded native retirement ownership");
+        RepositoryWorkspaceRetirementGuard {
+            state: self.state.clone(),
+        }
+    }
+    /// Zero means all command fields and worker/result owners have retired.
+    /// A quarantine timeout leaves the enclosing native session Busy.
+    pub(in crate::runtime) fn wait_until(&self, deadline: std::time::Instant) -> bool {
+        let mut owners = self
+            .state
+            .owners
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        while *owners != 0 {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
+                return false;
+            }
+            let (next, _) = self
+                .state
+                .changed
+                .wait_timeout(owners, remaining)
+                .unwrap_or_else(|poison| poison.into_inner());
+            owners = next;
+        }
+        true
+    }
+}
+impl Drop for RepositoryWorkspaceRetirementGuard {
+    fn drop(&mut self) {
+        let mut owners = self
+            .state
+            .owners
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        *owners = owners
+            .checked_sub(1)
+            .expect("native retirement owner underflow");
+        if *owners == 0 {
+            self.state.changed.notify_all();
+        }
+    }
+}
+
 struct CreditedEpoch {
     epoch: RepositoryWorkspaceEpoch,
     _credit: resources::ResourceCredit,
@@ -36,7 +115,11 @@ pub(in crate::runtime) struct RepositoryWorkspaceCommand {
     scope: Arc<SourceServiceScope>,
     resources: Arc<RepositoryRootResources>,
     max_roots: usize,
+    #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
+    process_probe: Option<RepositoryWorkspaceProcessProbe>,
     _control: resources::ResourceCredit,
+    // LAST: a drain cannot report completion before authority/credits above.
+    _retirement: RepositoryWorkspaceRetirementGuard,
 }
 
 impl RepositoryWorkspaceCommand {
@@ -55,6 +138,14 @@ impl RepositoryWorkspaceCommand {
             ));
         }
         let control = resources.reserve(std::mem::size_of::<Self>(), 0, 0)?;
+        let retirement_credit = resources.reserve(arc_bytes::<RetirementState>()?, 0, 0)?;
+        let retirement = RepositoryWorkspaceRetirementGuard {
+            state: Arc::new(RetirementState {
+                owners: std::sync::Mutex::new(1),
+                changed: std::sync::Condvar::new(),
+                _credit: retirement_credit,
+            }),
+        };
         let bytes = RepositoryWorkspaceEpoch::fresh_storage_bytes(&workspace, lease, limits)
             .map_err(PhysicalRootError::Protocol)?;
         let credit = resources.reserve(add(bytes, std::mem::size_of::<CreditedEpoch>())?, 0, 0)?;
@@ -73,8 +164,99 @@ impl RepositoryWorkspaceCommand {
             scope,
             resources,
             max_roots: limits.max_state_versions(),
+            #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
+            process_probe: None,
             _control: control,
+            _retirement: retirement,
         })
+    }
+    pub(in crate::runtime) fn retirement_observer(&self) -> RepositoryWorkspaceRetirementObserver {
+        RepositoryWorkspaceRetirementObserver {
+            state: self._retirement.state.clone(),
+        }
+    }
+    /// Pure complete-frontier preadmission. Future snapshots remain actual
+    /// per-operation work; this validates every currently knowable replay fact.
+    pub(in crate::runtime) fn validate_frontier_request(
+        &self,
+        request: &RepositoryWorkspaceRequest,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+        comparison: &mut ViewComparison<'_>,
+    ) -> Result<(), PhysicalRootError> {
+        self.check_scope(scope, active)?;
+        let slot = self.root_slot(request.reservation())?;
+        if self.roots[slot].progress.is_none() {
+            return Err(PhysicalRootError::Reservation);
+        }
+        let storage = request
+            .storage_partition()
+            .map_err(PhysicalRootError::Protocol)?;
+        let bytes = if self.source_dependencies.covers_request(request) {
+            storage.owned_bytes()
+        } else {
+            storage.total_bytes().map_err(PhysicalRootError::Protocol)?
+        };
+        struct ExpectedRequest {
+            request: RepositoryWorkspaceRequest,
+            _credit: resources::ResourceCredit,
+        }
+        let credit =
+            self.resources
+                .reserve(add(bytes, std::mem::size_of::<ExpectedRequest>())?, 0, 0)?;
+        let expected = ExpectedRequest {
+            request: self
+                .epoch()
+                .request_at(
+                    request.reservation(),
+                    request.index(),
+                    request.operation().clone(),
+                )
+                .map_err(PhysicalRootError::Protocol)?,
+            _credit: credit,
+        };
+        if !request.try_eq_with_states(&expected.request, &mut |left, right| {
+            comparison.state_equal(left, right)
+        })? {
+            return Err(PhysicalRootError::Protocol(
+                slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
+            ));
+        }
+        let transcript = self
+            .epoch()
+            .transcripts()
+            .unwrap()
+            .iter()
+            .find(|transcript| transcript.reservation().as_ref() == request.reservation().as_ref())
+            .ok_or(PhysicalRootError::Reservation)?;
+        if let Some(record) = transcript.records().get(request.index()) {
+            if !request.try_eq_with_states(record.request(), &mut |left, right| {
+                comparison.state_equal(left, right)
+            })? {
+                return Err(PhysicalRootError::Protocol(
+                    slug_bzlmod_v2::RepositoryWorkspaceError::ReplayConflict,
+                ));
+            }
+        }
+        Ok(())
+    }
+    #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(in crate::runtime) fn with_process_probe_for_test(
+        mut self,
+        stage: Arc<std::sync::atomic::AtomicUsize>,
+        hold_before_hello: bool,
+    ) -> Self {
+        self.process_probe = Some(RepositoryWorkspaceProcessProbe {
+            stage,
+            hold_before_hello,
+        });
+        self
+    }
+    #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(in crate::runtime::repository_physical_root) fn process_probe(
+        &self,
+    ) -> Option<RepositoryWorkspaceProcessProbe> {
+        self.process_probe.clone()
     }
     pub(in crate::runtime) fn epoch(&self) -> &RepositoryWorkspaceEpoch {
         &self.epoch.epoch
@@ -676,6 +858,17 @@ pub(in crate::runtime::repository_physical_root) struct NativeProcessAdmission {
     _credit: resources::ResourceCredit,
 }
 impl NativeProcessAdmission {
+    #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(in crate::runtime::repository_physical_root) fn process_probe(
+        &self,
+    ) -> Option<RepositoryWorkspaceProcessProbe> {
+        self.command.process_probe()
+    }
+    pub(in crate::runtime::repository_physical_root) fn retirement_observer(
+        &self,
+    ) -> RepositoryWorkspaceRetirementObserver {
+        self.command.retirement_observer()
+    }
     pub(in crate::runtime::repository_physical_root) fn begin_rolling(
         &mut self,
         active: &dyn Fn() -> bool,

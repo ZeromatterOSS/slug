@@ -358,6 +358,7 @@ fn fixture(large: bool) -> Fixture {
             ))
             .unwrap(),
             1,
+            a.expected_repo_spec().clone(),
             NormalizedAbsolutePath::new(Path::new(wire::RESERVED_PREFIX).join(format!("{leaf}-b")))
                 .unwrap(),
             slug_workspace_v2::PathObservationInstanceId::new(2202),
@@ -531,7 +532,28 @@ fn native_shared_domain_readonly_view_renews_while_same_executor_root_remains_wr
         probe.stale_capture = Some(capture);
         probe.arm();
     }
+    let retirement = match probe.root.as_ref().unwrap() {
+        Root::First(q) => q.retirement_observer(),
+        Root::Again { admission, .. } => admission.retirement_observer(),
+    };
+    let renewed = probe
+        .attempt
+        .take()
+        .expect("renewed view armed after both launches");
     drop(probe);
+    assert!(
+        !retirement.wait_until(std::time::Instant::now()),
+        "renewed standalone view must retain original retirement custody after command drop"
+    );
+    drop(renewed);
+    assert!(retirement.wait_until(std::time::Instant::now() + Duration::from_secs(1)));
+    assert_eq!(bank.snapshot().backing_bytes, ARCHIVE_BYTES);
+    assert_eq!(
+        bank.snapshot().native_fds,
+        1,
+        "only sealed Archive data remains after renewed view retirement"
+    );
+    drop(retirement);
     drop(sealed);
     release(&bank, baseline);
 }
@@ -563,9 +585,14 @@ fn native_process_finalization_preserves_actual_record_and_data_after_setup_auth
     let count = command.epoch().transcripts().unwrap()[0].records().len();
     assert_eq!(count, 1);
     let request = final_request(&command, &selected);
-    let (command, sealed, view) = runtime
+    let retirement = command.retirement_observer();
+    let finalized = runtime
         .block_on(command.finalize_read_view(request, &scope, &|| true))
         .unwrap();
+    let (send, receive) = tokio::sync::oneshot::channel();
+    assert!(send.send(finalized).is_ok());
+    assert!(!retirement.wait_until(std::time::Instant::now()));
+    let (command, sealed, view) = runtime.block_on(receive).unwrap();
     assert_eq!(
         command.epoch().transcripts().unwrap()[0].records().len(),
         count
@@ -573,8 +600,19 @@ fn native_process_finalization_preserves_actual_record_and_data_after_setup_auth
     assert_eq!(sealed.root().mode, RepositoryWorkspaceMode::Process);
     assert_eq!(bank.snapshot().backing_bytes, PROCESS_BYTES);
     let mut reader = sealed.root().open_member("data", &scope, &|| true).unwrap();
-    drop(view);
     drop(command);
+    assert!(
+        !retirement.wait_until(std::time::Instant::now()),
+        "standalone finalized view still owns setup descriptors/domain"
+    );
+    drop(view);
+    assert!(retirement.wait_until(std::time::Instant::now() + Duration::from_secs(1)));
+    drop(retirement);
+    assert_eq!(
+        bank.snapshot().backing_bytes,
+        PROCESS_BYTES,
+        "legitimate sealed data survives setup retirement"
+    );
     drop(sealed);
     assert_eq!(
         bank.snapshot().native_fds,

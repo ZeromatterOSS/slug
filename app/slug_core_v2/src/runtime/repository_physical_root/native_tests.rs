@@ -44,6 +44,13 @@ pub(super) fn reservation(display: &Path, instance: u64) -> Arc<RepositoryWorksp
             owner,
             repository,
             0,
+            Arc::new(slug_bzlmod_v2::RepoSpec {
+                rule_id: slug_bzlmod_v2::RepoRuleId {
+                    bzl_file: slug_identity_v2::CanonicalLabel::parse("@@//:repo.bzl").unwrap(),
+                    rule_name: "generic".into(),
+                },
+                attributes: Arc::new(SmallMap::new()),
+            }),
             NormalizedAbsolutePath::new(display).unwrap(),
             PathObservationInstanceId::new(instance),
             711,

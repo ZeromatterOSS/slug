@@ -13,6 +13,15 @@ fn limits() -> RepositoryWorkspaceRetentionLimits {
     RepositoryWorkspaceRetentionLimits::new(1024, 128 * 1024 * 1024, 2 * 1024 * 1024 * 1024)
         .unwrap()
 }
+fn workspace_spec() -> Arc<crate::RepoSpec> {
+    Arc::new(crate::RepoSpec {
+        rule_id: crate::RepoRuleId {
+            bzl_file: CanonicalLabel::parse("@@//:repos.bzl").unwrap(),
+            rule_name: "repository".into(),
+        },
+        attributes: Arc::new(SmallMap::new()),
+    })
+}
 fn reservation_with(
     lease: u64,
     instance: u64,
@@ -24,6 +33,7 @@ fn reservation_with(
             Arc::new(HostSelectedExtensionOwner::testing("owner")),
             CanonicalRepoName::new("owner+repo").unwrap(),
             3,
+            workspace_spec(),
             NormalizedAbsolutePath::new("/logical/repo").unwrap(),
             PathObservationInstanceId::new(instance),
             lease,
@@ -107,6 +117,7 @@ fn reservation_rejects_zero_and_retains_full_generation_policy_identity() {
             a.owner().clone(),
             a.repository().clone(),
             a.ordinal(),
+            a.expected_repo_spec().clone(),
             a.display_root().clone(),
             PathObservationInstanceId::new(0),
             7,
@@ -120,12 +131,102 @@ fn reservation_rejects_zero_and_retains_full_generation_policy_identity() {
             a.owner().clone(),
             a.repository().clone(),
             a.ordinal(),
+            a.expected_repo_spec().clone(),
             a.display_root().clone(),
             a.instance(),
             0,
             limits()
         )
         .is_err()
+    );
+}
+
+#[test]
+fn reservation_binds_full_spec_without_changing_slot_or_coarse_hash() {
+    let a = reservation_with(7, 11, limits());
+    let bind = |spec| {
+        RepositoryWorkspaceReservation::new(
+            a.workspace().clone(),
+            a.owner().clone(),
+            a.repository().clone(),
+            a.ordinal(),
+            spec,
+            a.display_root().clone(),
+            a.instance(),
+            a.lease(),
+            a.limits(),
+        )
+    };
+    let mut secret = CompactString::with_capacity(32768);
+    secret.push_str("private-nested-spec-value");
+    let mut changed = a.expected_repo_spec().as_ref().clone();
+    changed.attributes = Arc::new(SmallMap::from_iter([(
+        CompactString::new("nested"),
+        crate::OverrideAttributeValue::Iterable(Arc::from([
+            crate::OverrideAttributeValue::String(secret),
+        ])),
+    )]));
+    let b = Arc::new(bind(Arc::new(changed)).unwrap());
+    assert_ne!(a, b);
+    assert!(a.same_slot(&b));
+    assert_eq!(a.display_root(), b.display_root());
+    let hash = |value: &RepositoryWorkspaceReservation| {
+        let mut state = std::hash::DefaultHasher::new();
+        value.hash(&mut state);
+        state.finish()
+    };
+    let equal = bind(Arc::new(a.expected_repo_spec().as_ref().clone())).unwrap();
+    assert_eq!(a.as_ref(), &equal);
+    assert_eq!(hash(&a), hash(&equal));
+    assert_eq!(hash(&a), hash(&b)); // Spec changes deliberately share a routing bucket.
+    assert!(!format!("{b:?}").contains("private-nested-spec-value"));
+    assert!(b.retained_storage_bytes().unwrap() > a.retained_storage_bytes().unwrap() + 32768);
+    let epoch = RepositoryWorkspaceEpoch::fresh(a.workspace().clone(), a.lease(), a.limits())
+        .unwrap()
+        .reserve(a.clone(), 0o755)
+        .unwrap();
+    assert_eq!(
+        epoch.reserve(b.clone(), 0o755),
+        Err(RepositoryWorkspaceError::ForeignReservation)
+    );
+    assert_eq!(
+        epoch.request_at(&b, 0, RepositoryWorkspaceOperation::Exists("".into())),
+        Err(RepositoryWorkspaceError::ForeignReservation)
+    );
+    let realization = RepositoryWorkspaceTranscript::new(a.clone(), 0o755)
+        .unwrap()
+        .realize(0)
+        .unwrap();
+    assert_eq!(
+        RepositoryWorkspaceReadView::new(
+            b.expected_repo_spec().as_ref().clone(),
+            realization.final_state().clone()
+        ),
+        Err(RepositoryWorkspaceError::ForeignReservation)
+    );
+    let mut terminal = crate::RepositoryMaterializationRequest {
+        id: crate::RepositoryMaterializationRequestId {
+            workspace: a.workspace().clone(),
+            canonical_repo: a.repository().clone(),
+        },
+        repo_spec: a.expected_repo_spec().as_ref().clone(),
+        kind: crate::RepositoryMaterializationKind::GeneralWorkspace(realization),
+    };
+    assert_eq!(terminal.validate_general_workspace_binding(), Ok(()));
+    terminal.repo_spec = b.expected_repo_spec().as_ref().clone();
+    assert_eq!(
+        terminal.general_workspace_storage_partition(),
+        Err(RepositoryWorkspaceError::ForeignReservation)
+    );
+    let mut deep = crate::OverrideAttributeValue::None;
+    for _ in 0..65 {
+        deep = crate::OverrideAttributeValue::Iterable(Arc::from([deep]));
+    }
+    let mut invalid = a.expected_repo_spec().as_ref().clone();
+    invalid.attributes = Arc::new(SmallMap::from_iter([(CompactString::new("deep"), deep)]));
+    assert_eq!(
+        bind(Arc::new(invalid)),
+        Err(RepositoryWorkspaceError::RetentionLimit)
     );
 }
 
@@ -832,13 +933,20 @@ fn protocol_debug_redacts_body_argv_environment_and_captured_bytes() {
             crate::OverrideAttributeValue::String("top-secret-spec".into()),
         )])),
     };
-    let source = RepositoryWorkspaceReadView::new(source_spec, t.current().clone()).unwrap();
+    let mut source_reservation = t.reservation().as_ref().clone();
+    source_reservation.expected_repo_spec = Arc::new(source_spec.clone());
+    assert!(!format!("{source_reservation:?}").contains("top-secret"));
+    let source_transcript =
+        RepositoryWorkspaceTranscript::new(Arc::new(source_reservation), 0o755).unwrap();
+    let source =
+        RepositoryWorkspaceReadView::new(source_spec, source_transcript.current().clone()).unwrap();
     let selected = t.reservation();
     let executor = RepositoryWorkspaceReservation::new(
         selected.workspace().clone(),
         selected.owner().clone(),
         CanonicalRepoName::new("debug-executor").unwrap(),
         4,
+        selected.expected_repo_spec().clone(),
         NormalizedAbsolutePath::new("/logical/debug-executor").unwrap(),
         PathObservationInstanceId::new(999),
         selected.lease(),
@@ -1467,6 +1575,7 @@ fn native_epoch_publication_cannot_bypass_other_process_root_history_admission()
             a.owner().clone(),
             CanonicalRepoName::new("owner+other").unwrap(),
             4,
+            a.expected_repo_spec().clone(),
             NormalizedAbsolutePath::new("/logical/other").unwrap(),
             PathObservationInstanceId::new(12),
             7,
@@ -1543,4 +1652,5 @@ fn native_epoch_publication_cannot_bypass_other_process_root_history_admission()
     );
 }
 
+mod demand_tests;
 mod read_view_tests;

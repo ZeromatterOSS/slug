@@ -604,7 +604,11 @@ impl PhysicalObservationBatch {
             })?;
             epochs.push(
                 root.observe(demands, scope, &|| actor.session_is_active(token))
-                    .map_err(|_| {
+                    .map_err(|error| {
+                        #[cfg(test)]
+                        report_physical_observation_refusal(&error);
+                        #[cfg(not(test))]
+                        let _ = error;
                         RepositorySessionError::NativeWorkspace(
                             "physical root observation refused".into(),
                         )
@@ -641,6 +645,38 @@ impl PhysicalObservationBatch {
         }
         Ok(merged)
     }
+}
+#[cfg(all(test, target_os = "linux"))]
+fn report_physical_observation_refusal(
+    error: &crate::runtime::repository_physical_root::PhysicalRootError,
+) {
+    use crate::runtime::path_observation::rooted::RootedObservationError as O;
+    use crate::runtime::repository_physical_root::PhysicalRootError as E;
+    let (category, errno) = match error {
+        E::Io(error) => ("io", error.raw_os_error()),
+        E::Reservation => ("reservation", None),
+        E::Mode => ("mode", None),
+        E::Backing => ("backing", None),
+        E::RootIdentity => ("root_identity", None),
+        E::Snapshot => ("snapshot", None),
+        E::UnsupportedOperation => ("unsupported_operation", None),
+        E::Mutation(_) => ("mutation", None),
+        E::Protocol(_) => ("protocol", None),
+        E::Resource => ("resource", None),
+        E::SourceService(_) => ("source_service", None),
+        E::Inactive => ("inactive", None),
+        E::Observation(error) => match error {
+            O::UnauthorizedDemand(_) => ("observation_unauthorized", None),
+            O::DuplicateDemand => ("observation_duplicate", None),
+            O::Bound => ("observation_bound", None),
+            O::Unstable => ("observation_unstable", None),
+            O::Inactive => ("observation_inactive", None),
+            O::RootIo(error) => ("observation_root_io", error.raw_os_error()),
+            O::SourceService(_) => ("observation_source_service", None),
+            O::Epoch(_) => ("observation_epoch", None),
+        },
+    };
+    eprintln!("physical observation refused: category={category} errno={errno:?}");
 }
 fn row_matches_result(
     row: &RetainedRepositoryRoot,

@@ -114,6 +114,17 @@ impl RepositoryWorkspaceCommand {
     }
 }
 impl NativeViewFinalization {
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) fn process_probe(
+        &self,
+    ) -> Option<super::RepositoryWorkspaceProcessProbe> {
+        self.command.process_probe()
+    }
+    pub(in crate::runtime::repository_physical_root) fn retirement_observer(
+        &self,
+    ) -> super::RepositoryWorkspaceRetirementObserver {
+        self.command.retirement_observer()
+    }
     pub(in crate::runtime::repository_physical_root) fn builder(
         &self,
     ) -> &RepositoryPhysicalRootBuilder {
@@ -184,11 +195,13 @@ impl NativeViewFinalization {
         }
         let scope = self.scope().clone();
         let domain = self.domain().clone();
+        let retirement = self.command.retirement_observer();
         let (command, sealed) =
             self.command
                 .seal_for_materialization(self.request, &scope, &|| true)?;
         let view = FinalizedRepositoryView::bind(&sealed, pending, domain, &scope, &|| true)
-            .map_err(PhysicalRootError::mount)?;
+            .map_err(PhysicalRootError::mount)?
+            .with_retirement_observer(retirement);
         drop(capture);
         Ok((command, sealed, view))
     }

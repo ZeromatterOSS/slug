@@ -342,6 +342,7 @@ async fn compute_generated_effect(
             (
                 Option<slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan>,
                 Option<slug_bzlmod_v2::RepositoryFilesystemRealization>,
+                Option<slug_bzlmod_v2::RepositoryWorkspaceRealization>,
                 PathObservationEpoch,
             ),
         >,
@@ -350,6 +351,7 @@ async fn compute_generated_effect(
 > {
     let Some(seed) = route.view().generated_effect_seed() else {
         return SourcePreparationOutcome::Complete(Ok(ControlFlow::Continue((
+            None,
             None,
             None,
             route_observations,
@@ -431,6 +433,7 @@ async fn compute_generated_effect(
         Ok(effect) => SourcePreparationOutcome::Complete(Ok(ControlFlow::Continue((
             Some(effect.plan().clone()),
             effect.filesystem_realization().cloned(),
+            effect.workspace_realization().cloned(),
             observations,
         )))),
         Err(error) => SourcePreparationOutcome::Complete(Ok(ControlFlow::Break((
@@ -458,7 +461,7 @@ async fn compute_load_route(
             return SourcePreparationOutcome::Complete(Ok(value));
         }
     };
-    let (plan, filesystem_realization, observations) =
+    let (plan, filesystem_realization, workspace_realization, observations) =
         match compute_generated_effect(ctx, key, route.clone(), observations, mode).await {
             SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
@@ -469,11 +472,18 @@ async fn compute_load_route(
                 return SourcePreparationOutcome::Complete(Ok(value));
             }
         };
-    let result = host_canonical_repository_source_input_with_filesystem_realization(
-        route,
-        plan,
-        filesystem_realization,
-    )
+    let result = if let Some(realization) = workspace_realization {
+        slug_bzlmod_v2::host_canonical_repository_source_input_with_workspace_realization(
+            route,
+            realization,
+        )
+    } else {
+        host_canonical_repository_source_input_with_filesystem_realization(
+            route,
+            plan,
+            filesystem_realization,
+        )
+    }
     .map(|input| HostCanonicalRepositoryLoadRoute { input })
     .map_err(|error| HostCanonicalRepositoryLoadRouteError {
         canonical_repo: key.canonical_repo.clone(),

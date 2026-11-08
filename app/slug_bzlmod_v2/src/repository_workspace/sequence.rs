@@ -1175,6 +1175,9 @@ impl RepositoryWorkspaceEpoch {
     pub fn lease(&self) -> Option<u64> {
         self.active.as_ref().map(|a| a.lease)
     }
+    pub fn workspace(&self) -> Option<&NormalizedAbsolutePath> {
+        self.active.as_ref().map(|active| &active.workspace)
+    }
     pub fn transcripts(&self) -> Option<&[RepositoryWorkspaceTranscript]> {
         self.active.as_ref().map(|a| a.transcripts.as_ref())
     }

@@ -108,6 +108,8 @@ pub(in crate::runtime::repository_physical_root) struct FinalizedRepositoryView 
     root: Arc<RepositoryPhysicalRoot>,
     domain: Arc<NativeMountDomain>,
     _credit: resources::ResourceCredit,
+    // LAST: standalone/queued view custody can outlive its returned command.
+    retirement: Option<super::super::progress::command::RepositoryWorkspaceRetirementGuard>,
 }
 impl FinalizedRepositoryView {
     pub(in crate::runtime::repository_physical_root) fn bind(
@@ -126,6 +128,7 @@ impl FinalizedRepositoryView {
             root: sealed.root().clone(),
             domain,
             _credit: credit,
+            retirement: None,
         };
         let slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(realization) =
             &sealed.request().kind
@@ -139,6 +142,17 @@ impl FinalizedRepositoryView {
         }
         owner.validate(scope, active)?;
         Ok(owner)
+    }
+    pub(in crate::runtime::repository_physical_root) fn with_retirement_observer(
+        mut self,
+        observer: super::super::progress::command::RepositoryWorkspaceRetirementObserver,
+    ) -> Self {
+        assert!(
+            self.retirement.is_none(),
+            "finalized view retirement already bound"
+        );
+        self.retirement = Some(observer.worker_guard());
+        self
     }
     fn validate(
         &self,
@@ -380,13 +394,22 @@ impl ReadOnlyViewInFlight {
             backing: Some(view.root.backing.clone()),
             credit: clone_credit,
         };
-        let next = FinalizedRepositoryView {
+        let mut next = FinalizedRepositoryView {
             mount: ReadOnlyMountClone::from_received_clone(successor)?,
             root: view.root.clone(),
             domain: view.domain.clone(),
             _credit: credit,
+            // The original armed phase retains custody through every fallible
+            // successor check. Move its guard only after validation succeeds.
+            retirement: None,
         };
         next.validate(scope, active)?;
+        next.retirement = self
+            .view
+            .as_mut()
+            .expect("armed source view")
+            .retirement
+            .take();
         let binding = self.binding.take().expect("unconsumed view use");
         drop(self.view.take());
         Ok(PendingReadOnlyView {

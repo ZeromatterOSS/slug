@@ -23,6 +23,7 @@ fn source_reservation(
             executor.owner().clone(),
             CanonicalRepoName::new(name).unwrap(),
             instance as usize,
+            Arc::new(spec()),
             NormalizedAbsolutePath::new(display).unwrap(),
             PathObservationInstanceId::new(instance),
             7,
@@ -51,6 +52,19 @@ fn source(
 }
 fn projection(t: &RepositoryWorkspaceTranscript) -> RepositoryWorkspaceReadView {
     RepositoryWorkspaceReadView::new(spec(), t.current().clone()).unwrap()
+}
+fn projection_with_spec(
+    state: &RepositoryWorkspaceState,
+    repo_spec: RepoSpec,
+) -> RepositoryWorkspaceReadView {
+    let mut reservation = state.reservation().as_ref().clone();
+    reservation.expected_repo_spec = Arc::new(repo_spec.clone());
+    let state = RepositoryWorkspaceState::from_admitted(
+        Arc::new(reservation),
+        state.mode(),
+        state.entries().to_vec(),
+    );
+    RepositoryWorkspaceReadView::new(repo_spec, Arc::new(state)).unwrap()
 }
 fn manifest(views: Vec<RepositoryWorkspaceReadView>) -> RepositoryWorkspaceReadViewManifest {
     RepositoryWorkspaceReadViewManifest::new(&reservation_with(7, 11, limits()), views).unwrap()
@@ -163,6 +177,7 @@ fn manifest_canonicalizes_exact_bound_and_refuses_aliases_and_foreign_command_fa
                 base.owner().clone(),
                 base.repository().clone(),
                 base.ordinal(),
+                base.expected_repo_spec().clone(),
                 NormalizedAbsolutePath::new(display).unwrap(),
                 base.instance(),
                 lease,
@@ -191,9 +206,7 @@ fn view_identity_uses_full_spec_state_mode_literal_link_and_instance() {
     changed.rule_id.rule_name = "different".into();
     assert_ne!(
         base,
-        operation(manifest(vec![
-            RepositoryWorkspaceReadView::new(changed, a.current().clone()).unwrap()
-        ]))
+        operation(manifest(vec![projection_with_spec(a.current(), changed)]))
     );
     let other = source(
         source_reservation("source", 101, "/views/source"),
@@ -374,9 +387,7 @@ fn repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies() {
         CompactString::new("key"),
         crate::OverrideAttributeValue::String(spare),
     )]));
-    let larger = manifest(vec![
-        RepositoryWorkspaceReadView::new(larger, source.current().clone()).unwrap(),
-    ]);
+    let larger = manifest(vec![projection_with_spec(source.current(), larger)]);
     assert!(
         larger.storage_partition().unwrap().owned_bytes()
             > selected.storage_partition().unwrap().owned_bytes() + 32000
@@ -391,16 +402,14 @@ fn repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies() {
         CompactString::new("key"),
         crate::OverrideAttributeValue::Iterable(shared),
     )]));
-    let a = RepositoryWorkspaceReadView::new(large_spec.clone(), source.current().clone()).unwrap();
+    let a = projection_with_spec(source.current(), large_spec.clone());
     let other = source_reservation("other", 101, "/views/other");
-    let b = RepositoryWorkspaceReadView::new(
-        large_spec,
+    let b = projection_with_spec(
         RepositoryWorkspaceTranscript::new(other, 0o755)
             .unwrap()
-            .current()
-            .clone(),
-    )
-    .unwrap();
+            .current(),
+        large_spec,
+    );
     assert_eq!(
         RepositoryWorkspaceReadViewManifest::new(&reservation_with(7, 11, limits()), vec![a, b])
             .unwrap_err(),
@@ -633,9 +642,7 @@ fn bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_
         let views = if field == 6 {
             let mut changed_spec = spec();
             changed_spec.rule_id.rule_name = "different".into();
-            manifest(vec![
-                RepositoryWorkspaceReadView::new(changed_spec, a.current().clone()).unwrap(),
-            ])
+            manifest(vec![projection_with_spec(a.current(), changed_spec)])
         } else {
             selected.clone()
         };

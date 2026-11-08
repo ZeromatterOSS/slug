@@ -112,7 +112,7 @@ pub fn run(argv: Vec<String>) -> i32 {
                         environment_to_clear: expected_environment_clear(),
                     }));
                 }
-                TerminalOutput::new(outcome.exit_code, String::new(), outcome.stderr)
+                TerminalOutput::from_bytes(outcome.exit_code, String::new(), outcome.stderr)
             }
         })
         .publish();
@@ -167,7 +167,7 @@ fn run_daemon(
 fn finish_build(
     exit_code: i32,
     stdout: String,
-    stderr: String,
+    stderr: Vec<u8>,
     plan: Option<RunLaunchPlan>,
     program_args: &[String],
     runtime_mode: &str,
@@ -176,7 +176,9 @@ fn finish_build(
         print!("{stdout}");
     }
     if !stderr.is_empty() {
-        eprint!("{stderr}");
+        if super::write_stderr(&stderr).is_err() {
+            return 2;
+        }
     }
     match (exit_code, plan) {
         (0, Some(plan)) => launch(plan, program_args, runtime_mode),

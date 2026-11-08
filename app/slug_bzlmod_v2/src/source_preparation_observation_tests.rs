@@ -9963,6 +9963,7 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
                     .map(|event| match event {
                         EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                         EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+                        EvaluationEvent::RepositoryExecuteOutput { .. } => "<execute-output>",
                     })
                     .collect::<Vec<_>>()
             })
@@ -10532,3 +10533,311 @@ use slug_workspace_v2::PathDirectoryEntry;
 use slug_workspace_v2::PathDirectoryEntryKind;
 use slug_workspace_v2::PathDirectoryListing;
 use slug_workspace_v2::PathDirectoryName;
+
+#[tokio::test]
+async fn generic_workspace_path_and_source_read_keep_anchor_without_ancestor_demands() {
+    use crate::HostCanonicalRepositoryRoute;
+    use crate::HostSelectedExtensionOwner;
+    use crate::RepositoryWorkspaceEntry;
+    use crate::RepositoryWorkspaceNode;
+    use crate::RepositoryWorkspaceOperation;
+    use crate::RepositoryWorkspaceReservation;
+    use crate::RepositoryWorkspaceResult;
+    use crate::RepositoryWorkspaceRetentionLimits;
+    use crate::RepositoryWorkspaceTranscript;
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let root = NormalizedAbsolutePath::new("/__slug_repositories__/v1/anchored-source").unwrap();
+    let requested = NormalizedAbsolutePath::new(root.as_path().join("data")).unwrap();
+    let instance = PathObservationInstanceId::new(591);
+    let namespace = PathObservationNamespace::Materialization(instance);
+    let owner = Arc::new(HostSelectedExtensionOwner::testing("+anchor"));
+    let repository = CanonicalRepoName::new("+anchor+repo").unwrap();
+    let spec = RepoSpec {
+        rule_id: crate::RepoRuleId {
+            bzl_file: CanonicalLabel::parse("@@//:repo.bzl").unwrap(),
+            rule_name: "repo".into(),
+        },
+        attributes: Arc::new(SmallMap::new()),
+    };
+    let route = Arc::new(
+        HostCanonicalRepositoryRoute::generated(
+            workspace.clone(),
+            repository.clone(),
+            owner.clone(),
+            0,
+            "repo",
+            spec.clone(),
+            repository.clone(),
+            SmallMap::new(),
+        )
+        .unwrap(),
+    );
+    let reservation = Arc::new(
+        RepositoryWorkspaceReservation::new(
+            workspace.clone(),
+            owner,
+            repository,
+            0,
+            Arc::new(spec),
+            root.clone(),
+            instance,
+            9,
+            RepositoryWorkspaceRetentionLimits::new(128, 16 * 1024 * 1024, 1024 * 1024 * 1024)
+                .unwrap(),
+        )
+        .unwrap(),
+    );
+    let transcript = RepositoryWorkspaceTranscript::new(reservation, 0o755).unwrap();
+    let body: Arc<[u8]> = Arc::from(&b"actual anchored bytes"[..]);
+    let request = transcript
+        .request(RepositoryWorkspaceOperation::File {
+            path: "data".into(),
+            body: body.clone(),
+            mode: 0o644,
+        })
+        .unwrap();
+    let transcript = transcript
+        .complete(
+            request,
+            RepositoryWorkspaceResult::Unit,
+            crate::RepositoryWorkspaceMode::Archive,
+            vec![
+                RepositoryWorkspaceEntry::new("".into(), 0o755, RepositoryWorkspaceNode::Directory)
+                    .unwrap(),
+                RepositoryWorkspaceEntry::new(
+                    "data".into(),
+                    0o644,
+                    RepositoryWorkspaceNode::File(body.clone()),
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap();
+    let realization = transcript.realize(1).unwrap();
+    let source_identity = realization.source_identity().clone();
+    let input = crate::host_canonical_repository_source_input_with_workspace_realization(
+        route,
+        realization,
+    )
+    .unwrap();
+    let HostRepositorySourceInputDispositionView::Request(material_request) =
+        input.view().disposition()
+    else {
+        panic!("normal generated source request")
+    };
+    let materialization = RepositoryMaterializationResultEpoch::new(
+        workspace,
+        [RepositoryMaterializationEpochEntry {
+            request: material_request.clone(),
+            result: RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Immutable {
+                    source_identity,
+                    generation_root: root.as_path().to_path_buf(),
+                    observation_instance: instance,
+                },
+            ),
+        }],
+    )
+    .unwrap();
+    let route = HostRepositorySourceRoute::canonical(input.clone());
+    let path_key = HostRepositoryPathKey::from_source_route(route.clone(), PathBuf::from("data"));
+    let observed_path_key =
+        HostRepositoryPathObservationKey::from_source_route(route.clone(), PathBuf::from("data"));
+    let root_key = HostRepositoryPathObservationKey::for_repository_root(route.clone());
+    let listing_key =
+        HostRepositoryDirectoryListingKey::from_source_route(route.clone(), PackagePath::root());
+    let observed_listing_key =
+        HostRepositoryDirectoryListingObservationKey::from_source_route(route, PackagePath::root());
+    let relative = host_repository_relative_path(PathBuf::from("data")).unwrap();
+    let read_key =
+        HostRepositorySourceObservationKey::new_canonical(input.clone(), relative.clone());
+    let observed_read_key = HostRepositorySourceObservationEpochKey::new_canonical(input, relative);
+    let script = [
+        (
+            PathObservationDemand::new(namespace, root.clone(), PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::Directory,
+                1,
+                2,
+                3,
+                4,
+                0o755,
+            ))),
+        ),
+        (
+            PathObservationDemand::new(
+                namespace,
+                requested.clone(),
+                PathObservationOperation::Lstat,
+            ),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                1,
+                3,
+                3,
+                4,
+                0o644,
+            ))),
+        ),
+        (
+            PathObservationDemand::new(
+                namespace,
+                requested.clone(),
+                PathObservationOperation::FileBytes,
+            ),
+            PathObservationResult::FileBytes(PathOperationResult::Present(body.clone())),
+        ),
+        (
+            PathObservationDemand::new(
+                namespace,
+                root.clone(),
+                PathObservationOperation::DirectoryEntries,
+            ),
+            PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+                PathDirectoryEntries::new([PathDirectoryEntry::new(
+                    PathDirectoryName::new("data").unwrap(),
+                    PathDirectoryEntryKind::File,
+                )]),
+            )),
+        ),
+    ];
+    fn assert_need<T>(value: &SourcePreparationOutcome<T>, expected: &PathObservationDemand) {
+        let SourcePreparationOutcome::Need(needs) = value else {
+            panic!("expected exact next anchored demand")
+        };
+        assert_eq!(
+            needs.path_observations().unwrap().demands(),
+            &[expected.clone()]
+        );
+    }
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    for prefix in 0..=script.len() {
+        // No Host or materialization ancestor above the selected root is supplied.
+        let epoch = PathObservationEpoch::new(script[..prefix].iter().cloned()).unwrap();
+        let mut transaction =
+            observed_source_transaction(&dice, materialization.clone(), epoch.clone(), None).await;
+        let path = transaction.compute(&path_key).await.unwrap();
+        let observed_path = transaction.compute(&observed_path_key).await.unwrap();
+        let root_path = transaction.compute(&root_key).await.unwrap();
+        let read = transaction.compute(&read_key).await.unwrap();
+        let observed_read = transaction.compute(&observed_read_key).await.unwrap();
+        let listing = transaction.compute(&listing_key).await.unwrap();
+        let observed_listing = transaction.compute(&observed_listing_key).await.unwrap();
+        if prefix < 2 {
+            assert_need(&path, &script[prefix].0);
+            assert_need(&observed_path, &script[prefix].0);
+        } else {
+            let SourcePreparationOutcome::Complete(path) = path else {
+                panic!("generic path completes at file lstat")
+            };
+            let path = path.as_ref().as_ref().unwrap().resolved();
+            assert_eq!(path.requested_path(), &requested);
+            assert_eq!(path.anchor().unwrap().root(), &root);
+            let SourcePreparationOutcome::Complete(Ok(observed)) = observed_path else {
+                panic!("observed generic path completes")
+            };
+            assert!(
+                observed
+                    .observations()
+                    .observations()
+                    .keys()
+                    .all(|demand| demand.namespace() == namespace
+                        && demand.path().as_path().starts_with(root.as_path()))
+            );
+        }
+        if prefix == 0 {
+            assert_need(&root_path, &script[0].0);
+        } else {
+            let SourcePreparationOutcome::Complete(Ok(observed)) = root_path else {
+                panic!("selected root requires only root lstat")
+            };
+            assert_eq!(observed.observations().observations().len(), 1);
+        }
+        if prefix < 3 {
+            assert_need(&read, &script[prefix].0);
+            assert_need(&observed_read, &script[prefix].0);
+        } else {
+            let SourcePreparationOutcome::Complete(read) = read else {
+                panic!("source completes after bytes")
+            };
+            let HostRepositorySourceObservation::Request(HostRepositorySourceFileValue::Present {
+                bytes,
+                ..
+            }) = read.as_ref().as_ref().unwrap()
+            else {
+                panic!("normal materialized source bytes")
+            };
+            assert!(Arc::ptr_eq(bytes, &body));
+            let SourcePreparationOutcome::Complete(Ok(observed)) = observed_read else {
+                panic!("observed source completes")
+            };
+            let read_epoch = PathObservationEpoch::new(script[..3].iter().cloned()).unwrap();
+            assert_selected_epoch(&mut transaction, &read_epoch, observed.observations()).await;
+            assert!(
+                observed
+                    .observations()
+                    .observations()
+                    .keys()
+                    .all(|demand| demand.namespace() == namespace
+                        && demand.path().as_path().starts_with(root.as_path()))
+            );
+        }
+        if prefix == 0 {
+            assert_need(&listing, &script[0].0);
+            assert_need(&observed_listing, &script[0].0);
+        } else if prefix < 4 {
+            assert_need(&listing, &script[3].0);
+            assert_need(&observed_listing, &script[3].0);
+        } else {
+            let SourcePreparationOutcome::Complete(listing) = listing else {
+                panic!("generic listing completes after exact directory entries")
+            };
+            assert_eq!(
+                listing_names(listing.as_ref().as_ref().unwrap()),
+                [("data".to_owned(), PathDirectoryEntryKind::File)]
+            );
+            let SourcePreparationOutcome::Complete(Ok(observed)) = observed_listing else {
+                panic!("observed generic listing completes")
+            };
+            let listing_epoch =
+                PathObservationEpoch::new([script[0].clone(), script[3].clone()]).unwrap();
+            assert_selected_epoch(&mut transaction, &listing_epoch, observed.observations()).await;
+            assert!(
+                observed
+                    .observations()
+                    .observations()
+                    .keys()
+                    .all(|demand| demand.namespace() == namespace && demand.path() == &root)
+            );
+        }
+    }
+    // The unobserved key also discards a captured anchored error frontier.
+    let invalid = PathObservationEpoch::new([(
+        script[0].0.clone(),
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            PathNodeKind::RegularFile,
+            1,
+            2,
+            3,
+            4,
+            0o644,
+        ))),
+    )])
+    .unwrap();
+    let mut transaction = observed_source_transaction(&dice, materialization, invalid, None).await;
+    let plain = transaction.compute(&read_key).await.unwrap();
+    assert!(matches!(plain,SourcePreparationOutcome::Complete(result) if result.is_err()));
+    let observed = transaction.compute(&observed_read_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(Ok(observed)) = observed else {
+        panic!("anchored error retains observed frontier")
+    };
+    assert!(observed.result().is_err());
+    assert_eq!(observed.observations().observations().len(), 1);
+    assert!(
+        observed
+            .observations()
+            .observations()
+            .keys()
+            .all(|demand| demand.path() == &root)
+    );
+}
