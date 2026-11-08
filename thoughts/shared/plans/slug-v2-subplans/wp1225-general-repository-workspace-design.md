@@ -1107,6 +1107,94 @@ Next, discriminate the observed Source IO refusal. Static evidence suggests
 final MODULE replacement over an extracted read-only regular member; its causal
 producer and safe generic replacement require proof before implementation.
 
+### Verified Source placement over read-only members
+
+The original Rust Source refusal is discriminated by the existing original
+Immutable archive fixture: changing only its packaged MODULE from0644 to0555
+(and requiring the published registry MODULE to remain0644) reproduces raw
+PermissionDenied13 with native FD/backing cleanup. This is an independent caller
+of the same Source producer. The natural Kotlin tar likewise has0555 regular
+members and a patched MODULE before final registry replacement.
+
+Pinned Bazel9.2 `tools/build_defs/repo/http.bzl:203–218` orders extraction,
+remote overlays and patching; `utils.bzl:215–242` applies registry patches then
+explicitly deletes MODULE and downloads the integrity-checked registry copy.
+`utils.bzl:86–115` says remote overlays overwrite existing files and marks them
+executable. Exact admitted behavior is verified replacement bytes and that
+ordering, independent of the old regular inode's writability. Slug's existing
+normalization to0644 MODULE/0755 overlay remains. Same-root private staging,
+finite namespace bounds, refusal of unsafe node kinds and unpublished failure
+visibility are Slug-native; this is no new general filesystem permission or
+arbitrary read-only-tree support. Unwritable parent directories may still refuse.
+
+Repair only `SourceRootInput`'s closed placement helper. Do not change global
+RootIo `WriteMode::ReplaceRegular`, process writes, patch semantics, Host policy,
+privileges, caps or published Source identity. Population keeps its actual
+builder/request/original-scope/resources checks and exclusive quiescent private
+generation. Extracted archive, overlay-before-patch and final registry-MODULE
+ordering stay unchanged. Whole Source state is still captured and sealed only
+after every placement and capture close succeeds; no new DICE key/cache, native
+constructor, source-body substitution or caller-specific recipe is introduced.
+
+Before placement, check scope/activity, admit the known verified capture length
+against the existing RootIo file bound, and validate the destination without
+following it. Missing targets use atomic CreateNew, never an overwrite if a name
+appears. Existing targets must be regular with nlink1; reject directories,
+links, hardlinks and other kinds before a staging mutation. For an existing
+regular target, create a fresh private root-level staging name with CreateNew.
+The short root-level basename avoids deep destination path/depth growth while
+remaining on the same admitted backing. A fixed8192-candidate search skips the
+final destination and every preexisting candidate of any kind; it never removes,
+chmods or overwrites a collision. Existing path/name/work checks bound the loop.
+
+Stream the original capture through its unchanged frame/size/EOF validation,
+count every actual write on WrittenBytes, and compare SHA-256 to its expected
+digest. Set the requested mode on the staged FD only, flush it, and check the
+original scope/activity immediately before commit. Recheck the original target
+frame and reuse RootIo's existing `replace_regular` staged-FD/name, nofollow,
+same-device, regular/nlink1 and post-rename checks. This is not atomic inode-CAS
+against external writers; the exclusive private-generation precondition remains.
+Close the writer and leave no stage name before full tree capture/seal. Missing
+CreateNew placement keeps the same capture verification and publication gate.
+
+The existing2*IO_SCRATCH/eight-FD admission covers placement's source/output and
+RootIo scratch/handles; bounded stage-name/control storage stays inside that
+fixed allowance. Old+new bytes and one temporary inode coexist under the still
+live full Archive backing. No backing contraction/refund precedes final seal and
+retirement; real ENOSPC still refuses. Errors may leave private staged or partial
+new names, as the existing patch writer does: the whole unpublished generation
+must be disposed, with all handle/capture/backing credits retained until actual
+retirement. Never clean up a preexisting collision or expose a partial Source
+epoch. No SourceAttempts/DecodedBytes reclassification is added by this repair.
+
+Core scope is `repository_source_root/input.rs` plus a cohesive placement leaf
+and tests; RootIo replacement is reused unchanged. Strengthen the existing
+original archive fixture for native RED/GREEN and existing readonly overlay,
+then preserve actual fresh commands and exact cleanup. Ordinary FD tests cover
+regular/missing destinations, mode/content/inode results, forbidden kinds,
+collisions/exhaustion/deep paths, capture-integrity/cancel/write-limit refusal
+before commit and preservation of the old target. Root owns serialized Core
+feature/default CLI builds, protected Source/patch/owner/compiler gates and the
+same-input original Rust comparison under unchanged27+3/native/source/archive
+limits. Pinned source plus the causal original regression establishes the named
+slice; no Rust completion, production activation, latency or RSS acceptance is
+implied. A new boundary is attributed before another generic change.
+
+The [Source-placement receipt](wp1225-source-placement-acceptance-2026-11-08.json)
+records70 ordinary tests, the actual original readonly MODULE/overlay fixture
+across two fresh commands, protected large Source lifetime and four warm compiler
+commands. The MODULE-only RED and overlay-strengthened GREEN are distinguished.
+Same-input Rust now crosses PermissionDenied13, completes806 graph cycles and
+retains52 roots/104 records (156 states), then reaches the existing27-second
+work deadline. Root-compute intervals total21.255s wall/21.627s parentCPU and
+explicitly include one aborted final interval among807 closed intervals.
+Source acquisitions are last observed at17; no General Archive callback is
+observed. Peak native backing/retained counters stay unchanged and every owner
+refunds exactly. This is boundary progress, not a completed command, latency,
+archive-envelope or equivalent-RSS proof. Attribute graph cost before the next
+generic optimization; Analysis's adjacent broad Source projections are a
+candidate to investigate, not an accepted cause or implementation selection.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

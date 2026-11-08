@@ -1,6 +1,5 @@
 //! Closed source acquisition. Only actual admitted producers create these
 //! inputs; captured files, source descriptors and storage credits remain private.
-use std::io::Write;
 use std::os::unix::fs::FileExt;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::fs::OpenOptionsExt;
@@ -25,6 +24,13 @@ pub(in crate::runtime) struct SourceRootInput {
     // initializer is being cancelled or a worker result remains queued.
     retirement: Option<progress::command::RepositoryWorkspaceRetirementGuard>,
 }
+#[path = "input/placement.rs"]
+mod placement;
+use placement::place_capture;
+#[cfg(test)]
+#[path = "input/placement_tests.rs"]
+mod placement_tests;
+
 enum Input {
     Local(LocalInput),
     Builtin(slug_bzlmod_v2::BuiltinBazelToolsRouteIdentity),
@@ -584,39 +590,6 @@ impl SourceRootInput {
         check(scope, active)?;
         Ok(captured)
     }
-}
-fn place_capture(
-    capture: &Capture,
-    io: &RootIo<'_>,
-    path: &str,
-    mode: u32,
-    scope: &Arc<SourceServiceScope>,
-    active: &dyn Fn() -> bool,
-) -> Result<(), PhysicalRootError> {
-    if let Some(parent) = Path::new(path).parent() {
-        io.ensure_directory(parent, 0o755)?;
-    }
-    let mut output = io.open_write_regular(
-        Path::new(path),
-        crate::runtime::repository_root_io::WriteMode::ReplaceRegular,
-    )?;
-    let mut hash = Sha256::new();
-    capture.read_chunks(scope, active, |chunk| {
-        crate::runtime::repository_io::source_service::write_counted(
-            &mut output,
-            chunk,
-            active,
-            Some(scope),
-        )?;
-        hash.update(chunk);
-        Ok(())
-    })?;
-    if <[u8; 32]>::from(hash.finalize()) != capture.digest {
-        return Err(PhysicalRootError::Snapshot);
-    }
-    io.chmod_regular(&output, mode)?;
-    output.flush()?;
-    Ok(())
 }
 impl From<slug_bzlmod_v2::BuiltinBazelToolsSourceFileError> for PhysicalRootError {
     fn from(_: slug_bzlmod_v2::BuiltinBazelToolsSourceFileError) -> Self {

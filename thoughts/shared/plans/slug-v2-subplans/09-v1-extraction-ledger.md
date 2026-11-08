@@ -68,6 +68,20 @@ Slug-native policy changes under the selected owner contract. Native ownership,
 body-alias lifetime and bounded original-command evidence are recorded in the
 [acceptance receipt](wp1225-owned-observation-acceptance-2026-11-08.json).
 
+Verified Source placement reuses the existing patch writer's bounded staging
+pattern and RootIo's nofollow regular-file replacement, with original verified
+capture streaming/SHA and counted writes. A short private root-level stage
+avoids deep destination path growth; existing targets stay intact until commit.
+No global process-write policy, caller dispatch, source identity, collection,
+cache, interner or donor import changes. Temporary old/new filesystem overlap
+retains full Source backing credit through seal/retirement; fixed descriptor and
+scratch admission covers the one staged writer. Missing destinations use
+CreateNew and unsafe nodes still refuse. This is bounded private staging, not
+arbitrary readonly-tree permission or completed-command memory acceptance.
+The [Source-placement receipt](wp1225-source-placement-acceptance-2026-11-08.json)
+records causal readonly inputs, refusal boundaries, native lifetime and bounded
+original-command advancement; full RSS and archive gates remain open.
+
 The inactive rooted source observer reuses RootIo and ordinary immutable path
 epochs. The credited regular-file reader now shares one FD capture kernel with
 the unchanged Host/Registry adapters; rooted bytes retain the same exact Arc

@@ -3,13 +3,20 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: diagnose and repair the observed PermissionDenied13 in genuine
-Immutable Source preparation for original `rules-rust-073-toolchain-owner`
-`cquery //pkg:probe` with its nightly setting. Static archive/producer evidence
-points to final MODULE replacement over a mode0555 archive member; confirm the
-exact producer with a causal regression and pinned-source semantics before
-selecting a generic same-root replacement fix. No cap or privilege increase,
-caller pruning, fabricated root or semantic substitute is selected.
+Current delta: attribute remaining DICE root-compute cost in original
+`rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
+The [verified Source placement component](wp1225-source-placement-acceptance-2026-11-08.json)
+now replaces read-only regular archive MODULE/overlay members through bounded
+same-root staging, without global write-policy, privilege or quota changes.
+The genuine original readonly fixture is RED→GREEN;70 ordinary tests, Source
+lifetime and four warm compiler commands pass. Rust passes PermissionDenied13,
+completes806 graph cycles and retains52 roots/104 records, then reaches the
+unchanged27-second deadline. Root-compute wall21.255s/parentCPU21.627s dominate;
+807 closed intervals include one explicitly aborted final interval. Exact native
+refunds pass. Inspect existing bounded key-family attribution and causal source
+projection cutoffs before selecting a generic graph change. No Need-cacheability,
+clock/cap increase or caller-specific pruning is selected. Rust archive work,
+completion, activation and completed-command latency/RSS gates remain open.
 
 The [owned-verification component](wp1225-owned-observation-acceptance-2026-11-08.json)
 now shares canonical General bodies after complete fresh FD verification.

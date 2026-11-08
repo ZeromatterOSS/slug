@@ -186,7 +186,12 @@ fn initialize_archive(fixture: &mut Fixture) {
         (
             "MODULE.bazel",
             b"module(name='unverified_archive_module')\n".as_slice(),
-            0o644,
+            0o555,
+        ),
+        (
+            "overlay.txt",
+            b"unverified archive overlay\n".as_slice(),
+            0o555,
         ),
         ("tool.sh", original.as_bytes(), 0o755),
     ] {
@@ -510,6 +515,8 @@ fn run(family: Family, commands: usize) {
                     source.reservation().request().selected_identity(),
                     Some(("archive_tool", "1.0"))
                 );
+                assert_eq!(source.entry("MODULE.bazel").unwrap().mode(), 0o644);
+                assert_eq!(source.entry("overlay.txt").unwrap().mode(), 0o755);
                 for (path, bytes) in [
                     ("tool.sh", script_contents("archive", "A").into_bytes()),
                     (
