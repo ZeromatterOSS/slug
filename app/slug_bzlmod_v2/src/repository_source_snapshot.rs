@@ -26,8 +26,10 @@ use crate::RepositoryWorkspaceError;
 use crate::source_preparation::workspace_identity::WorkspaceSpecStorageWalk;
 
 mod epoch;
+mod observation;
 mod state;
 pub use epoch::*;
+pub use observation::*;
 pub use state::*;
 
 pub const REPOSITORY_SOURCE_SNAPSHOT_FILE_BYTES: u64 = 64 * 1024 * 1024;

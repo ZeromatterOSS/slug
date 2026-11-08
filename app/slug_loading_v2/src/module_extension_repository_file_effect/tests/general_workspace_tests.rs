@@ -11,6 +11,8 @@ use slug_bzlmod_v2::RepositoryWorkspaceResult;
 use slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits;
 
 use super::*;
+#[path = "dependency_cutoff_tests.rs"]
+mod dependency_cutoff_tests;
 async fn update(
     transaction: dice::DiceTransaction,
     policy: RepositoryWorkspaceExecutionPolicy,

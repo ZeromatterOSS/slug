@@ -7,6 +7,7 @@
  * source tree. You may select the license that applies to you.
  */
 
+mod materialization_projection;
 pub(crate) mod workspace_identity;
 use std::fmt;
 use std::hash::Hash;
@@ -27,6 +28,7 @@ use dice::InjectedKey;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+pub use materialization_projection::*;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_events_v2::CaptureEvaluationEvents;
@@ -1039,6 +1041,10 @@ impl RepositoryMaterializationResultEpoch {
             }
         }
         Ok(found)
+    }
+
+    pub fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
     }
 
     /// Borrow a current producer-owned association; path text never creates one.

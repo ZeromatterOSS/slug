@@ -1,12 +1,12 @@
 //! Original-evaluation fences and immutable reservation binding.
-use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
-use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
-use slug_bzlmod_v2::RepositoryWorkspaceEpoch;
+use slug_bzlmod_v2::RepositoryWorkspaceContext;
+use slug_bzlmod_v2::RepositoryWorkspaceContextProjection;
 use slug_bzlmod_v2::RepositoryWorkspaceEpochKey;
 use slug_bzlmod_v2::RepositoryWorkspaceExecutionPolicy;
 use slug_bzlmod_v2::RepositoryWorkspaceExecutionPolicyKey;
-use slug_bzlmod_v2::RepositoryWorkspaceObservationKey;
 use slug_bzlmod_v2::RepositoryWorkspaceReservationDemand;
+use slug_bzlmod_v2::RepositoryWorkspaceTranscriptObservation;
+use slug_bzlmod_v2::RepositoryWorkspaceTranscriptProjection;
 use slug_bzlmod_v2::source_preparation::RepositoryWorkspaceStableKey;
 
 use super::*;
@@ -14,58 +14,54 @@ use super::*;
 pub(super) async fn fence(
     ctx: &mut DiceComputations<'_>,
     key: &HostSelectedRepositoryFileEffectKey,
-) -> Result<Option<RepositoryWorkspaceEpoch>, EffectDriver> {
+) -> Result<Option<Arc<RepositoryWorkspaceContext>>, EffectDriver> {
+    let fail = |message: String| {
+        complete_effect_error(
+            HostSelectedRepositoryFileEffectError::Compute(message.into()),
+            PathObservationEpoch::empty(),
+        )
+    };
     let policy = ctx
         .compute(&RepositoryWorkspaceExecutionPolicyKey::new(
             key.workspace.dupe(),
         ))
         .await
-        .map_err(|error| {
-            complete_effect_error(
-                HostSelectedRepositoryFileEffectError::Compute(error.to_string().into()),
-                PathObservationEpoch::empty(),
-            )
-        })?;
+        .map_err(|e| fail(e.to_string()))?;
     if policy == RepositoryWorkspaceExecutionPolicy::Disabled {
         return Ok(None);
     }
-    // Check injection first: the observation key assumes Core's active command.
-    ctx.compute(&RepositoryWorkspaceEpochKey::new(key.workspace.dupe()))
-        .await
-        .map_err(|error| {
-            complete_effect_error(
-                HostSelectedRepositoryFileEffectError::Compute(error.to_string().into()),
-                PathObservationEpoch::empty(),
-            )
-        })?;
     let epoch = ctx
-        .compute(&RepositoryWorkspaceObservationKey::new(
-            key.workspace.dupe(),
-        ))
+        .compute_opaque(&RepositoryWorkspaceEpochKey::new(key.workspace.dupe()))
         .await
-        .map_err(|error| {
-            complete_effect_error(
-                HostSelectedRepositoryFileEffectError::Compute(error.to_string().into()),
-                PathObservationEpoch::empty(),
-            )
-        })?;
-    if epoch.workspace() != Some(&key.workspace) || epoch.lease().is_none() {
-        return Err(complete_effect_error(
-            HostSelectedRepositoryFileEffectError::Compute(
-                "repository workspace epoch is revoked or foreign".into(),
-            ),
-            PathObservationEpoch::empty(),
-        ));
-    }
-    Ok(Some(epoch))
+        .map_err(|e| fail(e.to_string()))?;
+    let context = ctx
+        .projection(
+            &epoch,
+            &RepositoryWorkspaceContextProjection::new(key.workspace.dupe()),
+        )
+        .map_err(|e| fail(e.to_string()))?
+        .map_err(|e| fail(e.to_string()))?;
+    Ok(Some(context))
 }
-pub(super) fn reservation(
+pub(super) async fn reservation(
+    ctx: &mut DiceComputations<'_>,
     key: &HostSelectedRepositoryFileEffectKey,
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
     repository: &HostInstantiatedModuleExtensionRepository,
-    epoch: &RepositoryWorkspaceEpoch,
     observations: &PathObservationEpoch,
-) -> Result<RepositoryWorkspaceReservationDemand, EffectDriver> {
+) -> Result<
+    (
+        RepositoryWorkspaceReservationDemand,
+        Arc<RepositoryWorkspaceTranscriptObservation>,
+    ),
+    EffectDriver,
+> {
+    let fail = |message: String| {
+        complete_effect_error(
+            host_input_error(certificate, key.ordinal, message),
+            observations.dupe(),
+        )
+    };
     let (name, spec) = repository.spec_parts();
     let demand = RepositoryWorkspaceStableKey::new(
         key.workspace.dupe(),
@@ -76,39 +72,24 @@ pub(super) fn reservation(
     .and_then(|key| {
         RepositoryWorkspaceReservationDemand::new(Arc::new(key), Arc::new(spec.clone()))
     })
-    .map_err(|error| {
-        complete_effect_error(
-            host_input_error(certificate, key.ordinal, error.to_string()),
-            observations.dupe(),
+    .map_err(|e| fail(e.to_string()))?;
+    let epoch = ctx
+        .compute_opaque(&RepositoryWorkspaceEpochKey::new(key.workspace.dupe()))
+        .await
+        .map_err(|e| fail(e.to_string()))?;
+    let observed = ctx
+        .projection(
+            &epoch,
+            &RepositoryWorkspaceTranscriptProjection::new(Arc::new(demand.clone())),
         )
-    })?;
-    match demand.find_in(epoch) {
-        Ok(Some(_)) => Ok(demand),
-        Ok(None) => Err(SourcePreparationOutcome::Need(
+        .map_err(|e| fail(e.to_string()))?
+        .map_err(|e| fail(e.to_string()))?;
+    if observed.transcript().is_none() {
+        return Err(SourcePreparationOutcome::Need(
             SourcePreparationNeeds::repository_workspace_reservation(Arc::new(demand)),
-        )),
-        Err(error) => Err(complete_effect_error(
-            host_input_error(certificate, key.ordinal, error.to_string()),
-            observations.dupe(),
-        )),
+        ));
     }
-}
-pub(super) async fn selected_epoch(
-    ctx: &mut DiceComputations<'_>,
-    key: &HostSelectedRepositoryFileEffectKey,
-    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
-    observations: &PathObservationEpoch,
-) -> Result<RepositoryMaterializationResultEpoch, EffectDriver> {
-    ctx.compute(&RepositoryMaterializationResultEpochKey {
-        workspace: key.workspace.dupe(),
-    })
-    .await
-    .map_err(|error| {
-        complete_effect_error(
-            host_input_error(certificate, key.ordinal, error.to_string()),
-            observations.dupe(),
-        )
-    })
+    Ok((demand, observed))
 }
 
 pub(super) async fn read_host(

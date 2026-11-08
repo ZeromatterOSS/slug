@@ -1327,6 +1327,9 @@ impl RepositoryWorkspaceEpoch {
     pub fn workspace(&self) -> Option<&NormalizedAbsolutePath> {
         self.active.as_ref().map(|active| &active.workspace)
     }
+    pub fn limits(&self) -> Option<RepositoryWorkspaceRetentionLimits> {
+        self.active.as_ref().map(|active| active.limits)
+    }
     pub fn transcripts(&self) -> Option<&[RepositoryWorkspaceTranscript]> {
         self.active.as_ref().map(|a| a.transcripts.as_ref())
     }

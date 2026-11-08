@@ -1,5 +1,4 @@
 //! Original evaluation consumes source snapshots before prepared external bytes.
-use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
 use slug_bzlmod_v2::RepositorySourceSnapshotEntry;
 use slug_bzlmod_v2::RepositorySourceSnapshotEpoch;
 use slug_bzlmod_v2::RepositorySourceSnapshotNode;
@@ -41,12 +40,24 @@ fn attempt(
     )
     .unwrap()
     .with_workspace(
-        epoch.clone(),
+        slug_bzlmod_v2::RepositoryWorkspaceTranscriptObservation::from_epoch(epoch, demand)
+            .unwrap(),
         demand.clone(),
-        RepositoryMaterializationResultEpoch::new(demand.key().workspace().clone(), []).unwrap(),
     )
     .unwrap()
-    .with_source_snapshots(snapshots);
+    .with_workspace_bindings(
+        snapshots
+            .states()
+            .unwrap_or(&[])
+            .iter()
+            .map(|source| {
+                (
+                    source.reservation().repository().clone(),
+                    RepositoryWorkspaceSourceBinding::Source(source.clone()),
+                )
+            })
+            .collect(),
+    );
     invoke_repository_rule_with_host_paths(
         implementation,
         &manifest,

@@ -40,6 +40,19 @@ or latency claim; the selected owner contract defines the discriminators and
 the [retention receipt](wp1225-retention-dimensions-acceptance-2026-11-08.json)
 records their execution.
 
+Repository observation cutoffs reuse existing opaque DICE projections rather
+than adding a second graph or semantic cache. Full command context, exact own
+transcript and natural-request-bound optional Source/materialization rows retain
+Arc/Allocative owners and structural equality; coarse slot hashes only route
+lookups. Loading prepares typed rows in the existing bounded SmallMap from
+actual accesses, with empty prefix declarations on every replay. Full history
+and source bodies stay with their existing owners, and Core retains aggregate
+admission authority. No FD, native credit, scope or deep body copy enters a
+projection. The feature-only phase probe reuses the existing bounded scalar
+observer and adds fixed progress counters, without a production hook or donor
+import. This component does not establish completed-command memory fit; its
+validation belongs to the selected observation-cutoff acceptance receipt.
+
 The inactive rooted source observer reuses RootIo and ordinary immutable path
 epochs. The credited regular-file reader now shares one FD capture kernel with
 the unchanged Host/Registry adapters; rooted bytes retain the same exact Arc

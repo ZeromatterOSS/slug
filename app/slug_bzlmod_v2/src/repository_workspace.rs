@@ -18,6 +18,7 @@ use crate::HostSelectedExtensionOwner;
 use crate::RepoSpec;
 
 mod demand;
+mod observation;
 mod operation;
 mod read_views;
 mod sequence;
@@ -26,6 +27,7 @@ mod state_path;
 mod state_sources;
 
 pub use demand::*;
+pub use observation::*;
 pub use operation::*;
 pub use read_views::*;
 pub use sequence::*;
@@ -38,7 +40,7 @@ pub const REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES: u64 = 64 * 1024 * 1024;
 pub const REPOSITORY_WORKSPACE_PROCESS_ENTRIES: usize = 8192;
 pub const REPOSITORY_WORKSPACE_PROCESS_NAMES: usize = 1024 * 1024;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, dupe::Dupe)]
 pub enum RepositoryWorkspaceError {
     InvalidPolicy,
     InvalidReservation,

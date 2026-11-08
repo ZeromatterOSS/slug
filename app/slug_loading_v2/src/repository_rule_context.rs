@@ -163,24 +163,21 @@ impl RepositoryRuleInvocationInput {
 
     pub(crate) fn with_workspace(
         mut self,
-        epoch: slug_bzlmod_v2::RepositoryWorkspaceEpoch,
+        observed: Arc<slug_bzlmod_v2::RepositoryWorkspaceTranscriptObservation>,
         demand: slug_bzlmod_v2::RepositoryWorkspaceReservationDemand,
-        selected: slug_bzlmod_v2::RepositoryMaterializationResultEpoch,
     ) -> Result<Self, RepositoryRuleInvocationError> {
-        self.workspace = Some(workspace::WorkspaceInput::new(epoch, demand, selected)?);
+        self.workspace = Some(workspace::WorkspaceInput::new(observed, demand)?);
         Ok(self)
     }
-
-    pub(crate) fn with_source_snapshots(
+    pub(crate) fn with_workspace_bindings(
         mut self,
-        sources: Arc<slug_bzlmod_v2::RepositorySourceSnapshotEpoch>,
+        bindings: PreparedRepositoryWorkspaceBindings,
     ) -> Self {
-        if let Some(workspace) = &mut self.workspace {
-            workspace.source_snapshots = sources;
+        if let Some(workspace) = self.workspace.take() {
+            self.workspace = Some(workspace.with_bindings(bindings));
         }
         self
     }
-
     pub(crate) fn with_host_reads(
         mut self,
         reads: SmallMap<NormalizedAbsolutePath, Arc<[u8]>>,
@@ -537,6 +534,8 @@ struct RepositoryRuleAttributes {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct RepositoryOs { platform: RepositoryPlatform, snapshot: RepositoryEnvironmentSnapshot, environment_enumerated: Arc<AtomicBool> }
 
+pub(crate) use workspace::bindings::PreparedRepositoryWorkspaceBindings;
+pub(crate) use workspace::bindings::RepositoryWorkspaceSourceBinding;
 pub(crate) type PreparedRepositoryLabelPaths =
     SmallMap<RepositoryLabelPathAddress, HostRepositoryLabelPathValue>;
 pub(crate) type PreparedRepositoryLabelSources = SmallMap<RepositoryLabelPathAddress, Arc<[u8]>>;

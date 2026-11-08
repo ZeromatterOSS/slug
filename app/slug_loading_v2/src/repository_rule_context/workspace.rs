@@ -1,11 +1,8 @@
 //! Pure prefix replay for the general original repository-rule route.
 use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
 use slug_bzlmod_v2::RepositoryMaterializationKind;
-use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
 use slug_bzlmod_v2::RepositoryWorkspaceArgument;
 use slug_bzlmod_v2::RepositoryWorkspaceEnvironmentValue;
-use slug_bzlmod_v2::RepositoryWorkspaceEpoch;
-use slug_bzlmod_v2::RepositoryWorkspaceError;
 use slug_bzlmod_v2::RepositoryWorkspaceExecute;
 use slug_bzlmod_v2::RepositoryWorkspaceOperation;
 use slug_bzlmod_v2::RepositoryWorkspaceOperationDemand;
@@ -24,29 +21,39 @@ use super::*;
 mod symlink;
 pub(super) use symlink::create as symlink;
 
+#[path = "workspace/bindings.rs"]
+pub(crate) mod bindings;
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(super) struct WorkspaceInput {
-    epoch: RepositoryWorkspaceEpoch,
-    demand: RepositoryWorkspaceReservationDemand,
-    selected: RepositoryMaterializationResultEpoch,
-    pub(super) source_snapshots: Arc<slug_bzlmod_v2::RepositorySourceSnapshotEpoch>,
+    observed: Arc<slug_bzlmod_v2::RepositoryWorkspaceTranscriptObservation>,
+    bindings: bindings::PreparedRepositoryWorkspaceBindings,
 }
 impl WorkspaceInput {
     pub(super) fn new(
-        epoch: RepositoryWorkspaceEpoch,
+        observed: Arc<slug_bzlmod_v2::RepositoryWorkspaceTranscriptObservation>,
         demand: RepositoryWorkspaceReservationDemand,
-        selected: RepositoryMaterializationResultEpoch,
     ) -> Result<Self, RepositoryRuleInvocationError> {
-        demand
-            .find_in(&epoch)
-            .map_err(RepositoryRuleInvocationError::Workspace)?
+        let transcript = observed
+            .transcript()
             .ok_or(RepositoryRuleInvocationError::WorkspaceReplay)?;
+        if !demand.matches(transcript.reservation())
+            || observed.context().workspace() != transcript.reservation().workspace()
+            || observed.context().lease() != transcript.reservation().lease()
+            || observed.context().limits() != transcript.reservation().limits()
+        {
+            return Err(RepositoryRuleInvocationError::WorkspaceReplay);
+        }
         Ok(Self {
-            epoch,
-            demand,
-            selected,
-            source_snapshots: Arc::new(slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked()),
+            observed,
+            bindings: SmallMap::new(),
         })
+    }
+    pub(super) fn with_bindings(
+        mut self,
+        bindings: bindings::PreparedRepositoryWorkspaceBindings,
+    ) -> Self {
+        self.bindings = bindings;
+        self
     }
 }
 #[derive(Debug, Allocative)]
@@ -67,10 +74,9 @@ pub(super) struct WorkspaceReplay {
 impl WorkspaceReplay {
     pub(super) fn new(input: &WorkspaceInput) -> Self {
         let transcript = input
-            .demand
-            .find_in(&input.epoch)
+            .observed
+            .transcript()
             .expect("validated workspace input")
-            .expect("validated reservation")
             .clone();
         Self {
             state: transcript.initial().clone(),
@@ -90,9 +96,10 @@ impl WorkspaceReplay {
         operation: RepositoryWorkspaceOperation,
     ) -> Result<RepositoryWorkspaceResult, RepositoryRuleInvocationError> {
         let request = Arc::new(
-            self.input
-                .epoch
-                .request_at(self.reservation(), self.index, operation)
+            // This is replay-local construction, not command-wide admission.
+            // Core checks every new Need against its full current epoch before IO.
+            self.transcript
+                .request_at(self.index, operation)
                 .map_err(RepositoryRuleInvocationError::Workspace)?,
         );
         if request.predecessor() != &self.state {
@@ -139,6 +146,14 @@ impl WorkspaceReplay {
             PathObservationNamespace::Materialization(instance)
                 if instance == self.reservation().instance() =>
             {
+                if !path
+                    .path()
+                    .as_path()
+                    .starts_with(self.reservation().display_root().as_path())
+                    || repository.is_some_and(|repo| repo != self.reservation().repository())
+                {
+                    return Err(RepositoryRuleInvocationError::WorkspaceReplay);
+                }
                 return Ok(());
             }
             PathObservationNamespace::Materialization(instance) => Some(instance),
@@ -151,22 +166,20 @@ impl WorkspaceReplay {
                 Err(RepositoryRuleInvocationError::WorkspaceUnsupported)
             };
         };
-        if let Some(source) = self.input.source_snapshots.states().and_then(|states| {
-            states
-                .iter()
-                .find(|s| Some(s.reservation().instance()) == instance)
-        }) {
-            let reservation = source.reservation();
-            if reservation.workspace() != self.reservation().workspace()
-                || reservation.lease() != self.reservation().lease()
-                || reservation.repository() != repository
-                || !path
-                    .path()
-                    .as_path()
-                    .starts_with(reservation.display_root().as_path())
-            {
-                return Err(RepositoryRuleInvocationError::WorkspaceReplay);
-            }
+        let binding = self
+            .input
+            .bindings
+            .get(repository)
+            .ok_or(RepositoryRuleInvocationError::WorkspaceReplay)?;
+        if binding.repository() != repository {
+            return Err(RepositoryRuleInvocationError::WorkspaceReplay);
+        }
+        binding.validate_path(
+            self.reservation().workspace(),
+            self.reservation().lease(),
+            path,
+        )?;
+        if let bindings::RepositoryWorkspaceSourceBinding::Source(source) = binding {
             if self.declarations.contains_key(repository) {
                 return Err(RepositoryRuleInvocationError::WorkspaceReplay);
             }
@@ -182,30 +195,10 @@ impl WorkspaceReplay {
             }
             return Ok(());
         }
-        if repository.is_root() {
-            return Err(RepositoryRuleInvocationError::WorkspaceUnsupported);
-        }
-        let entry = self
-            .input
-            .selected
-            .entry_for_repository(repository)
-            .ok_or(RepositoryRuleInvocationError::WorkspaceReplay)?;
-        if entry.request.id.workspace != *self.reservation().workspace() {
-            return Err(RepositoryRuleInvocationError::WorkspaceReplay);
-        }
-        let valid = match &entry.result {
-            slug_bzlmod_v2::RepositoryMaterializationResult::Success(
-                slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
-                    observation_instance,
-                    ..
-                },
-            ) => instance == Some(*observation_instance),
-            slug_bzlmod_v2::RepositoryMaterializationResult::Success(
-                slug_bzlmod_v2::RepositoryMaterializationSuccess::Local,
-            ) => instance.is_none(),
-            _ => false,
+        let bindings::RepositoryWorkspaceSourceBinding::Materialized(entry) = binding else {
+            unreachable!()
         };
-        if !valid {
+        if self.sources.contains_key(repository) {
             return Err(RepositoryRuleInvocationError::WorkspaceReplay);
         }
         if let Some(previous) = self.declarations.get(&entry.request.id.canonical_repo) {

@@ -1,0 +1,978 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "c411bb874decbb8c9885589bc840f949a5ad2b96",
+  "classification": "Slug-native DICE observation cutoff and error-stage revision; original Starlark/API behavior preserved; default General execution remains Disabled",
+  "outcome": "Completed repository effects no longer reevaluate for unrelated workspace/materialization/Source publications. Actual Rust bounded ABBA diagnostics observe about1.9s less root-compute wall time for the same762 cycles, then reach the unchanged SourceAttempts64 boundary. Rust cquery remains incomplete.",
+  "contract": {
+    "observations": "Existing opaque DICE projections only: full workspace/lease/limits, full-demand own transcript, and exact natural-request-bound optional Source/materialization rows. Absence is tracked; foreign/conflicting/revoked values error. Full exposed structural equality, coarse hashes only route.",
+    "loading": "Explicit context/transcript + typed bounded prepared rows from actual accesses; prefix declarations start empty on each replay, unused rows grant nothing. Missing rows preserve Need/error and cannot fall back to Host. No whole epoch carrier or reduced fake epoch.",
+    "admission": "Pure local requests remain UNADMITTED and Need remains noncacheable. Core rederives against the actual full command epoch before consuming NativeProcessAdmission and child/quota setup. Unknown completion costs remain post-capture, pre-publication.",
+    "error_stage_revision": "Aggregate Execute/process-history refusal may move from pure invocation to current Native admission; this is explicitly Slug-native.",
+    "held_request_proof": "No-child pure protocol counter fixture: A and B first Execute requests originate from actual original evaluation. Later127 B records exercise aggregate counter admission, not128 original B calls or native execution. Current full epoch refuses retained A at128; requery A remains equal Need with validityfalse. Existing Core consuming-admission source + actual native history/replay tests cover pre-launch/quota custody.",
+    "unchanged": [
+      "SourceAttempts64",
+      "work27s/cleanup3s",
+      "root capacity128 and complete metadata-bounded history",
+      "Execute128",
+      "Process64MiB and stream1MiB",
+      "native retained512MiB/FD512/backing8GiB",
+      "full source/archive/body/decoder bounds",
+      "complete Spec/request/state/history/source equality and command freshness"
+    ],
+    "instrumentation": "Feature-only ignored frontier test uses existing sealed512-byte scalar observer ABI V2 and fixed7 progress buckets. No new production hook. Total report including prefixes/cleanup <=512KiB. Legacy Need overlaps progress; parent process CPU excludes helpers; missing/reversed/overflow/aborted/suppressed/unknown qualifiers retained."
+  },
+  "source_pins": {
+    "app/slug_bzlmod_v2/src/lib.rs": "7a88cd65867efc24b0ebe7a85ab7b051a13ad82a4f957cecb74aeda9ef86b910",
+    "app/slug_bzlmod_v2/src/repository_source_snapshot.rs": "a77c69582d9bcb649c42b9f8274081e0847476eb2f74f203d000fb7bd5a33066",
+    "app/slug_bzlmod_v2/src/repository_source_snapshot/observation.rs": "2f2bd2a7b02cc819aba59ac043ee6b761e10fd2ea1552de3abecf2c29aebde3b",
+    "app/slug_bzlmod_v2/src/repository_source_snapshot/observation_tests.rs": "cc375c80450ab02711e0697ebd47d8ee3619e8ae823df5cee04f58f92287b190",
+    "app/slug_bzlmod_v2/src/repository_workspace.rs": "640328a188bd1e3723e8e0f0e46ed2e982d332ab5f4c6dccf8a161f1b641fb6e",
+    "app/slug_bzlmod_v2/src/repository_workspace/observation.rs": "6dc17a0f5ecf19b286dd3dde8c5a99da794e65beb659534d8a9448a7c747343a",
+    "app/slug_bzlmod_v2/src/repository_workspace/observation_tests.rs": "73020f3ce835fd6d8d637158ea515ac47461ff506709ff0b7e2155b035df053f",
+    "app/slug_bzlmod_v2/src/repository_workspace/sequence.rs": "da3625f23bf947565ff405365b0511a5c1c3574e99c1837e9f8bc1f3beef843c",
+    "app/slug_bzlmod_v2/src/source_preparation.rs": "a7c7e5468b9de6354c42fa3e5906faedc523e34b35965a5bcd220c33444d0bd7",
+    "app/slug_bzlmod_v2/src/source_preparation/materialization_projection.rs": "afd492f6f5a7d9d85d8c4914f478fb07fc4d26a05a0c4284fe372e9ed4d7971d",
+    "app/slug_bzlmod_v2/src/source_preparation/materialization_projection_tests.rs": "a2b9bc92a353b496bf2c52f9928e24d4cfac4995ca4a8ad285f24277ea8427f0",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests.rs": "85a61689a67268407db175b2b80e417400392cc820b7cc5d0a65b30aaebfb710",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests/phase_profile.rs": "de36e459ce8fd7a521ea20aa363b462f139332731866f4f76f1980440375bfab",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect.rs": "7c79ed963cd57f449e2fa7637042e8b880b76c3b494f40672072d26d922a57d1",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect/general.rs": "845733f8b636c92373bde0971058cc773189d1ed71e17e45aeba7b032ae6608e",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect/invocation.rs": "925f7fa7d08cc196cd1bd7b3ebf76e945c56d33ebc2110a46259db5bd645d69f",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect/source_binding.rs": "f057a66bcf7be07f580833344e16f035ae4985a2c381e5ec9f630044eeb5e2e2",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect/source_snapshot.rs": "aa7a9a2c3cfdfd0c9e83d73e839e9ac2545cf5d4d6ac049a5e6ac1fe514644f3",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect/source_snapshot/read.rs": "562859faa166a37a04e09739086802f3ebfa34b40cdc06f0912d8fa8b6915874",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect/source_snapshot/request.rs": "4ad9fe833664170e02f2c3068f8b8afda52caefde74b39d7b2871f5902cb346a",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect/tests/dependency_cutoff_tests.rs": "3af54a2a056019be98e00ac4bb3630e40743215bdb9deda6c43eca1ffcee62d6",
+    "app/slug_loading_v2/src/module_extension_repository_file_effect/tests/general_workspace_tests.rs": "b902250b92880f0a83840285f0130b87a592ab3a791f892465b8a9c323293410",
+    "app/slug_loading_v2/src/repository_rule_context.rs": "d63443f1261d4a008fb33ebe615190b4c6c3e03e38dd24f8813dc8ca1030ffe2",
+    "app/slug_loading_v2/src/repository_rule_context/tests/source_snapshot_tests.rs": "aa1fd1b937a5c77b767081faa9ec382935d07a398599664be92cb3e3e8cdebf1",
+    "app/slug_loading_v2/src/repository_rule_context/tests/workspace_tests.rs": "884d244ead9838da34d879d928dadc382517c76c43e77a6f01eaf4aca982f0ea",
+    "app/slug_loading_v2/src/repository_rule_context/workspace.rs": "18c5f053bfe58c3936a1f24d1448d1406f11e00799eca053a311c1c5cd86320c",
+    "app/slug_loading_v2/src/repository_rule_context/workspace/bindings.rs": "322e0266c57b82399d26f4e08e6ce015945898ad658c04f15772f3167b9c7859",
+    "app/slug_core_v2/src/runtime/repository_workspace_command.rs": "5e32ab89ca3f9b01c6c8a3a2e96aff73cdb6b5647a353affca661b3f5a51c5d4",
+    "app/slug_core_v2/src/runtime/repository_workspace_process_views.rs": "ed32af3cb224d72ded3b28acff984068d40d3c093ee1a92b08d8266ce493d12a"
+  },
+  "compile": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "-p",
+        "slug_loading_v2",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "slug_core_v2/native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 47.96352459400077,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "-p",
+        "slug_loading_v2",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "slug_core_v2/native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 133.57754439499695,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 89.33203597800457,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "post_validation_formatting": {
+    "file": "app/slug_bzlmod_v2/src/source_preparation.rs",
+    "validated_source_sha256": "b626398fccffbec96830b436162bc5d223c0303f2b385735869c444db36f7df1",
+    "formatted_source_sha256": "a7c7e5468b9de6354c42fa3e5906faedc523e34b35965a5bcd220c33444d0bd7",
+    "classification": "rustfmt-only module/use declaration ordering; no semantic change; no rebuild or repeated workload measurement"
+  },
+  "compile_correction": "Initial combined no-run refused on routine extraction visibility/error conversions; owned fixes then full owner/direct-dependent feature tests and default CLI build passed. No architectural widening.",
+  "causal_red": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+      "--exact",
+      "module_extension_repository_file_effect::tests::general_workspace_tests::dependency_cutoff_tests::observed_original_a_stays_cached_while_unrelated_b_and_source_progress",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "preflight_command": [
+      "python3",
+      "scripts/v2_test_preflight.py",
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+      "--exact",
+      "module_extension_repository_file_effect::tests::general_workspace_tests::dependency_cutoff_tests::observed_original_a_stays_cached_while_unrelated_b_and_source_progress"
+    ],
+    "selected": 1,
+    "exit_code": 101,
+    "elapsed_seconds": 0.01991475699469447,
+    "executable_sha256": "111ea3e0d4e251c9bd756a8604c9733b356201622a904bf0c7f69a62e4283c3c"
+  },
+  "causal_red_expected": {
+    "b_reserved": [
+      4,
+      5
+    ],
+    "b_completed": [
+      6,
+      7
+    ],
+    "b_materialized": [
+      8,
+      9
+    ],
+    "unrelated_source": [
+      9,
+      10
+    ]
+  },
+  "ordinary_tests": [
+    {
+      "target": "slug_bzlmod_v2",
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-6ed4b973def1affc",
+      "executable_sha256": "a5bcee1266f954a8a0040a3234e1cbc790f394ea5cd14e77e6480583a12ca597",
+      "selected": 67,
+      "passed": 67,
+      "exit_code": 0,
+      "elapsed_seconds": 0.3826308520074235,
+      "exact_selectors": [
+        "repository_source_snapshot::observation::tests::source_projection_uses_exact_request_state_and_context_without_absence_fallback",
+        "repository_source_snapshot::tests::complete_tree_rejects_missing_parents_aliases_and_escaping_literal_links",
+        "repository_source_snapshot::tests::digest_state_enforces_exact_file_and_total_limits_without_body_retention",
+        "repository_source_snapshot::tests::genuine_builtin_subject_keeps_catalog_mapping_and_has_no_invented_spec",
+        "repository_source_snapshot::tests::needs_tests::source_need_same_slot_compares_full_lease_kind_mapping_and_spec",
+        "repository_source_snapshot::tests::needs_tests::source_need_union_admits_128_distinct_slots_and_refuses_the_next",
+        "repository_source_snapshot::tests::needs_tests::source_only_need_keeps_other_channels_empty_and_unions_without_loss",
+        "repository_source_snapshot::tests::snapshot_epoch_is_command_bound_and_rejects_replay_and_revocation",
+        "repository_workspace::observation::tests::observation_factories_reject_foreign_spec_and_keep_full_context_identity",
+        "repository_workspace::observation::tests::opaque_transcript_cutoff_preserves_presence_own_append_and_freshness",
+        "repository_workspace::sequence::retention_floor_tests::intrinsic_state_floor_checks_exact_plus_one_and_overflow",
+        "repository_workspace::tests::all_position_arguments_environment_removal_empty_and_requested_timeout_are_literal",
+        "repository_workspace::tests::archive_deeper_than_256_preserves_lane_while_delete_and_process_keep_own_limits",
+        "repository_workspace::tests::argument_environment_archive_metadata_charge_actual_spare_storage_and_owner_arrays",
+        "repository_workspace::tests::demand_tests::operation_demand_authenticates_independent_source_declarations_against_execute_manifest",
+        "repository_workspace::tests::demand_tests::reservation_demand_requires_current_full_binding_and_conflicting_needs_refuse",
+        "repository_workspace::tests::demand_tests::source_declarations_keep_nonexecute_prefixes_and_refuse_alias_foreign_limit_and_need_conflicts",
+        "repository_workspace::tests::demand_tests::workspace_operation_need_preserves_independent_unsupported_rows_and_full_conflicts",
+        "repository_workspace::tests::demand_tests::workspace_policy_default_and_cached_switches_are_dice_observed",
+        "repository_workspace::tests::dice_observes_completed_state_fresh_commands_revocation_and_workspace_isolation",
+        "repository_workspace::tests::equal_argv_new_index_is_a_new_sample_not_replay",
+        "repository_workspace::tests::equal_foreign_bodies_are_compared_then_replaced_without_double_retention",
+        "repository_workspace::tests::equal_foreign_predecessor_and_reservation_are_released_before_retention",
+        "repository_workspace::tests::execute_count_exact_limit_replays_prior_indices_and_refuses_new_plus_one",
+        "repository_workspace::tests::execute_cwd_requires_selected_instance_and_repository_subtree_before_need",
+        "repository_workspace::tests::fresh_empty_revoked_epochs_reject_stale_reservations",
+        "repository_workspace::tests::incorrect_read_write_delete_results_and_reverse_mode_are_not_certificates",
+        "repository_workspace::tests::native_epoch_forecasts_cover_fresh_reservation_and_exact_completed_append",
+        "repository_workspace::tests::native_epoch_publication_cannot_bypass_other_process_root_history_admission",
+        "repository_workspace::tests::native_epoch_publication_rejects_equal_final_state_with_rewritten_or_skipped_history",
+        "repository_workspace::tests::native_storage_forecast_covers_initial_unique_and_reused_completion",
+        "repository_workspace::tests::native_storage_forecast_refuses_foreign_replay_and_invalid_effects",
+        "repository_workspace::tests::nonzero_exit_keeps_writes_deletions_modes_and_later_read",
+        "repository_workspace::tests::normal_exit_and_each_output_stream_have_independent_exact_plus_one_limits",
+        "repository_workspace::tests::owner_layout_rounds_byte_tails_and_refuses_impossible_array_layouts",
+        "repository_workspace::tests::process_body_exact_limit_and_new_version_plus_one_count_complete_history",
+        "repository_workspace::tests::process_entry_and_depth_exact_plus_one_do_not_lower_archive_admission",
+        "repository_workspace::tests::process_names_and_absolute_path_have_exact_plus_one_limits",
+        "repository_workspace::tests::protocol_debug_redacts_body_argv_environment_and_captured_bytes",
+        "repository_workspace::tests::read_view_tests::archive_source_storage_stays_outside_mutable_history_and_forecasts_remain_complete",
+        "repository_workspace::tests::read_view_tests::bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_fields",
+        "repository_workspace::tests::read_view_tests::exact_prefix_replay_keeps_old_views_and_rehomes_equal_foreign_state_without_copying",
+        "repository_workspace::tests::read_view_tests::manifest_canonicalizes_exact_bound_and_refuses_aliases_and_foreign_command_facts",
+        "repository_workspace::tests::read_view_tests::repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies",
+        "repository_workspace::tests::read_view_tests::source_digest_view_is_exact_bounded_and_not_mutable_process_body_history",
+        "repository_workspace::tests::read_view_tests::view_identity_uses_full_spec_state_mode_literal_link_and_instance",
+        "repository_workspace::tests::replay_requires_full_operation_index_predecessor_and_generation",
+        "repository_workspace::tests::reservation_binds_full_spec_without_changing_slot_or_coarse_hash",
+        "repository_workspace::tests::reservation_rejects_zero_and_retains_full_generation_policy_identity",
+        "repository_workspace::tests::retention_admission_tests::command_execute_128_is_independent_of_history_and_authenticates_old_replay",
+        "repository_workspace::tests::retention_admission_tests::history_beyond_128_versions_preserves_noops_and_exact_replay",
+        "repository_workspace::tests::retention_admission_tests::root_capacity_is_independent_and_refuses_forecast_before_new_state",
+        "repository_workspace::tests::source_link_tests::payload_links_use_only_exact_execute_prefix_not_future_source_discovery",
+        "repository_workspace::tests::source_link_tests::source_link_content_identity_hashes_full_image_and_prunes_deleted_source_images",
+        "repository_workspace::tests::source_link_tests::source_link_content_identity_ignores_fresh_incarnations_at_same_literal_display",
+        "repository_workspace::tests::source_link_tests::source_link_delete_filters_final_data_but_retains_historical_projection",
+        "repository_workspace::tests::source_link_tests::source_link_identity_and_callback_include_full_projection_not_just_target_text",
+        "repository_workspace::tests::source_link_tests::source_link_literal_escape_cycles_and_write_through_directory_refuse",
+        "repository_workspace::tests::source_link_tests::source_link_modeled_resolution_guard_stops_before_fact_and_reuses_bounded_read_route",
+        "repository_workspace::tests::source_link_tests::source_links_resolve_directory_internal_and_dangling_without_changing_logical_owner",
+        "repository_workspace::tests::source_link_tests::typed_symlink_source_requires_independent_declaration_and_full_binding",
+        "repository_workspace::tests::state_rejects_missing_parent_duplicate_special_modes_and_escaping_link",
+        "repository_workspace::tests::state_versions_metadata_and_retained_bodies_have_exact_plus_one_policies",
+        "repository_workspace::tests::template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equal",
+        "source_preparation::materialization_projection::tests::materialization_projection_refuses_foreign_full_request_spec_and_general_lease",
+        "source_preparation::materialization_projection::tests::materialization_projection_returns_actual_bound_row_and_preserves_absence_and_errors",
+        "source_preparation::materialization_projection::tests::ordinary_materialization_projection_refuses_same_id_changed_spec_and_kind"
+      ],
+      "execution_argv": "[executable, --exact, ...exact_selectors, --test-threads=1]",
+      "ignored": false,
+      "preflight_argv": "[python3, scripts/v2_test_preflight.py, executable, --exact, ...exact_selectors]",
+      "cli_sha256": null
+    },
+    {
+      "target": "slug_loading_v2",
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-54099f21382e9896",
+      "executable_sha256": "23281e52784091e54bdaaaad61a99e55ecce3ba3018064d1405a0c4015c6d5d9",
+      "selected": 79,
+      "passed": 79,
+      "exit_code": 0,
+      "elapsed_seconds": 1.0137144860054832,
+      "exact_selectors": [
+        "module_extension_repository_file_effect::tests::archive_replay_tests::archive_callback_accepts_all_nine_positional_default_arguments",
+        "module_extension_repository_file_effect::tests::archive_replay_tests::changed_prefix_revoked_epoch_and_swallowed_generated_observation_fail_closed",
+        "module_extension_repository_file_effect::tests::archive_replay_tests::general_archive_calls_suspend_then_replay_exact_order_and_terminal_reference",
+        "module_extension_repository_file_effect::tests::archive_replay_tests::repository_metadata_only_change_invalidates_and_restores_without_archive_epoch",
+        "module_extension_repository_file_effect::tests::exact_builtin_winsdk_reaches_generic_environment_retry",
+        "module_extension_repository_file_effect::tests::filesystem_replay_tests::archive_delete_archive_share_ordered_prefix_without_generated_read_authority",
+        "module_extension_repository_file_effect::tests::filesystem_replay_tests::delete_callback_replays_actual_booleans_prunes_known_descendants_and_seals_delete_only",
+        "module_extension_repository_file_effect::tests::filesystem_replay_tests::delete_changed_path_prefix_kind_and_revoked_epoch_do_not_resume",
+        "module_extension_repository_file_effect::tests::filesystem_replay_tests::disabled_execute_refuses_in_all_filesystem_orders_without_process_need",
+        "module_extension_repository_file_effect::tests::general_workspace_tests::dependency_cutoff_tests::observed_original_a_stays_cached_while_unrelated_b_and_source_progress",
+        "module_extension_repository_file_effect::tests::general_workspace_tests::dependency_cutoff_tests::retained_original_execute_request_stays_unadmitted_after_other_root_spends_budget",
+        "module_extension_repository_file_effect::tests::general_workspace_tests::disabled_original_execute_ignores_completed_legacy_epoch_and_policy_changes_invalidate",
+        "module_extension_repository_file_effect::tests::general_workspace_tests::general_template_enumerated_environment_invalidates_same_completed_epoch_a_b_a",
+        "module_extension_repository_file_effect::tests::general_workspace_tests::original_general_policy_invalidates_disabled_prepared_result_and_fresh_zero_execute_commands",
+        "module_extension_repository_file_effect::tests::repository_context_attributes_restore_warm_effects_for_ordinary_and_innate_owners",
+        "module_extension_repository_file_effect::tests::repository_context_defaults_names_and_failures_cover_both_owner_kinds",
+        "module_extension_repository_file_effect::tests::repository_host_dependencies_retry_invalidate_and_fail_closed",
+        "module_extension_repository_file_effect::tests::repository_label_path_enforces_distinct_address_cap",
+        "module_extension_repository_file_effect::tests::repository_label_path_retries_without_publishing_partial_attempts",
+        "module_extension_repository_file_effect::tests::repository_os_environ_tracks_membership_and_values_across_a_b_a",
+        "module_extension_repository_file_effect::tests::repository_read_and_template_route_bytes_retries_and_restore_a_b_a",
+        "module_extension_repository_file_effect::tests::repository_read_rejects_present_builtin_label_at_path_boundary",
+        "module_extension_repository_file_effect::tests::repository_symlink_observes_external_source_and_restores_a_b_a",
+        "module_extension_repository_file_effect::tests::repository_which_fails_closed_on_unstable_resolution_errors",
+        "module_extension_repository_file_effect::tests::repository_which_observes_candidate_beyond_old_budget_a_b_a",
+        "module_extension_repository_file_effect::tests::repository_which_retry_distinguishes_repeated_candidate_from_aggregate_limit",
+        "module_extension_repository_file_effect::tests::repository_which_verifies_path_then_tracks_order_kind_mode_and_frontier",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_executes_generated_local_jdk_absence_atomically",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_executes_selected_ordinal_not_failing_sibling",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_forwards_real_observed_need_without_batch",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_has_exact_authentication_and_retained_shape",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_is_owner_ordinal_scoped_and_observed",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_keys_distinguish_owner_and_ordinal",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_owns_cold_warm_events_and_recovers_after_cancel",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_preserves_semantic_failures_in_observed_carrier",
+        "module_extension_repository_file_effect::tests::selected_repository_file_effect_reloads_implementation_and_is_complete_only",
+        "module_extension_repository_file_effect::tests::selected_repository_host_path_exists_rejects_dangling_and_cycle",
+        "module_extension_repository_file_effect::tests::selected_repository_host_path_exists_replays_home_and_path_a_b_a",
+        "module_extension_repository_file_effect::tests::selected_repository_host_path_exists_replays_same_path_absent_file_directory_absent",
+        "repository_rule_context::tests::absolute_host_path_exists_needs_observed_state_and_marks_environment_use",
+        "repository_rule_context::tests::context_exposes_exact_host_values_and_records_only_getenv_names",
+        "repository_rule_context::tests::disabled_execute_refuses_uniformly_before_argument_or_option_validation",
+        "repository_rule_context::tests::file_preserves_binding_order_modes_and_typed_path_failures",
+        "repository_rule_context::tests::label_uses_repository_implementation_and_imported_helper_modules",
+        "repository_rule_context::tests::path_demands_then_projects_prepared_label_path_values",
+        "repository_rule_context::tests::private_repository_attributes_expose_defaults_and_concrete_overrides",
+        "repository_rule_context::tests::private_repository_label_list_exposes_ordered_default_and_override",
+        "repository_rule_context::tests::read_demands_label_path_then_shares_prepared_source_with_template",
+        "repository_rule_context::tests::read_rejects_non_label_root_explicit_watch_non_ascii_and_limit",
+        "repository_rule_context::tests::repository_attribute_preflight_elides_none_before_other_checks",
+        "repository_rule_context::tests::repository_context_generated_relative_paths_are_lexical_absent_and_idempotent",
+        "repository_rule_context::tests::repository_context_projects_all_attribute_kinds_and_reflection",
+        "repository_rule_context::tests::repository_context_projects_all_declared_default_kinds_and_order",
+        "repository_rule_context::tests::repository_context_projects_integer_lists_for_explicit_default_and_implicit_values",
+        "repository_rule_context::tests::repository_path_dirname_projects_observed_host_parent_without_new_provenance",
+        "repository_rule_context::tests::repository_path_dirname_rejects_missing_host_and_source_origins",
+        "repository_rule_context::tests::repository_return_metadata_is_independent_of_the_rule_owner",
+        "repository_rule_context::tests::source_snapshot_tests::builtin_prepared_read_template_and_execute_require_matching_source_snapshot",
+        "repository_rule_context::tests::source_snapshot_tests::direct_external_read_and_template_demand_label_path_before_source_bytes",
+        "repository_rule_context::tests::source_snapshot_tests::general_source_alias_read_template_and_delete_use_logical_workspace_operations",
+        "repository_rule_context::tests::source_snapshot_tests::general_source_string_symlink_cannot_use_available_but_undeclared_or_future_source",
+        "repository_rule_context::tests::source_snapshot_tests::general_source_symlink_preserves_projection_and_admits_directory_and_dangling_without_body_need",
+        "repository_rule_context::tests::source_snapshot_tests::general_symlink_converts_own_string_path_and_label_before_exact_prefix_replay",
+        "repository_rule_context::tests::source_snapshot_tests::general_symlink_target_conversion_precedes_destination_and_stale_source_refuses",
+        "repository_rule_context::tests::source_snapshot_tests::invalid_execute_options_precede_unresolved_label_and_source_paths_never_fall_back_to_host",
+        "repository_rule_context::tests::symlink_demands_external_label_path_then_source_and_retains_ordered_identity",
+        "repository_rule_context::tests::symlink_rejects_other_source_forms_and_unsafe_destination",
+        "repository_rule_context::tests::template_rejects_unbounded_or_non_latin1_substitutions_before_effects",
+        "repository_rule_context::tests::template_retries_from_a_canonical_path_and_replaces_latin1_bytes_in_order",
+        "repository_rule_context::tests::which_demands_ordered_candidates_and_preserves_path_value_semantics",
+        "repository_rule_context::tests::which_path_cannot_supply_a_template_label_source",
+        "repository_rule_context::tests::which_validates_inputs_trimming_and_bounded_path_shape",
+        "repository_rule_context::tests::workspace_tests::general_dirname_refuses_above_anchor_and_preserves_owned_parent",
+        "repository_rule_context::tests::workspace_tests::general_execute_validates_argv_before_timeout_and_all_environment_keys_before_values",
+        "repository_rule_context::tests::workspace_tests::general_normalized_foreign_displays_refuse_before_host_lookup_or_need",
+        "repository_rule_context::tests::workspace_tests::general_original_replays_nonzero_state_reads_template_delete_and_ordered_output",
+        "repository_rule_context::tests::workspace_tests::general_own_labels_resolve_before_terminal_materialization_in_every_argv_position",
+        "repository_rule_context::tests::workspace_tests::general_prefix_declarations_ignore_later_prepared_paths_and_refuse_unbridged_sources",
+        "repository_rule_context::tests::workspace_tests::general_replay_preserves_output_before_failure_and_never_host_opens_foreign_display"
+      ],
+      "execution_argv": "[executable, --exact, ...exact_selectors, --test-threads=1]",
+      "ignored": false,
+      "preflight_argv": "[python3, scripts/v2_test_preflight.py, executable, --exact, ...exact_selectors]",
+      "cli_sha256": null
+    },
+    {
+      "target": "slug_core_v2",
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "executable_sha256": "add26de6de5a59d2a3e6191ef1dfeab258308c608313c69617c8f8608db2ff9f",
+      "selected": 16,
+      "passed": 16,
+      "exit_code": 0,
+      "elapsed_seconds": 1.601635108992923,
+      "exact_selectors": [
+        "runtime::dice::repository_workspace_driver::tests::combined_root_frontier_exact_capacity_and_plus_one_precede_native_setup",
+        "runtime::dice::repository_workspace_driver::tests::diagnostic_command_scope_keeps_the_original_owner_without_refresh",
+        "runtime::dice::repository_workspace_driver::tests::enabled_policy_rejects_legacy_realizations_in_complete_frontier_before_setup",
+        "runtime::dice::repository_workspace_driver::tests::generic_policy_is_disabled_by_default_and_scopes_native_commands_without_replacing_acquisition",
+        "runtime::dice::repository_workspace_driver::tests::legacy_execute_retirement_tests::legacy_execute_refuses_complete_mixed_frontier_before_io_under_both_policies",
+        "runtime::dice::repository_workspace_driver::tests::native_command_cancellation_interrupts_pending_work_and_drains_with_original_cleanup_clock",
+        "runtime::dice::repository_workspace_driver::tests::queued_and_refused_result_delivery_keep_retirement_armed_until_command_drop",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::frontier_diagnostic_reason_and_config_are_bounded_and_never_emit_payload",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_scalar_v2_qualifiers_and_progress_pairing_are_bounded",
+        "runtime::dice::repository_workspace_driver::tests::unretired_queued_owner_refuses_cleanup_and_keeps_session_busy",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_disabled_closures_preserve_totals_and_last_drop",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_qualify_clocks_overflow_and_concurrent_updates",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_route_repeat_abort_and_preserve_frames",
+        "runtime::repository_io::reservations::tests::live_full_key_collision_refuses_and_dead_weak_control_stays_paid_until_prune",
+        "runtime::repository_io::reservations::tests::reservation_binds_fresh_command_spec_scope_and_blocks_generic_success_before_callback",
+        "runtime::repository_physical_root::progress::command::tests::command_creation_is_fresh_and_scope_refusal_precedes_native_allocation"
+      ],
+      "execution_argv": "[executable, --exact, ...exact_selectors, --test-threads=1]",
+      "ignored": false,
+      "preflight_argv": "[python3, scripts/v2_test_preflight.py, executable, --exact, ...exact_selectors]",
+      "cli_sha256": null
+    }
+  ],
+  "ordinary_passed": 162,
+  "protected_native_guards": {
+    "target": "slug_core_v2",
+    "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+    "executable_sha256": "add26de6de5a59d2a3e6191ef1dfeab258308c608313c69617c8f8608db2ff9f",
+    "selected": 3,
+    "passed": 3,
+    "exit_code": 0,
+    "elapsed_seconds": 0.28216758799680974,
+    "exact_selectors": [
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged"
+    ],
+    "execution_argv": "[executable, --ignored, --exact, ...exact_selectors, --test-threads=1, --show-output]",
+    "ignored": true,
+    "preflight_argv": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+      "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "cli_sha256": "770d66571fd581b663f13874923763dbe1e7e48d060a28051f4aacbfdffcda7a"
+  },
+  "protected_original_compiler": {
+    "target": "slug_core_v2",
+    "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+    "executable_sha256": "add26de6de5a59d2a3e6191ef1dfeab258308c608313c69617c8f8608db2ff9f",
+    "selected": 1,
+    "passed": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 13.28362025199749,
+    "exact_selectors": [
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources"
+    ],
+    "execution_argv": "[executable, --ignored, --exact, ...exact_selectors, --test-threads=1, --show-output]",
+    "ignored": true,
+    "preflight_argv": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources",
+      "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "cli_sha256": "770d66571fd581b663f13874923763dbe1e7e48d060a28051f4aacbfdffcda7a",
+    "actual_original_commands": 4,
+    "one_runtime": true,
+    "steady_backing_bytes": 335544320,
+    "peak_backing_bytes": 4803530752,
+    "qualification": "Absent Homebrew then A/B/A environment/probe changes; original Loading/source links/actual process records and final exact native resource refunds pass."
+  },
+  "rust_abba": [
+    {
+      "label": "repository-cutoff-rust-control",
+      "raw_receipt_sha256": "218a1fde281cf5f6236b1f2490d04dc8bb9903899d043d0f85c40e1f03f472d6",
+      "command": [
+        "/tmp/slug-wp425-validation/artifacts/rust-profile-control-5ad0b9704301e2d4",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/tmp/slug-wp425-validation/artifacts/rust-profile-control-5ad0b9704301e2d4",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected_diagnostic_tests": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.089556295002694,
+      "core_sha256": "5ad0b9704301e2d42fa3d46487e39e265b35b484dd3a0787a08301934959c4a9",
+      "cli_sha256": "770d66571fd581b663f13874923763dbe1e7e48d060a28051f4aacbfdffcda7a",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "semantic_result": {
+        "error": {
+          "detail": {
+            "code": "WorkDeadline",
+            "kind": "source_service"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      "computes": 762,
+      "last_epoch": {
+        "roots": 51,
+        "records": 100,
+        "state_versions": 151
+      },
+      "last_scope": {
+        "decoded_bytes": 3125450,
+        "first_error": "WorkDeadline",
+        "live_buffer_bytes": 0,
+        "live_decoder_bytes": 0,
+        "peak_buffer_bytes": 852795,
+        "peak_decoder_bytes": 0,
+        "registry_attempts": 0,
+        "registry_bytes": 0,
+        "source_attempts": 63,
+        "transferred_bytes": 23579455,
+        "written_bytes": 26151983
+      },
+      "phase_intervals": [
+        {
+          "closed_count": 762,
+          "kind": "injection_revision",
+          "process_cpu_ns": 457411698,
+          "status": 0,
+          "wall_ns": 459176559
+        },
+        {
+          "closed_count": 762,
+          "kind": "root_compute",
+          "process_cpu_ns": 21909367601,
+          "status": 0,
+          "wall_ns": 21548382861
+        },
+        {
+          "closed_count": 611,
+          "kind": "legacy_need",
+          "process_cpu_ns": 861744138,
+          "status": 0,
+          "wall_ns": 2770800659
+        },
+        {
+          "closed_count": 762,
+          "kind": "idle_drain",
+          "process_cpu_ns": 133845943,
+          "status": 0,
+          "wall_ns": 121879079
+        }
+      ],
+      "phase_qualifiers": {
+        "categories_are_exclusive": false,
+        "closed_count_includes_aborted": true,
+        "cpu_includes_helpers": false,
+        "disabled": 1,
+        "event_overflow": 0,
+        "runtime_construction_measured": false,
+        "sampled_event_dropped": 0,
+        "unknown_interval_status_bits": 0,
+        "valid_abi": true,
+        "version": 2
+      },
+      "progress_wall_seconds": 4.833515583,
+      "progress_qualifiers": {
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "peak_backing_bytes": 5915017216,
+      "peak_retained_bytes": 24822529,
+      "peak_native_fds": 407,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "supervisor_timed_out": false,
+      "output_overflow": false,
+      "invalid_counter_delta": false,
+      "content_census_complete": false
+    },
+    {
+      "label": "repository-cutoff-rust-candidate",
+      "raw_receipt_sha256": "1faabc5bca591fc90ca4e64884b30a80a43ab3fb34b265bca908815d1327a9c3",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected_diagnostic_tests": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 24.96190132900665,
+      "core_sha256": "add26de6de5a59d2a3e6191ef1dfeab258308c608313c69617c8f8608db2ff9f",
+      "cli_sha256": "770d66571fd581b663f13874923763dbe1e7e48d060a28051f4aacbfdffcda7a",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "semantic_result": {
+        "error": {
+          "detail": {
+            "kind": "mutation",
+            "reason": "unclassified",
+            "stage": "Transport"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      "computes": 762,
+      "last_epoch": {
+        "roots": 51,
+        "records": 100,
+        "state_versions": 151
+      },
+      "last_scope": {
+        "decoded_bytes": 3125450,
+        "first_error": "Limit(SourceAttempts)",
+        "live_buffer_bytes": 0,
+        "live_decoder_bytes": 0,
+        "peak_buffer_bytes": 852795,
+        "peak_decoder_bytes": 0,
+        "registry_attempts": 0,
+        "registry_bytes": 0,
+        "source_attempts": 64,
+        "transferred_bytes": 23579730,
+        "written_bytes": 26152258
+      },
+      "phase_intervals": [
+        {
+          "closed_count": 762,
+          "kind": "injection_revision",
+          "process_cpu_ns": 451039513,
+          "status": 0,
+          "wall_ns": 452620653
+        },
+        {
+          "closed_count": 762,
+          "kind": "root_compute",
+          "process_cpu_ns": 19978096712,
+          "status": 0,
+          "wall_ns": 19626569764
+        },
+        {
+          "closed_count": 611,
+          "kind": "legacy_need",
+          "process_cpu_ns": 863167095,
+          "status": 0,
+          "wall_ns": 2555589586
+        },
+        {
+          "closed_count": 762,
+          "kind": "idle_drain",
+          "process_cpu_ns": 127565239,
+          "status": 0,
+          "wall_ns": 115644108
+        }
+      ],
+      "phase_qualifiers": {
+        "categories_are_exclusive": false,
+        "closed_count_includes_aborted": true,
+        "cpu_includes_helpers": false,
+        "disabled": 1,
+        "event_overflow": 0,
+        "runtime_construction_measured": false,
+        "sampled_event_dropped": 0,
+        "unknown_interval_status_bits": 0,
+        "valid_abi": true,
+        "version": 2
+      },
+      "progress_wall_seconds": 4.638495333,
+      "progress_qualifiers": {
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "peak_backing_bytes": 5924454400,
+      "peak_retained_bytes": 24822529,
+      "peak_native_fds": 407,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "supervisor_timed_out": false,
+      "output_overflow": false,
+      "invalid_counter_delta": false,
+      "content_census_complete": false
+    },
+    {
+      "label": "repository-cutoff-rust-candidate-second",
+      "raw_receipt_sha256": "3e5f6cfe90aab4336f6a892eacba1be056235edc53bff549d7710ae227b135ed",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected_diagnostic_tests": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 25.043120429007104,
+      "core_sha256": "add26de6de5a59d2a3e6191ef1dfeab258308c608313c69617c8f8608db2ff9f",
+      "cli_sha256": "770d66571fd581b663f13874923763dbe1e7e48d060a28051f4aacbfdffcda7a",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "semantic_result": {
+        "error": {
+          "detail": {
+            "kind": "mutation",
+            "reason": "unclassified",
+            "stage": "Transport"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      "computes": 762,
+      "last_epoch": {
+        "roots": 51,
+        "records": 100,
+        "state_versions": 151
+      },
+      "last_scope": {
+        "decoded_bytes": 3125450,
+        "first_error": "Limit(SourceAttempts)",
+        "live_buffer_bytes": 0,
+        "live_decoder_bytes": 0,
+        "peak_buffer_bytes": 852795,
+        "peak_decoder_bytes": 0,
+        "registry_attempts": 0,
+        "registry_bytes": 0,
+        "source_attempts": 64,
+        "transferred_bytes": 23579730,
+        "written_bytes": 26152258
+      },
+      "phase_intervals": [
+        {
+          "closed_count": 762,
+          "kind": "injection_revision",
+          "process_cpu_ns": 449142039,
+          "status": 0,
+          "wall_ns": 451030894
+        },
+        {
+          "closed_count": 762,
+          "kind": "root_compute",
+          "process_cpu_ns": 19989496157,
+          "status": 0,
+          "wall_ns": 19649530980
+        },
+        {
+          "closed_count": 611,
+          "kind": "legacy_need",
+          "process_cpu_ns": 873925051,
+          "status": 0,
+          "wall_ns": 2654813803
+        },
+        {
+          "closed_count": 762,
+          "kind": "idle_drain",
+          "process_cpu_ns": 126190462,
+          "status": 0,
+          "wall_ns": 114137696
+        }
+      ],
+      "phase_qualifiers": {
+        "categories_are_exclusive": false,
+        "closed_count_includes_aborted": true,
+        "cpu_includes_helpers": false,
+        "disabled": 1,
+        "event_overflow": 0,
+        "runtime_construction_measured": false,
+        "sampled_event_dropped": 0,
+        "unknown_interval_status_bits": 0,
+        "valid_abi": true,
+        "version": 2
+      },
+      "progress_wall_seconds": 4.711997242,
+      "progress_qualifiers": {
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "peak_backing_bytes": 5924454400,
+      "peak_retained_bytes": 24822529,
+      "peak_native_fds": 407,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "supervisor_timed_out": false,
+      "output_overflow": false,
+      "invalid_counter_delta": false,
+      "content_census_complete": false
+    },
+    {
+      "label": "repository-cutoff-rust-control-second",
+      "raw_receipt_sha256": "0313830c3b84d6d8c776ab3e8264271cd887f34d94bf224356526d457f60a03a",
+      "command": [
+        "/tmp/slug-wp425-validation/artifacts/rust-profile-control-5ad0b9704301e2d4",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/tmp/slug-wp425-validation/artifacts/rust-profile-control-5ad0b9704301e2d4",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected_diagnostic_tests": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.02928726800019,
+      "core_sha256": "5ad0b9704301e2d42fa3d46487e39e265b35b484dd3a0787a08301934959c4a9",
+      "cli_sha256": "770d66571fd581b663f13874923763dbe1e7e48d060a28051f4aacbfdffcda7a",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "semantic_result": {
+        "error": {
+          "detail": {
+            "kind": "mutation",
+            "reason": "unclassified",
+            "stage": "Transport"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      "computes": 762,
+      "last_epoch": {
+        "roots": 51,
+        "records": 100,
+        "state_versions": 151
+      },
+      "last_scope": {
+        "decoded_bytes": 3125450,
+        "first_error": "Limit(SourceAttempts)",
+        "live_buffer_bytes": 0,
+        "live_decoder_bytes": 0,
+        "peak_buffer_bytes": 852795,
+        "peak_decoder_bytes": 0,
+        "registry_attempts": 0,
+        "registry_bytes": 0,
+        "source_attempts": 64,
+        "transferred_bytes": 23579730,
+        "written_bytes": 26152258
+      },
+      "phase_intervals": [
+        {
+          "closed_count": 762,
+          "kind": "injection_revision",
+          "process_cpu_ns": 453166043,
+          "status": 0,
+          "wall_ns": 455040408
+        },
+        {
+          "closed_count": 762,
+          "kind": "root_compute",
+          "process_cpu_ns": 21927967930,
+          "status": 0,
+          "wall_ns": 21561334542
+        },
+        {
+          "closed_count": 611,
+          "kind": "legacy_need",
+          "process_cpu_ns": 858157697,
+          "status": 0,
+          "wall_ns": 2719300587
+        },
+        {
+          "closed_count": 762,
+          "kind": "idle_drain",
+          "process_cpu_ns": 131612212,
+          "status": 0,
+          "wall_ns": 119674368
+        }
+      ],
+      "phase_qualifiers": {
+        "categories_are_exclusive": false,
+        "closed_count_includes_aborted": true,
+        "cpu_includes_helpers": false,
+        "disabled": 1,
+        "event_overflow": 0,
+        "runtime_construction_measured": false,
+        "sampled_event_dropped": 0,
+        "unknown_interval_status_bits": 0,
+        "valid_abi": true,
+        "version": 2
+      },
+      "progress_wall_seconds": 4.781094821,
+      "progress_qualifiers": {
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "peak_backing_bytes": 5924454400,
+      "peak_retained_bytes": 24822529,
+      "peak_native_fds": 407,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "supervisor_timed_out": false,
+      "output_overflow": false,
+      "invalid_counter_delta": false,
+      "content_census_complete": false
+    }
+  ],
+  "comparison_qualification": "Same verified flat-dir input config and rebuilt current CLI for allfour. Control is SHA-preserved pre-cutoff feature executable, not a reconstructed Cargo artifact. Candidate root-compute wall19.627/19.650s vs controls21.548/21.561s; CPU19.978/19.989s vs21.909/21.928s. Both candidates and secondcontrol reach SourceAttempts64; firstcontrol reaches WorkDeadline after63. Same762 cycles/51roots/100records; no exclusive frontier-depth, completed-command latency, Rust archive success or RSS-ratio claim. Allinterval qualifiers valid/unaborted; census incomplete.",
+  "control_preservation": {
+    "base": "c411bb874decbb8c9885589bc840f949a5ad2b96",
+    "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+    "preserved_executable": "/tmp/slug-wp425-validation/artifacts/rust-profile-control-5ad0b9704301e2d4",
+    "executable_sha256": "5ad0b9704301e2d42fa3d46487e39e265b35b484dd3a0787a08301934959c4a9",
+    "bytes": 1123837672,
+    "feature": "native-probe-observer",
+    "source_pins": {
+      "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests.rs": "85a61689a67268407db175b2b80e417400392cc820b7cc5d0a65b30aaebfb710",
+      "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests/phase_profile.rs": "de36e459ce8fd7a521ea20aa363b462f139332731866f4f76f1980440375bfab"
+    },
+    "run_record": "rust-phase-profile-first-run.json",
+    "cli_sha256": "840458937a7d93af9bf97394713d8965f255c8d2748123e108bb8f240a0ae607",
+    "config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203"
+  },
+  "source_attempt_boundary": {
+    "paths": 53,
+    "path_general_family": 51,
+    "path_source_family": 2,
+    "workspace_successes": 9,
+    "final_refused_capture": 2,
+    "total": 64,
+    "last_natural_request": "rules_kotlin+ Immutable Source snapshot",
+    "census_qualification": "Incomplete65 identities with269 omitted occurrences; no universal duplicate-file or eligible-regular-file claim. General51 are an owner class for investigation, not51 proven redundant reads."
+  },
+  "architecture_validation": {
+    "command": [
+      "sh",
+      "scripts/v2_archive_status.sh"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": null,
+    "qualification": "Executed successfully; not separately timed."
+  },
+  "review": "Independent consequential design, frozen source, causal RED/GREEN, exact ordinary selection, held-request admission composition, actual native/warm compiler/ABBA evidence and final receipt/29 source pins ACCEPT. Acceptance is limited to the observation cutoff and bounded interval reduction; SourceAttempts64/Rust completion/activation/RSS gates remain open.",
+  "next": "Attribute actual Source charges and investigate fresh FD verification with canonical already-owned bodies for eligible general native regular-file observations; no implementation/cap/clock change selected by this receipt.",
+  "remaining": [
+    "Rust archive extraction and envelope",
+    "Derived Source Path/repeated Workspace publication",
+    "Authentic Rust cquery/action comparison/REAPI execution",
+    "General activation",
+    "Equivalent-command <=1.25x Bazel RSS",
+    "Full Slug/M7A/M8/Stage10 closure"
+  ],
+  "final_validation": {
+    "rustfmt": {
+      "changed_rust_files": 27,
+      "exit_code": 0,
+      "elapsed_seconds": 0.2479380089935148
+    },
+    "plan_status": {
+      "command": [
+        "python3",
+        "scripts/v2_plan_status.py"
+      ],
+      "exit_code": 0,
+      "packet": "WP-7-425-m7a-general-repository-process"
+    },
+    "diff_check": {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0
+    }
+  }
+}

@@ -69,9 +69,13 @@ operations, repeated Workspace publication, public Rust and matching-command
 memory gates still precede General production activation.
 The [retention-dimension component](./slug-v2-subplans/wp1225-retention-dimensions-acceptance-2026-11-08.json)
 separates root capacity128 from byte-bounded complete history and explicitly
-bounds command-wide execution. Unchanged Rust cquery now retains143 states
-across48 roots/95 records, then reaches the existing work deadline. Bounded
-phase attribution precedes a generic optimization and Rust archive extraction.
+bounds command-wide execution. The
+[observation-cutoff component](./slug-v2-subplans/wp1225-observation-cutoffs-acceptance-2026-11-08.json)
+now preserves exact per-repository dependencies with causal cache/freshness proof.
+Same-input bounded diagnostics observe about1.9s less root-compute wall time;
+Rust reaches the unchanged Source-attempt64 boundary with51 roots/100 records.
+Source-charge attribution precedes the next generic change and Rust archive
+extraction. No completed-command latency or RSS acceptance is implied.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

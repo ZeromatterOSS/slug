@@ -58,6 +58,22 @@ pub(super) async fn binding(
         demand,
     )
 }
+fn workspace_input(
+    epoch: &RepositoryWorkspaceEpoch,
+    demand: &RepositoryWorkspaceReservationDemand,
+) -> Result<RepositoryRuleInvocationInput, RepositoryRuleInvocationError> {
+    let observed =
+        slug_bzlmod_v2::RepositoryWorkspaceTranscriptObservation::from_epoch(epoch, demand)
+            .map_err(RepositoryRuleInvocationError::Workspace)?;
+    RepositoryRuleInvocationInput::new(
+        "repo".into(),
+        None,
+        Arc::new(SmallMap::new()),
+        Arc::from([]),
+    )
+    .unwrap()
+    .with_workspace(observed, demand.clone())
+}
 fn attempt(
     source: &str,
     epoch: &RepositoryWorkspaceEpoch,
@@ -86,15 +102,18 @@ fn attempt_selected(
             .unwrap()
             .unchecked_frozen_value()
     };
-    let input = RepositoryRuleInvocationInput::new(
-        "repo".into(),
-        None,
-        Arc::new(SmallMap::new()),
-        Arc::from([]),
-    )
-    .unwrap()
-    .with_workspace(epoch.clone(), demand.clone(), selected)
-    .unwrap();
+    let mut bindings = PreparedRepositoryWorkspaceBindings::new();
+    for address in paths.keys() {
+        if let Some(entry) = selected.entry_for_repository(address.repo()) {
+            bindings.insert(
+                address.repo().clone(),
+                RepositoryWorkspaceSourceBinding::Materialized(entry.clone()),
+            );
+        }
+    }
+    let input = workspace_input(epoch, demand)
+        .unwrap()
+        .with_workspace_bindings(bindings);
     invoke_repository_rule_with_host_paths(
         implementation,
         &manifest,
@@ -267,22 +286,7 @@ async fn general_execute_validates_argv_before_timeout_and_all_environment_keys_
     }
     let revoked = RepositoryWorkspaceEpoch::revoked();
     assert!(matches!(
-        RepositoryRuleInvocationInput::new(
-            "repo".into(),
-            None,
-            Arc::new(SmallMap::new()),
-            Arc::from([])
-        )
-        .unwrap()
-        .with_workspace(
-            revoked,
-            demand,
-            RepositoryMaterializationResultEpoch::new(
-                NormalizedAbsolutePath::new("/workspace").unwrap(),
-                []
-            )
-            .unwrap()
-        ),
+        workspace_input(&revoked, &demand),
         Err(RepositoryRuleInvocationError::Workspace(
             slug_bzlmod_v2::RepositoryWorkspaceError::Revoked
         ))
@@ -394,7 +398,8 @@ async fn general_prefix_declarations_ignore_later_prepared_paths_and_refuse_unbr
             request: Arc::new(legacy),
             result: RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
-                    path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
+                    path_policy:
+                        slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                     source_identity: "legacy".into(),
                     generation_root: source.display_root().as_path().to_path_buf(),
                     observation_instance: source.instance(),
@@ -551,19 +556,7 @@ async fn general_normalized_foreign_displays_refuse_before_host_lookup_or_need()
     }
     let source = "def implementation(ctx):\n    ctx.path('/tmp').get_child('..','__slug_repositories__','v1','foreign','file')\n";
     let (_module, implementation) = implementation(source);
-    let input = RepositoryRuleInvocationInput::new(
-        "repo".into(),
-        None,
-        Arc::new(SmallMap::new()),
-        Arc::from([]),
-    )
-    .unwrap()
-    .with_workspace(
-        epoch.clone(),
-        demand.clone(),
-        RepositoryMaterializationResultEpoch::new(demand.key().workspace().clone(), []).unwrap(),
-    )
-    .unwrap();
+    let input = workspace_input(&epoch, &demand).unwrap();
     let host = SmallMap::from_iter([(NormalizedAbsolutePath::new("/tmp").unwrap(), true)]);
     let child = invoke_repository_rule_with_host_paths(
         implementation,

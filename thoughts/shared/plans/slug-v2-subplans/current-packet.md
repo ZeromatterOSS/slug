@@ -3,14 +3,19 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: attribute the unchanged work deadline for original
+Current delta: attribute the unchanged Source-attempt64 exhaustion on original
 `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
-The [retention-dimension component](wp1225-retention-dimensions-acceptance-2026-11-08.json)
-retains143 complete states across48 roots/95 records and then reaches the
-existing27-second scope deadline, before Rust archive demand. Use bounded phase
-timing on the same ordinary Native command and verified flat inputs before
-selecting a generic graph/native optimization; test builds currently use
-opt-level1. No caller-specific pruning or clock increase is selected.
+The [observation-cutoff component](wp1225-observation-cutoffs-acceptance-2026-11-08.json)
+now keeps completed original A cached across unrelated repository publications,
+while full own history, request-bound sources and fresh leases remain tracked.
+Its same-input ABBA diagnostic observes about1.9s less root-compute wall time
+across762 cycles. Both candidate runs reach Source-attempt64 at about25s;
+the controls reach the deadline or the same refusal at about27s. This is bounded
+graph evidence, not completed Rust cquery or whole-command performance/RSS proof.
+Inspect actual source charges and their producer custody before selecting any
+generic reuse change under the [owner contract](wp1225-general-repository-workspace-design.md#repository-observation-cutoffs).
+No caller-specific pruning, clock/cap increase or Need-cacheability change is
+selected. Rust archive progress remains unreached.
 
 The [retention contract](wp1225-general-repository-workspace-design.md#retention-admission-dimensions)
 now separates root capacity128 from metadata-bounded exact history and enforces

@@ -17,11 +17,19 @@ use slug_workspace_v2::PathObservationOperation;
 
 use super::*;
 
+#[cfg(feature = "native-probe-observer")]
+#[path = "rust_toolchain_tests/phase_profile.rs"]
+mod phase_profile;
+
 const EVENT_LIMIT: usize = 128;
 const TRACE_BYTES: usize = 512 * 1024;
 const PREFIX_EVENTS: usize = 32;
 const CENSUS_BYTES: usize = 64 * 1024;
-const EVENT_TRACE_BYTES: usize = TRACE_BYTES - CENSUS_BYTES - 4096;
+#[cfg(feature = "native-probe-observer")]
+const PHASE_BYTES: usize = phase_profile::REPORT_BYTES;
+#[cfg(not(feature = "native-probe-observer"))]
+const PHASE_BYTES: usize = 0;
+const EVENT_TRACE_BYTES: usize = TRACE_BYTES - CENSUS_BYTES - 4096 - PHASE_BYTES;
 const CONTENT_IDENTITIES: usize = 65;
 const CONTENT_PATH_BYTES: usize = CONTENT_IDENTITIES * 4096;
 const EVENT_BYTES: usize = EVENT_TRACE_BYTES / (PREFIX_EVENTS + 1);
@@ -50,6 +58,8 @@ struct Trace {
     progress_totals: [ChargeTotals; 7],
     family_totals: [ChargeTotals; 7],
     invalid_counter_delta: bool,
+    #[cfg(feature = "native-probe-observer")]
+    progress_wall: phase_profile::ProgressTiming,
 }
 impl Trace {
     fn record(&mut self, mut value: Value) {
@@ -553,8 +563,15 @@ impl NativeCommandRoot for ObservedCquery {
         attempt: usize,
         result: Option<&Result<NativeDemandProgress, NativeDemandSessionError>>,
     ) {
+        // Sample the progress boundary before census/counter rendering or locks.
+        #[cfg(feature = "native-probe-observer")]
+        let progress_end = result.map(|_| Instant::now());
         let mut trace = self.trace.lock().unwrap();
         if let Some(result) = result {
+            #[cfg(feature = "native-probe-observer")]
+            trace
+                .progress_wall
+                .finish(attempt, progress_kind(result), progress_end.unwrap());
             let pending = trace
                 .pending_progress
                 .take()
@@ -621,6 +638,12 @@ impl NativeCommandRoot for ObservedCquery {
         drop(trace);
         self.inner
             .progress_observed(needs, command, attempt, result);
+        // Start last, after diagnostics and unchanged inner delegation. No lock
+        // remains held through actual progress; only fixed dispatch tail remains.
+        #[cfg(feature = "native-probe-observer")]
+        if result.is_none() {
+            self.trace.lock().unwrap().progress_wall.begin(attempt);
+        }
     }
     fn progress_refused(
         &self,
@@ -766,6 +789,8 @@ fn native_original_rust_toolchain_cquery_frontier() {
     verify_inputs(&config, workspace);
     let mut runtime =
         WorkspaceRuntime::new(workspace, crate::runtime::ProcessHostOwner::native()).unwrap();
+    #[cfg(feature = "native-probe-observer")]
+    let phase_profile = phase_profile::InstalledProfile::attach(&mut runtime).unwrap();
     assert!(runtime.source_scope().is_none());
     let resources = bank();
     let baseline = resources.snapshot().retained_bytes;
@@ -837,30 +862,39 @@ fn native_original_rust_toolchain_cquery_frontier() {
         },
     };
     let snapshot = resources.snapshot();
-    {
+    let mut report = {
         let trace = trace.lock().unwrap();
-        let mut report = json!({"result":status,"computes":trace.computes,"truncated":trace.truncated,"events":trace.events,"content_census":trace.census.summary(),"invalid_counter_delta":trace.invalid_counter_delta,"progress_totals":trace.progress_totals.iter().enumerate().map(|(kind,total)|json!({"kind":progress_name(kind),"counters":total.value()})).collect::<Vec<_>>(),"family_totals":trace.family_totals.iter().enumerate().map(|(family,total)|json!({"family":family_name(family),"counters":total.value()})).collect::<Vec<_>>(),"backing_bytes":snapshot.backing_bytes,"peak_backing_bytes":snapshot.peak_backing_bytes,"native_fds":snapshot.native_fds,"peak_native_fds":snapshot.peak_native_fds,"retained_bytes":snapshot.retained_bytes,"peak_retained_bytes":snapshot.peak_retained_bytes});
-        let mut encoded = report.to_string();
-        while encoded.len() > TRACE_BYTES {
-            let events = report["events"].as_array_mut().unwrap();
-            assert!(events.len() > PREFIX_EVENTS);
-            events.remove(PREFIX_EVENTS);
-            report["truncated"] = json!(true);
-            encoded = report.to_string();
-        }
-        println!("WP425_RUST_FRONTIER {encoded}");
-    }
+        json!({"result":status,"computes":trace.computes,"truncated":trace.truncated,"events":trace.events,"content_census":trace.census.summary(),"invalid_counter_delta":trace.invalid_counter_delta,"progress_totals":trace.progress_totals.iter().enumerate().map(|(kind,total)|json!({"kind":progress_name(kind),"counters":total.value()})).collect::<Vec<_>>(),"family_totals":trace.family_totals.iter().enumerate().map(|(family,total)|json!({"family":family_name(family),"counters":total.value()})).collect::<Vec<_>>(),"backing_bytes":snapshot.backing_bytes,"peak_backing_bytes":snapshot.peak_backing_bytes,"native_fds":snapshot.native_fds,"peak_native_fds":snapshot.peak_native_fds,"retained_bytes":snapshot.retained_bytes,"peak_retained_bytes":snapshot.peak_retained_bytes})
+    };
     drop(outcome);
     drop(runtime);
     let final_snapshot = resources.snapshot();
     assert_eq!(final_snapshot.native_fds, 0);
     assert_eq!(final_snapshot.backing_bytes, 0);
     assert_eq!(final_snapshot.retained_bytes, baseline);
+    #[cfg(feature = "native-probe-observer")]
+    {
+        report["phase_profile"] = phase_profile.finish();
+        report["progress_wall"] = trace.lock().unwrap().progress_wall.summary();
+        assert!(
+            report["phase_profile"].to_string().len() + report["progress_wall"].to_string().len()
+                < PHASE_BYTES
+        );
+    }
     verify_inputs(&config, workspace);
-    println!(
-        "WP425_RUST_CLEANUP {}",
-        json!({"native_fds":final_snapshot.native_fds,"backing_bytes":final_snapshot.backing_bytes,"retained_bytes":final_snapshot.retained_bytes,"baseline":baseline})
-    );
+    let cleanup = json!({"native_fds":final_snapshot.native_fds,"backing_bytes":final_snapshot.backing_bytes,"retained_bytes":final_snapshot.retained_bytes,"baseline":baseline}).to_string();
+    let overhead = "WP425_RUST_FRONTIER ".len() + "WP425_RUST_CLEANUP ".len() + 2 + cleanup.len();
+    let mut encoded = report.to_string();
+    while encoded.len().checked_add(overhead).unwrap() > TRACE_BYTES {
+        let events = report["events"].as_array_mut().unwrap();
+        assert!(events.len() > PREFIX_EVENTS);
+        events.remove(PREFIX_EVENTS);
+        report["truncated"] = json!(true);
+        encoded = report.to_string();
+    }
+    assert!(encoded.len() + overhead <= TRACE_BYTES);
+    println!("WP425_RUST_FRONTIER {encoded}");
+    println!("WP425_RUST_CLEANUP {cleanup}");
 }
 
 #[test]

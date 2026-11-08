@@ -555,6 +555,10 @@ pub use selected_repo_spec::HostSelectedRegistrationPatternsObservationKey;
 pub use selected_repo_spec::HostSelectedRegistrationPatternsOutcome;
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostSelectedRegistrationPatterns;
+#[doc(hidden)]
+pub use source_preparation::RepositoryMaterializationObservation;
+#[doc(hidden)]
+pub use source_preparation::RepositoryMaterializationProjection;
 #[rustfmt::skip]
 #[doc(hidden)]
 pub use selected_repo_spec::HostRootRepositoryMappingObservationError;

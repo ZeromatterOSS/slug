@@ -962,12 +962,73 @@ not establish acceptable latency or the completed-command1.25x Bazel RSS gate.
 
 The [retention acceptance receipt](wp1225-retention-dimensions-acceptance-2026-11-08.json)
 records focused protocol/Core/Loading and protected original compiler proof.
-Unchanged original Rust now retains143 states under the same byte banks and
-reaches the existing work deadline before archive extraction. Next, attribute
-injection, graph compute, idle drain and actual progress wall/CPU costs using
-bounded nonsemantic observation. A global-epoch invalidation or helper-setup
-hypothesis requires measured evidence before implementation; developer-profile
-timing does not establish production latency or the memory ratio.
+Unchanged original Rust crosses the predecessor128-state proxy under the same
+byte banks. The following observation-cutoff component owns its measured graph
+follow-up; developer-profile diagnostics do not establish production latency or
+the completed-command memory ratio.
+
+### Repository observation cutoffs
+
+The bounded V2 phase probe attributes21.349s wall/21.365s parent CPU to root
+compute within the unchanged27-second deadline; its final interval is aborted.
+Progress consumes4.864s, including the legacy Need subset. A causal observed-key
+regression now proves that querying completed original A recomputes it after
+unrelated B reservation, completion, materialization and Source publication.
+These are measured owners for investigation, not a performance acceptance.
+
+The reviewed cutoff uses existing DICE `compute_opaque`/`ProjectionKey`, without
+an accompanying whole-value read. A command-context projection exposes only full
+workspace/lease/limits or an explicit error. A full-demand transcript projection
+exposes that context and its exact optional transcript, validating complete Spec
+and slot binding. Active absence remains tracked; revoked/foreign/conflicting
+values remain errors. Every exposed field participates in full equality.
+
+Loading replaces whole-epoch invocation carriers with explicit replay
+context/transcript and typed prepared Source or Materialized rows. Resolve rows
+only for actual Label/path/source accesses; compare full natural requests and
+current context before exposing path text. Source lookup is keyed by context
+and the full natural request. Materialization lookup is centrally keyed by
+current context and the complete expected natural request; a conflicting row is
+an error rather than absence. It validates repository/workspace and a General
+row's command lease before use. No unchecked repository-only alternate or
+hidden whole epoch
+or catalogue may sit behind narrowed equality. Prefix declarations still begin
+empty and grow only through original evaluation; prepared-but-unused rows grant
+no authority. Missing rows yield the existing Need/error, never a Host fallback.
+
+Pure replay reconstructs requests from the actual transcript; it never creates
+a one-row epoch. Such requests are **unadmitted**. Core's actual full command
+epoch retains aggregate authority. Existing new Execute/process-history and
+root-capacity checks precede child/quota/bootstrap effects. Unknown snapshot
+metadata/body forecasts still follow private mutation/capture and gate
+publication; failure poisons/disposes the private root under existing staging
+semantics. This cutoff adds no universal pre-IO completion gate. Aggregate
+Execute/process-history refusal may move from pure invocation to Native
+admission, an explicit Slug-native error-stage revision. Local validation and
+authenticated historical replay remain. Parent effect Need values stay invalid
+for DICE caching; a caller-held earlier Need must still pass current admission.
+
+The [cutoff receipt](wp1225-observation-cutoffs-acceptance-2026-11-08.json)
+records causal RED/GREEN, relevant-change/freshness/absence and foreign-request
+refusals, held-request aggregate admission,162 ordinary tests, three actual native
+guards and four warm original compiler commands. The held-request test is a
+no-child protocol counter proof; only B's first operation is original. Existing
+Core source and actual history/replay tests establish the pre-launch/quota join.
+
+The same-input ABBA diagnostics retain51 roots/100 completed records and762
+root-compute intervals per run. Candidate wall intervals are19.627/19.650s;
+controls21.548/21.561s. Candidates refuse at Source-attempt64 around25s; one
+control reaches the unchanged work deadline and the other the same64 refusal
+around27s. Profile qualifiers remain explicit, parent CPU excludes helpers, and
+legacy Need timing overlaps progress. Every run refunds native FD/backing and
+retained credits exactly. This is bounded attribution/cutoff evidence, not
+completed-command latency, Rust success or equivalent Bazel RSS proof.
+
+Next, attribute the64 charged source attempts to actual producers and distinguish
+required reads from safe generic reuse under current custody/freshness rules.
+No clock, Source, root, byte, process or backing expansion is selected. Analysis's
+adjacent broad source projections remain a separate measured follow-up if the
+public cquery still exposes them.
 
 ### Current captured Source transport (accepted inactive component)
 
