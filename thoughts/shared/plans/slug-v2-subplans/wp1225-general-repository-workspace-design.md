@@ -63,9 +63,10 @@ inheritable/ambient capabilities and sets no-new-privileges; trusted libtest
 infrastructure may retain other privileged threads. General-runner privilege
 retirement and untrusted confinement remain production gates. The fixture does
 not prove detached creation from fstat facts alone: trusted setup provenance
-remains explicit. Common native
-progress integration, non-execute index advancement, quota transition,
-pre-untrusted-exec transfer and adversarial lifecycle remain to prove.
+remains explicit. The command/quota owner below integrates initial admission and
+same-backing shrink. General completion/next-token return to the command,
+non-execute advancement of an accepted Process token, pre-untrusted-exec transfer
+and adversarial lifecycle remain to prove.
 Adoption transfers the SAME root Arc; sealed roots cannot mutate. Native source
 leases/readers retain it until the last user closes; Arc clones duplicate no FD.
 
@@ -147,9 +148,9 @@ capture creation excludes outstanding writers until retirement. Complete actual
 snapshot and prepaid transcript completion still follow every successful decode.
 
 Trusted setup still excludes all other writers. Snapshot equality does not prove
-descendant death or absence of write aliases. Registry association, rolling-token
-integration, quota transition, confinement and production activation remain
-separate packet gates.
+descendant death or absence of write aliases. Registry association, general
+rolling-token completion, confinement and production activation remain separate
+packet gates.
 
 Legacy plain archive behavior remains 512 MiB/call, 1 GiB cumulative DECODED,
 with its existing bounds. Select general-root Archive mode with **tmpfs size=
@@ -181,6 +182,40 @@ verify actual post-remount limits before child launch. Failed admission/remount
 refuses generation BEFORE child; never copies/restarts/relabels it. No later
 expansion from Process to Archive. Later archives retain old per-call/decoded
 caps AND must fit process caps; successful mixed sequences use this SAME root.
+
+The inactive [command/quota component](wp1225-quota-command-acceptance-2026-11-07.json)
+implements that first admission with one non-Clone native command owner. It
+creates its own empty epoch and owns all unfinished roots and never-used initial
+mount seeds. Immutable epoch publication accepts exactly the existing complete
+transcript prefix plus one record; equal final trees cannot substitute rewritten
+history. Before first Execute, the consuming owner compares the full selected
+transcript, asks the current epoch for the exact request (including cumulative
+body retention across Process roots), and verifies the actual complete tree
+under Process RootIo limits without copying existing bodies. Old projected epochs
+and individual native roots cannot mint this admission. Epoch/root/control and
+transfer allocations are positively credited; no DICE transaction or lock spans
+native work. Archive-only completion keeps its larger envelope.
+
+Trusted setup attaches the consumed seed, checks actual allocated bytes and
+charged inodes, shrinks the same superblock and mints a bound successor. The
+parent independently observes the Process quotas through its original root FD
+before ACK; a closed proof permits one atomic shared backing allowance/mode
+reduction with no fallible operation after that update. No expansion or rollback
+exists. Failure after commit and before ACK reaps the helper before poisoning
+and retiring transition authority, retaining the original root in the consumed
+command until disposal. The ready value is closed pending first-Execute
+ownership, not a generic process result or quiescence constructor. General
+Execute capture/completion and return to the command remain unimplemented.
+
+Fixed Rust native checks cover the real2GiB/262144→64MiB/8192 remount,
+unchanged root identity, shared-credit release, failure after commit, page
+exact/+1 refusal and measured inode charge8192→8193 before shrink. Process
+creates reach ENOSPC at actual used8192. Counts of visible filenames are not
+inode-capacity units: [tmpfs](https://docs.kernel.org/filesystems/tmpfs.html)
+charges this space for extended attributes as well. Logical entry and physical
+inode bounds remain separate. A deleted64MiB+1 history is refused before Execute
+while its Archive-only tree can still seal. These are bounded mechanism tests,
+not full Archive-envelope exhaustion or equivalent-command memory evidence.
 
 Process snapshot bounds: **8192 entries INCLUDING root**, depth<=64 below root,
 each logical absolute demand/path<=4096 bytes (including display prefix), and
@@ -315,6 +350,14 @@ syscalls refuse. Trusted setup consumes root/userns/mount/filter/status/control
 FDs; payload inherits ONLY0/1/2. Reuse closefrom/reaper tests, prove detached
 writers closing stdio dead before capture. Exact allowlist/setup binding and
 actual socket/device/FD/nested-mount tests remain PREACTIVATION gates.
+
+The inactive `repository_process_policy` leaf now emits one static
+LinuxReadOnlyHostV1 cBPF artifact for64-bit Linux x86_64, with strict architecture,
+x32 and argument-width checks, default EPERM, restricted process/signal/control
+operations and clone3 ENOSYS fallback. Thirteen independent literal-UAPI
+interpreter/verifier tests cover emitted decisions and control flow. There is no
+installer, launch path or caller-selectable policy. Actual installation together
+with full mount/FD/device/socket/descendant confinement remains required.
 
 | Owner | Files under app/ (new leaves explicitly named) |
 | --- | --- |

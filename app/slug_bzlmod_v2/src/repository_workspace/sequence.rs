@@ -749,6 +749,22 @@ impl RepositoryWorkspaceEpoch {
         lease: u64,
         limits: RepositoryWorkspaceRetentionLimits,
     ) -> Result<Self, RepositoryWorkspaceError> {
+        let overhead = Self::fresh_metadata(&workspace, lease, limits)?;
+        Ok(Self {
+            active: Some(ActiveWorkspaceEpoch {
+                workspace,
+                lease,
+                limits,
+                transcripts: Arc::from([]),
+                overhead,
+            }),
+        })
+    }
+    fn fresh_metadata(
+        workspace: &NormalizedAbsolutePath,
+        lease: u64,
+        limits: RepositoryWorkspaceRetentionLimits,
+    ) -> Result<usize, RepositoryWorkspaceError> {
         if lease == 0 {
             return Err(RepositoryWorkspaceError::InvalidReservation);
         }
@@ -761,15 +777,130 @@ impl RepositoryWorkspaceEpoch {
         if overhead > limits.metadata_bytes {
             return Err(RepositoryWorkspaceError::RetentionLimit);
         }
-        Ok(Self {
-            active: Some(ActiveWorkspaceEpoch {
-                workspace,
-                lease,
-                limits,
-                transcripts: Arc::from([]),
-                overhead,
-            }),
-        })
+        Ok(overhead)
+    }
+    /// Complete conservative native guard; semantic retention counters remain
+    /// independently checked by every epoch update. The empty Arc header is
+    /// included even before any transcript has been reserved.
+    #[doc(hidden)]
+    pub fn fresh_storage_bytes(
+        workspace: &NormalizedAbsolutePath,
+        lease: u64,
+        limits: RepositoryWorkspaceRetentionLimits,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            Self::fresh_metadata(workspace, lease, limits)?,
+            array_bytes::<RepositoryWorkspaceTranscript>(0)?,
+        )
+    }
+    #[doc(hidden)]
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        let Some(active) = &self.active else {
+            return Ok(std::mem::size_of::<Self>());
+        };
+        let mut bytes = add(
+            active.overhead,
+            array_bytes::<RepositoryWorkspaceTranscript>(0)?,
+        )?;
+        for transcript in active.transcripts.iter() {
+            bytes = add(bytes, transcript.retained_storage_bytes()?)?;
+        }
+        Ok(bytes)
+    }
+    fn reservation_budget(
+        &self,
+        reservation: &RepositoryWorkspaceReservation,
+    ) -> Result<RepositoryWorkspaceRetentionLimits, RepositoryWorkspaceError> {
+        let active = self
+            .active
+            .as_ref()
+            .ok_or(RepositoryWorkspaceError::Revoked)?;
+        if reservation.workspace != active.workspace
+            || reservation.lease != active.lease
+            || reservation.limits != active.limits
+            || active.transcripts.iter().any(|t| {
+                t.reservation.same_slot(reservation)
+                    || t.reservation.instance == reservation.instance
+                    || t.reservation.display_root == reservation.display_root
+            })
+        {
+            return Err(RepositoryWorkspaceError::ForeignReservation);
+        }
+        Ok(self.remaining_budget(None)?.0)
+    }
+    #[doc(hidden)]
+    pub fn reserve_storage_bytes(
+        &self,
+        reservation: &RepositoryWorkspaceReservation,
+        root_mode: u16,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        let budget = self.reservation_budget(reservation)?;
+        let (_, retention) =
+            RepositoryWorkspaceTranscript::initial_retention(reservation, root_mode, budget)?;
+        let (_, total) =
+            self.projected_retention(None, retention, RepositoryWorkspaceMode::Archive)?;
+        Self::retention_storage(total)
+    }
+    fn publish_slot(
+        &self,
+        transcript: &RepositoryWorkspaceTranscript,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        let active = self
+            .active
+            .as_ref()
+            .ok_or(RepositoryWorkspaceError::Revoked)?;
+        let slot = active
+            .transcripts
+            .iter()
+            .position(|old| old.reservation == transcript.reservation)
+            .ok_or(RepositoryWorkspaceError::ForeignReservation)?;
+        let old = &active.transcripts[slot];
+        if transcript.records.len() != add(old.records.len(), 1)? {
+            return Err(RepositoryWorkspaceError::WrongIndex);
+        }
+        if transcript.initial != old.initial {
+            return Err(RepositoryWorkspaceError::ForeignPredecessor);
+        }
+        if transcript.records[..old.records.len()] != *old.records {
+            return Err(RepositoryWorkspaceError::ReplayConflict);
+        }
+        Ok(slot)
+    }
+    /// Native completion may publish exactly one already validated append.
+    /// Matching only the final state cannot replace retained command history.
+    /// This carries immutable facts, never physical or child authority.
+    #[doc(hidden)]
+    pub fn publish_completed(
+        &self,
+        transcript: RepositoryWorkspaceTranscript,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        let slot = self.publish_slot(&transcript)?;
+        self.update(Some(slot), transcript)
+    }
+    #[doc(hidden)]
+    pub fn publish_storage_bytes(
+        &self,
+        transcript: &RepositoryWorkspaceTranscript,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        let slot = self.publish_slot(transcript)?;
+        let (_, total) = self.projected_retention(
+            Some(slot),
+            transcript.retention,
+            transcript.current().mode(),
+        )?;
+        Self::retention_storage(total)
+    }
+    fn retention_storage(
+        total: RepositoryWorkspaceRetention,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            add(
+                total.metadata_bytes,
+                array_bytes::<RepositoryWorkspaceTranscript>(0)?,
+            )?,
+            usize::try_from(total.body_bytes)
+                .map_err(|_| RepositoryWorkspaceError::RetentionLimit)?,
+        )
     }
     pub fn lease(&self) -> Option<u64> {
         self.active.as_ref().map(|a| a.lease)
@@ -782,24 +913,7 @@ impl RepositoryWorkspaceEpoch {
         reservation: Arc<RepositoryWorkspaceReservation>,
         root_mode: u16,
     ) -> Result<Self, RepositoryWorkspaceError> {
-        let active = self
-            .active
-            .as_ref()
-            .ok_or(RepositoryWorkspaceError::Revoked)?;
-        if reservation.workspace != active.workspace
-            || reservation.lease != active.lease
-            || reservation.limits != active.limits
-        {
-            return Err(RepositoryWorkspaceError::ForeignReservation);
-        }
-        if active.transcripts.iter().any(|t| {
-            t.reservation.same_slot(&reservation)
-                || t.reservation.instance == reservation.instance
-                || t.reservation.display_root == reservation.display_root
-        }) {
-            return Err(RepositoryWorkspaceError::ForeignReservation);
-        }
-        let (budget, _) = self.remaining_budget(None)?;
+        let budget = self.reservation_budget(&reservation)?;
         let transcript =
             RepositoryWorkspaceTranscript::new_with_budget(reservation, root_mode, budget)?;
         self.update(None, transcript)
@@ -905,11 +1019,12 @@ impl RepositoryWorkspaceEpoch {
         }
         Ok((budget, process_limit))
     }
-    fn update(
+    fn projected_retention(
         &self,
         index: Option<usize>,
-        transcript: RepositoryWorkspaceTranscript,
-    ) -> Result<Self, RepositoryWorkspaceError> {
+        replacement: RepositoryWorkspaceRetention,
+        mode: RepositoryWorkspaceMode,
+    ) -> Result<(usize, RepositoryWorkspaceRetention), RepositoryWorkspaceError> {
         let active = self
             .active
             .as_ref()
@@ -925,23 +1040,23 @@ impl RepositoryWorkspaceEpoch {
             ..Default::default()
         };
         let mut process_body = 0u64;
-        for item in active
+        for (item, mode) in active
             .transcripts
             .iter()
             .enumerate()
             .filter(|(i, _)| Some(*i) != index)
-            .map(|(_, t)| t)
-            .chain(std::iter::once(&transcript))
+            .map(|(_, t)| (t.retention, t.current().mode()))
+            .chain(std::iter::once((replacement, mode)))
         {
-            total.state_versions = add(total.state_versions, item.retention.state_versions)?;
-            total.metadata_bytes = add(total.metadata_bytes, item.retention.metadata_bytes)?;
+            total.state_versions = add(total.state_versions, item.state_versions)?;
+            total.metadata_bytes = add(total.metadata_bytes, item.metadata_bytes)?;
             total.body_bytes = total
                 .body_bytes
-                .checked_add(item.retention.body_bytes)
+                .checked_add(item.body_bytes)
                 .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
-            if item.current().mode() == RepositoryWorkspaceMode::Process {
+            if mode == RepositoryWorkspaceMode::Process {
                 process_body = process_body
-                    .checked_add(item.retention.body_bytes)
+                    .checked_add(item.body_bytes)
                     .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
             }
         }
@@ -949,6 +1064,20 @@ impl RepositoryWorkspaceEpoch {
         if process_body > REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES {
             return Err(RepositoryWorkspaceError::RetentionLimit);
         }
+        Ok((overhead, total))
+    }
+    fn update(
+        &self,
+        index: Option<usize>,
+        transcript: RepositoryWorkspaceTranscript,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        let (overhead, _) =
+            self.projected_retention(index, transcript.retention, transcript.current().mode())?;
+        let active = self
+            .active
+            .as_ref()
+            .ok_or(RepositoryWorkspaceError::Revoked)?;
+        let count = add(active.transcripts.len(), usize::from(index.is_none()))?;
         let mut transcripts = Vec::with_capacity(count);
         transcripts.extend(active.transcripts.iter().cloned());
         if let Some(index) = index {

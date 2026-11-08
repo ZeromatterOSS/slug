@@ -25,10 +25,14 @@ adds an inactive linear token primitive and fixed Rust three-launch handoff proo
 The [archive-progress receipt](wp1225-archive-progress-acceptance-2026-11-07.json)
 adds verified same-FD archive handoff, pinned source-scope/cumulative decode
 accounting, and shared backing-credit lifetime through root and token owners.
-Execute/common rolling-lease integration and quota transition remain the native
-progress frontier, followed by selected physical-root registry
-and InputImage/native source transport, then
-by original Loading/process activation under the complete gates below. Existing
+The [command/quota receipt](wp1225-quota-command-acceptance-2026-11-07.json)
+adds a consuming whole-command owner, strict epoch publication and first-Execute
+history/tree admission, actual same-backing Process quota shrink and atomic shared
+credit reduction. A static default-deny Linux syscall policy also passes pure
+interpreter checks. These remain inactive: general runner completion back into
+the command, pre-untrusted-exec setup, full confinement and lifecycle are the
+next frontier, followed by selected physical-root registry and InputImage/native
+source transport, then original Loading/process activation under the gates below. Existing
 production routes remain replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)

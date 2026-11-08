@@ -47,10 +47,12 @@ Inactive consuming native progress and actual complete credited snapshots now
 cover ordered File/Template/Read/Exists/Delete. An inactive linear rolling-lease
 primitive also has fixed Rust three-launch handoff evidence. Verified archive
 handoff and shared root/token backing credits are integrated in the inactive
-owner. Execute, common lease integration/quota transition, selected root registry and source/
-transport integration remain the implementation frontier under the selected design.
-Production activation still requires full confinement, lifecycle, archive quota,
-actual-original and public integration gates; see the
+owner. Consuming command/epoch admission and actual same-backing Process quota
+shrink are now accepted inactive, alongside a pure static syscall policy.
+General runner completion, full confinement/lifecycle, selected root registry and
+source/transport integration remain the implementation frontier. Production
+activation still requires full archive-envelope, actual-original and public
+integration gates; see the
 [current packet](./slug-v2-subplans/current-packet.md).
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,

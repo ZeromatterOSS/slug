@@ -1353,3 +1353,152 @@ fn native_storage_forecast_refuses_foreign_replay_and_invalid_effects() {
         Err(RepositoryWorkspaceError::WrongIndex)
     );
 }
+
+#[test]
+fn native_epoch_forecasts_cover_fresh_reservation_and_exact_completed_append() {
+    let reservation = reservation_with(7, 11, limits());
+    let fresh = RepositoryWorkspaceEpoch::fresh_storage_bytes(reservation.workspace(), 7, limits())
+        .unwrap();
+    let epoch =
+        RepositoryWorkspaceEpoch::fresh(reservation.workspace().clone(), 7, limits()).unwrap();
+    assert!(fresh >= epoch.retained_storage_bytes().unwrap());
+    let reserved = epoch.reserve_storage_bytes(&reservation, 0o755).unwrap();
+    let epoch = epoch.reserve(reservation, 0o755).unwrap();
+    assert!(reserved >= epoch.retained_storage_bytes().unwrap());
+    let next = write(&epoch.transcripts().unwrap()[0], b"actual").unwrap();
+    let forecast = epoch.publish_storage_bytes(&next).unwrap();
+    let epoch = epoch.publish_completed(next).unwrap();
+    assert!(forecast >= epoch.retained_storage_bytes().unwrap());
+    assert_eq!(
+        epoch.publish_completed(epoch.transcripts().unwrap()[0].clone()),
+        Err(RepositoryWorkspaceError::WrongIndex)
+    );
+    assert_eq!(
+        RepositoryWorkspaceEpoch::revoked().publish_storage_bytes(&epoch.transcripts().unwrap()[0]),
+        Err(RepositoryWorkspaceError::Revoked)
+    );
+}
+
+#[test]
+fn native_epoch_publication_rejects_equal_final_state_with_rewritten_or_skipped_history() {
+    let initial = transcript();
+    let first = write(&initial, b"original prefix").unwrap();
+    let epoch =
+        RepositoryWorkspaceEpoch::fresh(first.reservation().workspace().clone(), 7, limits())
+            .unwrap()
+            .reserve(first.reservation().clone(), 0o755)
+            .unwrap()
+            .publish_completed(first.clone())
+            .unwrap();
+    let alternate = write(
+        &write(&initial, b"foreign prefix").unwrap(),
+        b"same last state",
+    )
+    .unwrap();
+    let correct = write(&first, b"same last state").unwrap();
+    assert_eq!(alternate.current(), correct.current());
+    assert_eq!(
+        epoch.publish_storage_bytes(&alternate),
+        Err(RepositoryWorkspaceError::ReplayConflict)
+    );
+    assert_eq!(
+        epoch.publish_completed(alternate),
+        Err(RepositoryWorkspaceError::ReplayConflict)
+    );
+    let skipped = write(&correct, b"third").unwrap();
+    assert_eq!(
+        epoch.publish_completed(skipped),
+        Err(RepositoryWorkspaceError::WrongIndex)
+    );
+    let foreign =
+        RepositoryWorkspaceTranscript::new(reservation_with(8, 12, limits()), 0o755).unwrap();
+    assert_eq!(
+        epoch.publish_completed(write(&foreign, b"same last state").unwrap()),
+        Err(RepositoryWorkspaceError::ForeignReservation)
+    );
+    assert!(epoch.publish_completed(correct).is_ok());
+}
+
+#[test]
+fn native_epoch_publication_cannot_bypass_other_process_root_history_admission() {
+    let a = reservation_with(7, 11, limits());
+    let b = Arc::new(
+        RepositoryWorkspaceReservation::new(
+            a.workspace().clone(),
+            a.owner().clone(),
+            CanonicalRepoName::new("owner+other").unwrap(),
+            4,
+            NormalizedAbsolutePath::new("/logical/other").unwrap(),
+            PathObservationInstanceId::new(12),
+            7,
+            limits(),
+        )
+        .unwrap(),
+    );
+    let epoch = RepositoryWorkspaceEpoch::fresh(a.workspace().clone(), 7, limits())
+        .unwrap()
+        .reserve(a.clone(), 0o755)
+        .unwrap()
+        .reserve(b.clone(), 0o755)
+        .unwrap();
+    let process = |reservation: &RepositoryWorkspaceReservation| {
+        RepositoryWorkspaceOperation::Execute(
+            RepositoryWorkspaceExecute::new(
+                Arc::from([RepositoryWorkspaceArgument::String("generic-tool".into())]),
+                RepositoryEnvironmentSnapshot::empty(),
+                SmallMap::new(),
+                600,
+                true,
+                HostRepositoryLabelPathValue::new(
+                    reservation.display_root().clone(),
+                    PathObservationNamespace::Materialization(reservation.instance()),
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        )
+    };
+    let a0 = &epoch.transcripts().unwrap()[0];
+    let a1 = a0
+        .complete(
+            a0.request(process(&a)).unwrap(),
+            RepositoryWorkspaceResult::Execute(RepositoryExecuteResult::new(
+                0,
+                Arc::from([]),
+                Arc::from([]),
+            )),
+            RepositoryWorkspaceMode::Process,
+            vec![root(), file("out", Arc::from(vec![b'a'; 40 * 1024 * 1024]))],
+        )
+        .unwrap();
+    let epoch = epoch.publish_completed(a1).unwrap();
+    let b0 = &epoch.transcripts().unwrap()[1];
+    let b1 = write(b0, &vec![b'b'; 40 * 1024 * 1024]).unwrap();
+    let epoch = epoch.publish_completed(b1).unwrap();
+    assert_eq!(
+        epoch.request_at(&b, 1, process(&b)),
+        Err(RepositoryWorkspaceError::RetentionLimit)
+    );
+    let b1 = &epoch.transcripts().unwrap()[1];
+    let b2 = b1
+        .complete(
+            b1.request(process(&b)).unwrap(),
+            RepositoryWorkspaceResult::Execute(RepositoryExecuteResult::new(
+                0,
+                Arc::from([]),
+                Arc::from([]),
+            )),
+            RepositoryWorkspaceMode::Process,
+            b1.current().entries().to_vec(),
+        )
+        .unwrap();
+    // A standalone transcript is valid; only the current command knows about A.
+    assert_eq!(
+        epoch.publish_storage_bytes(&b2),
+        Err(RepositoryWorkspaceError::RetentionLimit)
+    );
+    assert_eq!(
+        epoch.publish_completed(b2),
+        Err(RepositoryWorkspaceError::RetentionLimit)
+    );
+}

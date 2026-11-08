@@ -248,3 +248,6 @@ mod tests;
 #[cfg(test)]
 #[path = "repository_workspace_progress/archive_tests.rs"]
 mod archive_tests;
+
+#[path = "repository_workspace_command.rs"]
+pub(super) mod command;

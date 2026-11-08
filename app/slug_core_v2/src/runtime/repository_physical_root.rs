@@ -67,6 +67,15 @@ pub(in crate::runtime) enum PhysicalRootError {
     Inactive,
     Observation(RootedObservationError),
 }
+impl PhysicalRootError {
+    pub(super) fn mount(error: mount_lease::MountLeaseError) -> Self {
+        match error {
+            mount_lease::MountLeaseError::Root(error) => error,
+            mount_lease::MountLeaseError::Io(error) => Self::Io(error),
+            _ => Self::Backing,
+        }
+    }
+}
 impl From<io::Error> for PhysicalRootError {
     fn from(e: io::Error) -> Self {
         Self::Io(e)

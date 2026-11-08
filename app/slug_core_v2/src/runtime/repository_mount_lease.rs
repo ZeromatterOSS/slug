@@ -22,6 +22,9 @@ use slug_bzlmod_v2::RepositoryWorkspaceState;
 
 use super::*;
 
+#[path = "repository_quota_transition.rs"]
+pub(super) mod quota;
+
 const NS_GET_USERNS: libc::c_ulong = 0xb701;
 const NS_GET_NSTYPE: libc::c_ulong = 0xb703;
 const CLONE: u32 = 1;
@@ -289,6 +292,52 @@ pub(super) fn attach_in_owning_namespace(
         file: root,
         _credit: retained,
     })
+}
+
+/// Never-used archive setup authority. No execution index or fabricated
+/// process record exists until the whole command mints first-execute admission.
+#[derive(Debug)]
+pub(super) struct InitialRepositoryMount {
+    clone: AttachedMountClone,
+}
+impl InitialRepositoryMount {
+    pub(super) fn bind(
+        root: &RepositoryPhysicalRootBuilder,
+        clone: AttachedMountClone,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, MountLeaseError> {
+        let initial = Self { clone };
+        initial.check_binding(root, scope, active)?;
+        Ok(initial)
+    }
+    pub(super) fn check_binding(
+        &self,
+        root: &RepositoryPhysicalRootBuilder,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), MountLeaseError> {
+        check(scope, active)?;
+        if root.mode != RepositoryWorkspaceMode::Archive
+            || self.clone.attached != root.identity
+            || identity(&root.file)? != root.identity
+            || !same_backing(self.clone.detached, root.identity)
+            || !Arc::ptr_eq(&self.clone.resources, &root.resources)
+            || !self
+                .clone
+                .backing
+                .as_ref()
+                .is_some_and(|backing| Arc::ptr_eq(backing, &root.backing))
+        {
+            return Err(MountLeaseError::Request);
+        }
+        root.backing
+            .matches(&root.resources, RepositoryWorkspaceMode::Archive)?;
+        if backing_identity(&root.file, RepositoryWorkspaceMode::Archive)? != root.identity {
+            return Err(MountLeaseError::AttachedRoot);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

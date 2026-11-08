@@ -137,17 +137,129 @@ pub(super) fn launch(
     resources: &Arc<RepositoryRootResources>,
     scope: &Arc<SourceServiceScope>,
 ) -> io::Result<(Receipt, Option<MountInFlight>)> {
+    launch_inner(
+        phase,
+        display,
+        attempt,
+        root,
+        resources,
+        scope,
+        RepositoryWorkspaceMode::Process,
+        None,
+        QuotaFault::None,
+    )?
+    .ok_or_else(|| fail("missing ordinary rolling receipt"))
+}
+
+pub(super) fn archive_seed(
+    display: &Path,
+    resources: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+) -> io::Result<Receipt> {
+    launch_inner(
+        0,
+        display,
+        None,
+        None,
+        resources,
+        scope,
+        RepositoryWorkspaceMode::Archive,
+        None,
+        QuotaFault::None,
+    )?
+    .map(|(receipt, _)| receipt)
+    .ok_or_else(|| fail("missing archive seed"))
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum QuotaFault {
+    None,
+    AfterVerifiedBeforeAck,
+}
+pub(super) fn quota_transition(
+    display: &Path,
+    transition: &mut quota::ProcessQuotaTransition,
+    resources: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+) -> io::Result<()> {
+    quota_transition_with_fault(display, transition, resources, scope, QuotaFault::None)
+}
+pub(super) fn quota_transition_fail_after_commit(
+    display: &Path,
+    transition: &mut quota::ProcessQuotaTransition,
+    resources: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+) -> io::Result<()> {
+    quota_transition_with_fault(
+        display,
+        transition,
+        resources,
+        scope,
+        QuotaFault::AfterVerifiedBeforeAck,
+    )
+}
+fn quota_transition_with_fault(
+    display: &Path,
+    transition: &mut quota::ProcessQuotaTransition,
+    resources: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+    fault: QuotaFault,
+) -> io::Result<()> {
+    // launch_inner owns Reap. All its exits have killed/reaped the helper before
+    // this wrapper closes mount authority or permits disposal of the command.
+    let result = launch_inner(
+        1,
+        display,
+        None,
+        None,
+        resources,
+        scope,
+        RepositoryWorkspaceMode::Archive,
+        Some(&mut *transition),
+        fault,
+    )
+    .and_then(|receipt| {
+        if receipt.is_some() {
+            Err(fail("unexpected transition receipt"))
+        } else {
+            Ok(())
+        }
+    });
+    if result.is_err() {
+        transition.poison();
+    }
+    result
+}
+#[allow(clippy::too_many_arguments)]
+fn launch_inner(
+    phase: usize,
+    display: &Path,
+    mut attempt: Option<RepositoryMountAttempt>,
+    root: Option<&RepositoryPhysicalRootBuilder>,
+    resources: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+    bootstrap_mode: RepositoryWorkspaceMode,
+    mut transition: Option<&mut quota::ProcessQuotaTransition>,
+    fault: QuotaFault,
+) -> io::Result<Option<(Receipt, Option<MountInFlight>)>> {
     scope.check().map_err(|e| fail(format!("{e:?}")))?;
     // The root may be created only after its full backing allowance is paid.
     // Later launches retain the exact guard rather than reserving quota again.
-    let backing = if let Some(root) = root {
+    let backing = if let Some(transition) = transition.as_ref() {
+        transition.builder().backing.clone()
+    } else if let Some(root) = root {
         root.backing.clone()
     } else {
-        RepositoryRootBacking::new(resources, RepositoryWorkspaceMode::Process)
-            .map_err(|e| fail(format!("{e:?}")))?
+        RepositoryRootBacking::new(resources, bootstrap_mode).map_err(|e| fail(format!("{e:?}")))?
     };
     backing
-        .matches(resources, RepositoryWorkspaceMode::Process)
+        .matches(
+            resources,
+            if transition.is_some() || root.is_none() {
+                bootstrap_mode
+            } else {
+                RepositoryWorkspaceMode::Process
+            },
+        )
         .map_err(|e| fail(format!("{e:?}")))?;
     let binary = std::env::current_exe()?;
     {
@@ -184,8 +296,19 @@ pub(super) fn launch(
     File::open("/dev/urandom")?.read_exact(&mut nonce)?;
     let text = nonce.iter().map(|v| format!("{v:02x}")).collect::<String>();
     let mut command = Command::new(BWRAP);
-    if let Some(attempt) = attempt.as_ref() {
-        let owner = attempt.owning_user_namespace().as_raw_fd();
+    let namespace = if let Some(transition) = transition.as_ref() {
+        Some(
+            transition
+                .namespace()
+                .map_err(|e| fail(format!("{e:?}")))?
+                .as_raw_fd(),
+        )
+    } else {
+        attempt
+            .as_ref()
+            .map(|attempt| attempt.owning_user_namespace().as_raw_fd())
+    };
+    if let Some(owner) = namespace {
         command.args(["--userns", &owner.to_string()]);
         unsafe {
             command.pre_exec(move || {
@@ -199,6 +322,17 @@ pub(super) fn launch(
     } else {
         command.arg("--unshare-user");
     }
+    let sequence = if transition.is_some() {
+        "archive-transition"
+    } else if bootstrap_mode == RepositoryWorkspaceMode::Archive {
+        "archive-seed"
+    } else {
+        "process"
+    };
+    let request_index = transition
+        .as_ref()
+        .map_or(phase, |transition| transition.request().index())
+        .to_string();
     command
         .args([
             "--unshare-pid",
@@ -225,6 +359,12 @@ pub(super) fn launch(
             "/dev",
         ])
         .args([
+            "--setenv",
+            "SLUG_WP425_MOUNT_SEQUENCE",
+            sequence,
+            "--setenv",
+            "SLUG_WP425_MOUNT_INDEX",
+            &request_index,
             "--setenv",
             "SLUG_WP425_MOUNT_FIXTURE",
             "v1",
@@ -263,6 +403,7 @@ pub(super) fn launch(
     let mut end = false;
     let mut receipt = None;
     let mut inflight = None;
+    let mut quota_wire = None;
     loop {
         scope.check().map_err(|e| fail(format!("{e:?}")))?;
         let stderr_end = drain(&mut stderr, &mut err, STDERR_BYTES)?;
@@ -289,7 +430,11 @@ pub(super) fn launch(
                     return Err(fail("bad READY"));
                 }
                 ready = true;
-                if phase > 0 {
+                if let Some(transition) = transition.as_deref_mut() {
+                    transition
+                        .transfer(socket.as_fd(), &nonce, &|| true)
+                        .map_err(|e| fail(format!("{e:?}")))?;
+                } else if phase > 0 {
                     let attempt = attempt
                         .take()
                         .ok_or_else(|| fail("missing linear incoming lease"))?;
@@ -305,6 +450,33 @@ pub(super) fn launch(
                             .map_err(|e| fail(format!("{e:?}")))?,
                     );
                 }
+                continue;
+            }
+            if bytes.len() == FRAME && bytes[9] == 3 {
+                if transition.is_none() || !ready || quota_wire.is_some() || !fds.is_empty() {
+                    return Err(fail("unexpected quota facts"));
+                }
+                let mut words = [0u64; 8];
+                for (i, value) in words.iter_mut().enumerate() {
+                    *value = u64::from_le_bytes(bytes[34 + i * 8..42 + i * 8].try_into().unwrap());
+                }
+                if bytes != frame(3, phase, &nonce, words) {
+                    return Err(fail("foreign quota facts"));
+                }
+                quota_wire = Some((
+                    quota::QuotaFacts {
+                        bytes: words[0],
+                        inodes: words[1],
+                        allocated: words[2],
+                        used_inodes: words[3],
+                    },
+                    quota::QuotaFacts {
+                        bytes: words[4],
+                        inodes: words[5],
+                        allocated: words[6],
+                        used_inodes: words[7],
+                    },
+                ));
                 continue;
             }
             if bytes.len() != FRAME || !ready || receipt.is_some() || fds.len() != 3 {
@@ -351,7 +523,26 @@ pub(super) fn launch(
                 backing: Some(backing.clone()),
                 credit,
             };
-            receipt = Some((attached_file, successor));
+            if let Some(transition) = transition.as_deref_mut() {
+                transition
+                    .verify_and_commit(
+                        &attached_file,
+                        successor,
+                        quota_wire
+                            .take()
+                            .ok_or_else(|| fail("missing quota facts"))?,
+                        &|| true,
+                    )
+                    .map_err(|e| fail(format!("{e:?}")))?;
+                if fault == QuotaFault::AfterVerifiedBeforeAck {
+                    return Err(fail(
+                        "injected failure after verified quota commit before ACK",
+                    ));
+                }
+                receipt = Some((attached_file, None));
+            } else {
+                receipt = Some((attached_file, Some(successor)));
+            }
             send(socket.as_raw_fd(), &frame(2, phase, &nonce, [0; 8]), &[])?;
         }
         if let Some(status) = child.0.try_wait()? {
@@ -363,15 +554,21 @@ pub(super) fn launch(
                     )));
                 }
                 let (root, successor) = receipt.ok_or_else(|| fail("no pre-payload successor"))?;
-                return Ok((
-                    Receipt {
-                        root,
-                        successor,
-                        backing,
-                        _receipt: receive_credit,
-                    },
-                    inflight,
-                ));
+                if let Some(successor) = successor {
+                    return Ok(Some((
+                        Receipt {
+                            root,
+                            successor,
+                            backing,
+                            _receipt: receive_credit,
+                        },
+                        inflight,
+                    )));
+                }
+                // Child is actually reaped before borrowed transition can leave
+                // this driver. Every earlier error drops Reap before its owner.
+                drop(root);
+                return Ok(None);
             }
         }
         if Instant::now() >= deadline {
@@ -391,6 +588,15 @@ fn trusted_rolling_mount_helper() {
         std::env::var("SLUG_WP425_MOUNT_FIXTURE").as_deref(),
         Ok("v1")
     );
+    let sequence = std::env::var("SLUG_WP425_MOUNT_SEQUENCE").unwrap();
+    assert!(matches!(
+        sequence.as_str(),
+        "process" | "archive-seed" | "archive-transition"
+    ));
+    let request_index: u64 = std::env::var("SLUG_WP425_MOUNT_INDEX")
+        .unwrap()
+        .parse()
+        .unwrap();
     let phase: usize = std::env::var("SLUG_WP425_MOUNT_PHASE")
         .unwrap()
         .parse()
@@ -435,7 +641,13 @@ fn trusted_rolling_mount_helper() {
                     display.as_ptr(),
                     c"tmpfs".as_ptr(),
                     libc::MS_NOSUID | libc::MS_NODEV,
-                    c"size=67108864,nr_inodes=8192,mode=0755".as_ptr().cast(),
+                    if sequence == "archive-seed" {
+                        c"size=2147483648,nr_inodes=262144,mode=0755"
+                            .as_ptr()
+                            .cast()
+                    } else {
+                        c"size=67108864,nr_inodes=8192,mode=0755".as_ptr().cast()
+                    },
                 )
             },
             0,
@@ -459,7 +671,7 @@ fn trusted_rolling_mount_helper() {
         assert_eq!(&bytes[9..25], &nonce);
         assert_eq!(
             u64::from_le_bytes(bytes[25..33].try_into().unwrap()),
-            phase as u64
+            request_index
         );
         assert_eq!(fds.len(), 3);
         let owner = File::from(fds.pop().unwrap());
@@ -483,6 +695,37 @@ fn trusted_rolling_mount_helper() {
     let root = initial
         .as_ref()
         .unwrap_or_else(|| &attached.as_ref().unwrap().file);
+    if sequence == "archive-transition" {
+        assert_eq!(phase, 1);
+        let (before, after) = quota::shrink_attached(
+            attached.as_ref().unwrap(),
+            &display,
+            &resources,
+            &scope,
+            &|| true,
+        )
+        .unwrap();
+        send(
+            1,
+            &frame(
+                3,
+                phase,
+                &nonce,
+                [
+                    before.bytes,
+                    before.inodes,
+                    before.allocated,
+                    before.used_inodes,
+                    after.bytes,
+                    after.inodes,
+                    after.allocated,
+                    after.used_inodes,
+                ],
+            ),
+            &[],
+        )
+        .unwrap();
+    }
     let successor = clone_from_attached_root(root, &display, &resources, &scope, &|| true).unwrap();
     let a = successor.attached;
     let d = successor.detached;
@@ -534,6 +777,10 @@ fn trusted_rolling_mount_helper() {
     retire_capabilities();
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
+    if sequence == "archive-seed" {
+        assert_eq!(phase, 0);
+        return;
+    }
     let _output_credit = resources.reserve(1024, 1, 0).unwrap();
     let mut output = std::fs::OpenOptions::new()
         .write(true)

@@ -222,3 +222,40 @@ impl RepositoryRootBacking {
         Ok(())
     }
 }
+
+impl RepositoryRootBacking {
+    /// One-way atomic accounting for a physically verified SAME backing. No
+    /// bytes/FD credit is refunded, no IO or DICE compute occurs under locks.
+    pub(super) fn shrink_to_process(
+        &self,
+        proof: &super::mount_lease::quota::VerifiedProcessQuota,
+    ) -> Result<(), PhysicalRootError> {
+        let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        let (identity, reservation) = state.binding.as_ref().ok_or(PhysicalRootError::Backing)?;
+        if state.mode != RepositoryWorkspaceMode::Archive
+            || state.credit.slots.backing != ARCHIVE_BYTES
+            || !proof.matches_binding(self, *identity, reservation)
+        {
+            return Err(PhysicalRootError::Backing);
+        }
+        let delta = ARCHIVE_BYTES
+            .checked_sub(PROCESS_BYTES)
+            .ok_or(PhysicalRootError::Resource)?;
+        let mut usage = self
+            .resources
+            .usage
+            .lock()
+            .map_err(|_| PhysicalRootError::Resource)?;
+        if usage.backing < state.credit.slots.backing {
+            return Err(PhysicalRootError::Resource);
+        }
+        let remaining = usage
+            .backing
+            .checked_sub(delta)
+            .ok_or(PhysicalRootError::Resource)?;
+        usage.backing = remaining;
+        state.credit.slots.backing = PROCESS_BYTES;
+        state.mode = RepositoryWorkspaceMode::Process;
+        Ok(())
+    }
+}
