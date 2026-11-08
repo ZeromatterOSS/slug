@@ -82,6 +82,7 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::repository_rule_context::invoke_repository_rule_with_host_paths;
 
 mod general;
+mod source_snapshot;
 
 struct RepositoryEffectLimits;
 // Pinned rules_cc 0.2.17 unix_cc_configure.bzl:68-87,332-417 can probe
@@ -980,6 +981,20 @@ async fn resolve_repository_label_path(
         }
     };
 
+    let (snapshot_path, observations) = source_snapshot::path(
+        ctx,
+        key,
+        certificate,
+        &address,
+        route.as_ref(),
+        mode,
+        observations,
+    )
+    .await?;
+    if let Some(path) = snapshot_path {
+        return Ok((path, observations));
+    }
+
     match mode {
         EffectMode::Legacy => {
             resolve_legacy_repository_label_path(
@@ -1167,6 +1182,27 @@ async fn resolve_repository_source(
     mode: EffectMode,
     observations: PathObservationEpoch,
 ) -> Result<(Arc<[u8]>, PathObservationEpoch), EffectDriver> {
+    if general::fence(ctx, key).await?.is_some() {
+        let (path, observations) = resolve_repository_label_path(
+            ctx,
+            key,
+            certificate,
+            address.clone(),
+            mode,
+            observations,
+        )
+        .await?;
+        return source_snapshot::read(
+            ctx,
+            key,
+            certificate,
+            address.repo(),
+            path,
+            mode,
+            observations,
+        )
+        .await;
+    }
     if address.repo().is_root() {
         return Err(repository_source_error(
             certificate,
@@ -2055,7 +2091,24 @@ async fn compute_effect(
             Ok(epoch) => epoch,
             Err(outcome) => return outcome,
         };
-        match input.with_workspace(epoch, demand, selected) {
+        let sources = match ctx
+            .compute(&slug_bzlmod_v2::RepositorySourceSnapshotEpochKey::new(
+                key.workspace.dupe(),
+            ))
+            .await
+        {
+            Ok(epoch) => epoch,
+            Err(error) => {
+                return complete_effect_error(
+                    host_input_error(&certificate, key.ordinal, error.to_string()),
+                    observations,
+                );
+            }
+        };
+        match input
+            .with_workspace(epoch, demand, selected)
+            .map(|input| input.with_source_snapshots(sources))
+        {
             Ok(input) => input,
             Err(error) => {
                 return complete_effect_error(

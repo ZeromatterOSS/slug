@@ -25,6 +25,10 @@ use super::repository_io::source_service::SourceCounter;
 use super::repository_io::source_service::SourceServiceScope;
 use super::repository_io::source_service::{self};
 
+#[path = "repository_archive_realize/destination.rs"]
+mod destination;
+use destination::Destination;
+
 const BLOCK: usize = 512;
 const DECOMPRESSED_LIMIT: u64 = 256 * 1024 * 1024;
 const PAYLOAD_LIMIT: u64 = 256 * 1024 * 1024;
@@ -139,6 +143,33 @@ fn framed_usize(digest: &mut Sha256, value: usize) {
 fn extract(
     capture: &File,
     root: &Path,
+    strip_prefix: Option<&str>,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
+    extract_to(
+        capture,
+        &destination::PathDestination(root),
+        strip_prefix,
+        active,
+        scope,
+    )
+}
+
+#[cfg(target_os = "linux")]
+pub(super) fn extract_selected_bcr_at(
+    capture: &File,
+    root: &super::repository_root_io::RootIo<'_>,
+    strip_prefix: Option<&str>,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
+    extract_to(capture, root, strip_prefix, active, scope)
+}
+
+fn extract_to(
+    capture: &File,
+    root: &impl Destination,
     strip_prefix: Option<&str>,
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
@@ -303,39 +334,25 @@ fn extract(
         };
         admit_namespace(&namespace, &path, kind)?;
         namespace.insert(path.clone(), kind);
-        let destination = root.join(&path);
         match kind {
             EntryKind::Directory => {
                 if size != 0 {
                     return Err(materialization("selected BCR directory has a payload"));
                 }
-                std::fs::create_dir_all(&destination).map_err(|error| {
-                    materialization(format!("creating selected BCR directory {path}: {error}"))
-                })?;
-                set_mode(&destination, 0o755)?;
+                root.directory(&path)?;
             }
             EntryKind::Regular => {
                 if size > ENTRY_LIMIT {
                     return Err(materialization("selected BCR entry exceeds size limit"));
                 }
                 payload = checked_payload(payload, size)?;
-                if let Some(parent) = destination.parent() {
-                    std::fs::create_dir_all(parent).map_err(|error| {
-                        materialization(format!("creating selected BCR parent for {path}: {error}"))
-                    })?;
-                }
-                let mut output = OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&destination)
-                    .map_err(|error| {
-                        materialization(format!("creating selected BCR file {path}: {error}"))
-                    })?;
+                root.parent(&path)?;
+                let mut output = root.regular(&path)?;
                 tar.copy_exact(size, &mut output, &path)?;
                 output.flush().map_err(|error| {
                     materialization(format!("flushing selected BCR file {path}: {error}"))
                 })?;
-                set_mode(&destination, mode | 0o400)?;
+                root.mode(&path, &output, mode | 0o400)?;
                 let mtime = header
                     .mtime()
                     .map_err(|error| materialization(format!("reading tar mtime: {error}")))?;
@@ -351,13 +368,7 @@ fn extract(
             EntryKind::Symlink => {
                 let target = validate_path_text(&header.link_name_bytes().unwrap_or_default())?;
                 let resolved = relative_link_destination(&path, &target)?;
-                if let Some(parent) = destination.parent() {
-                    std::fs::create_dir_all(parent).map_err(|error| {
-                        materialization(format!(
-                            "creating selected BCR link parent {path}: {error}"
-                        ))
-                    })?;
-                }
+                root.parent(&path)?;
                 symlinks.push((path, target, resolved));
             }
         }
@@ -433,7 +444,7 @@ fn relative_link_destination(
 }
 
 fn install_symlinks(
-    root: &Path,
+    root: &impl Destination,
     namespace: &BTreeMap<String, EntryKind>,
     symlinks: &[(String, String, String)],
     active: &dyn Fn() -> bool,
@@ -449,19 +460,7 @@ fn install_symlinks(
         if !active() {
             return Err(materialization("repository session is no longer active"));
         }
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(target, root.join(path)).map_err(|error| {
-            materialization(format!(
-                "creating selected BCR symbolic link {path}: {error}"
-            ))
-        })?;
-        #[cfg(not(unix))]
-        {
-            let _ = (root, path, target);
-            return Err(materialization(
-                "selected BCR symbolic links are unsupported on this platform",
-            ));
-        }
+        root.link(path, target)?;
     }
     Ok(())
 }

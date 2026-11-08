@@ -48,9 +48,12 @@ same-root adoption across command-fresh cquery requests, with ordered binary
 output and cancellation retirement. Its bounded fixture evidence is linked from
 the current packet. Trusted internal Native configuration now owns fresh command
 scopes while preserving the permanent Host/Registry owner and original data
-deadlines. Selected-source bridges and profile removal are the frontier. Full
-archive-envelope, public Rust,
-original-route physical CAS/runfiles and matching-command memory gates still
+deadlines. The inactive selected-source bridge now captures Workspace, Local,
+selected BCR tar.gz and pinned Builtin sources through ordinary repository
+Starlark, with fresh command ownership and read-only digest manifests.
+Original-route physical CAS/runfiles and profile removal are the frontier. Full
+archive-envelope, derived Source Path operations, public Rust and
+matching-command memory gates still
 precede production activation.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,

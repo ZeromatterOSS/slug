@@ -1,5 +1,9 @@
 use super::*;
 
+#[cfg(target_os = "linux")]
+#[path = "../repository_archive_patch/rooted_tests.rs"]
+mod rooted;
+
 fn stream_scope(written: u64) -> Arc<SourceServiceScope> {
     use std::time::Duration;
     use std::time::Instant;

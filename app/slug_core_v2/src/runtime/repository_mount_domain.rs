@@ -22,6 +22,49 @@ impl std::fmt::Debug for NativeMountDomain {
     }
 }
 impl NativeMountDomain {
+    pub(in crate::runtime::repository_physical_root) fn from_source(
+        reservation: &slug_bzlmod_v2::RepositorySourceSnapshotReservation,
+        clone: &AttachedMountClone,
+        resources: &Arc<RepositoryRootResources>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Arc<Self>, MountLeaseError> {
+        check(scope, active)?;
+        if reservation.workspace() != scope.workspace()
+            || reservation.lease() == 0
+            || !Arc::ptr_eq(&clone.resources, resources)
+        {
+            return Err(MountLeaseError::Request);
+        }
+        let credit = resources.reserve(arc_bytes::<Self>()?, 1, 0)?;
+        let namespace = duplicate_namespace(&clone.owner)?;
+        let owner = Arc::new(Self {
+            namespace,
+            identity: clone.namespace,
+            lease: reservation.lease(),
+            scope: scope.clone(),
+            resources: resources.clone(),
+            _credit: credit,
+        });
+        owner.check_clone(clone, scope, active)?;
+        Ok(owner)
+    }
+    pub(in crate::runtime::repository_physical_root) fn check_source(
+        &self,
+        reservation: &slug_bzlmod_v2::RepositorySourceSnapshotReservation,
+        resources: &Arc<RepositoryRootResources>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), MountLeaseError> {
+        self.check_scope(scope, active)?;
+        if reservation.workspace() != self.scope.workspace()
+            || reservation.lease() != self.lease
+            || !Arc::ptr_eq(resources, &self.resources)
+        {
+            return Err(MountLeaseError::Request);
+        }
+        Ok(())
+    }
     /// Only a verified, reaped bootstrap's seed may establish the domain. The
     /// consuming command calls this after its bootstrap lifecycle has settled.
     pub(in crate::runtime::repository_physical_root) fn from_initial(

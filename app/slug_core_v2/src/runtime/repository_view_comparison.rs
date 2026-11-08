@@ -3,20 +3,26 @@
 use std::collections::HashMap;
 
 use slug_bzlmod_v2::RepositoryMaterializationRequest;
+use slug_bzlmod_v2::RepositorySourceSnapshotState;
 use slug_bzlmod_v2::RepositoryWorkspaceNode;
+use slug_bzlmod_v2::RepositoryWorkspaceReadViewStateRef;
 use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
 use starlark_map::StarlarkHasherBuilder;
 
 use super::*;
 
 const MAX_PAIRS: usize = 131_072;
-type StateKey = (usize, usize);
+type StateKey = (u8, usize, usize);
+enum ComparedState {
+    Workspace {
+        _state: Arc<RepositoryWorkspaceState>,
+    },
+    Source {
+        _state: Arc<RepositorySourceSnapshotState>,
+    },
+}
 type BodyKey = (usize, usize, usize, usize);
-type StateValue = (
-    Arc<RepositoryWorkspaceState>,
-    Arc<RepositoryWorkspaceState>,
-    bool,
-);
+type StateValue = (ComparedState, ComparedState, bool);
 type BodyValue = (Arc<[u8]>, Arc<[u8]>, bool);
 type Memo<K, V> = HashMap<K, V, StarlarkHasherBuilder>;
 
@@ -163,7 +169,7 @@ impl<'a> ViewComparison<'a> {
         if Arc::ptr_eq(left, right) {
             return Ok(true);
         }
-        let key = (Arc::as_ptr(left) as usize, Arc::as_ptr(right) as usize);
+        let key = (0, Arc::as_ptr(left) as usize, Arc::as_ptr(right) as usize);
         if let Some((_, _, equal)) = self.states.get(&key) {
             return Ok(*equal);
         }
@@ -194,9 +200,79 @@ impl<'a> ViewComparison<'a> {
             }
         }
         self.check()?;
-        self.states
-            .insert(key, (left.clone(), right.clone(), equal));
+        self.states.insert(
+            key,
+            (
+                ComparedState::Workspace {
+                    _state: left.clone(),
+                },
+                ComparedState::Workspace {
+                    _state: right.clone(),
+                },
+                equal,
+            ),
+        );
         Ok(equal)
+    }
+    /// Source files already use the explicit SHA256/size content-identity
+    /// domain. Every tree field and full source reservation still compares.
+    pub(in crate::runtime) fn source_state_equal(
+        &mut self,
+        left: &Arc<RepositorySourceSnapshotState>,
+        right: &Arc<RepositorySourceSnapshotState>,
+    ) -> Result<bool, PhysicalRootError> {
+        self.check()?;
+        if Arc::ptr_eq(left, right) {
+            return Ok(true);
+        }
+        let key = (1, Arc::as_ptr(left) as usize, Arc::as_ptr(right) as usize);
+        if let Some((_, _, equal)) = self.states.get(&key) {
+            return Ok(*equal);
+        }
+        self.state_slot()?;
+        let mut equal = left.reservation() == right.reservation()
+            && left.entries().len() == right.entries().len();
+        if equal {
+            for (a, b) in left.entries().iter().zip(right.entries()) {
+                self.check()?;
+                if a != b {
+                    equal = false;
+                    break;
+                }
+            }
+        }
+        self.check()?;
+        self.states.insert(
+            key,
+            (
+                ComparedState::Source {
+                    _state: left.clone(),
+                },
+                ComparedState::Source {
+                    _state: right.clone(),
+                },
+                equal,
+            ),
+        );
+        Ok(equal)
+    }
+    pub(in crate::runtime) fn state_ref_equal(
+        &mut self,
+        left: RepositoryWorkspaceReadViewStateRef<'_>,
+        right: RepositoryWorkspaceReadViewStateRef<'_>,
+    ) -> Result<bool, PhysicalRootError> {
+        self.check()?;
+        match (left, right) {
+            (
+                RepositoryWorkspaceReadViewStateRef::Workspace(a),
+                RepositoryWorkspaceReadViewStateRef::Workspace(b),
+            ) => self.state_equal(a, b),
+            (
+                RepositoryWorkspaceReadViewStateRef::Source(a),
+                RepositoryWorkspaceReadViewStateRef::Source(b),
+            ) => self.source_state_equal(a, b),
+            _ => Ok(false),
+        }
     }
     pub(in crate::runtime) fn request_equal(
         &mut self,
@@ -204,7 +280,7 @@ impl<'a> ViewComparison<'a> {
         right: &RepositoryMaterializationRequest,
     ) -> Result<bool, PhysicalRootError> {
         self.check()?;
-        let equal = left.try_eq_with_states(right, &mut |a, b| self.state_equal(a, b))?;
+        let equal = left.try_eq_with_states(right, &mut |a, b| self.state_ref_equal(a, b))?;
         self.check()?;
         Ok(equal)
     }
@@ -214,7 +290,7 @@ impl<'a> ViewComparison<'a> {
         right: &slug_bzlmod_v2::RepositoryMaterializationResultEpoch,
     ) -> Result<bool, PhysicalRootError> {
         self.check()?;
-        let equal = left.try_eq_with_states(right, &mut |a, b| self.state_equal(a, b))?;
+        let equal = left.try_eq_with_states(right, &mut |a, b| self.state_ref_equal(a, b))?;
         self.check()?;
         Ok(equal)
     }
@@ -224,7 +300,7 @@ impl<'a> ViewComparison<'a> {
         right: &RepositoryWorkspaceTranscript,
     ) -> Result<bool, PhysicalRootError> {
         self.check()?;
-        let equal = left.try_eq_with_states(right, &mut |a, b| self.state_equal(a, b))?;
+        let equal = left.try_eq_with_states(right, &mut |a, b| self.state_ref_equal(a, b))?;
         self.check()?;
         Ok(equal)
     }

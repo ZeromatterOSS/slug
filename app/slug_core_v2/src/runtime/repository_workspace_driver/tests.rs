@@ -894,3 +894,6 @@ fn native_original_cancellation_keeps_session_open_until_bootstrap_or_payload_re
         assert_eq!(resources.snapshot().retained_bytes, baseline);
     }
 }
+
+#[path = "source_snapshot_tests.rs"]
+mod source_snapshot_tests;

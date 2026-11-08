@@ -88,6 +88,37 @@ pub(super) fn unlink(parent: &File, name: &Path, directory: bool) -> io::Result<
     .map_err(Into::into)
 }
 
+pub(super) fn symlink(parent: &File, name: &Path, target: &Path) -> io::Result<()> {
+    let name = name.as_os_str().as_bytes();
+    let target = target.as_os_str().as_bytes();
+    if name.len() > 255 || target.len() > 4096 || name.contains(&0) || target.contains(&0) {
+        return Err(io::Error::from(io::ErrorKind::InvalidInput));
+    }
+    let mut terminated_name = [0u8; 256];
+    let mut terminated_target = [0u8; 4097];
+    terminated_name[..name.len()].copy_from_slice(name);
+    terminated_target[..target.len()].copy_from_slice(target);
+    if unsafe {
+        libc::symlinkat(
+            terminated_target.as_ptr().cast(),
+            parent.as_raw_fd(),
+            terminated_name.as_ptr().cast(),
+        )
+    } != 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+pub(super) fn rename(
+    from_parent: &File,
+    from: &Path,
+    to_parent: &File,
+    to: &Path,
+) -> io::Result<()> {
+    nix::fcntl::renameat(from_parent, from, to_parent, to).map_err(Into::into)
+}
+
 pub(super) fn read_link(parent: &File, name: &Path, buffer: &mut [u8]) -> io::Result<usize> {
     let bytes = name.as_os_str().as_bytes();
     if bytes.len() > 255 || bytes.contains(&0) {

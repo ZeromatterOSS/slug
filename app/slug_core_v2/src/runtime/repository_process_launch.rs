@@ -61,8 +61,11 @@ impl ProcessLaunch for SelectedExecuteLaunch {
     fn mode(&self) -> RunMode {
         self.root.mode()
     }
-    fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
-        self.root.reservation()
+    fn workspace(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.root.workspace()
+    }
+    fn display_root(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.root.display_root()
     }
     fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
         self.root.request()
@@ -175,7 +178,7 @@ fn quota_words(words: [u64; 8]) -> (QuotaFacts, QuotaFacts) {
 }
 /// All incoming descriptors are already owned and covered by the driver's
 /// transient allowance. These guards cover the successor's retained lifetime.
-fn received_successor(
+pub(super) fn received_successor(
     root: &File,
     token: File,
     owner: File,
@@ -239,8 +242,11 @@ impl ProcessLaunch for ExecuteLaunch {
             Self::Continue { .. } => RunMode::ContinueExecute,
         }
     }
-    fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
-        &self.builder().reservation
+    fn workspace(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.builder().reservation.workspace()
+    }
+    fn display_root(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.builder().reservation.display_root()
     }
     fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
         Some(match self {
@@ -505,8 +511,11 @@ impl ProcessLaunch for BootstrapLaunch {
     fn mode(&self) -> RunMode {
         RunMode::InitializeArchive
     }
-    fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
-        &self.reservation
+    fn workspace(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.reservation.workspace()
+    }
+    fn display_root(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.reservation.display_root()
     }
     fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
         None
@@ -646,8 +655,11 @@ impl ProcessLaunch for FinalizeLaunch {
             RepositoryWorkspaceMode::Process => RunMode::FinalizeProcess,
         }
     }
-    fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
-        &self.admission.builder().reservation
+    fn workspace(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.admission.builder().reservation.workspace()
+    }
+    fn display_root(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.admission.builder().reservation.display_root()
     }
     fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
         None

@@ -165,3 +165,169 @@ async fn workspace_policy_default_and_cached_switches_are_dice_observed() {
         assert_eq!(tx.compute(&key).await.unwrap(), policy);
     }
 }
+
+fn builtin_source_state(lease: u64, digest: u8) -> Arc<crate::RepositorySourceSnapshotState> {
+    let route = Arc::new(crate::HostCanonicalRepositoryRoute::builtin(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        crate::HostBuiltinBazelToolsRepositoryMapping::testing(),
+    ));
+    let input = crate::host_canonical_repository_source_input(route, None).unwrap();
+    let request =
+        Arc::new(crate::RepositorySourceSnapshotRequest::from_canonical(&input, lease).unwrap());
+    let reservation = Arc::new(
+        crate::RepositorySourceSnapshotReservation::new(
+            request,
+            NormalizedAbsolutePath::new("/__slug_repositories__/builtin").unwrap(),
+            PathObservationInstanceId::new(100),
+        )
+        .unwrap(),
+    );
+    Arc::new(
+        crate::RepositorySourceSnapshotState::new(
+            reservation,
+            vec![
+                crate::RepositorySourceSnapshotEntry::new(
+                    "".into(),
+                    0o755,
+                    crate::RepositorySourceSnapshotNode::Directory,
+                )
+                .unwrap(),
+                crate::RepositorySourceSnapshotEntry::new(
+                    "data".into(),
+                    0o644,
+                    crate::RepositorySourceSnapshotNode::File(
+                        slug_workspace_v2::FileContentDigest::new([digest; 32], 1).unwrap(),
+                    ),
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap(),
+    )
+}
+
+#[test]
+fn operation_demand_authenticates_independent_source_declarations_against_execute_manifest() {
+    let t = transcript();
+    let source = builtin_source_state(7, 1);
+    let with = |sources: Vec<Arc<crate::RepositorySourceSnapshotState>>| {
+        let RepositoryWorkspaceOperation::Execute(command) = execute() else {
+            panic!("execute fixture")
+        };
+        let manifest = RepositoryWorkspaceReadViewManifest::new(
+            t.reservation(),
+            sources
+                .into_iter()
+                .map(|s| RepositoryWorkspaceReadView::from_source(s).unwrap())
+                .collect(),
+        )
+        .unwrap();
+        Arc::new(
+            t.request(RepositoryWorkspaceOperation::Execute(
+                command.with_read_views(manifest).unwrap(),
+            ))
+            .unwrap(),
+        )
+    };
+    let request = with(vec![source.clone()]);
+    assert_eq!(
+        RepositoryWorkspaceOperationDemand::new(request.clone(), Arc::from([])).unwrap_err(),
+        RepositoryWorkspaceError::ReplayConflict
+    );
+    assert_eq!(
+        RepositoryWorkspaceOperationDemand::new_with_sources(
+            with(vec![]),
+            Arc::from([]),
+            Arc::from([source.clone()])
+        )
+        .unwrap_err(),
+        RepositoryWorkspaceError::ReplayConflict
+    );
+    assert_eq!(
+        RepositoryWorkspaceOperationDemand::new_with_sources(
+            request.clone(),
+            Arc::from([]),
+            Arc::from([builtin_source_state(7, 2)])
+        )
+        .unwrap_err(),
+        RepositoryWorkspaceError::ReplayConflict
+    );
+    let need = RepositoryWorkspaceOperationDemand::new_with_sources(
+        request,
+        Arc::from([]),
+        Arc::from([source.clone()]),
+    )
+    .unwrap();
+    assert_eq!(need.declared_sources(), &[source]);
+}
+
+#[test]
+fn source_declarations_keep_nonexecute_prefixes_and_refuse_alias_foreign_limit_and_need_conflicts()
+{
+    let t = transcript();
+    let source = builtin_source_state(7, 1);
+    let request = Arc::new(
+        t.request(RepositoryWorkspaceOperation::Exists("".into()))
+            .unwrap(),
+    );
+    let unsupported = selected(t.reservation(), "unsupported");
+    let need = Arc::new(
+        RepositoryWorkspaceOperationDemand::new_with_sources(
+            request.clone(),
+            Arc::from([unsupported.clone()]),
+            Arc::from([source.clone()]),
+        )
+        .unwrap(),
+    );
+    assert_eq!(need.selected_entries(), &[unsupported]);
+    assert_eq!(need.declared_sources(), &[source.clone()]);
+    let original = SourcePreparationNeeds::repository_workspace_operation(need);
+    let changed = SourcePreparationNeeds::repository_workspace_operation(Arc::new(
+        RepositoryWorkspaceOperationDemand::new_with_sources(
+            request.clone(),
+            Arc::from([selected(t.reservation(), "unsupported")]),
+            Arc::from([builtin_source_state(7, 2)]),
+        )
+        .unwrap(),
+    ));
+    assert!(matches!(
+        original.try_union(&changed),
+        Err(SourcePreparationNeedsError::ConflictingWorkspaceOperation { .. })
+    ));
+    let refused_sources: [Arc<[Arc<crate::RepositorySourceSnapshotState>]>; 2] = [
+        Arc::from([builtin_source_state(8, 1)]),
+        Arc::from([source.clone(), source.clone()]),
+    ];
+    for sources in refused_sources {
+        assert_eq!(
+            RepositoryWorkspaceOperationDemand::new_with_sources(
+                request.clone(),
+                Arc::from([]),
+                sources
+            )
+            .unwrap_err(),
+            RepositoryWorkspaceError::ForeignReservation
+        );
+    }
+    assert_eq!(
+        RepositoryWorkspaceOperationDemand::new_with_sources(
+            request.clone(),
+            Arc::from([selected(t.reservation(), "bazel_tools")]),
+            Arc::from([source.clone()])
+        )
+        .unwrap_err(),
+        RepositoryWorkspaceError::ForeignReservation
+    );
+    let entries = (0..128)
+        .map(|i| selected(t.reservation(), &format!("repo{i}")))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        RepositoryWorkspaceOperationDemand::new_with_sources(
+            request,
+            entries.into(),
+            Arc::from([source])
+        )
+        .unwrap_err(),
+        RepositoryWorkspaceError::RetentionLimit
+    );
+}

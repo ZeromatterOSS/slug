@@ -64,6 +64,8 @@ pub(in crate::runtime) mod physical_roots;
 pub(in crate::runtime) mod process_views;
 #[cfg(target_os = "linux")]
 pub(in crate::runtime) mod reservations;
+#[cfg(target_os = "linux")]
+pub(in crate::runtime) mod source_snapshots;
 use physical_roots::LegacyRootOwner;
 use physical_roots::RetainedRootOwner;
 pub(super) mod source_service;
@@ -199,6 +201,10 @@ struct ActiveRepositorySession {
     reusable: Vec<AcceptedRepository>,
     entries: Vec<RepositoryMaterializationEpochEntry>,
     provisional_roots: Vec<RetainedRepositoryRoot>,
+    #[cfg(target_os = "linux")]
+    source_snapshots: Vec<source_snapshots::SourceSnapshotRow>,
+    #[cfg(target_os = "linux")]
+    source_snapshot_credit: Option<super::repository_physical_root::ResourceCredit>,
     #[cfg(target_os = "linux")]
     general: Option<reservations::GeneralWorkspaceSession>,
 }
@@ -655,7 +661,10 @@ impl RepositoryMaterializer {
         demands.sort_unstable();
         demands.dedup();
         #[cfg(target_os = "linux")]
-        let mut physical = self.split_physical_demands(token, demands)?;
+        let mut sources = self.split_source_demands(token, demands)?;
+        #[cfg(target_os = "linux")]
+        let mut physical =
+            self.split_physical_demands(token, std::mem::take(&mut sources.legacy))?;
         #[cfg(target_os = "linux")]
         let demands = std::mem::take(&mut physical.legacy);
         let observed = observe(&root_owners, roots, demands).map_err(native_observation_error)?;
@@ -1325,7 +1334,10 @@ impl RepositoryMaterializer {
         #[cfg(target_os = "linux")]
         let (demands, _native_input_credit) = self.collect_native_demands(token, demands)?;
         #[cfg(target_os = "linux")]
-        let mut physical = self.split_physical_demands(token, demands)?;
+        let mut sources = self.split_source_demands(token, demands)?;
+        #[cfg(target_os = "linux")]
+        let mut physical =
+            self.split_physical_demands(token, std::mem::take(&mut sources.legacy))?;
         #[cfg(target_os = "linux")]
         let demands = std::mem::take(&mut physical.legacy);
         #[cfg(all(test, target_os = "linux"))]
@@ -1348,6 +1360,8 @@ impl RepositoryMaterializer {
         .map_err(native_observation_error);
         #[cfg(target_os = "linux")]
         let observed = observed.and_then(|legacy| physical.observe(self, token, legacy));
+        #[cfg(target_os = "linux")]
+        let observed = observed.and_then(|current| sources.observe(self, token, current));
         self.check_source_scope(self.source_scope.as_ref())?;
         let state = self
             .state

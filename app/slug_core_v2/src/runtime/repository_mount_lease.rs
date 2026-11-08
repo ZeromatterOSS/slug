@@ -37,6 +37,9 @@ pub(super) mod launch;
 pub(super) mod quota;
 #[path = "repository_process_views.rs"]
 pub(super) mod readonly;
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+#[path = "repository_source_root/launch.rs"]
+pub(super) mod source;
 
 const NS_GET_USERNS: libc::c_ulong = 0xb701;
 const NS_GET_NSTYPE: libc::c_ulong = 0xb703;

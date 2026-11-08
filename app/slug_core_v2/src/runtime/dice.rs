@@ -848,6 +848,8 @@ struct AcceptedNativeDemandSnapshot {
         SmallMap<Arc<HostSelectedExtensionOwner>, Arc<SelectedExtensionDownloadVerified>>,
     selected: SelectedWorkspaceDemands,
     events: AcceptedEventEpoch,
+    #[cfg(target_os = "linux")]
+    _command_paths_credit: Option<Arc<super::repository_physical_root::ResourceCredit>>,
 }
 
 #[allow(dead_code)]
@@ -2711,6 +2713,8 @@ impl NativeDemandSessionOwner {
                     download_results: SmallMap::new(),
                     selected: SelectedWorkspaceDemands::empty(),
                     events: AcceptedEventEpoch::empty(),
+                    #[cfg(target_os = "linux")]
+                    _command_paths_credit: None,
                 },
                 #[cfg(test)]
                 fail_next_restoration: false,
@@ -8100,6 +8104,7 @@ impl NativeDemandCommand<'_> {
             self.execute_transcript.dupe(),
         ));
         data.data.set(self.current_workspace_epoch().dupe());
+        data.data.set(self.current_source_snapshot_epoch());
         data.data.set(self.runtime.repository_workspace_policy());
         if let Some(capture) = &self.workspace_status {
             super::workspace_status_inputs::install(&mut data, capture);
@@ -8149,6 +8154,12 @@ impl NativeDemandCommand<'_> {
             updater,
             &self.runtime.workspace,
             self.current_workspace_epoch().dupe(),
+        )
+        .map_err(NativeDemandSessionError::Injection)?;
+        inject_repository_source_snapshot_epoch(
+            updater,
+            &self.runtime.workspace,
+            self.current_source_snapshot_epoch(),
         )
         .map_err(NativeDemandSessionError::Injection)?;
         Ok(())
@@ -8634,6 +8645,12 @@ impl NativeDemandCommand<'_> {
                         slug_bzlmod_v2::RepositoryWorkspaceEpoch::revoked(),
                     )
                     .map_err(NativeDemandSessionError::Restoration)?;
+                    inject_repository_source_snapshot_epoch(
+                        &mut updater,
+                        &self.runtime.workspace,
+                        Arc::new(slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked()),
+                    )
+                    .map_err(NativeDemandSessionError::Restoration)?;
                     #[allow(unused_mut)]
                     let mut transaction = self.runtime.request_revision.commit(updater).await;
                     #[cfg(test)]
@@ -8675,12 +8692,88 @@ impl NativeDemandCommand<'_> {
         self.runtime
             .native_demand_sessions
             .mark_workspace_stage("selection");
+        let source_epoch = self.current_source_snapshot_epoch();
+        #[cfg(target_os = "linux")]
+        let mut command_paths_credit = None;
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        if source_epoch
+            .states()
+            .is_some_and(|states| !states.is_empty())
+        {
+            // Prepay old/new path arrays, validation rows, normalization peaks
+            // and complete borrowed path storage before partitioning. This guard
+            // follows native accepted/prior snapshots, and grants no IO authority.
+            let mut bytes = selected
+                .repository_validations()
+                .len()
+                .checked_mul(
+                    4 * std::mem::size_of::<super::demands::SelectedRepositoryValidation>(),
+                )
+                .and_then(|n| n.checked_add(4096))
+                .ok_or_else(|| {
+                    NativeDemandSessionError::Computation(anyhow::anyhow!(
+                        "source selection storage overflow"
+                    ))
+                })?;
+            for demand in selected
+                .unscoped_paths()
+                .iter()
+                .chain(selected.command_paths())
+                .chain(
+                    selected
+                        .repository_validations()
+                        .iter()
+                        .flat_map(|v| v.paths()),
+                )
+            {
+                let path = demand.path().retained_storage_bytes().ok_or_else(|| {
+                    NativeDemandSessionError::Computation(anyhow::anyhow!(
+                        "source selection path overflow"
+                    ))
+                })?;
+                bytes = bytes
+                    .checked_add(
+                        path.checked_mul(8)
+                            .and_then(|n| {
+                                n.checked_add(
+                                    8 * std::mem::size_of::<PathObservationDemand>() + 256,
+                                )
+                            })
+                            .ok_or_else(|| {
+                                NativeDemandSessionError::Computation(anyhow::anyhow!(
+                                    "source selection storage overflow"
+                                ))
+                            })?,
+                    )
+                    .ok_or_else(|| {
+                        NativeDemandSessionError::Computation(anyhow::anyhow!(
+                            "source selection storage overflow"
+                        ))
+                    })?;
+            }
+            command_paths_credit = Some(
+                self.workspace_progress
+                    .as_ref()
+                    .ok_or_else(|| {
+                        NativeDemandSessionError::Computation(anyhow::anyhow!(
+                            "source selection lacks command owner"
+                        ))
+                    })?
+                    .source_selection_credit(bytes)?,
+            );
+        }
+        let selected = selected.partition_command_sources(&source_epoch);
         let repository_results = self
             .runtime
             .repository_materializer
             .selected_epoch(self.repository_session, selected.repository_requests())
             .map_err(NativeDemandSessionError::Repository)?;
         let mut selected_paths = selected.unscoped_paths().to_vec();
+        selected_paths.extend_from_slice(selected.command_paths());
         for validation in selected.repository_validations() {
             selected_paths.extend(validation.paths().iter().cloned());
         }
@@ -8760,6 +8853,8 @@ impl NativeDemandCommand<'_> {
                 download_results,
                 selected,
                 events: self.prior.events.dupe(),
+                #[cfg(target_os = "linux")]
+                _command_paths_credit: command_paths_credit,
             },
             validation,
         ))
@@ -9424,6 +9519,12 @@ fn prepare_selected_native_demand_snapshot(
         slug_bzlmod_v2::RepositoryWorkspaceEpoch::revoked(),
     )
     .map_err(NativeDemandSessionError::Injection)?;
+    inject_repository_source_snapshot_epoch(
+        &mut updater,
+        &command.runtime.workspace,
+        Arc::new(slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked()),
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
     // Keep the provisional terminal alive until its prepared updater reaches
     // revision finalization or the ordinary commit leaf.
     std::hint::black_box(terminal_authority);
@@ -9458,6 +9559,21 @@ fn inject_repository_filesystem_epoch(
     updater
         .changed_to(vec![(RepositoryFilesystemEpochKey::new(workspace), epoch)])
         .context("injecting repository archive epoch")
+}
+
+fn inject_repository_source_snapshot_epoch(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &Path,
+    epoch: Arc<slug_bzlmod_v2::RepositorySourceSnapshotEpoch>,
+) -> anyhow::Result<()> {
+    let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())
+        .context("normalizing source snapshot workspace")?;
+    updater
+        .changed_to(vec![(
+            slug_bzlmod_v2::RepositorySourceSnapshotEpochKey::new(workspace),
+            epoch,
+        )])
+        .context("injecting command source snapshot epoch")
 }
 
 fn inject_repository_workspace_epoch(
@@ -9718,6 +9834,14 @@ pub(super) fn physical_root_owner_for_test() -> Arc<slug_bzlmod_v2::HostSelected
         "def _impl(ctx):\n    pass\next = module_extension(implementation = _impl)\n",
     );
     selected_tool_source::tests::discover_owner(&fixture.runtime)
+}
+
+#[cfg(test)]
+pub(in crate::runtime) fn workspace_source_request_for_test(
+    workspace: &Path,
+    lease: u64,
+) -> Arc<slug_bzlmod_v2::RepositorySourceSnapshotRequest> {
+    tests::source_snapshot_request_fixture::workspace_request(workspace, lease)
 }
 
 #[cfg(test)]
@@ -14654,6 +14778,11 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
                 .to_string()
                 .contains("configured action output conflict")
         );
+    }
+
+    pub(super) mod source_snapshot_request_fixture {
+        use super::*;
+        include!("tests/source_snapshot_request_fixture.rs");
     }
 
     mod workspace_epoch_tests {

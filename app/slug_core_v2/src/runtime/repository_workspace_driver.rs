@@ -200,12 +200,27 @@ impl NativeDemandCommand<'_> {
         &self.workspace_epoch
     }
 
+    pub(super) fn current_source_snapshot_epoch(
+        &self,
+    ) -> Arc<slug_bzlmod_v2::RepositorySourceSnapshotEpoch> {
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        if let Some(progress) = &self.workspace_progress {
+            return progress.source_epoch.clone();
+        }
+        Arc::new(slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked())
+    }
+
     pub(super) fn progress_general_workspace(
         &mut self,
         needs: &slug_bzlmod_v2::SourcePreparationNeeds,
     ) -> Result<Option<NativeDemandProgress>, NativeDemandSessionError> {
-        let demanded =
-            !needs.workspace_reservations().is_empty() || !needs.workspace_operations().is_empty();
+        let demanded = !needs.workspace_reservations().is_empty()
+            || !needs.workspace_operations().is_empty()
+            || !needs.source_snapshots().is_empty();
         #[cfg(all(
             target_os = "linux",
             target_arch = "x86_64",
@@ -385,6 +400,7 @@ mod native {
         scope: Arc<source_service::SourceServiceScope>,
         resources: Arc<RepositoryRootResources>,
         max_roots: usize,
+        pub(super) source_epoch: Arc<slug_bzlmod_v2::RepositorySourceSnapshotEpoch>,
         _credit: ResourceCredit,
     }
     struct OperationSelection {
@@ -422,7 +438,7 @@ mod native {
                         ReservedRepositoryWorkspace,
                     )>() + 64),
                 )
-                .and_then(|n| n.checked_add(std::mem::size_of::<Self>() + 4096))
+                .and_then(|n| n.checked_add(std::mem::size_of::<Self>() + 32768))
                 .ok_or_else(|| refusal("workspace ticket storage overflow"))?;
             let credit = config.resources.reserve(bytes, 0, 0).map_err(physical)?;
             let lease = runtime
@@ -456,10 +472,28 @@ mod native {
                 scope,
                 resources: config.resources.clone(),
                 max_roots,
+                source_epoch: Arc::new(
+                    slug_bzlmod_v2::RepositorySourceSnapshotEpoch::fresh(
+                        runtime.repository_materializer.workspace().clone(),
+                        lease,
+                    )
+                    .map_err(|_| refusal("invalid source snapshot epoch"))?,
+                ),
                 _credit: credit,
             }))
         }
+        pub(in crate::runtime::dice) fn source_selection_credit(
+            &self,
+            bytes: usize,
+        ) -> Result<Arc<ResourceCredit>, NativeDemandSessionError> {
+            Ok(Arc::new(
+                self.resources.reserve(bytes, 0, 0).map_err(physical)?,
+            ))
+        }
         pub(super) fn retire(&mut self) -> Result<(), NativeDemandSessionError> {
+            // Native semantic projections retire while the command/actor data
+            // owners still cover their canonical tree allocations.
+            self.source_epoch = Arc::new(slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked());
             drop(self.command.take());
             if !self.retirement.wait_until(self.scope.cleanup_deadline()) {
                 return Err(NativeDemandSessionError::SourceService(
@@ -586,6 +620,40 @@ mod native {
                     }
                 }
             }
+            let fresh_sources =
+                needs
+                    .source_snapshots()
+                    .values()
+                    .try_fold(0usize, |count, request| {
+                        if request.workspace() != runtime.repository_materializer.workspace()
+                            || Some(request.lease()) != self.source_epoch.lease()
+                        {
+                            return Err(refusal("foreign source snapshot demand"));
+                        }
+                        let existing = self
+                            .source_epoch
+                            .find(request)
+                            .map_err(|_| refusal("source snapshot demand changed"))?;
+                        Ok(count + usize::from(existing.is_none()))
+                    })?;
+            let roots = self
+                .tickets
+                .len()
+                .checked_add(self.source_epoch.states().map_or(0, |s| s.len()))
+                .and_then(|n| n.checked_add(fresh_sources))
+                .and_then(|n| {
+                    n.checked_add(
+                        needs
+                            .workspace_reservations()
+                            .keys()
+                            .filter(|key| !self.tickets.contains_key(*key))
+                            .count(),
+                    )
+                })
+                .ok_or_else(|| refusal("combined source root count overflow"))?;
+            if roots > self.max_roots {
+                return Err(refusal("combined source root count exceeds policy"));
+            }
             let active = || runtime.repository_materializer.session_is_active(token);
             let mut comparison = crate::runtime::repository_physical_root::ViewComparison::new(
                 &self.resources,
@@ -617,6 +685,7 @@ mod native {
                             token,
                             &selected.requests,
                             &selected.epoch,
+                            demand.declared_sources(),
                             &self.scope,
                             &|| runtime.repository_materializer.session_is_active(token),
                         )
@@ -690,6 +759,55 @@ mod native {
                 self.tickets.insert(demand.key().clone(), ticket);
                 advanced = true;
             }
+            for request in needs.source_snapshots().values() {
+                if self
+                    .source_epoch
+                    .find(request)
+                    .map_err(|_| refusal("source snapshot demand changed"))?
+                    .is_some()
+                {
+                    continue;
+                }
+                let ticket = runtime
+                    .repository_materializer
+                    .reserve_source_snapshot(token, request.clone(), &self.scope)
+                    .map_err(NativeDemandSessionError::Repository)?;
+                let input =
+                    crate::runtime::repository_physical_root::source::SourceRootInput::capture(
+                        request.clone(),
+                        &self.resources,
+                        &runtime.runtime,
+                        distdirs,
+                        &self.scope,
+                        &active,
+                    )
+                    .map_err(physical)?;
+                let command = self
+                    .command
+                    .take()
+                    .ok_or_else(|| refusal("workspace command was consumed"))?;
+                let (command, sealed) = runtime
+                    .runtime
+                    .block_on(command.initialize_source_snapshot(
+                        ticket.reservation().clone(),
+                        ticket.claim().clone(),
+                        input,
+                        &self.scope,
+                        &active,
+                    ))
+                    .map_err(physical)?;
+                self.command = Some(command);
+                let state = runtime
+                    .repository_materializer
+                    .adopt_source_snapshot(token, &ticket, sealed, &self.scope)
+                    .map_err(NativeDemandSessionError::Repository)?;
+                let epoch = self
+                    .source_epoch
+                    .with_snapshot(state)
+                    .map_err(|_| refusal("source snapshot epoch publication refused"))?;
+                self.source_epoch = Arc::new(epoch);
+                advanced = true;
+            }
             for demand in needs.workspace_operations().values() {
                 let before = self
                     .command
@@ -719,15 +837,22 @@ mod native {
                         let selected = self.selected(demand)?;
                         runtime
                             .runtime
-                            .block_on(runtime.repository_materializer.execute_workspace(
-                                token,
-                                command,
-                                demand.request().as_ref().clone(),
-                                &selected.requests,
-                                &selected.epoch,
-                                &self.scope,
-                                &|| runtime.repository_materializer.session_is_active(token),
-                            ))
+                            .block_on(
+                                runtime
+                                    .repository_materializer
+                                    .execute_workspace_with_sources(
+                                        token,
+                                        command,
+                                        demand.request().as_ref().clone(),
+                                        &selected.requests,
+                                        &selected.epoch,
+                                        demand.declared_sources(),
+                                        &self.scope,
+                                        &|| {
+                                            runtime.repository_materializer.session_is_active(token)
+                                        },
+                                    ),
+                            )
                             .map_err(physical)?
                     } else {
                         #[cfg(test)]

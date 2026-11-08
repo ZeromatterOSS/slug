@@ -182,6 +182,16 @@ impl RepositoryRuleInvocationInput {
         Ok(self)
     }
 
+    pub(crate) fn with_source_snapshots(
+        mut self,
+        sources: Arc<slug_bzlmod_v2::RepositorySourceSnapshotEpoch>,
+    ) -> Self {
+        if let Some(workspace) = &mut self.workspace {
+            workspace.source_snapshots = sources;
+        }
+        self
+    }
+
     pub(crate) fn with_host_reads(
         mut self,
         reads: SmallMap<NormalizedAbsolutePath, Arc<[u8]>>,
@@ -1548,6 +1558,7 @@ pub(crate) fn invoke_repository_rule_with_host_paths(
 
 #[cfg(test)]
 mod tests {
+    mod source_snapshot_tests;
     mod workspace_tests;
     use std::path::PathBuf;
 

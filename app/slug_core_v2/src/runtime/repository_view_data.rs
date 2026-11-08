@@ -8,8 +8,13 @@ use super::*;
 #[derive(Debug)]
 pub(in crate::runtime) struct NativeReadViewData {
     projection: RepositoryWorkspaceReadView,
-    root: Arc<RepositoryPhysicalRoot>,
+    root: ReadViewRoot,
     _credit: ResourceCredit,
+}
+#[derive(Debug)]
+enum ReadViewRoot {
+    Workspace(Arc<RepositoryPhysicalRoot>),
+    Source(Arc<source::RepositorySourceRoot>),
 }
 impl NativeReadViewData {
     pub(super) fn from_sealed(
@@ -27,19 +32,64 @@ impl NativeReadViewData {
                 .map_err(PhysicalRootError::Protocol)?;
         Ok(Arc::new(Self {
             projection,
-            root: sealed.root().clone(),
+            root: ReadViewRoot::Workspace(sealed.root().clone()),
             _credit: credit,
         }))
     }
     pub(in crate::runtime) fn projection(&self) -> &RepositoryWorkspaceReadView {
         &self.projection
     }
-    pub(in crate::runtime) fn root(&self) -> &Arc<RepositoryPhysicalRoot> {
-        &self.root
+    pub(in crate::runtime) fn from_source(
+        sealed: &source::SealedSourceSnapshot,
+    ) -> Result<Arc<Self>, PhysicalRootError> {
+        let projection = RepositoryWorkspaceReadView::from_source(sealed.state().clone())
+            .map_err(PhysicalRootError::Protocol)?;
+        let bytes = add(
+            arc_bytes::<Self>()?,
+            projection
+                .storage_partition()
+                .map_err(PhysicalRootError::Protocol)?
+                .owned_bytes(),
+        )?;
+        let credit = sealed.root().resources.reserve(bytes, 0, 0)?;
+        Ok(Arc::new(Self {
+            projection,
+            root: ReadViewRoot::Source(sealed.root().clone()),
+            _credit: credit,
+        }))
+    }
+    pub(in crate::runtime) fn root(&self) -> Option<&Arc<RepositoryPhysicalRoot>> {
+        match &self.root {
+            ReadViewRoot::Workspace(root) => Some(root),
+            _ => None,
+        }
+    }
+    pub(in crate::runtime) fn source_root(&self) -> Option<&Arc<source::RepositorySourceRoot>> {
+        match &self.root {
+            ReadViewRoot::Source(root) => Some(root),
+            _ => None,
+        }
+    }
+    pub(super) fn identity(&self) -> RootIdentity {
+        match &self.root {
+            ReadViewRoot::Workspace(root) => root.identity,
+            ReadViewRoot::Source(root) => root.identity,
+        }
+    }
+    pub(super) fn same_state_allocation(&self, view: &RepositoryWorkspaceReadView) -> bool {
+        match (
+            self.projection.workspace_state(),
+            view.workspace_state(),
+            self.projection.source_state(),
+            view.source_state(),
+        ) {
+            (Some(a), Some(b), None, None) => Arc::ptr_eq(a, b),
+            (None, None, Some(a), Some(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
     }
     fn covers(&self, view: &RepositoryWorkspaceReadView) -> bool {
-        Arc::ptr_eq(self.projection.state(), view.state())
-            && self.projection.repo_spec() == view.repo_spec()
+        self.same_state_allocation(view) && self.projection.repo_spec() == view.repo_spec()
     }
 }
 
@@ -114,8 +164,7 @@ impl NativeReadViewDependencies {
                 return Err(PhysicalRootError::Resource);
             }
             if owners.iter().any(|old: &Arc<NativeReadViewData>| {
-                old.projection.state().reservation().instance()
-                    == owner.projection.state().reservation().instance()
+                old.projection.instance() == owner.projection.instance()
             }) {
                 return Err(PhysicalRootError::Reservation);
             }
@@ -154,7 +203,7 @@ impl NativeReadViewDependencies {
             covered &= self
                 .owners
                 .iter()
-                .any(|owner| Arc::ptr_eq(owner.projection.state(), view.state()))
+                .any(|owner| owner.same_state_allocation(view))
         });
         covered
     }

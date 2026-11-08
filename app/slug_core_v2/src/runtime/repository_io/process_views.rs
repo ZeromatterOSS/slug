@@ -14,6 +14,7 @@ use crate::runtime::repository_physical_root::RepositoryWorkspaceCommand;
 pub(in crate::runtime) struct SelectedProcessSources {
     entries: Vec<RepositoryMaterializationEpochEntry>,
     rows: Vec<RetainedRepositoryRoot>,
+    source_rows: Vec<super::source_snapshots::SourceSnapshotRow>,
     token: RepositorySessionToken,
     lease: u64,
     scope: Arc<SourceServiceScope>,
@@ -32,7 +33,7 @@ impl SelectedProcessSources {
         if self.lease != executor.lease()
             || !Arc::ptr_eq(resources, &self.resources)
             || !Arc::ptr_eq(scope, &self.scope)
-            || manifest.views().len() != self.rows.len()
+            || manifest.views().len() != self.rows.len() + self.source_rows.len()
         {
             return Err(PhysicalRootError::Reservation);
         }
@@ -43,31 +44,56 @@ impl SelectedProcessSources {
             resources, scope, active,
         )?;
         for view in manifest.views() {
-            let row = self
-                .rows
-                .iter()
-                .find(|row| row.observation_instance == view.state().reservation().instance())
-                .ok_or(PhysicalRootError::Reservation)?;
-            let RetainedRootOwner::Physical(root) = &row.root else {
-                return Err(PhysicalRootError::UnsupportedOperation);
-            };
-            if row.request.repo_spec != *view.repo_spec()
-                || !comparison.state_equal(root.state(), view.state())?
-                || root.reservation() != view.state().reservation()
-            {
-                return Err(PhysicalRootError::Reservation);
+            if let Some(state) = view.source_state() {
+                let row = self
+                    .source_rows
+                    .iter()
+                    .find(|row| row.root.reservation().instance() == view.instance())
+                    .ok_or(PhysicalRootError::Reservation)?;
+                if !comparison.source_state_equal(row.root.state(), state)? {
+                    return Err(PhysicalRootError::Reservation);
+                }
+            } else {
+                let row = self
+                    .rows
+                    .iter()
+                    .find(|row| row.observation_instance == view.instance())
+                    .ok_or(PhysicalRootError::Reservation)?;
+                let RetainedRootOwner::Physical(root) = &row.root else {
+                    return Err(PhysicalRootError::UnsupportedOperation);
+                };
+                let state = view
+                    .workspace_state()
+                    .ok_or(PhysicalRootError::Reservation)?;
+                if Some(&row.request.repo_spec) != view.repo_spec()
+                    || !comparison.state_equal(root.state(), state)?
+                    || root.reservation() != state.reservation()
+                {
+                    return Err(PhysicalRootError::Reservation);
+                }
             }
         }
         Ok(())
     }
     pub(in crate::runtime) fn matches_data(&self, data: &Arc<NativeReadViewData>) -> bool {
-        self.rows.iter().any(|row| match &row.root {
-            RetainedRootOwner::Physical(root) => {
-                Arc::ptr_eq(root, data.root())
-                    && row.request.repo_spec == *data.projection().repo_spec()
-                    && Arc::ptr_eq(root.state(), data.projection().state())
+        if let Some(source) = data.source_root() {
+            return self.source_rows.iter().any(|row| {
+                Arc::ptr_eq(&row.root, source)
+                    && data
+                        .projection()
+                        .source_state()
+                        .is_some_and(|state| Arc::ptr_eq(row.root.state(), state))
+            });
+        }
+        self.rows.iter().any(|row| {
+            match (&row.root, data.root(), data.projection().workspace_state()) {
+                (RetainedRootOwner::Physical(root), Some(data_root), Some(state)) => {
+                    Arc::ptr_eq(root, data_root)
+                        && Some(&row.request.repo_spec) == data.projection().repo_spec()
+                        && Arc::ptr_eq(root.state(), state)
+                }
+                _ => false,
             }
-            _ => false,
         })
     }
     pub(in crate::runtime) fn recheck(
@@ -108,6 +134,16 @@ impl SelectedProcessSources {
                 return Err(PhysicalRootError::Reservation);
             }
         }
+        for row in &self.source_rows {
+            if row.root.reservation().lease() != self.lease
+                || !active
+                    .source_snapshots
+                    .iter()
+                    .any(|now| Arc::ptr_eq(&now.root, &row.root))
+            {
+                return Err(PhysicalRootError::Reservation);
+            }
+        }
         Ok(())
     }
 }
@@ -117,6 +153,7 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         selected: &[Arc<RepositoryMaterializationRequest>],
         results: &RepositoryMaterializationResultEpoch,
+        declared_sources: &[Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>],
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<SelectedProcessSources, PhysicalRootError> {
@@ -126,7 +163,11 @@ impl RepositoryMaterializer {
         scope.check()?;
         self.check_command_scope(token, scope)
             .map_err(|_| PhysicalRootError::Reservation)?;
-        if selected.len() > 128 {
+        if selected
+            .len()
+            .checked_add(declared_sources.len())
+            .is_none_or(|count| count > 128)
+        {
             return Err(PhysicalRootError::Resource);
         }
         let snapshot = {
@@ -152,6 +193,8 @@ impl RepositoryMaterializer {
             .map_err(|_| PhysicalRootError::Resource)?;
             let bytes = selected
                 .len()
+                .checked_add(declared_sources.len())
+                .ok_or(PhysicalRootError::Resource)?
                 .checked_mul(
                     4 * std::mem::size_of::<RepositoryMaterializationEpochEntry>()
                         + 4 * std::mem::size_of::<RetainedRepositoryRoot>()
@@ -207,9 +250,25 @@ impl RepositoryMaterializer {
                 entries.push(entry.clone());
                 rows.push(row.clone());
             }
+            let mut source_rows = Vec::with_capacity(declared_sources.len());
+            for source in declared_sources {
+                let row = active
+                    .source_snapshots
+                    .iter()
+                    .find(|row| {
+                        row.root.reservation().instance() == source.reservation().instance()
+                    })
+                    .ok_or(PhysicalRootError::Reservation)?;
+                row.root.check_origin(scope, &|| true)?;
+                if row.root.reservation().lease() != general.lease() {
+                    return Err(PhysicalRootError::Reservation);
+                }
+                source_rows.push(row.clone());
+            }
             SelectedProcessSources {
                 entries,
                 rows,
+                source_rows,
                 token,
                 lease: general.lease(),
                 scope: scope.clone(),
@@ -226,6 +285,11 @@ impl RepositoryMaterializer {
         )?;
         for (entry, requested) in snapshot.entries.iter().zip(selected) {
             if !comparison.request_equal(&entry.request, requested)? {
+                return Err(PhysicalRootError::Reservation);
+            }
+        }
+        for (row, declared) in snapshot.source_rows.iter().zip(declared_sources) {
+            if !comparison.source_state_equal(row.root.state(), declared)? {
                 return Err(PhysicalRootError::Reservation);
             }
         }
@@ -253,6 +317,7 @@ impl RepositoryMaterializer {
             request,
             selected,
             results,
+            &[],
             scope,
             active,
             |_| {},
@@ -272,7 +337,39 @@ impl RepositoryMaterializer {
         after_reap: impl FnOnce(&RepositoryWorkspaceCommand),
     ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
         self.execute_workspace_impl(
-            token, command, request, selected, results, scope, active, after_reap,
+            token,
+            command,
+            request,
+            selected,
+            results,
+            &[],
+            scope,
+            active,
+            after_reap,
+        )
+        .await
+    }
+    pub(in crate::runtime) async fn execute_workspace_with_sources(
+        &self,
+        token: RepositorySessionToken,
+        command: RepositoryWorkspaceCommand,
+        request: RepositoryWorkspaceRequest,
+        selected: &[Arc<RepositoryMaterializationRequest>],
+        results: &RepositoryMaterializationResultEpoch,
+        declared_sources: &[Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>],
+        scope: &Arc<SourceServiceScope>,
+        active: &(dyn Fn() -> bool + Sync),
+    ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
+        self.execute_workspace_impl(
+            token,
+            command,
+            request,
+            selected,
+            results,
+            declared_sources,
+            scope,
+            active,
+            |_| {},
         )
         .await
     }
@@ -283,6 +380,7 @@ impl RepositoryMaterializer {
         request: RepositoryWorkspaceRequest,
         selected: &[Arc<RepositoryMaterializationRequest>],
         results: &RepositoryMaterializationResultEpoch,
+        declared_sources: &[Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>],
         scope: &Arc<SourceServiceScope>,
         active: &(dyn Fn() -> bool + Sync),
         after_reap: impl FnOnce(&RepositoryWorkspaceCommand),
@@ -290,7 +388,25 @@ impl RepositoryMaterializer {
         if !active() {
             return Err(PhysicalRootError::Inactive);
         }
-        let snapshot = self.selected_process_sources(token, selected, results, scope, active)?;
+        let slug_bzlmod_v2::RepositoryWorkspaceOperation::Execute(execute) = request.operation()
+        else {
+            return Err(PhysicalRootError::Mode);
+        };
+        let snapshot = self.selected_process_sources(
+            token,
+            selected,
+            results,
+            declared_sources,
+            scope,
+            active,
+        )?;
+        snapshot.validate_manifest(
+            execute.read_views(),
+            request.reservation(),
+            &snapshot.resources,
+            scope,
+            active,
+        )?;
         let command = command
             .execute_selected_sources(request, &snapshot, self, scope, &|| {
                 active() && self.session_is_active(token)

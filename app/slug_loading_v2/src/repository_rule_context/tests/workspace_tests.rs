@@ -13,7 +13,7 @@ use slug_bzlmod_v2::source_preparation::RepositoryWorkspaceStableKey;
 
 use super::*;
 
-async fn binding(
+pub(super) async fn binding(
     lease: u64,
 ) -> (
     RepositoryWorkspaceEpoch,

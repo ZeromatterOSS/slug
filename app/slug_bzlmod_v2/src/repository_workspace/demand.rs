@@ -150,12 +150,14 @@ impl Hash for RepositoryWorkspaceOperationId {
 pub struct RepositoryWorkspaceOperationDemand {
     request: Arc<RepositoryWorkspaceRequest>,
     selected: Arc<[RepositoryMaterializationEpochEntry]>,
+    prefix_source_states: Arc<[Arc<crate::RepositorySourceSnapshotState>]>,
 }
 impl fmt::Debug for RepositoryWorkspaceOperationDemand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RepositoryWorkspaceOperationDemand")
             .field("request", &self.request)
             .field("selected_count", &self.selected.len())
+            .field("source_count", &self.prefix_source_states.len())
             .finish()
     }
 }
@@ -164,7 +166,18 @@ impl RepositoryWorkspaceOperationDemand {
         request: Arc<RepositoryWorkspaceRequest>,
         selected: Arc<[RepositoryMaterializationEpochEntry]>,
     ) -> Result<Self, RepositoryWorkspaceError> {
-        if selected.len() > REPOSITORY_WORKSPACE_MAX_READ_VIEWS {
+        Self::new_with_sources(request, selected, Arc::from([]))
+    }
+    pub fn new_with_sources(
+        request: Arc<RepositoryWorkspaceRequest>,
+        selected: Arc<[RepositoryMaterializationEpochEntry]>,
+        prefix_source_states: Arc<[Arc<crate::RepositorySourceSnapshotState>]>,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        if selected
+            .len()
+            .checked_add(prefix_source_states.len())
+            .is_none_or(|n| n > REPOSITORY_WORKSPACE_MAX_READ_VIEWS)
+        {
             return Err(RepositoryWorkspaceError::RetentionLimit);
         }
         if selected.iter().any(|entry| {
@@ -181,6 +194,115 @@ impl RepositoryWorkspaceOperationDemand {
                 return Err(RepositoryWorkspaceError::ForeignReservation);
             }
         }
+        let executor = request.reservation();
+        let overlaps =
+            |a: &std::path::Path, b: &std::path::Path| a.starts_with(b) || b.starts_with(a);
+        fn binding(
+            entry: &RepositoryMaterializationEpochEntry,
+        ) -> Option<(PathObservationInstanceId, &std::path::Path)> {
+            if let crate::RepositoryMaterializationKind::GeneralWorkspace(realization) =
+                &entry.request.kind
+            {
+                Some((
+                    realization.reservation().instance(),
+                    realization.reservation().display_root().as_path(),
+                ))
+            } else if let crate::RepositoryMaterializationResult::Success(
+                crate::RepositoryMaterializationSuccess::Immutable {
+                    observation_instance,
+                    generation_root,
+                    ..
+                },
+            ) = &entry.result
+            {
+                Some((*observation_instance, generation_root.as_path()))
+            } else {
+                None
+            }
+        }
+        for (index, entry) in selected.iter().enumerate() {
+            if binding(entry).is_some_and(|(instance, path)| {
+                instance == executor.instance()
+                    || overlaps(path, executor.display_root().as_path())
+                    || selected[..index].iter().any(|previous| {
+                        binding(previous).is_some_and(|(previous_instance, previous_path)| {
+                            instance == previous_instance || overlaps(path, previous_path)
+                        })
+                    })
+            }) {
+                return Err(RepositoryWorkspaceError::ForeignReservation);
+            }
+            if let crate::RepositoryMaterializationKind::GeneralWorkspace(realization) =
+                &entry.request.kind
+            {
+                entry.request.validate_general_workspace_binding()?;
+                if realization.reservation().lease() != executor.lease() {
+                    return Err(RepositoryWorkspaceError::ForeignReservation);
+                }
+            }
+        }
+        for (index, state) in prefix_source_states.iter().enumerate() {
+            let source = state.reservation();
+            state.retained_storage_bytes()?;
+            if source.workspace() != executor.workspace()
+                || source.lease() != executor.lease()
+                || source.repository() == executor.repository()
+                || source.instance() == executor.instance()
+                || overlaps(
+                    source.display_root().as_path(),
+                    executor.display_root().as_path(),
+                )
+                || selected.iter().any(|entry| {
+                    entry.request.id.canonical_repo == *source.repository()
+                        || binding(entry).is_some_and(|(instance, path)| {
+                            instance == source.instance()
+                                || overlaps(path, source.display_root().as_path())
+                        })
+                })
+                || prefix_source_states[..index].iter().any(|previous| {
+                    let previous = previous.reservation();
+                    previous.repository() == source.repository()
+                        || previous.instance() == source.instance()
+                        || overlaps(
+                            previous.display_root().as_path(),
+                            source.display_root().as_path(),
+                        )
+                })
+            {
+                return Err(RepositoryWorkspaceError::ForeignReservation);
+            }
+        }
+        if let RepositoryWorkspaceOperation::Execute(execute) = request.operation() {
+            let manifest = execute.read_views();
+            manifest.validate_for(executor)?;
+            let sources = manifest
+                .views()
+                .iter()
+                .filter_map(|view| view.source_state());
+            if sources.clone().count() != prefix_source_states.len()
+                || sources.into_iter().any(|state| {
+                    !prefix_source_states
+                        .iter()
+                        .any(|declared| declared == state)
+                })
+            {
+                return Err(RepositoryWorkspaceError::ReplayConflict);
+            }
+        }
+        let prefix_source_states = if prefix_source_states
+            .windows(2)
+            .all(|pair| pair[0].reservation().repository() < pair[1].reservation().repository())
+        {
+            prefix_source_states
+        } else {
+            let mut rows = prefix_source_states.to_vec();
+            rows.sort_unstable_by(|a, b| {
+                a.reservation()
+                    .repository()
+                    .cmp(b.reservation().repository())
+            });
+            rows.into()
+        };
         let selected = if selected
             .windows(2)
             .all(|pair| pair[0].request.id.canonical_repo < pair[1].request.id.canonical_repo)
@@ -196,12 +318,19 @@ impl RepositoryWorkspaceOperationDemand {
             });
             ordered.into()
         };
-        Ok(Self { request, selected })
+        Ok(Self {
+            request,
+            selected,
+            prefix_source_states,
+        })
     }
     pub fn request(&self) -> &Arc<RepositoryWorkspaceRequest> {
         &self.request
     }
     pub fn selected_entries(&self) -> &[RepositoryMaterializationEpochEntry] {
         &self.selected
+    }
+    pub fn declared_sources(&self) -> &[Arc<crate::RepositorySourceSnapshotState>] {
+        &self.prefix_source_states
     }
 }

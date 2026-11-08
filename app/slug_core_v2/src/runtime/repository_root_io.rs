@@ -162,6 +162,12 @@ impl<'root> RootIo<'root> {
         Ok(current)
     }
 
+    /// Credited native source acquisition may pin a directory below its already
+    /// authenticated Host anchor. Every intermediate component is no-follow.
+    pub fn open_directory(&self, relative: &Path) -> io::Result<File> {
+        self.directory(relative)
+    }
+
     fn parent<'path>(&self, relative: &'path Path) -> io::Result<(File, &'path Path)> {
         let bytes = self.validate_path(relative, false)?;
         let (parent, name) = match bytes.iter().rposition(|byte| *byte == b'/') {
@@ -429,6 +435,71 @@ impl<'root> RootIo<'root> {
         Ok(())
     }
 
+    /// Install a new literal relative link without following its destination.
+    /// The caller owns complete-tree membership and immutable-source policy.
+    /// Absolute or lexically escaping targets never reach the syscall.
+    pub fn symlink_relative(&self, relative: &Path, target: &Path) -> io::Result<()> {
+        self.validate_path(relative, false)?;
+        let bytes = target.as_os_str().as_bytes();
+        if bytes.is_empty()
+            || bytes.len() > self.limits.max_link_bytes
+            || bytes.contains(&0)
+            || target.is_absolute()
+        {
+            return Err(invalid("invalid rooted literal link"));
+        }
+        let mut depth = relative.parent().map_or(0, |p| p.components().count());
+        for component in target.components() {
+            match component {
+                std::path::Component::Normal(name)
+                    if name.as_bytes().len() <= self.limits.max_name_bytes =>
+                {
+                    depth = depth.checked_add(1).ok_or_else(limit)?;
+                    if depth > self.limits.max_depth {
+                        return Err(limit());
+                    }
+                }
+                std::path::Component::CurDir => {}
+                std::path::Component::ParentDir => {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("rooted link escapes root"))?;
+                }
+                _ => return Err(invalid("invalid rooted link component")),
+            }
+        }
+        let (parent, name) = self.parent(relative)?;
+        linux::symlink(&parent, name, target)?;
+        let mut actual = [0u8; 4097];
+        if self.read_link(relative, &mut actual)? != bytes {
+            return Err(stale());
+        }
+        Ok(())
+    }
+
+    /// Commit a privately staged regular replacement. Both names are walked
+    /// without following links; caller retains the exact staged file handle.
+    pub fn replace_regular(&self, staged: &Path, target: &Path, file: &File) -> io::Result<()> {
+        let opened = self.check_regular(file)?;
+        let (from_parent, from) = self.parent(staged)?;
+        let (to_parent, to) = self.parent(target)?;
+        if !unchanged(&opened, &linux::lstat(&from_parent, from)?) {
+            return Err(stale());
+        }
+        self.check_regular_metadata(&linux::lstat(&to_parent, to)?)?;
+        linux::rename(&from_parent, from, &to_parent, to)?;
+        let moved = linux::stat(file)?;
+        if opened.st_dev != moved.st_dev
+            || opened.st_ino != moved.st_ino
+            || opened.st_mode != moved.st_mode
+            || opened.st_size != moved.st_size
+            || !unchanged(&moved, &linux::lstat(&to_parent, to)?)
+        {
+            return Err(stale());
+        }
+        Ok(())
+    }
+
     /// Remove the named file/link itself; never follow its literal target.
     pub fn unlink(&self, relative: &Path) -> io::Result<()> {
         let (parent, name) = self.parent(relative)?;
@@ -469,7 +540,7 @@ impl<'root> RootIo<'root> {
     }
 }
 
-fn unchanged(before: &libc::stat, after: &libc::stat) -> bool {
+pub(super) fn unchanged(before: &libc::stat, after: &libc::stat) -> bool {
     before.st_dev == after.st_dev
         && before.st_ino == after.st_ino
         && before.st_mode == after.st_mode

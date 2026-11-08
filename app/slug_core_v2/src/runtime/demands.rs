@@ -189,6 +189,7 @@ pub(super) struct SelectedWorkspaceDemands {
     repository_requests: Arc<[Arc<RepositoryMaterializationRequest>]>,
     repository_validations: Arc<[SelectedRepositoryValidation]>,
     unscoped_paths: Arc<[PathObservationDemand]>,
+    command_paths: Arc<[PathObservationDemand]>,
     download_requests: Arc<[Arc<SelectedExtensionDownloadRequest>]>,
     scratch_elf_cells: [Option<SelectedScratchElfMetadataEpochKey>; 3],
     scratch_elf_cell_count: usize,
@@ -200,6 +201,7 @@ impl SelectedWorkspaceDemands {
             repository_requests: Arc::from([]),
             repository_validations: Arc::from([]),
             unscoped_paths: Arc::from([]),
+            command_paths: Arc::from([]),
             download_requests: Arc::from([]),
             scratch_elf_cells: std::array::from_fn(|_| None),
             scratch_elf_cell_count: 0,
@@ -218,6 +220,61 @@ impl SelectedWorkspaceDemands {
         self
     }
 
+    /// Images are immutable facts of this command. Their producer namespaces
+    /// never become reusable IO demands under another command's later clock.
+    pub(super) fn partition_command_sources(
+        mut self,
+        epoch: &slug_bzlmod_v2::RepositorySourceSnapshotEpoch,
+    ) -> Self {
+        let Some(states) = epoch.states().filter(|states| !states.is_empty()) else {
+            return self;
+        };
+        let is_image = |d: &PathObservationDemand| {
+            states.iter().any(|s| {
+                d.namespace()
+                    == slug_workspace_v2::PathObservationNamespace::Materialization(
+                        s.reservation().instance(),
+                    )
+            })
+        };
+        let mut command_paths = self.command_paths.to_vec();
+        let mut unscoped = self.unscoped_paths.to_vec();
+        unscoped.retain(|d| {
+            if is_image(d) {
+                command_paths.push(d.clone());
+                false
+            } else {
+                true
+            }
+        });
+        let mut validations = Vec::with_capacity(self.repository_validations.len());
+        for validation in self.repository_validations.iter() {
+            let mut row = validation.clone();
+            if row.paths.iter().any(&is_image) {
+                let mut paths = row.paths.to_vec();
+                paths.retain(|d| {
+                    if is_image(d) {
+                        command_paths.push(d.clone());
+                        false
+                    } else {
+                        true
+                    }
+                });
+                row.paths = paths.into();
+            }
+            validations.push(row);
+        }
+        command_paths.sort_unstable();
+        command_paths.dedup();
+        self.unscoped_paths = unscoped.into();
+        self.repository_validations = validations.into();
+        self.command_paths = command_paths.into();
+        self
+    }
+    pub(super) fn command_paths(&self) -> &[PathObservationDemand] {
+        &self.command_paths
+    }
+
     #[cfg(test)]
     pub(super) fn for_test(
         repository_requests: impl Into<Arc<[Arc<RepositoryMaterializationRequest>]>>,
@@ -227,6 +284,7 @@ impl SelectedWorkspaceDemands {
             repository_requests: repository_requests.into(),
             repository_validations: Arc::from([]),
             unscoped_paths: unscoped_paths.into(),
+            command_paths: Arc::from([]),
             download_requests: Arc::from([]),
             scratch_elf_cells: std::array::from_fn(|_| None),
             scratch_elf_cell_count: 0,
@@ -250,6 +308,7 @@ impl SelectedWorkspaceDemands {
                 paths: Arc::from([validation_path]),
             }]),
             unscoped_paths: Arc::from([]),
+            command_paths: Arc::from([]),
             download_requests: Arc::from([]),
             scratch_elf_cells: std::array::from_fn(|_| None),
             scratch_elf_cell_count: 0,
@@ -695,6 +754,7 @@ fn select_demands(
         repository_requests: repository_requests.into(),
         repository_validations: repository_validations.into(),
         unscoped_paths: unscoped_paths.into(),
+        command_paths: Arc::from([]),
         download_requests: download_requests.into(),
         scratch_elf_cells,
         scratch_elf_cell_count,
@@ -703,6 +763,9 @@ fn select_demands(
 
 #[cfg(test)]
 mod tests {
+    mod source_image_tests {
+        include!("demands_source_image_tests.rs");
+    }
     use std::fmt;
     use std::hash::Hash;
     use std::hash::Hasher;

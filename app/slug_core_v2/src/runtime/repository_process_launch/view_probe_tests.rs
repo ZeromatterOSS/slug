@@ -94,8 +94,11 @@ impl ProcessLaunch for Probe {
             Root::Again { .. } => RunMode::ContinueExecute,
         }
     }
-    fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
-        &self.builder().reservation
+    fn workspace(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.builder().reservation.workspace()
+    }
+    fn display_root(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        self.builder().reservation.display_root()
     }
     fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
         Some(self.executor())

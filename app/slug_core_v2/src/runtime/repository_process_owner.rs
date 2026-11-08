@@ -45,7 +45,8 @@ pub(super) use capture::ReapedCapture;
 pub(super) trait ProcessLaunch: Send + 'static {
     type Output: Send + 'static;
     fn mode(&self) -> RunMode;
-    fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation>;
+    fn workspace(&self) -> &slug_workspace_v2::NormalizedAbsolutePath;
+    fn display_root(&self) -> &slug_workspace_v2::NormalizedAbsolutePath;
     fn request(&self) -> Option<&RepositoryWorkspaceRequest>;
     fn covered_request_owner(&self) -> Option<Arc<CoveredWorkspaceRequest>>;
     fn root_identity(&self) -> Option<RootIdentity>;
@@ -214,18 +215,8 @@ fn plan<L: ProcessLaunch>(
     mirrors: Vec<wire::MirrorEntry>,
     nonce: [u8; 16],
 ) -> Result<RunPlan, PhysicalRootError> {
-    let display = launch
-        .reservation()
-        .display_root()
-        .as_path()
-        .as_os_str()
-        .as_bytes();
-    let workspace = launch
-        .reservation()
-        .workspace()
-        .as_path()
-        .as_os_str()
-        .as_bytes();
+    let display = launch.display_root().as_path().as_os_str().as_bytes();
+    let workspace = launch.workspace().as_path().as_os_str().as_bytes();
     let execute = match launch.request() {
         Some(request) => match request.operation() {
             RepositoryWorkspaceOperation::Execute(e) => Some(e),

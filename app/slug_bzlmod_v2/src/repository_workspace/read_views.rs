@@ -45,18 +45,29 @@ impl RepositoryWorkspaceStoragePartition {
     }
 }
 
+/// Borrowed state edges for scope-bounded exact comparison. No source can be
+/// represented by a fabricated mutable workspace state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RepositoryWorkspaceReadViewStateRef<'a> {
+    Workspace(&'a Arc<RepositoryWorkspaceState>),
+    Source(&'a Arc<crate::RepositorySourceSnapshotState>),
+}
+
 #[derive(Clone, PartialEq, Eq, Allocative)]
-pub struct RepositoryWorkspaceReadView {
-    repo_spec: RepoSpec,
-    state: Arc<RepositoryWorkspaceState>,
+pub enum RepositoryWorkspaceReadView {
+    Workspace {
+        repo_spec: RepoSpec,
+        state: Arc<RepositoryWorkspaceState>,
+    },
+    Source {
+        state: Arc<crate::RepositorySourceSnapshotState>,
+    },
 }
 impl fmt::Debug for RepositoryWorkspaceReadView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RepositoryWorkspaceReadView")
-            .field("repository", self.state.reservation().repository())
-            .field("instance", &self.state.reservation().instance())
-            .field("mode", &self.state.mode())
-            .field("entries", &self.state.entries().len())
+            .field("repository", self.repository())
+            .field("instance", &self.instance())
             .field("repo_spec", &"<redacted>")
             .finish()
     }
@@ -71,34 +82,115 @@ impl RepositoryWorkspaceReadView {
         if &repo_spec != state.reservation().expected_repo_spec().as_ref() {
             return Err(RepositoryWorkspaceError::ForeignReservation);
         }
-        Ok(Self { repo_spec, state })
+        Ok(Self::Workspace { repo_spec, state })
+    }
+    pub fn from_source(
+        state: Arc<crate::RepositorySourceSnapshotState>,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        state.retained_storage_bytes()?;
+        Ok(Self::Source { state })
     }
     pub(super) fn try_eq_with_states<E>(
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<RepositoryWorkspaceState>,
-            &Arc<RepositoryWorkspaceState>,
+            RepositoryWorkspaceReadViewStateRef<'_>,
+            RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
-        let Self { repo_spec, state } = self;
-        let Self {
-            repo_spec: other_spec,
-            state: other_state,
-        } = other;
-        if repo_spec != other_spec {
-            return Ok(false);
+        match (self, other) {
+            (
+                Self::Workspace { repo_spec, state },
+                Self::Workspace {
+                    repo_spec: other_spec,
+                    state: other_state,
+                },
+            ) => {
+                if repo_spec != other_spec {
+                    return Ok(false);
+                }
+                compare(
+                    RepositoryWorkspaceReadViewStateRef::Workspace(state),
+                    RepositoryWorkspaceReadViewStateRef::Workspace(other_state),
+                )
+            }
+            (Self::Source { state }, Self::Source { state: other_state }) => compare(
+                RepositoryWorkspaceReadViewStateRef::Source(state),
+                RepositoryWorkspaceReadViewStateRef::Source(other_state),
+            ),
+            _ => Ok(false),
         }
-        compare(state, other_state)
     }
-    pub fn repo_spec(&self) -> &RepoSpec {
-        &self.repo_spec
+    pub fn workspace_state(&self) -> Option<&Arc<RepositoryWorkspaceState>> {
+        match self {
+            Self::Workspace { state, .. } => Some(state),
+            _ => None,
+        }
     }
-    pub fn state(&self) -> &Arc<RepositoryWorkspaceState> {
-        &self.state
+    pub fn source_state(&self) -> Option<&Arc<crate::RepositorySourceSnapshotState>> {
+        match self {
+            Self::Source { state } => Some(state),
+            _ => None,
+        }
     }
-    /// Source state includes its own reservation/control/entry/body allocations;
-    /// none of those allocations belong to mutable Process history.
+    pub fn repo_spec(&self) -> Option<&RepoSpec> {
+        match self {
+            Self::Workspace { repo_spec, .. } => Some(repo_spec),
+            Self::Source { state } => state.reservation().request().repo_spec(),
+        }
+    }
+    pub fn workspace(&self) -> &NormalizedAbsolutePath {
+        match self {
+            Self::Workspace { state, .. } => state.reservation().workspace(),
+            Self::Source { state } => state.reservation().workspace(),
+        }
+    }
+    pub fn repository(&self) -> &CanonicalRepoName {
+        match self {
+            Self::Workspace { state, .. } => state.reservation().repository(),
+            Self::Source { state } => state.reservation().repository(),
+        }
+    }
+    pub fn display_root(&self) -> &NormalizedAbsolutePath {
+        match self {
+            Self::Workspace { state, .. } => state.reservation().display_root(),
+            Self::Source { state } => state.reservation().display_root(),
+        }
+    }
+    pub fn instance(&self) -> PathObservationInstanceId {
+        match self {
+            Self::Workspace { state, .. } => state.reservation().instance(),
+            Self::Source { state } => state.reservation().instance(),
+        }
+    }
+    pub fn lease(&self) -> u64 {
+        match self {
+            Self::Workspace { state, .. } => state.reservation().lease(),
+            Self::Source { state } => state.reservation().lease(),
+        }
+    }
+    fn owned_metadata_bytes_with(
+        &self,
+        walk: &mut WorkspaceSpecStorageWalk,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        match self {
+            Self::Workspace { repo_spec, .. } => {
+                repo_spec.workspace_retained_storage_bytes_with(walk)
+            }
+            Self::Source { state } => state
+                .reservation()
+                .request()
+                .retained_storage_bytes_with(walk),
+        }
+    }
+    fn source_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        match self {
+            Self::Workspace { state, .. } => state.retained_storage_bytes(),
+            Self::Source { state } => state.retained_storage_bytes(),
+        }
+    }
+    /// Complete reachable allocation bound. Source sizes constrain physical
+    /// backing separately; digest-only states allocate no file payloads.
     #[doc(hidden)]
     pub fn storage_partition(
         &self,
@@ -106,9 +198,9 @@ impl RepositoryWorkspaceReadView {
         RepositoryWorkspaceStoragePartition::new(
             add(
                 std::mem::size_of::<Self>(),
-                self.repo_spec.workspace_retained_storage_bytes()?,
+                self.owned_metadata_bytes_with(&mut WorkspaceSpecStorageWalk::default())?,
             )?,
-            self.state.retained_storage_bytes()?,
+            self.source_storage_bytes()?,
         )
     }
 }
@@ -124,8 +216,8 @@ impl RepositoryWorkspaceReadViewManifest {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<RepositoryWorkspaceState>,
-            &Arc<RepositoryWorkspaceState>,
+            RepositoryWorkspaceReadViewStateRef<'_>,
+            RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         let Self {
@@ -160,16 +252,9 @@ impl RepositoryWorkspaceReadViewManifest {
         }
         Self::validate_rows(executor, &views)?;
         views.sort_unstable_by(|a, b| {
-            a.state
-                .reservation()
-                .display_root
-                .cmp(&b.state.reservation().display_root)
-                .then_with(|| {
-                    a.state
-                        .reservation()
-                        .repository
-                        .cmp(&b.state.reservation().repository)
-                })
+            a.display_root()
+                .cmp(b.display_root())
+                .then_with(|| a.repository().cmp(b.repository()))
         });
         Ok(Self {
             workspace: executor.workspace.clone(),
@@ -211,29 +296,31 @@ impl RepositoryWorkspaceReadViewManifest {
         }
         let mut walk = WorkspaceSpecStorageWalk::default();
         for (index, view) in views.iter().enumerate() {
-            let source = view.state.reservation();
-            if source.workspace != executor.workspace
-                || source.lease != executor.lease
-                || source.limits != executor.limits
-                || source.instance == executor.instance
-                || source.repository == executor.repository
+            if view.workspace() != &executor.workspace
+                || view.lease() != executor.lease
+                || view
+                    .workspace_state()
+                    .is_some_and(|s| s.reservation().limits != executor.limits)
+                || view.instance() == executor.instance
+                || view.repository() == &executor.repository
                 || overlaps(
-                    source.display_root.as_path(),
+                    view.display_root().as_path(),
                     executor.display_root.as_path(),
                 )
-                || views[..index].iter().any(|prior| {
-                    let prior = prior.state.reservation();
-                    prior.repository == source.repository
-                        || prior.instance == source.instance
-                        || overlaps(prior.display_root.as_path(), source.display_root.as_path())
+                || views[..index].iter().any(|p| {
+                    p.repository() == view.repository()
+                        || p.instance() == view.instance()
+                        || overlaps(p.display_root().as_path(), view.display_root().as_path())
                 })
             {
                 return Err(RepositoryWorkspaceError::ForeignReservation);
             }
-            // One shared depth/edge budget across all specs, including repeated
-            // shared attribute occurrences. Equality never depends on a hash.
-            view.repo_spec
-                .workspace_retained_storage_bytes_with(&mut walk)?;
+            if let RepositoryWorkspaceReadView::Workspace { repo_spec, state } = view {
+                if repo_spec != state.reservation().expected_repo_spec().as_ref() {
+                    return Err(RepositoryWorkspaceError::ForeignReservation);
+                }
+            }
+            view.owned_metadata_bytes_with(&mut walk)?;
         }
         Ok(())
     }
@@ -250,11 +337,7 @@ impl RepositoryWorkspaceReadViewManifest {
         )?;
         let mut walk = WorkspaceSpecStorageWalk::default();
         for view in self.views.iter() {
-            bytes = add(
-                bytes,
-                view.repo_spec
-                    .workspace_retained_storage_bytes_with(&mut walk)?,
-            )?;
+            bytes = add(bytes, view.owned_metadata_bytes_with(&mut walk)?)?;
         }
         Ok(bytes)
     }
@@ -264,7 +347,7 @@ impl RepositoryWorkspaceReadViewManifest {
     ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
         let mut sources = 0;
         for view in self.views.iter() {
-            sources = add(sources, view.state.retained_storage_bytes()?)?
+            sources = add(sources, view.source_storage_bytes()?)?
         }
         RepositoryWorkspaceStoragePartition::new(self.owned_metadata_bytes()?, sources)
     }
@@ -278,7 +361,7 @@ pub(super) fn source_storage_bytes(
 ) -> Result<usize, RepositoryWorkspaceError> {
     let mut bytes = Ok(0usize);
     visit(&mut |view| {
-        bytes = bytes.and_then(|old| add(old, view.state.retained_storage_bytes()?));
+        bytes = bytes.and_then(|old| add(old, view.source_storage_bytes()?));
     });
     bytes
 }

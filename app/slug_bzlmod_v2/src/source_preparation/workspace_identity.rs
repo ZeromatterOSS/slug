@@ -225,8 +225,8 @@ impl RepositoryMaterializationRequest {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<crate::RepositoryWorkspaceState>,
-            &Arc<crate::RepositoryWorkspaceState>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         let Self {

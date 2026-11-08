@@ -102,16 +102,103 @@ pub(super) fn clone_readonly_from_attached_root(
 
 /// A closed full-seal receipt binds the token only after the actual finalizing
 /// helper has reaped. The native command/glue is the sole caller of bind.
+#[derive(Clone, Debug)]
+enum ViewDataRoot {
+    Workspace(Arc<RepositoryPhysicalRoot>),
+    Source(Arc<super::super::source::RepositorySourceRoot>),
+}
+impl ViewDataRoot {
+    fn resources(&self) -> &Arc<RepositoryRootResources> {
+        match self {
+            Self::Workspace(r) => &r.resources,
+            Self::Source(r) => &r.resources,
+        }
+    }
+    fn identity(&self) -> RootIdentity {
+        match self {
+            Self::Workspace(r) => r.identity,
+            Self::Source(r) => r.identity,
+        }
+    }
+    fn backing(&self) -> &Arc<RepositoryRootBacking> {
+        match self {
+            Self::Workspace(r) => &r.backing,
+            Self::Source(r) => &r.backing,
+        }
+    }
+    fn mode(&self) -> RepositoryWorkspaceMode {
+        match self {
+            Self::Workspace(r) => r.mode,
+            Self::Source(_) => RepositoryWorkspaceMode::Archive,
+        }
+    }
+    fn display(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
+        match self {
+            Self::Workspace(r) => r.reservation.display_root(),
+            Self::Source(r) => r.reservation().display_root(),
+        }
+    }
+    fn instance(&self) -> slug_workspace_v2::PathObservationInstanceId {
+        match self {
+            Self::Workspace(r) => r.reservation.instance(),
+            Self::Source(r) => r.reservation().instance(),
+        }
+    }
+    fn check_domain(
+        &self,
+        domain: &NativeMountDomain,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), MountLeaseError> {
+        match self {
+            Self::Workspace(r) => {
+                r.check_origin(scope, active)?;
+                domain.check_root(&r.reservation, &r.resources, scope, active)
+            }
+            Self::Source(r) => {
+                r.check_origin(scope, active)?;
+                domain.check_source(r.reservation(), &r.resources, scope, active)
+            }
+        }
+    }
+    fn validate_backing(&self) -> Result<(), PhysicalRootError> {
+        match self {
+            Self::Workspace(r) => r.validate_backing(),
+            Self::Source(r) => r.validate_backing(),
+        }
+    }
+}
 #[derive(Debug)]
 pub(in crate::runtime::repository_physical_root) struct FinalizedRepositoryView {
     mount: ReadOnlyMountClone,
-    root: Arc<RepositoryPhysicalRoot>,
+    root: ViewDataRoot,
     domain: Arc<NativeMountDomain>,
     _credit: resources::ResourceCredit,
     // LAST: standalone/queued view custody can outlive its returned command.
     retirement: Option<super::super::progress::command::RepositoryWorkspaceRetirementGuard>,
 }
 impl FinalizedRepositoryView {
+    pub(in crate::runtime::repository_physical_root) fn bind_source(
+        sealed: &super::super::source::SealedSourceSnapshot,
+        mount: ReadOnlyMountClone,
+        domain: Arc<NativeMountDomain>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, MountLeaseError> {
+        let credit = sealed
+            .root()
+            .resources
+            .reserve(view_control_bytes(), 0, 0)?;
+        let owner = Self {
+            mount,
+            root: ViewDataRoot::Source(sealed.root().clone()),
+            domain,
+            _credit: credit,
+            retirement: None,
+        };
+        owner.validate(scope, active)?;
+        Ok(owner)
+    }
     pub(in crate::runtime::repository_physical_root) fn bind(
         sealed: &SealedWorkspaceMaterialization,
         mount: ReadOnlyMountClone,
@@ -125,7 +212,7 @@ impl FinalizedRepositoryView {
             .reserve(view_control_bytes(), 0, 0)?;
         let owner = Self {
             mount,
-            root: sealed.root().clone(),
+            root: ViewDataRoot::Workspace(sealed.root().clone()),
             domain,
             _credit: credit,
             retirement: None,
@@ -135,8 +222,8 @@ impl FinalizedRepositoryView {
         else {
             return Err(MountLeaseError::Request);
         };
-        if realization.reservation() != owner.root.reservation()
-            || realization.final_state() != owner.root.state()
+        if realization.reservation() != sealed.root().reservation()
+            || realization.final_state() != sealed.root().state()
         {
             return Err(MountLeaseError::Request);
         }
@@ -159,46 +246,56 @@ impl FinalizedRepositoryView {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<(), MountLeaseError> {
-        self.domain
-            .check_root(&self.root.reservation, &self.root.resources, scope, active)?;
+        self.root.check_domain(&self.domain, scope, active)?;
         self.domain.check_clone(&self.mount.clone, scope, active)?;
-        if !same_backing(self.mount.clone.attached, self.root.identity)
-            || !same_backing(self.mount.clone.detached, self.root.identity)
+        if !same_backing(self.mount.clone.attached, self.root.identity())
+            || !same_backing(self.mount.clone.detached, self.root.identity())
             || self.mount.clone.attached.mount == self.mount.clone.detached.mount
             || !self
                 .mount
                 .clone
                 .backing
                 .as_ref()
-                .is_some_and(|backing| Arc::ptr_eq(backing, &self.root.backing))
+                .is_some_and(|backing| Arc::ptr_eq(backing, self.root.backing()))
             || identity(&self.mount.clone.token)? != self.mount.clone.detached
         {
             return Err(MountLeaseError::AttachedRoot);
         }
         self.root.validate_backing()?;
         self.root
-            .backing
-            .matches(&self.root.resources, self.root.mode)?;
+            .backing()
+            .matches(self.root.resources(), self.root.mode())?;
         check_readonly(&self.mount.clone.token)?;
         Ok(())
     }
     pub(in crate::runtime::repository_physical_root) fn display(
         &self,
     ) -> &slug_workspace_v2::NormalizedAbsolutePath {
-        self.root.reservation.display_root()
+        self.root.display()
     }
     pub(in crate::runtime::repository_physical_root) fn instance(
         &self,
     ) -> slug_workspace_v2::PathObservationInstanceId {
-        self.root.reservation.instance()
+        self.root.instance()
     }
     pub(in crate::runtime::repository_physical_root) fn root_identity(&self) -> RootIdentity {
-        self.root.identity
+        self.root.identity()
     }
     pub(in crate::runtime::repository_physical_root) fn data_root(
         &self,
-    ) -> &Arc<RepositoryPhysicalRoot> {
-        &self.root
+    ) -> Option<&Arc<RepositoryPhysicalRoot>> {
+        match &self.root {
+            ViewDataRoot::Workspace(root) => Some(root),
+            _ => None,
+        }
+    }
+    pub(in crate::runtime::repository_physical_root) fn source_data_root(
+        &self,
+    ) -> Option<&Arc<super::super::source::RepositorySourceRoot>> {
+        match &self.root {
+            ViewDataRoot::Source(root) => Some(root),
+            _ => None,
+        }
     }
     /// The incoming token's mount ID, rather than the original data FD's ID.
     pub(in crate::runtime::repository_physical_root) fn attachment_identity(&self) -> RootIdentity {
@@ -319,7 +416,7 @@ impl ReadOnlyViewAttempt {
         view.validate(scope, active)?;
         view.domain.check_root(
             binding.request.request().reservation(),
-            &view.root.resources,
+            view.root.resources(),
             scope,
             active,
         )?;
@@ -375,12 +472,12 @@ impl ReadOnlyViewInFlight {
                 flags,
             ]
             || attached_id != view.mount.clone.detached
-            || !same_backing(detached, view.root.identity)
+            || !same_backing(detached, view.root.identity())
             || detached.mount == attached_id.mount
         {
             return Err(MountLeaseError::AttachedRoot);
         }
-        let resources = &view.root.resources;
+        let resources = view.root.resources();
         let credit = resources.reserve(view_control_bytes(), 0, 0)?;
         let clone_credit = resources.reserve(std::mem::size_of::<AttachedMountClone>(), 2, 0)?;
         let owner = view.domain.duplicate_namespace()?;
@@ -391,7 +488,7 @@ impl ReadOnlyViewInFlight {
             detached,
             namespace: view.domain.namespace_identity(),
             resources: resources.clone(),
-            backing: Some(view.root.backing.clone()),
+            backing: Some(view.root.backing().clone()),
             credit: clone_credit,
         };
         let mut next = FinalizedRepositoryView {
@@ -440,7 +537,7 @@ impl PendingReadOnlyView {
         let view = self.view.as_ref().ok_or(MountLeaseError::Consumed)?;
         view.domain.check_root(
             self.binding.request.request().reservation(),
-            &view.root.resources,
+            view.root.resources(),
             scope,
             active,
         )?;

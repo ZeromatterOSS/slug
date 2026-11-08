@@ -53,9 +53,12 @@ and bootstrap/payload cancellation. The [command scope receipt](wp1225-command-s
 adds trusted crate-internal configuration on ordinary Native services: fresh
 command scopes on one persistent bank, original data deadlines, foreign-scope/
 bank refusal, Args/RPC stop signals and bounded retirement. Default CLI activation
-remains Disabled. Selected-source bridges are the next frontier, followed by
-original-route physical CAS/runfiles
-proof and the complete activation gates below. Existing production process routes
+remains Disabled. The [selected-source bridge receipt](wp1225-selected-source-bridge-acceptance-2026-11-08.json)
+adds inactive Workspace, Local, selected BCR tar.gz and pinned Builtin snapshots
+through original repository Starlark. Digest-only Source data keeps its original
+scope; fresh commands recapture through the existing producers. Original-route
+physical CAS/runfiles proof and profile removal are the next frontier, alongside
+the complete activation gates below. Existing production process routes
 remain replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
@@ -127,9 +130,12 @@ and [selected admission proof](wp1225-selected-view-admission-acceptance-2026-11
 cover shared owning namespaces, RO finalization/renewal, full child-visible
 manifests and complete native selected-set admission through ordinary Execute.
 Data-only history guards preserve source allocations without setup authority;
-source bodies never become mutable Process history. Original Loading source bridges, full
-Archive/public Rust, original-route physical CAS/runfiles and equivalent-memory
-gates remain. No production profile replacement is activated by this evidence.
+source bodies never become mutable Process history. The selected-source bridge
+admits direct Label/Path text, read/template and Execute; derived Source Path
+operations/listings, reserved string-read roundtrips, Legacy LocalTar and
+cross-source links remain unsupported. Full Archive/public Rust, original-route
+physical CAS/runfiles and equivalent-memory gates remain. No production profile
+replacement is activated by this evidence.
 
 Inactive protocol, anchored resolver, rooted observation/mutation and native
 reader candidates may proceed. Before untrusted activation, prove actual

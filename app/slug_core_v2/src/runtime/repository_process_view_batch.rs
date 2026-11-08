@@ -114,32 +114,37 @@ impl NativeViewBatch {
         }
         owner.incoming.sort_unstable_by(|a, b| {
             a.1.projection()
-                .state()
-                .reservation()
                 .display_root()
-                .cmp(b.1.projection().state().reservation().display_root())
+                .cmp(b.1.projection().display_root())
                 .then_with(|| {
                     a.1.projection()
-                        .state()
-                        .reservation()
                         .repository()
-                        .cmp(b.1.projection().state().reservation().repository())
+                        .cmp(b.1.projection().repository())
                 })
         });
         // The whole metadata set is checked before any native descriptor probe.
         for ((view, data), expected) in owner.incoming.iter().zip(manifest.views()) {
             if !Arc::ptr_eq(view.domain(), &owner.domain)
-                || !Arc::ptr_eq(view.data_root(), data.root())
+                || !match (
+                    view.data_root(),
+                    data.root(),
+                    view.source_data_root(),
+                    data.source_root(),
+                ) {
+                    (Some(a), Some(b), None, None) => Arc::ptr_eq(a, b),
+                    (None, None, Some(a), Some(b)) => Arc::ptr_eq(a, b),
+                    _ => false,
+                }
                 || !owner
                     .covered
                     .dependencies()
                     .owners()
                     .iter()
                     .any(|known| Arc::ptr_eq(known, data))
-                || !Arc::ptr_eq(data.projection().state(), expected.state())
+                || !data.same_state_allocation(expected)
                 || data.projection().repo_spec() != expected.repo_spec()
-                || view.display() != expected.state().reservation().display_root()
-                || view.instance() != expected.state().reservation().instance()
+                || view.display() != expected.display_root()
+                || view.instance() != expected.instance()
                 || view.display().as_path().as_os_str().len() > 4096
             {
                 return Err(PhysicalRootError::Reservation);

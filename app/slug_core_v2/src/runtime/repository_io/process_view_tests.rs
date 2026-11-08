@@ -307,15 +307,25 @@ fn native_selected_execute_records_replays_and_retains_data_after_controller_dro
             .iter()
             .find_map(|source| match &source.kind {
                 RepositoryMaterializationKind::GeneralWorkspace(realization)
-                    if realization.reservation() == view.state().reservation() =>
+                    if realization.reservation()
+                        == view
+                            .workspace_state()
+                            .expect("General view fixture")
+                            .reservation() =>
                 {
                     Some(realization.final_state())
                 }
                 _ => None,
             })
             .unwrap();
-        assert_eq!(view.state(), original);
-        assert!(!Arc::ptr_eq(view.state(), original));
+        assert_eq!(
+            view.workspace_state().expect("General view fixture"),
+            original
+        );
+        assert!(!Arc::ptr_eq(
+            view.workspace_state().expect("General view fixture"),
+            original
+        ));
     }
     let unused = match &fixture.sources[1].kind {
         RepositoryMaterializationKind::GeneralWorkspace(r) => {
@@ -388,7 +398,11 @@ fn native_selected_execute_records_replays_and_retains_data_after_controller_dro
                 .iter()
                 .find_map(|source| match &source.kind {
                     RepositoryMaterializationKind::GeneralWorkspace(realization)
-                        if realization.reservation() == view.state().reservation() =>
+                        if realization.reservation()
+                            == view
+                                .workspace_state()
+                                .expect("General view fixture")
+                                .reservation() =>
                     {
                         Some(realization.final_state())
                     }
@@ -396,7 +410,10 @@ fn native_selected_execute_records_replays_and_retains_data_after_controller_dro
                 })
                 .unwrap();
             assert!(
-                Arc::ptr_eq(view.state(), canonical),
+                Arc::ptr_eq(
+                    view.workspace_state().expect("General view fixture"),
+                    canonical
+                ),
                 "accepted history must retain the canonical credited source state"
             );
         }

@@ -17,6 +17,47 @@ pub(super) fn apply_selected_bcr_patch(
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
+    apply_selected_with(bytes, strip, active, |relative, hunks| {
+        apply_file(root, relative, hunks, active, scope)
+    })
+}
+
+#[cfg(target_os = "linux")]
+#[path = "repository_archive_patch/rooted.rs"]
+mod rooted;
+#[cfg(target_os = "linux")]
+pub(super) fn apply_selected_bcr_patch_at(
+    root: &super::repository_root_io::RootIo<'_>,
+    bytes: &[u8],
+    strip: usize,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
+    // The parser retains references into the captured patch, not target bodies.
+    // Prepay reference-vector growth and bounded hunk tables before allocation.
+    let lines = bytes
+        .iter()
+        .filter(|b| **b == b'\n')
+        .count()
+        .checked_add(1)
+        .ok_or_else(|| materialization("patch line count overflow"))?;
+    let control = lines
+        .checked_mul(2 * std::mem::size_of::<&str>())
+        .and_then(|n| {
+            n.checked_add(4 * PATCH_HUNK_LIMIT * std::mem::size_of::<(HunkHeader, &[&str])>())
+        })
+        .ok_or_else(|| materialization("patch metadata overflow"))?;
+    let _control = source_service::buffer(scope, control).map_err(materialization)?;
+    apply_selected_with(bytes, strip, active, |relative, hunks| {
+        rooted::apply(root, relative, hunks, active, scope)
+    })
+}
+fn apply_selected_with(
+    bytes: &[u8],
+    strip: usize,
+    active: &dyn Fn() -> bool,
+    mut apply: impl FnMut(&str, &[(HunkHeader, &[&str])]) -> Result<(), ArchiveMaterializationError>,
+) -> Result<(), ArchiveMaterializationError> {
     if bytes.contains(&b'\r') || bytes.contains(&0) || !bytes.ends_with(b"\n") {
         return Err(materialization(
             "selected BCR patch must be NUL-free UTF-8 LF text ending in LF",
@@ -83,7 +124,7 @@ pub(super) fn apply_selected_bcr_patch(
         if hunks.is_empty() {
             return Err(materialization("selected BCR patch file has no hunks"));
         }
-        apply_file(root, &old, &hunks, active, scope)?;
+        apply(&old, &hunks)?;
     }
     if files == 0 {
         return Err(materialization(

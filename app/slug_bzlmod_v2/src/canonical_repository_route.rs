@@ -233,6 +233,20 @@ impl<'a> HostCanonicalRepositoryRouteView<'a> {
 
     /// Module declaration associated with a selected repository. Builtin and
     /// generated routes need separate provenance before exposing this value.
+    /// Selected lookup identity, distinct from the evaluated module declaration.
+    #[doc(hidden)]
+    pub fn selected_module_identity(
+        self,
+    ) -> Option<crate::selected_repo_spec::HostCanonicalSelectedModuleIdentity<'a>> {
+        match &self.route.source {
+            HostCanonicalRepositoryRouteSource::Selected(definition) => {
+                Some(definition.view().identity())
+            }
+            HostCanonicalRepositoryRouteSource::Builtin(_)
+            | HostCanonicalRepositoryRouteSource::Generated(_) => None,
+        }
+    }
+
     pub fn associated_module_metadata(self) -> Option<(&'a str, &'a str)> {
         match &self.route.source {
             HostCanonicalRepositoryRouteSource::Selected(definition) => {

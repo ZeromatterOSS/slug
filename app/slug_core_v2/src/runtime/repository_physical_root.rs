@@ -3,6 +3,9 @@
 //! Filesystem verification does not prove descendant death or mount provenance.
 //! This owner exposes no ambient-path/proc/registry mutation or activation.
 //! Trusted setup and process lifecycle stay in closed native child leaves.
+#[path = "repository_source_root.rs"]
+pub(in crate::runtime) mod source;
+
 use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;

@@ -12,10 +12,54 @@ use super::*;
 use crate::runtime::repository_io::process_views::SelectedProcessSources;
 
 pub(super) struct RetainedProcessView {
-    view: FinalizedRepositoryView,
-    data: Arc<NativeReadViewData>,
+    pub(super) view: FinalizedRepositoryView,
+    pub(super) data: Arc<NativeReadViewData>,
+}
+#[derive(Clone, Copy)]
+enum ProcessViewSlot {
+    Workspace(usize),
+    Source(usize),
 }
 impl RepositoryWorkspaceCommand {
+    fn process_view_slot(
+        &self,
+        projection: &slug_bzlmod_v2::RepositoryWorkspaceReadView,
+    ) -> Result<ProcessViewSlot, PhysicalRootError> {
+        if let Some(state) = projection.source_state() {
+            return self
+                .source_slots
+                .iter()
+                .position(|slot| &slot.reservation == state.reservation())
+                .map(ProcessViewSlot::Source)
+                .ok_or(PhysicalRootError::Reservation);
+        }
+        let state = projection
+            .workspace_state()
+            .ok_or(PhysicalRootError::Reservation)?;
+        self.roots
+            .iter()
+            .position(|slot| &slot.reservation == state.reservation())
+            .map(ProcessViewSlot::Workspace)
+            .ok_or(PhysicalRootError::Reservation)
+    }
+    fn process_view_at(&self, slot: ProcessViewSlot) -> Option<&RetainedProcessView> {
+        match slot {
+            ProcessViewSlot::Workspace(i) => self.roots[i].process_view.as_ref(),
+            ProcessViewSlot::Source(i) => self.source_slots[i].process_view.as_ref(),
+        }
+    }
+    fn take_process_view(&mut self, slot: ProcessViewSlot) -> Option<RetainedProcessView> {
+        match slot {
+            ProcessViewSlot::Workspace(i) => self.roots[i].process_view.take(),
+            ProcessViewSlot::Source(i) => self.source_slots[i].process_view.take(),
+        }
+    }
+    fn set_process_view(&mut self, slot: ProcessViewSlot, view: RetainedProcessView) {
+        match slot {
+            ProcessViewSlot::Workspace(i) => self.roots[i].process_view = Some(view),
+            ProcessViewSlot::Source(i) => self.source_slots[i].process_view = Some(view),
+        }
+    }
     pub(in crate::runtime::repository_physical_root) fn install_process_view(
         mut self,
         sealed: &super::super::super::SealedWorkspaceMaterialization,
@@ -91,7 +135,7 @@ impl RepositoryWorkspaceCommand {
                 .source_dependencies
                 .owners()
                 .iter()
-                .any(|owner| Arc::ptr_eq(owner.projection().state(), view.state()))
+                .any(|owner| owner.same_state_allocation(view))
         });
         let bytes = if canonical_pointers {
             partition.owned_bytes()
@@ -134,17 +178,10 @@ impl RepositoryWorkspaceCommand {
             .map_err(PhysicalRootError::Protocol)?
             .owned_bytes();
         for projection in execute.read_views().views() {
-            let index = self
-                .roots
-                .iter()
-                .position(|slot| {
-                    slot.process_view.as_ref().is_some_and(|view| {
-                        view.data.projection().state().reservation()
-                            == projection.state().reservation()
-                    })
-                })
+            let index = self.process_view_slot(projection)?;
+            let controller = self
+                .process_view_at(index)
                 .ok_or(PhysicalRootError::Reservation)?;
-            let controller = self.roots[index].process_view.as_ref().unwrap();
             if controller.data.projection().repo_spec() != projection.repo_spec()
                 || !sources.matches_data(&controller.data)
                 || !Arc::ptr_eq(
@@ -181,10 +218,8 @@ impl RepositoryWorkspaceCommand {
         let canonical = indices
             .iter()
             .map(|index| {
-                self.roots[*index]
-                    .process_view
-                    .as_ref()
-                    .unwrap()
+                self.process_view_at(*index)
+                    .expect("validated controller")
                     .data
                     .projection()
                     .clone()
@@ -227,9 +262,8 @@ impl RepositoryWorkspaceCommand {
         let scope = scope.clone();
         let mut pairs = Vec::with_capacity(count);
         for index in indices {
-            let retained = self.roots[index]
-                .process_view
-                .take()
+            let retained = self
+                .take_process_view(index)
                 .expect("validated exclusive controller");
             pairs.push((retained.view, retained.data));
         }
@@ -268,14 +302,10 @@ impl RepositoryWorkspaceCommand {
     ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope, active)?;
         for (view, data) in restored.pairs() {
-            let slot = self
-                .roots
-                .iter()
-                .find(|slot| &slot.reservation == data.root().reservation())
-                .ok_or(PhysicalRootError::Reservation)?;
-            if slot.process_view.is_some()
-                || view.instance() != data.root().reservation().instance()
-                || view.root_identity() != data.root().identity
+            let slot = self.process_view_slot(data.projection())?;
+            if self.process_view_at(slot).is_some()
+                || view.instance() != data.projection().instance()
+                || view.root_identity() != data.identity()
                 || !Arc::ptr_eq(
                     view.domain(),
                     self.mount_domain
@@ -287,12 +317,8 @@ impl RepositoryWorkspaceCommand {
             }
         }
         for (view, data) in restored.take_pairs() {
-            let slot = self
-                .roots
-                .iter_mut()
-                .find(|slot| &slot.reservation == data.root().reservation())
-                .expect("validated restore slot");
-            slot.process_view = Some(RetainedProcessView { view, data });
+            let slot = self.process_view_slot(data.projection())?;
+            self.set_process_view(slot, RetainedProcessView { view, data });
         }
         Ok(self)
     }

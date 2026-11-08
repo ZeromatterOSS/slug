@@ -484,8 +484,87 @@ isolation, shared retained-buffer/decoder admission, retries and queued worker/
 view retirement. Existing Native acquisition and consumed Diagnostic behavior
 remain protected within the recorded passing coverage. Five inherited Diagnostic
 full-caller/counter fixtures fail identically on the clean baseline and candidate;
-their success is not claimed. Source bridges, full archive, original-route CAS/runfiles,
-public Rust, equivalent-command memory and default activation remain open.
+their success is not claimed. Derived Source Path and unsupported archive forms,
+full archive, original-route CAS/runfiles, public Rust, equivalent-command memory
+and default activation remain open.
+
+### Selected-source snapshot bridge (accepted inactive component)
+
+The [acceptance receipt](wp1225-selected-source-bridge-acceptance-2026-11-08.json)
+records the independent review and actual original/native proof. The bridge uses
+a distinct Source reservation and closed
+digest manifest, never an invented General owner/history. Natural subjects are
+Workspace (workspace, mapping and root identity), Local and Immutable (complete
+selected provenance, Spec, mapping and admitted source policy), and Builtin
+(pinned catalog identity and mapping). Route owners project these facts through
+tracked DICE dependencies. Every admitted repository-context source projection
+and prepared reuse demands the snapshot before exposing path text. The bridge
+admits direct Label/Path text, read/template and Execute. Derived Source Path
+attributes/methods, listings and reserved-path string read roundtrips explicitly
+refuse; they acquire no Host fallback. Ordinary module and .bzl acquisition retain their existing producers
+and final consistency certificates. Exposed paths are never rebased afterward.
+
+The manifest retains complete canonical paths, modes, kinds, literal links and
+FileContentDigest(size, SHA256), without file-body Arcs. Native sealing verifies
+the complete actual tree after all transforms, including membership and framed
+same-FD content. General exact body/history semantics remain unchanged. Bounded
+exact manifest comparisons run outside actor locks and check scope/activity.
+Partial Read/Seek is not an independent SHA proof; full-stream digest/EOF checks
+are required for future Source CAS/image publication, whose original-route
+integration remains open. Data retains original scope, credits and
+backing, without namespace/controller authority; command retirement includes
+pending acquisition, worker results, source views and queued installation.
+
+The current native Source epoch classifies its exact image-observation namespaces
+as command paths. Their complete facts remain in that command's terminal
+association, source certificate and DICE publication, and validate under the
+originating scope before publication. They are excluded from future-command IO
+and repository reuse validation; B must capture again through its fresh epoch.
+Original Host/module/.bzl and ordinary materialization certificates retain their
+existing validation. No path spelling selects this lifetime class. Partition and
+retained native snapshot metadata are prepaid on the same bank, without granting
+IO authority or retaining a controller.
+
+Each fresh command creates fresh backing. Immutable archives reacquire through
+the existing selected BCR tar.gz producer and extract/overlay/patch/MODULE directly
+into that backing, preserving its parser semantics. Legacy LocalTar source
+bridging remains unsupported; its ordinary acquisition producer is unchanged.
+Completed legacy TempDirs and
+A-scoped captures cannot be promoted into B. Builtins stream the complete
+validated static catalog verbatim. Local and Workspace use a nofollow whole-tree
+capture with framed per-file hashing, then complete membership/content rewalk
+and ordinary final Host/source-certificate validation. This Slug-native policy
+certifies the closed captured image, not an atomic Host instant or writer
+exclusion. Observed instability fails. Fresh B captures Host inputs anew.
+Internal relative symlinks retain their literal text; absolute, escaping or
+cross-source links, hardlinks and special files refuse. No live Host fallback or
+source-name filtering (including .git/target) is permitted.
+
+Native source setup is Linux x86_64/64-bit; other platforms have no source setup
+factory or activation path. Pure metadata carries no native permission.
+Source-specific per-root admission is 256 MiB final logical bytes, 64 MiB/file,
+8192 entries including root/directories, 1 MiB aggregate path/link bytes,
+256-byte paths, 255-byte components, depth32 and 8 MiB digest metadata. Native setup reuses the
+existing Archive physical envelope of 2 GiB/262144 charged units and prepays its
+complete capacity on the existing persistent bank; it does not borrow General
+history allowances or shrink/refund the physical quota. The complete selected
+set remains bounded by128 views and shared retained-byte/FD/backing admission
+before helper launch. Existing 128 MiB compressed capture, BCR256 MiB decode,
+source counters and original deadlines remain unchanged. Streaming scratch is
+fixed64 KiB and credited; validation hashing is not a second decode charge.
+Caps may explicitly refuse genuine Rust archives or large workspaces; this
+bridge cannot close full-workload, public activation or matched-memory gates.
+
+Implementation splits pure protocol/provenance in Bzlmod, SourceRoot/sealing and
+rooted archive/Local kernels in Core private leaves, and route/Need/replay plus
+catalog projection in existing source owners. Reuse Arc/Allocative, compact
+strings/maps and RootIo hashing, with no global cache/interner or donor import.
+Proof must cover actual original arbitrary argv using all source families,
+fresh A/B ownership, Local mutation/link refusals, complete-set rejection,
+cleanup/credits and a greater-than64 MiB source beside the64 MiB writable root.
+Existing pinned Bazel9.2 StarlarkBaseExternalContext.getPath/getPathFromLabel,
+read and execute Label projections supply exact API source authority; physical
+identity, capture consistency and finite admission remain Slug-native.
 
 ## Anchored source IO and native transport
 

@@ -41,6 +41,7 @@ mod repository_filesystem;
 mod repository_host_input;
 mod repository_ignore;
 mod repository_label_path;
+mod repository_source_snapshot;
 mod repository_workspace;
 pub mod resolution;
 mod root_bootstrap;
@@ -413,6 +414,7 @@ pub use repository_label_path::HostRepositoryLabelPathValue;
 pub use repository_label_path::ObservedHostRepositoryLabelPath;
 pub use repository_label_path::RepositoryLabelPathAddress;
 #[doc(hidden)]
+pub use repository_source_snapshot::*;
 pub use repository_workspace::*;
 pub use resolution::DevDependencyMode;
 pub use resolution::ModuleDirectiveOwner;

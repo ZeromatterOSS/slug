@@ -166,6 +166,12 @@ struct BackingState {
     // Stable spelling/domain claims follow every builder/root/token pin. They
     // contain no IO authority and keep collision control alive for old readers.
     claim: Option<Arc<crate::runtime::repository_io::reservations::SourceRootClaim>>,
+    source_binding: Option<(
+        RootIdentity,
+        Arc<slug_bzlmod_v2::RepositorySourceSnapshotReservation>,
+    )>,
+    source_snapshot_claim:
+        Option<Arc<crate::runtime::repository_io::source_snapshots::SourceSnapshotClaim>>,
     // Binding payload precedes the sole quota/control credit on destruction.
     credit: ResourceCredit,
 }
@@ -181,6 +187,8 @@ impl RepositoryRootBacking {
                 mode,
                 binding: None,
                 claim: None,
+                source_binding: None,
+                source_snapshot_claim: None,
                 credit,
             }),
         }))
@@ -194,10 +202,12 @@ impl RepositoryRootBacking {
             return Err(PhysicalRootError::Reservation);
         }
         let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
-        if state
-            .binding
-            .as_ref()
-            .is_some_and(|(_, prior)| prior.as_ref() != reservation)
+        if state.source_binding.is_some()
+            || state.source_snapshot_claim.is_some()
+            || state
+                .binding
+                .as_ref()
+                .is_some_and(|(_, prior)| prior.as_ref() != reservation)
         {
             return Err(PhysicalRootError::Reservation);
         }
@@ -238,6 +248,9 @@ impl RepositoryRootBacking {
         reservation: &Arc<RepositoryWorkspaceReservation>,
     ) -> Result<(), PhysicalRootError> {
         let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        if state.source_binding.is_some() || state.source_snapshot_claim.is_some() {
+            return Err(PhysicalRootError::Reservation);
+        }
         if let Some((selected, owner)) = &state.binding {
             if *selected != identity || owner != reservation {
                 return Err(PhysicalRootError::Backing);
@@ -258,6 +271,65 @@ impl RepositoryRootBacking {
 }
 
 impl RepositoryRootBacking {
+    pub(super) fn bind_source_claim(
+        &self,
+        reservation: &slug_bzlmod_v2::RepositorySourceSnapshotReservation,
+        claim: Arc<crate::runtime::repository_io::source_snapshots::SourceSnapshotClaim>,
+    ) -> Result<(), PhysicalRootError> {
+        if !claim.matches_reservation(reservation) || !claim.belongs_to(&self.resources) {
+            return Err(PhysicalRootError::Reservation);
+        }
+        let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        if state.claim.is_some()
+            || state.binding.is_some()
+            || state
+                .source_binding
+                .as_ref()
+                .is_some_and(|(_, r)| r.as_ref() != reservation)
+        {
+            return Err(PhysicalRootError::Reservation);
+        }
+        if let Some(old) = &state.source_snapshot_claim {
+            if !Arc::ptr_eq(old, &claim) {
+                return Err(PhysicalRootError::Reservation);
+            }
+        } else {
+            state.source_snapshot_claim = Some(claim)
+        }
+        Ok(())
+    }
+    pub(super) fn bind_source(
+        &self,
+        identity: RootIdentity,
+        reservation: &Arc<slug_bzlmod_v2::RepositorySourceSnapshotReservation>,
+    ) -> Result<(), PhysicalRootError> {
+        let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        if state.claim.is_some() || state.binding.is_some() {
+            return Err(PhysicalRootError::Reservation);
+        }
+        if let Some((old, r)) = &state.source_binding {
+            if *old != identity || r != reservation {
+                return Err(PhysicalRootError::Backing);
+            }
+            return Ok(());
+        }
+        state
+            .credit
+            .bytes
+            .try_grow(
+                reservation
+                    .retained_storage_bytes()
+                    .map_err(PhysicalRootError::Protocol)?,
+            )
+            .map_err(|_| PhysicalRootError::Resource)?;
+        state.source_binding = Some((identity, reservation.clone()));
+        Ok(())
+    }
+    pub(in crate::runtime::repository_physical_root) fn source_snapshot_claim(
+        &self,
+    ) -> Option<Arc<crate::runtime::repository_io::source_snapshots::SourceSnapshotClaim>> {
+        self.state.lock().ok()?.source_snapshot_claim.clone()
+    }
     /// One-way atomic accounting for a physically verified SAME backing. No
     /// bytes/FD credit is refunded, no IO or DICE compute occurs under locks.
     pub(super) fn shrink_to_process(

@@ -36,6 +36,14 @@ impl std::fmt::Debug for RepositoryWorkspaceRetirementGuard {
     }
 }
 impl RepositoryWorkspaceRetirementObserver {
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) fn owner_count_for_test(&self) -> usize {
+        *self
+            .state
+            .owners
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+    }
     pub(in crate::runtime::repository_physical_root) fn worker_guard(
         &self,
     ) -> RepositoryWorkspaceRetirementGuard {
@@ -103,11 +111,18 @@ struct NativeRootSlot {
     process_view: Option<selected::RetainedProcessView>,
 }
 
+struct NativeSourceSlot {
+    reservation: Arc<slug_bzlmod_v2::RepositorySourceSnapshotReservation>,
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    process_view: Option<selected::RetainedProcessView>,
+}
+
 /// Created fresh once by the native command lifecycle, never from an imported
 /// epoch. This is unfinished command state, not a second materialization registry.
 /// No Clone, root FD, generic mutation callback or child result injection exists.
 pub(in crate::runtime) struct RepositoryWorkspaceCommand {
     roots: Vec<NativeRootSlot>,
+    source_slots: Vec<NativeSourceSlot>,
     mount_domain: Option<Arc<NativeMountDomain>>,
     epoch: CreditedEpoch,
     // Semantic epoch payloads retire before the source-data lifetime union.
@@ -156,6 +171,7 @@ impl RepositoryWorkspaceCommand {
             NativeReadViewDependencies::empty(&resources, limits.max_state_versions())?;
         Ok(Self {
             roots: Vec::new(),
+            source_slots: Vec::new(),
             mount_domain: None,
             epoch: CreditedEpoch {
                 epoch,
@@ -217,7 +233,7 @@ impl RepositoryWorkspaceCommand {
             _credit: credit,
         };
         if !request.try_eq_with_states(&expected.request, &mut |left, right| {
-            comparison.state_equal(left, right)
+            comparison.state_ref_equal(left, right)
         })? {
             return Err(PhysicalRootError::Protocol(
                 slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
@@ -232,7 +248,7 @@ impl RepositoryWorkspaceCommand {
             .ok_or(PhysicalRootError::Reservation)?;
         if let Some(record) = transcript.records().get(request.index()) {
             if !request.try_eq_with_states(record.request(), &mut |left, right| {
-                comparison.state_equal(left, right)
+                comparison.state_ref_equal(left, right)
             })? {
                 return Err(PhysicalRootError::Protocol(
                     slug_bzlmod_v2::RepositoryWorkspaceError::ReplayConflict,
@@ -372,6 +388,15 @@ impl RepositoryWorkspaceCommand {
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope, active)?;
+        if self
+            .roots
+            .len()
+            .checked_add(self.source_slots.len())
+            .ok_or(PhysicalRootError::Resource)?
+            >= self.max_roots
+        {
+            return Err(PhysicalRootError::Resource);
+        }
         if !Arc::ptr_eq(&self.resources, &builder.resources) {
             return Err(PhysicalRootError::Resource);
         }
@@ -1014,3 +1039,7 @@ impl PendingFirstExecute {
 #[cfg(test)]
 #[path = "repository_workspace_command/tests.rs"]
 mod tests;
+
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+#[path = "repository_workspace_source.rs"]
+mod source;

@@ -70,8 +70,9 @@ struct Claims {
 #[derive(Debug)]
 pub(in crate::runtime) struct NativeSelectionDomain {
     resources: Arc<RepositoryRootResources>,
-    max: usize,
+    pub(super) max: usize,
     claims: Mutex<Claims>,
+    pub(super) source_claims: Mutex<super::source_snapshots::SourceClaims>,
     _credit: ResourceCredit,
 }
 impl NativeSelectionDomain {
@@ -95,6 +96,7 @@ impl NativeSelectionDomain {
             resources,
             max,
             claims: Mutex::new(Claims::default()),
+            source_claims: Mutex::new(super::source_snapshots::SourceClaims::default()),
             _credit: credit,
         }))
     }

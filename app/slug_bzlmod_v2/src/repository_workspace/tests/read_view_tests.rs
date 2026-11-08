@@ -110,13 +110,10 @@ fn manifest_canonicalizes_exact_bound_and_refuses_aliases_and_foreign_command_fa
     };
     let canonical = RepositoryWorkspaceReadViewManifest::new(&executor, rows()).unwrap();
     assert_eq!(canonical.views().len(), 128);
-    assert!(
-        canonical
-            .views()
-            .windows(2)
-            .all(|v| v[0].state().reservation().display_root()
-                < v[1].state().reservation().display_root())
-    );
+    assert!(canonical.views().windows(2).all(|v| {
+        v[0].workspace_state().unwrap().reservation().display_root()
+            < v[1].workspace_state().unwrap().reservation().display_root()
+    }));
     let mut over = rows();
     over.push(projection(
         &RepositoryWorkspaceTranscript::new(
@@ -293,7 +290,9 @@ fn exact_prefix_replay_keeps_old_views_and_rehomes_equal_foreign_state_without_c
     assert!(t.replay(&request).unwrap().is_some());
     let canonical = request.with_read_views(selected.clone()).unwrap();
     assert_eq!(t.records()[0].request(), &canonical);
-    canonical.visit_read_views(&mut |view| assert!(Arc::ptr_eq(view.state(), a.current())));
+    canonical.visit_read_views(&mut |view| {
+        assert!(Arc::ptr_eq(view.workspace_state().unwrap(), a.current()))
+    });
     let b = source(
         source_reservation("later", 101, "/views/later"),
         Arc::from(&b"later"[..]),
@@ -351,7 +350,12 @@ fn archive_source_storage_stays_outside_mutable_history_and_forecasts_remain_com
             >= realized.storage_partition().unwrap().owned_bytes()
     );
     t.visit_read_views(&mut |view| {
-        let RepositoryWorkspaceNode::File(retained) = view.state().entry("data").unwrap().node()
+        let RepositoryWorkspaceNode::File(retained) = view
+            .workspace_state()
+            .unwrap()
+            .entry("data")
+            .unwrap()
+            .node()
         else {
             unreachable!()
         };
@@ -377,7 +381,10 @@ fn repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies() {
     let mut refs = 0;
     t.visit_read_views(&mut |view| {
         refs += 1;
-        assert!(Arc::ptr_eq(view.state(), source.current()));
+        assert!(Arc::ptr_eq(
+            view.workspace_state().unwrap(),
+            source.current()
+        ));
     });
     assert_eq!(refs, 128);
     let mut spare = CompactString::with_capacity(32768);
@@ -430,9 +437,15 @@ fn bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_
     let mut source_calls = 0;
     let equal = t.try_eq_with_states(&other, &mut |left, right| {
         calls += 1;
-        if left.reservation().repository().as_str() == "source" {
+        let RepositoryWorkspaceReadViewStateRef::Workspace(left_state) = left else {
+            panic!("workspace fixture")
+        };
+        let RepositoryWorkspaceReadViewStateRef::Workspace(right_state) = right else {
+            panic!("workspace fixture")
+        };
+        if left_state.reservation().repository().as_str() == "source" {
             source_calls += 1;
-            assert!(!Arc::ptr_eq(left, right));
+            assert!(!Arc::ptr_eq(left_state, right_state));
         }
         Ok::<_, ()>(left == right)
     });
@@ -697,5 +710,104 @@ fn bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_
     assert_eq!(
         t.try_eq_with_states(&transcript(), &mut |_, _| Ok::<_, ()>(true)),
         Ok(false)
+    );
+}
+
+#[test]
+fn source_digest_view_is_exact_bounded_and_not_mutable_process_body_history() {
+    use crate::RepositorySourceSnapshotEntry as Entry;
+    use crate::RepositorySourceSnapshotNode as Node;
+    use crate::RepositorySourceSnapshotRequest as Request;
+    use crate::RepositorySourceSnapshotReservation as Reservation;
+    use crate::RepositorySourceSnapshotState as State;
+    let route = Arc::new(crate::HostCanonicalRepositoryRoute::builtin(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        crate::HostBuiltinBazelToolsRepositoryMapping::testing(),
+    ));
+    let input = crate::host_canonical_repository_source_input(route, None).unwrap();
+    let request = Arc::new(Request::from_canonical(&input, 7).unwrap());
+    let reservation = Arc::new(
+        Reservation::new(
+            request,
+            NormalizedAbsolutePath::new("/__slug_repositories__/v1/builtin").unwrap(),
+            PathObservationInstanceId::new(100),
+        )
+        .unwrap(),
+    );
+    let make = |digest| {
+        Arc::new(
+            State::new(
+                reservation.clone(),
+                vec![
+                    Entry::new("".into(), 0o755, Node::Directory).unwrap(),
+                    Entry::new(
+                        "a".into(),
+                        0o644,
+                        Node::File(
+                            slug_workspace_v2::FileContentDigest::new(digest, 64 * 1024 * 1024)
+                                .unwrap(),
+                        ),
+                    )
+                    .unwrap(),
+                    Entry::new(
+                        "b".into(),
+                        0o644,
+                        Node::File(
+                            slug_workspace_v2::FileContentDigest::new([2; 32], 1024 * 1024)
+                                .unwrap(),
+                        ),
+                    )
+                    .unwrap(),
+                ],
+            )
+            .unwrap(),
+        )
+    };
+    let source = make([1; 32]);
+    let view = RepositoryWorkspaceReadView::from_source(source.clone()).unwrap();
+    assert!(view.workspace_state().is_none());
+    assert!(view.repo_spec().is_none());
+    assert!(Arc::ptr_eq(view.source_state().unwrap(), &source));
+    let partition = view.storage_partition().unwrap();
+    assert!(partition.source_state_bytes() < 64 * 1024);
+    let t = complete_execute(&transcript(), manifest(vec![view.clone()]));
+    assert_eq!(t.retention().body_bytes(), 0);
+    assert!(t.retained_storage_bytes().unwrap() < 1024 * 1024);
+    let foreign = complete_execute(
+        &transcript(),
+        manifest(vec![
+            RepositoryWorkspaceReadView::from_source(make([1; 32])).unwrap(),
+        ]),
+    );
+    let mut source_calls = 0;
+    assert_eq!(
+        t.try_eq_with_states(&foreign, &mut |a, b| {
+            if let (
+                RepositoryWorkspaceReadViewStateRef::Source(a),
+                RepositoryWorkspaceReadViewStateRef::Source(b),
+            ) = (a, b)
+            {
+                source_calls += 1;
+                assert!(!Arc::ptr_eq(a, b));
+            }
+            Ok::<_, ()>(a == b)
+        }),
+        Ok(true)
+    );
+    assert_eq!(source_calls, 1);
+    let changed = complete_execute(
+        &transcript(),
+        manifest(vec![
+            RepositoryWorkspaceReadView::from_source(make([9; 32])).unwrap(),
+        ]),
+    );
+    assert_ne!(t, changed);
+    assert_eq!(
+        t.try_eq_with_states(&changed, &mut |a, b| Ok::<_, ()>(a == b)),
+        Ok(false)
+    );
+    assert!(
+        RepositoryWorkspaceReadViewManifest::new(&reservation_with(8, 11, limits()), vec![view])
+            .is_err()
     );
 }

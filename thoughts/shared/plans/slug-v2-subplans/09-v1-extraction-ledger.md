@@ -86,6 +86,27 @@ no new weak scope registry, cache, interner or donor import is introduced. DICE
 retains no scope or native authority. This is bounded component ownership, not a
 completed-command RSS claim; see the [scope evidence](wp1225-command-source-scope-acceptance-2026-11-08.json).
 
+Selected-source snapshots use a separate Arc/Allocative digest tree and natural
+route/Spec/mapping projection, without retaining the upstream selected-route
+graph or file-body Arcs. Source sizes constrain backing admission independently
+of retained metadata; General raw-body history stays exact. RootIo's existing
+64 KiB hashing/copy kernels and the existing BCR parser feed the eventual
+backing directly. Local capture keeps temporary canonical stat frames for a
+complete metadata/content rewalk; rooted patches stream their targets with
+prepaid parser-reference and staging peaks. Native byte/FD/backing guards follow
+actual data, controllers and queued completion custody, including never-polled
+setup futures. No donor import, global cache, interner or resource-cap increase
+is introduced.
+
+Typed Workspace/Source comparison reuses the existing prepaid strong-operand
+memo, outside actor locks. Producer namespaces partition Source image facts
+into command paths: current certificates and publication retain their full
+facts, while later commands revalidate original Host inputs and recapture their
+own images. Partition/accepted-snapshot metadata guards debit the persistent
+bank without carrying IO authority. Component admission and retained-byte
+counters do not establish completed-command RSS or the Bazel memory ratio. See
+the [selected-source bridge evidence](wp1225-selected-source-bridge-acceptance-2026-11-08.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

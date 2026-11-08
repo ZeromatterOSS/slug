@@ -55,8 +55,8 @@ impl RepositoryWorkspaceRequest {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<RepositoryWorkspaceState>,
-            &Arc<RepositoryWorkspaceState>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         let Self {
@@ -74,7 +74,10 @@ impl RepositoryWorkspaceRequest {
         if reservation != other_reservation || index != other_index {
             return Ok(false);
         }
-        if !compare(predecessor, other_predecessor)? {
+        if !compare(
+            RepositoryWorkspaceReadViewStateRef::Workspace(predecessor),
+            RepositoryWorkspaceReadViewStateRef::Workspace(other_predecessor),
+        )? {
             return Ok(false);
         }
         operation.try_eq_with_states(other_operation, compare)
@@ -164,8 +167,8 @@ impl RepositoryWorkspaceRecord {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<RepositoryWorkspaceState>,
-            &Arc<RepositoryWorkspaceState>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         let Self {
@@ -181,7 +184,10 @@ impl RepositoryWorkspaceRecord {
         if !request.try_eq_with_states(other_request, compare)? || result != other_result {
             return Ok(false);
         }
-        compare(next, other_next)
+        compare(
+            RepositoryWorkspaceReadViewStateRef::Workspace(next),
+            RepositoryWorkspaceReadViewStateRef::Workspace(other_next),
+        )
     }
 
     pub fn request(&self) -> &RepositoryWorkspaceRequest {
@@ -210,8 +216,8 @@ impl RepositoryWorkspaceTranscript {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<RepositoryWorkspaceState>,
-            &Arc<RepositoryWorkspaceState>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         let Self {
@@ -232,7 +238,10 @@ impl RepositoryWorkspaceTranscript {
         {
             return Ok(false);
         }
-        if !compare(initial, other_initial)? {
+        if !compare(
+            RepositoryWorkspaceReadViewStateRef::Workspace(initial),
+            RepositoryWorkspaceReadViewStateRef::Workspace(other_initial),
+        )? {
             return Ok(false);
         }
         for (record, other) in records.iter().zip(other_records.iter()) {
@@ -896,8 +905,8 @@ impl RepositoryWorkspaceRealization {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<RepositoryWorkspaceState>,
-            &Arc<RepositoryWorkspaceState>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         let Self {

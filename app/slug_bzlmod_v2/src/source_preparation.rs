@@ -192,6 +192,7 @@ pub struct SourcePreparationNeeds {
         Arc<SmallMap<crate::RepositoryExecuteCallId, Arc<crate::RepositoryExecuteRequest>>>,
     repository_filesystem_operations:
         Arc<SmallMap<crate::RepositoryFilesystemCallId, Arc<crate::RepositoryFilesystemRequest>>>,
+    source_snapshots: Arc<SmallMap<CanonicalRepoName, Arc<crate::RepositorySourceSnapshotRequest>>>,
     workspace_reservations: Arc<
         SmallMap<
             Arc<RepositoryWorkspaceStableKey>,
@@ -210,6 +211,10 @@ pub struct SourcePreparationNeeds {
 pub enum SourcePreparationNeedsError {
     ScratchElfMetadata(crate::SelectedToolSourceError),
     ConflictingRootModuleBootstrap,
+    ConflictingSourceSnapshot {
+        canonical_repo: CanonicalRepoName,
+    },
+    SourceSnapshotLimit,
     RepositoryEnvironment(crate::RepositoryEnvironmentCanonicalError),
     ConflictingRepositoryRequest {
         canonical_repo: CanonicalRepoName,
@@ -262,6 +267,7 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(SmallMap::new()),
         }
@@ -281,6 +287,7 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(SmallMap::new()),
         }
@@ -296,6 +303,7 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(SmallMap::new()),
         }
@@ -313,6 +321,7 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(SmallMap::new()),
         }
@@ -331,6 +340,7 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(selected_extension_downloads),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(SmallMap::new()),
         }
@@ -348,6 +358,7 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(repository_executes),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(SmallMap::new()),
         }
@@ -364,6 +375,7 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(repository_filesystem_operations),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
@@ -384,6 +396,7 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(workspace_reservations),
             workspace_operations: Arc::new(SmallMap::new()),
         }
@@ -405,9 +418,34 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(workspace_operations),
         }
+    }
+    pub fn source_snapshot(request: Arc<crate::RepositorySourceSnapshotRequest>) -> Self {
+        let mut source_snapshots = SmallMap::new();
+        source_snapshots.insert(request.repository().clone(), request);
+        let mut needs = Self {
+            scratch_elf_metadata: None,
+            root_module_bootstrap: None,
+            repository_environment: None,
+            path_observations: None,
+            repository_materializations: Arc::new(SmallMap::new()),
+            selected_extension_downloads: Arc::new(SmallMap::new()),
+            repository_executes: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
+            workspace_reservations: Arc::new(SmallMap::new()),
+            workspace_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
+        };
+        needs.source_snapshots = Arc::new(source_snapshots);
+        needs
+    }
+    pub fn source_snapshots(
+        &self,
+    ) -> &SmallMap<CanonicalRepoName, Arc<crate::RepositorySourceSnapshotRequest>> {
+        &self.source_snapshots
     }
     pub fn workspace_reservations(
         &self,
@@ -444,6 +482,7 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
             repository_filesystem_operations: Arc::new(SmallMap::new()),
+            source_snapshots: Arc::new(SmallMap::new()),
             workspace_reservations: Arc::new(SmallMap::new()),
             workspace_operations: Arc::new(SmallMap::new()),
         }
@@ -640,6 +679,30 @@ impl SourcePreparationNeeds {
             }
             Arc::new(requests)
         };
+        let source_snapshots = if let Some(shared) =
+            shared_no_op_need_map(&self.source_snapshots, &other.source_snapshots)
+        {
+            shared
+        } else {
+            let mut requests = (*self.source_snapshots).clone();
+            for (repository, request) in other.source_snapshots.iter() {
+                match requests.get(repository) {
+                    Some(existing) if existing == request => {}
+                    Some(_) => {
+                        return Err(SourcePreparationNeedsError::ConflictingSourceSnapshot {
+                            canonical_repo: repository.clone(),
+                        });
+                    }
+                    None => {
+                        if requests.len() == crate::REPOSITORY_WORKSPACE_MAX_READ_VIEWS {
+                            return Err(SourcePreparationNeedsError::SourceSnapshotLimit);
+                        }
+                        requests.insert(repository.clone(), request.clone());
+                    }
+                }
+            }
+            Arc::new(requests)
+        };
         let root_module_bootstrap =
             match (&self.root_module_bootstrap, &other.root_module_bootstrap) {
                 (Some(left), Some(right)) if left == right => Some(left.dupe()),
@@ -660,6 +723,7 @@ impl SourcePreparationNeeds {
                 || !repository_filesystem_operations.is_empty()
                 || !workspace_reservations.is_empty()
                 || !workspace_operations.is_empty()
+                || !source_snapshots.is_empty()
         );
         Ok(Self {
             scratch_elf_metadata,
@@ -672,6 +736,7 @@ impl SourcePreparationNeeds {
             repository_filesystem_operations,
             workspace_reservations,
             workspace_operations,
+            source_snapshots,
         })
     }
 }
@@ -796,16 +861,16 @@ impl RepositoryMaterializationResultEpoch {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<crate::RepositoryWorkspaceState>,
-            &Arc<crate::RepositoryWorkspaceState>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         fn entry_equal<E>(
             left: &RepositoryMaterializationEpochEntry,
             right: &RepositoryMaterializationEpochEntry,
             compare: &mut impl FnMut(
-                &Arc<crate::RepositoryWorkspaceState>,
-                &Arc<crate::RepositoryWorkspaceState>,
+                crate::RepositoryWorkspaceReadViewStateRef<'_>,
+                crate::RepositoryWorkspaceReadViewStateRef<'_>,
             ) -> Result<bool, E>,
         ) -> Result<bool, E> {
             let RepositoryMaterializationEpochEntry { request, result } = left;

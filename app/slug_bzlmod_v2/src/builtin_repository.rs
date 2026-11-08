@@ -77,6 +77,47 @@ impl BuiltinBazelToolsSnapshot {
             manifest_sha256: manifest_sha256(self),
         }
     }
+
+    /// Visit the complete pinned byte catalog without allocating file bodies.
+    /// Native producers still own destination admission, writes and final seal.
+    pub fn visit_validated_catalog<E>(
+        self,
+        identity: BuiltinBazelToolsRouteIdentity,
+        mut visit: impl FnMut(&'static str, &'static [u8], bool, [u8; 32]) -> Result<(), E>,
+    ) -> Result<(), E>
+    where
+        E: From<BuiltinBazelToolsSourceFileError>,
+    {
+        if identity != self.route_identity() {
+            return Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog {
+                path: "<catalog identity>".into(),
+            }
+            .into());
+        }
+        // Refuse a corrupted catalog before offering any entry to the writer.
+        for entry in CATALOG {
+            let mut expected = [0u8; 32];
+            let actual = file_sha256(entry.bytes);
+            if !valid_relative_path(entry.path)
+                || hex::decode_to_slice(entry.expected_sha256, &mut expected).is_err()
+                || actual != expected
+            {
+                return Err(BuiltinBazelToolsSourceFileError::Integrity {
+                    path: entry.path.into(),
+                    expected_sha256: entry.expected_sha256.into(),
+                    actual_sha256: hex::encode(actual).into(),
+                }
+                .into());
+            }
+        }
+        for entry in CATALOG {
+            let mut expected = [0u8; 32];
+            hex::decode_to_slice(entry.expected_sha256, &mut expected)
+                .expect("validated pinned catalog digest");
+            visit(entry.path, entry.bytes, entry.executable, expected)?;
+        }
+        Ok(())
+    }
 }
 
 struct CatalogEntry {
@@ -1830,3 +1871,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod catalog_snapshot_tests;

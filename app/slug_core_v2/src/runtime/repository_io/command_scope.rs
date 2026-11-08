@@ -68,6 +68,10 @@ impl RepositoryMaterializer {
             reusable: Vec::new(),
             entries: Vec::new(),
             provisional_roots: Vec::new(),
+            #[cfg(target_os = "linux")]
+            source_snapshots: Vec::new(),
+            #[cfg(target_os = "linux")]
+            source_snapshot_credit: None,
         });
         Ok(token)
     }

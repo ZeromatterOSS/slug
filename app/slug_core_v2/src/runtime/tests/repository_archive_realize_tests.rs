@@ -9,6 +9,10 @@ use super::super::repository_archive::SelectedBcrPatch;
 use super::super::repository_io::ArchiveFailureStage;
 use super::*;
 
+#[cfg(target_os = "linux")]
+#[path = "../repository_archive_realize/rooted_tests.rs"]
+mod rooted;
+
 fn plan(archive: [u8; 32], module: [u8; 32]) -> SelectedBcrArchive {
     SelectedBcrArchive {
         format: SelectedBcrArchiveFormat::TarGz,

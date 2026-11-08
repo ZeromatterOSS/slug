@@ -25,6 +25,7 @@ pub(super) struct WorkspaceInput {
     epoch: RepositoryWorkspaceEpoch,
     demand: RepositoryWorkspaceReservationDemand,
     selected: RepositoryMaterializationResultEpoch,
+    pub(super) source_snapshots: Arc<slug_bzlmod_v2::RepositorySourceSnapshotEpoch>,
 }
 impl WorkspaceInput {
     pub(super) fn new(
@@ -40,6 +41,7 @@ impl WorkspaceInput {
             epoch,
             demand,
             selected,
+            source_snapshots: Arc::new(slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked()),
         })
     }
 }
@@ -51,6 +53,10 @@ pub(super) struct WorkspaceReplay {
     state: Arc<RepositoryWorkspaceState>,
     declarations:
         SmallMap<slug_identity_v2::CanonicalRepoName, RepositoryMaterializationEpochEntry>,
+    sources: SmallMap<
+        slug_identity_v2::CanonicalRepoName,
+        Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>,
+    >,
     #[allocative(skip)]
     pub(super) error: Option<RepositoryRuleInvocationError>,
 }
@@ -68,6 +74,7 @@ impl WorkspaceReplay {
             input: input.clone(),
             index: 0,
             declarations: SmallMap::new(),
+            sources: SmallMap::new(),
             error: None,
         }
     }
@@ -88,13 +95,14 @@ impl WorkspaceReplay {
             return Err(RepositoryRuleInvocationError::WorkspaceReplay);
         }
         let Some(record) = self.transcript.records().get(self.index) else {
-            let demand = RepositoryWorkspaceOperationDemand::new(
+            let demand = RepositoryWorkspaceOperationDemand::new_with_sources(
                 request,
                 self.declarations
                     .values()
                     .cloned()
                     .collect::<Vec<_>>()
                     .into(),
+                self.sources.values().cloned().collect::<Vec<_>>().into(),
             )
             .map_err(RepositoryRuleInvocationError::Workspace)?;
             return Err(RepositoryRuleInvocationError::WorkspaceNeed(Arc::new(
@@ -139,12 +147,39 @@ impl WorkspaceReplay {
                 Err(RepositoryRuleInvocationError::WorkspaceUnsupported)
             };
         };
-        if repository.is_root() {
-            return if instance.is_none() {
-                Ok(())
+        if let Some(source) = self.input.source_snapshots.states().and_then(|states| {
+            states
+                .iter()
+                .find(|s| Some(s.reservation().instance()) == instance)
+        }) {
+            let reservation = source.reservation();
+            if reservation.workspace() != self.reservation().workspace()
+                || reservation.lease() != self.reservation().lease()
+                || reservation.repository() != repository
+                || !path
+                    .path()
+                    .as_path()
+                    .starts_with(reservation.display_root().as_path())
+            {
+                return Err(RepositoryRuleInvocationError::WorkspaceReplay);
+            }
+            if self.declarations.contains_key(repository) {
+                return Err(RepositoryRuleInvocationError::WorkspaceReplay);
+            }
+            if let Some(previous) = self.sources.get(repository) {
+                if previous != source {
+                    return Err(RepositoryRuleInvocationError::WorkspaceReplay);
+                }
             } else {
-                Err(RepositoryRuleInvocationError::WorkspaceReplay)
-            };
+                if self.declarations.len() + self.sources.len() == 128 {
+                    return Err(RepositoryRuleInvocationError::ExecuteLimit);
+                }
+                self.sources.insert(repository.clone(), source.clone());
+            }
+            return Ok(());
+        }
+        if repository.is_root() {
+            return Err(RepositoryRuleInvocationError::WorkspaceUnsupported);
         }
         let entry = self
             .input
@@ -174,7 +209,7 @@ impl WorkspaceReplay {
                 return Err(RepositoryRuleInvocationError::WorkspaceReplay);
             }
         } else {
-            if self.declarations.len() == 128 {
+            if self.declarations.len() + self.sources.len() == 128 {
                 return Err(RepositoryRuleInvocationError::ExecuteLimit);
             }
             self.declarations
@@ -185,7 +220,13 @@ impl WorkspaceReplay {
     fn manifest(
         &self,
     ) -> Result<RepositoryWorkspaceReadViewManifest, RepositoryRuleInvocationError> {
-        let mut views = Vec::with_capacity(self.declarations.len());
+        let mut views = Vec::with_capacity(self.declarations.len() + self.sources.len());
+        for source in self.sources.values() {
+            views.push(
+                RepositoryWorkspaceReadView::from_source(source.clone())
+                    .map_err(RepositoryRuleInvocationError::Workspace)?,
+            );
+        }
         for entry in self.declarations.values() {
             let RepositoryMaterializationKind::GeneralWorkspace(realization) = &entry.request.kind
             else {
@@ -356,7 +397,15 @@ pub(super) fn read_bytes(
     state: &RepositoryRuleInvocationState,
     value: Value<'_>,
 ) -> anyhow::Result<(HostRepositoryLabelPathValue, Arc<[u8]>)> {
-    if let Ok(relative) = own_relative(state, value) {
+    let own = match own_relative(state, value) {
+        Ok(relative) => Some(relative),
+        Err(
+            RepositoryRuleInvocationError::WorkspaceUnsupported
+            | RepositoryRuleInvocationError::PathArgument,
+        ) => None,
+        Err(error) => return Err(state.fail(error)),
+    };
+    if let Some(relative) = own {
         let selected = state
             .workspace
             .as_ref()
@@ -409,17 +458,12 @@ pub(super) fn read_bytes(
     } else {
         return Err(state.fail(RepositoryRuleInvocationError::WorkspaceUnsupported));
     };
-    let resolved = state.prepared_paths.get(&address).ok_or_else(|| {
-        state.fail(RepositoryRuleInvocationError::LabelPathNeed(
-            address.clone(),
-        ))
-    })?;
-    register(state, resolved, Some(address.repo())).map_err(|error| state.fail(error))?;
+    let resolved = resolve_label(state, &address).map_err(|error| state.fail(error))?;
     let body = state
         .prepared_sources
         .get(&address)
         .ok_or_else(|| state.fail(RepositoryRuleInvocationError::RepositorySourceNeed(address)))?;
-    Ok((resolved.clone(), body.clone()))
+    Ok((resolved, body.clone()))
 }
 pub(super) fn execute<'v>(
     state: &RepositoryRuleInvocationState,
@@ -440,6 +484,39 @@ pub(super) fn execute<'v>(
     };
     if values.is_empty() {
         return Err(state.fail(RepositoryRuleInvocationError::ExecuteArgument));
+    }
+    if values.iter().any(|value| {
+        value.unpack_str().is_none()
+            && StarlarkLabel::from_value(*value).is_none()
+            && RepositoryStarlarkPath::from_value(*value).is_none()
+    }) {
+        return Err(state.fail(RepositoryRuleInvocationError::ExecuteArgument));
+    }
+    let timeout = timeout
+        .unpack_i32()
+        .filter(|value| *value > 0)
+        .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteOptions))?;
+    let environment = DictRef::from_value(environment)
+        .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteOptions))?;
+    for (key, _) in environment.iter() {
+        if key.unpack_str().is_none_or(|key| key.contains(['\0', '='])) {
+            return Err(state.fail(RepositoryRuleInvocationError::ExecuteOptions));
+        }
+    }
+    let mut overrides = SmallMap::new();
+    for (key, value) in environment.iter() {
+        let value = if value.is_none() {
+            RepositoryWorkspaceEnvironmentValue::Remove
+        } else {
+            RepositoryWorkspaceEnvironmentValue::Override(
+                value
+                    .unpack_str()
+                    .filter(|value| !value.contains('\0'))
+                    .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteOptions))?
+                    .into(),
+            )
+        };
+        overrides.insert(key.unpack_str().unwrap().into(), value);
     }
     let mut argv = Vec::with_capacity(values.len());
     for value in values {
@@ -489,32 +566,6 @@ pub(super) fn execute<'v>(
             return Err(state.fail(RepositoryRuleInvocationError::ExecuteArgument));
         }
         argv.push(argument);
-    }
-    let timeout = timeout
-        .unpack_i32()
-        .filter(|value| *value > 0)
-        .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteOptions))?;
-    let environment = DictRef::from_value(environment)
-        .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteOptions))?;
-    for (key, _) in environment.iter() {
-        if key.unpack_str().is_none_or(|key| key.contains(['\0', '='])) {
-            return Err(state.fail(RepositoryRuleInvocationError::ExecuteOptions));
-        }
-    }
-    let mut overrides = SmallMap::new();
-    for (key, value) in environment.iter() {
-        let value = if value.is_none() {
-            RepositoryWorkspaceEnvironmentValue::Remove
-        } else {
-            RepositoryWorkspaceEnvironmentValue::Override(
-                value
-                    .unpack_str()
-                    .filter(|value| !value.contains('\0'))
-                    .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteOptions))?
-                    .into(),
-            )
-        };
-        overrides.insert(key.unpack_str().unwrap().into(), value);
     }
     let RepositoryStarlarkPath::Workspace { absolute, .. } =
         path(state, cwd).map_err(|error| state.fail(error))?

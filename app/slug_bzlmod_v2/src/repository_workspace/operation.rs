@@ -99,8 +99,8 @@ impl RepositoryWorkspaceExecute {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<RepositoryWorkspaceState>,
-            &Arc<RepositoryWorkspaceState>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         let Self {
@@ -353,8 +353,8 @@ impl RepositoryWorkspaceOperation {
         &self,
         other: &Self,
         compare: &mut impl FnMut(
-            &Arc<RepositoryWorkspaceState>,
-            &Arc<RepositoryWorkspaceState>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
+            crate::RepositoryWorkspaceReadViewStateRef<'_>,
         ) -> Result<bool, E>,
     ) -> Result<bool, E> {
         match (self, other) {
