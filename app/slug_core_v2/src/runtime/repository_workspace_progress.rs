@@ -33,7 +33,7 @@ impl RepositoryWorkspaceProgress {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
-        check(scope, active)?;
+        builder.check_origin(scope, active)?;
         if builder.mode != RepositoryWorkspaceMode::Archive {
             return Err(PhysicalRootError::Mode);
         }

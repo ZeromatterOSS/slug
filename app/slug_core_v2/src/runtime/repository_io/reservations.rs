@@ -256,8 +256,13 @@ impl RepositoryMaterializer {
         limits: RepositoryWorkspaceRetentionLimits,
         scope: &Arc<SourceServiceScope>,
     ) -> Result<u64, RepositorySessionError> {
-        self.check_source_scope(Some(scope))?;
-        if self.source_scope.is_none() {
+        self.check_command_scope(token, scope)?;
+        #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+        if self.source_scope.is_none()
+            && !scope
+                .command_resources()
+                .is_some_and(|bank| Arc::ptr_eq(bank, &resources))
+        {
             return Err(refusal());
         }
         let mut state = self
@@ -310,7 +315,7 @@ impl RepositoryMaterializer {
         repo_spec: Arc<RepoSpec>,
         scope: &Arc<SourceServiceScope>,
     ) -> Result<ReservedRepositoryWorkspace, RepositorySessionError> {
-        self.check_source_scope(Some(scope))?;
+        self.check_command_scope(token, scope)?;
         if key.workspace() != &self.workspace {
             return Err(RepositorySessionError::WrongWorkspace);
         }
@@ -401,7 +406,7 @@ impl RepositoryMaterializer {
         sealed: SealedWorkspaceMaterialization,
         scope: &Arc<SourceServiceScope>,
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
-        self.check_source_scope(Some(scope))?;
+        self.check_command_scope(token, scope)?;
         if token != ticket.token {
             return Err(refusal());
         }
@@ -495,7 +500,10 @@ impl RepositoryMaterializer {
             result: result.clone(),
         });
         let epoch = complete_epoch(&self.workspace, &entries)?;
-        self.check_source_scope(Some(scope))?;
+        // The actor lock already proves the exact active token. Recheck the
+        // borrowed original scope without recursively locking the actor.
+        source_service::check_identity(Some(&general.scope), Some(scope))
+            .map_err(RepositorySessionError::SourceService)?;
         // Only now disarm the receipt. Every earlier refusal drops actual root
         // and immutable payload before its complete guard, outside the mutex.
         let (request, root, credit) = sealed.into_parts();

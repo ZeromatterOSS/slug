@@ -46,8 +46,10 @@ registry and protected transport evidence is linked from the
 The inactive original Loading route now joins actual native execution and
 same-root adoption across command-fresh cquery requests, with ordered binary
 output and cancellation retirement. Its bounded fixture evidence is linked from
-the current packet. Production per-command source scope, selected-source bridges
-and profile removal are the frontier. Full archive-envelope, public Rust,
+the current packet. Trusted internal Native configuration now owns fresh command
+scopes while preserving the permanent Host/Registry owner and original data
+deadlines. Selected-source bridges and profile removal are the frontier. Full
+archive-envelope, public Rust,
 original-route physical CAS/runfiles and matching-command memory gates still
 precede production activation.
 

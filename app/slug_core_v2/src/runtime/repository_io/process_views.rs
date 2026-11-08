@@ -76,7 +76,7 @@ impl SelectedProcessSources {
     ) -> Result<(), PhysicalRootError> {
         self.scope.check()?;
         actor
-            .check_source_scope(Some(&self.scope))
+            .check_command_scope(self.token, &self.scope)
             .map_err(|_| PhysicalRootError::Reservation)?;
         let state = actor
             .state
@@ -124,7 +124,7 @@ impl RepositoryMaterializer {
             return Err(PhysicalRootError::Inactive);
         }
         scope.check()?;
-        self.check_source_scope(Some(scope))
+        self.check_command_scope(token, scope)
             .map_err(|_| PhysicalRootError::Reservation)?;
         if selected.len() > 128 {
             return Err(PhysicalRootError::Resource);
@@ -194,6 +194,7 @@ impl RepositoryMaterializer {
                 let RetainedRootOwner::Physical(root) = &row.root else {
                     return Err(PhysicalRootError::UnsupportedOperation);
                 };
+                root.check_origin(scope, &|| true)?;
                 if found.next().is_some()
                     || !Arc::ptr_eq(&entry.request, &row.request)
                     || row.guard.is_none()

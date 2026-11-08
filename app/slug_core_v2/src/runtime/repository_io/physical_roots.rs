@@ -362,6 +362,9 @@ impl RepositoryMaterializer {
         results: &RepositoryMaterializationResultEpoch,
         resources: &Arc<NativeReaderResources>,
     ) -> Result<SelectedRepositoryRoots, Arc<str>> {
+        let command_scope = self
+            .command_source_scope(token)
+            .map_err(|_| Arc::<str>::from("selected session or command scope refused"))?;
         self.check_source_scope(self.source_scope.as_ref())
             .map_err(|_| Arc::<str>::from("selected root scope refused"))?;
         let bytes = selected
@@ -447,12 +450,9 @@ impl RepositoryMaterializer {
         // outside the actor mutex. Cloned row guards keep their request/history
         // prepaid even if a concurrent discard retires the original row.
         let active = || self.session_is_active(token);
-        let mut comparison = RepositoryRequestComparison::new(
-            Some(resources),
-            self.source_scope.as_deref(),
-            &active,
-        )
-        .map_err(|_| Arc::<str>::from("selected request comparison refused"))?;
+        let mut comparison =
+            RepositoryRequestComparison::new(Some(resources), command_scope.as_deref(), &active)
+                .map_err(|_| Arc::<str>::from("selected request comparison refused"))?;
         for (entry, request) in entries.iter().zip(selected) {
             if !matches!(entry.result, RepositoryMaterializationResult::Success(_)) {
                 return Err("selected repository lacks successful materialization".into());
@@ -501,6 +501,14 @@ impl RepositoryMaterializer {
             {
                 return Err("selected native root association differs".into());
             }
+            #[cfg(target_os = "linux")]
+            if let RetainedRootOwner::Physical(root) = &row.root {
+                let scope = command_scope
+                    .as_ref()
+                    .ok_or_else(|| Arc::<str>::from("physical lease lacks command scope"))?;
+                root.check_origin(scope, &active)
+                    .map_err(|_| Arc::<str>::from("physical lease origin scope refused"))?;
+            }
             let credit = resources
                 .reserve(
                     std::mem::size_of::<SelectedRootData>()
@@ -519,6 +527,8 @@ impl RepositoryMaterializer {
                 }),
             });
         }
+        self.command_source_scope(token)
+            .map_err(|_| Arc::<str>::from("selected command scope expired"))?;
         self.check_source_scope(self.source_scope.as_ref())
             .map_err(|_| Arc::<str>::from("selected root scope changed"))?;
         let state = self
@@ -527,6 +537,9 @@ impl RepositoryMaterializer {
             .expect("repository materializer mutex poisoned");
         let active = matching_validated_active(&state, token)
             .map_err(|_| Arc::<str>::from("selected root session changed"))?;
+        if !super::command_scope::scope_is_current(active, command_scope.as_ref()) {
+            return Err("selected command scope changed".into());
+        }
         for entry in &entries {
             if !active
                 .entries
@@ -572,6 +585,7 @@ pub(super) fn association_current(
 pub(super) struct PhysicalObservationBatch {
     pub(super) legacy: Vec<PathObservationDemand>,
     physical: Vec<(RetainedRepositoryRoot, Vec<PathObservationDemand>)>,
+    scope: Option<Arc<SourceServiceScope>>,
     _credit: Option<crate::runtime::repository_physical_root::ResourceCredit>,
 }
 #[cfg(target_os = "linux")]
@@ -597,7 +611,7 @@ impl PhysicalObservationBatch {
             let RetainedRootOwner::Physical(root) = &row.root else {
                 unreachable!()
             };
-            let scope = actor.source_scope.as_ref().ok_or_else(|| {
+            let scope = self.scope.as_ref().ok_or_else(|| {
                 RepositorySessionError::NativeWorkspace(
                     "physical observation requires original scope".into(),
                 )
@@ -615,6 +629,9 @@ impl PhysicalObservationBatch {
                     })?,
             );
         }
+        if let Some(scope) = &self.scope {
+            actor.check_command_scope(token, scope)?;
+        }
         actor.check_source_scope(actor.source_scope.as_ref())?;
         let merged = PathObservationEpoch::from_shared(epochs.iter().flat_map(|epoch| {
             epoch
@@ -631,6 +648,11 @@ impl PhysicalObservationBatch {
             .lock()
             .expect("repository materializer mutex poisoned");
         let active = matching_active(&state, token)?;
+        if !super::command_scope::scope_is_current(active, self.scope.as_ref()) {
+            return Err(RepositorySessionError::NativeWorkspace(
+                "physical command scope changed".into(),
+            ));
+        }
         for (row, _) in &self.physical {
             if !association_current(&state, active, row)
                 || !active.entries.iter().any(|entry| {
@@ -763,6 +785,7 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         demands: Vec<PathObservationDemand>,
     ) -> Result<PhysicalObservationBatch, RepositorySessionError> {
+        let scope = self.command_source_scope(token)?;
         let (credit, rows) = {
             let state = self
                 .state
@@ -785,6 +808,7 @@ impl RepositoryMaterializer {
                 return Ok(PhysicalObservationBatch {
                     legacy: demands,
                     physical: Vec::new(),
+                    scope,
                     _credit: None,
                 });
             }
@@ -823,6 +847,13 @@ impl RepositoryMaterializer {
             let RetainedRootOwner::Physical(root) = &row.root else {
                 unreachable!()
             };
+            let original = scope.as_ref().ok_or_else(|| {
+                RepositorySessionError::NativeWorkspace(
+                    "physical observation lacks command scope".into(),
+                )
+            })?;
+            root.check_origin(original, &|| self.session_is_active(token))
+                .map_err(native_comparison_error)?;
             if !matches!(&row.request.kind,RepositoryMaterializationKind::GeneralWorkspace(realization)
                 if realization.reservation()==root.reservation()&&realization.final_state()==root.state())
                 || row.observation_instance != root.reservation().instance()
@@ -910,6 +941,7 @@ impl RepositoryMaterializer {
         Ok(PhysicalObservationBatch {
             legacy,
             physical,
+            scope,
             _credit: Some(credit),
         })
     }

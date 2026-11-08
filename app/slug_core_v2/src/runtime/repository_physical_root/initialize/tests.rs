@@ -112,7 +112,9 @@ fn generation_with_adoption_spec(
     crate::runtime::repository_io::RepositorySessionToken,
     Generation,
 )> {
-    let token = materializer.begin().unwrap();
+    let token = materializer
+        .begin_with_command_scope(Some(scope.clone()))
+        .unwrap();
     materializer.preflight_native(token, []).unwrap();
     let limits =
         RepositoryWorkspaceRetentionLimits::new(128, 16 * 1024 * 1024, ARCHIVE_BYTES).unwrap();
@@ -351,6 +353,205 @@ fn generation_with_adoption_spec(
             materialized,
         },
     ))
+}
+
+#[test]
+#[ignore = "actual compiled CLI Native command-scope origin/lifetime proof; finite native supervisor and SLUG_V2_BIN required"]
+fn native_command_scope_origin_survives_acceptance_without_renewal_by_next_command() {
+    let temporary = tempfile::tempdir().unwrap();
+    let workspace = NormalizedAbsolutePath::new(temporary.path()).unwrap();
+    let resources = RepositoryRootResources::new(
+        RepositoryRootResourceLimits::new(512 * 1024 * 1024, 512, 4 * ARCHIVE_BYTES).unwrap(),
+    )
+    .unwrap();
+    let baseline = resources.snapshot().retained_bytes;
+    let readers = new_reader_resources().unwrap();
+    let reader_baseline = readers.snapshot().retained_bytes;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let owner = crate::runtime::dice::physical_root_owner_for_test();
+    let key = Arc::new(
+        RepositoryWorkspaceStableKey::new(
+            workspace.clone(),
+            owner,
+            CanonicalRepoName::new("scope_origin").unwrap(),
+            0,
+        )
+        .unwrap(),
+    );
+    // The permanent Native actor is unscoped; each command owns a fresh clock
+    // and counter domain backed by the SAME finite retained-resource bank.
+    let materializer = RepositoryMaterializer::new(workspace.clone());
+    let work_a = Instant::now() + Duration::from_secs(1);
+    let scope_a = SourceServiceScope::new_command(
+        workspace.clone(),
+        work_a,
+        work_a + Duration::from_secs(1),
+        SourceServiceLimits::default(),
+        resources.clone(),
+    )
+    .unwrap();
+    let (token_a, a) = generation(
+        &materializer,
+        &key,
+        &resources,
+        &readers,
+        &scope_a,
+        &runtime,
+        b"actual A",
+    );
+    let root_a = a
+        .roots
+        .lease_for(&a.source)
+        .unwrap()
+        .unwrap()
+        .physical()
+        .unwrap()
+        .clone();
+    assert!(Arc::ptr_eq(&root_a.origin_scope, &scope_a));
+    root_a.check_origin(&scope_a, &|| true).unwrap();
+    let mut reader_a = NativeSourceReader::open_selected_for_test(
+        &a.source,
+        &a.roots,
+        Some(scope_a.clone()),
+        readers.clone(),
+    )
+    .unwrap();
+    let display = a.source.anchor().unwrap().root().clone();
+    let image_a = materializer
+        .image_source(
+            token_a,
+            a.source.namespace(),
+            &display,
+            Some((&a.request, &a.materialized)),
+        )
+        .unwrap();
+    materializer
+        .accept(token_a, std::slice::from_ref(&a.request), vec![])
+        .unwrap();
+    // Native command/controller custody is already retired by generation().
+    // Acceptance leaves the original data lease readable under A's clock.
+    let mut bytes = Vec::new();
+    reader_a.read_to_end(&mut bytes).unwrap();
+    assert_eq!(bytes, b"actual A");
+    reader_a.seek(SeekFrom::Start(0)).unwrap();
+    let budget = ImageDescriptorBudget::new(1024 * 1024);
+    let query_a = PathObservationDemand::input_image(
+        a.source.namespace(),
+        ImageChargedPath::pin_existing(a.source.real_path().clone(), &budget).unwrap(),
+        ImageObservationRequest::new(
+            ImageChargedPath::pin_existing(display.clone(), &budget).unwrap(),
+            ImageObservationOperation::BoundedDigest { max_bytes: 1024 },
+        ),
+    )
+    .unwrap();
+    let PathObservationResult::InputImage(observed) =
+        image_a.observe(&query_a, &budget, &|| true).unwrap()
+    else {
+        panic!("image result")
+    };
+    assert!(
+        matches!(observed.data(), ImageObservationData::Digest(PathOperationResult::Present(value)) if *value == digest(b"actual A"))
+    );
+    drop(observed);
+    let work_b = Instant::now() + Duration::from_secs(26);
+    let scope_b = SourceServiceScope::new_command(
+        workspace,
+        work_b,
+        work_b + Duration::from_secs(1),
+        SourceServiceLimits::default(),
+        resources.clone(),
+    )
+    .unwrap();
+    assert!(!Arc::ptr_eq(&scope_a, &scope_b));
+    assert_eq!(scope_b.snapshot().source_attempts, 0);
+    assert_eq!(scope_a.work_deadline(), work_a);
+    let (token_b, b) = generation(
+        &materializer,
+        &key,
+        &resources,
+        &readers,
+        &scope_b,
+        &runtime,
+        b"actual B",
+    );
+    assert_eq!(a.source.requested_path(), b.source.requested_path());
+    assert_ne!(a.source.namespace(), b.source.namespace());
+    assert_eq!(resources.snapshot().backing_bytes, 2 * ARCHIVE_BYTES);
+    let before = resources.snapshot();
+    assert!(matches!(
+        root_a.check_origin(&scope_b, &|| true),
+        Err(PhysicalRootError::SourceService(
+            SourceServiceError::ForeignScope
+        ))
+    ));
+    assert!(root_a.open_member("input", &scope_b, &|| true).is_err());
+    assert!(root_a.image_source(&scope_b, &|| true).is_err());
+    assert!(
+        NativeSourceReader::open_selected_for_test(
+            &a.source,
+            &a.roots,
+            Some(scope_b.clone()),
+            readers.clone(),
+        )
+        .is_err()
+    );
+    assert_eq!(resources.snapshot().native_fds, before.native_fds);
+    assert_eq!(resources.snapshot().peak_native_fds, before.peak_native_fds);
+    assert_eq!(scope_a.work_deadline(), work_a);
+    // Wait only for the original finite A deadline; no factory refresh, new
+    // scope, cancellation substitute, or resource-bank heuristic decides it.
+    let remaining = work_a.saturating_duration_since(Instant::now());
+    assert!(remaining < Duration::from_secs(1));
+    std::thread::sleep((remaining + Duration::from_millis(1)).min(Duration::from_secs(1)));
+    assert!(scope_a.check().is_err());
+    assert!(reader_a.read(&mut [0u8; 1]).is_err());
+    assert!(image_a.observe(&query_a, &budget, &|| true).is_err());
+    assert!(materializer.session_is_active(token_b));
+    scope_b.check().unwrap();
+    let mut reader_b = NativeSourceReader::open_selected_for_test(
+        &b.source,
+        &b.roots,
+        Some(scope_b.clone()),
+        readers.clone(),
+    )
+    .unwrap();
+    bytes.clear();
+    reader_b.read_to_end(&mut bytes).unwrap();
+    assert_eq!(bytes, b"actual B");
+    materializer
+        .accept(token_b, std::slice::from_ref(&b.request), vec![])
+        .unwrap();
+    drop(materializer);
+    drop(a);
+    drop(b);
+    drop(root_a);
+    assert!(!display.as_path().exists());
+    assert_eq!(resources.snapshot().backing_bytes, 2 * ARCHIVE_BYTES);
+    drop(reader_a);
+    drop(image_a);
+    assert_eq!(resources.snapshot().backing_bytes, ARCHIVE_BYTES);
+    drop(reader_b);
+    drop(query_a);
+    drop(scope_a);
+    drop(scope_b);
+    assert_eq!(
+        (
+            readers.snapshot().native_fds,
+            readers.snapshot().retained_bytes
+        ),
+        (0, reader_baseline)
+    );
+    assert_eq!(
+        (
+            resources.snapshot().native_fds,
+            resources.snapshot().backing_bytes,
+            resources.snapshot().retained_bytes
+        ),
+        (0, 0, baseline)
+    );
 }
 
 #[test]

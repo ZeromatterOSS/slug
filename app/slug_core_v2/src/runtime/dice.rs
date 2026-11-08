@@ -1118,6 +1118,8 @@ enum NativeDemandProgress {
 #[allow(dead_code)]
 struct NativeDemandCommand<'a> {
     runtime: &'a WorkspaceRuntime,
+    command_scope: Option<Arc<source_service::SourceServiceScope>>,
+    owns_command_scope: bool,
     lease: NativeDemandLeaseToken,
     repository_session: super::repository_io::RepositorySessionToken,
     inputs: NativeDemandInputBundle,
@@ -1351,7 +1353,7 @@ impl NativeCommandCompletionContext<'_, '_> {
         super::native_source_access::NativeSourceActionInputs::new(
             prepared,
             roots,
-            self.command.runtime.source_scope.clone(),
+            self.command.command_scope.clone(),
             self.command.runtime.source_readers.clone(),
         )
     }
@@ -1378,7 +1380,7 @@ impl NativeCommandCompletionContext<'_, '_> {
         super::native_source_access::NativeActionChainInputs::new(
             prepared,
             roots,
-            self.command.runtime.source_scope.clone(),
+            self.command.command_scope.clone(),
             self.command.runtime.source_readers.clone(),
         )
     }
@@ -6552,6 +6554,13 @@ impl WorkspaceRuntime {
         request: NativeDemandRequestInputBundle,
     ) -> Result<NativeDemandPreflight<'_>, NativeDemandSessionError> {
         let (lease, prior) = self.native_demand_sessions.acquire()?;
+        let (command_scope, owns_command_scope) = match self.new_command_source_scope() {
+            Ok(scope) => scope,
+            Err(error) => {
+                self.native_demand_sessions.close(lease)?;
+                return Err(error);
+            }
+        };
         // Busy is decided before any member of this fixed command bundle is
         // allocated.
         let inputs = NativeDemandInputBundle {
@@ -6570,7 +6579,12 @@ impl WorkspaceRuntime {
                 ),
             },
         };
-        let repository_session = match self.repository_materializer.begin() {
+        let repository_session = match if owns_command_scope {
+            self.repository_materializer
+                .begin_with_command_scope(command_scope.clone())
+        } else {
+            self.repository_materializer.begin()
+        } {
             Ok(token) => token,
             Err(error) => {
                 // Once the workspace lease is Open, an unexpected materializer
@@ -6640,6 +6654,7 @@ impl WorkspaceRuntime {
         let workspace_progress = match repository_workspace_driver::NativeWorkspaceProgress::new(
             self,
             repository_session,
+            command_scope.as_ref(),
         ) {
             Ok(progress) => progress,
             Err(error) => {
@@ -6653,6 +6668,8 @@ impl WorkspaceRuntime {
         Ok(NativeDemandPreflight {
             command: NativeDemandCommand {
                 runtime: self,
+                command_scope,
+                owns_command_scope,
                 lease,
                 repository_session,
                 inputs,
@@ -6760,7 +6777,15 @@ impl WorkspaceRuntime {
                 return guard.abort(error);
             }
             let attempt_root = root.clone();
-            let attempt = self.runtime.block_on(async {
+            // Fixed Diagnostic acquisition already owns its scoped waits and
+            // timeout provenance. Only the new owned Native command adds this
+            // outer work clock; its scope stays identical across all retries.
+            let command_scope = guard
+                .command()
+                .owns_command_scope
+                .then(|| guard.command().command_scope.clone())
+                .flatten();
+            let attempt = self.runtime.block_on(repository_workspace_driver::command_source_work(command_scope.as_ref(), async {
                 begin_probe_phase!(attempt_phase, self, AttemptInjectionRevision);
                 let data = guard.attempt_user_computation_data()?;
                 let mut updater = self.dice.updater_with_data(data);
@@ -6955,12 +6980,12 @@ impl WorkspaceRuntime {
                         }
                     }
                 }
-            });
+            }));
             // The block_on future has dropped every attempt transaction on
             // success or error. Retire cancellation workers before progressing,
             // restoring, accepting, or opening the next attempt.
             begin_probe_phase!(idle_phase, self, IdleDrain);
-            self.runtime.block_on(self.dice.wait_for_idle());
+            let drained = guard.command().wait_command_idle();
             finish_probe_phase!(idle_phase);
             let attempt = match attempt {
                 Ok(attempt) => attempt,
@@ -6971,6 +6996,9 @@ impl WorkspaceRuntime {
                     return guard.abort(error);
                 }
             };
+            if let Err(error) = drained {
+                return guard.abort(error);
+            }
             match attempt {
                 CommandAttemptResult::Retry(needs) => {
                     if let Err(error) = guard.progress(&needs) {
@@ -8513,7 +8541,8 @@ impl NativeDemandCommand<'_> {
     }
 
     fn discard_in_place(&mut self) -> Result<(), NativeDemandSessionError> {
-        self.runtime.wait_source_idle()?;
+        self.cancel_owned_command_scope();
+        self.wait_command_idle()?;
         // Process cancellation may have returned while its owning worker is
         // still proving namespace death. Never restore/discard/close early.
         self.retire_general_workspace()?;
@@ -8528,97 +8557,103 @@ impl NativeDemandCommand<'_> {
             )));
         }
         let prior = self.prior.clone();
+        let command_scope = self.command_scope.clone();
         self.runtime
             .runtime
-            .block_on(self.runtime.source_cleanup(async {
-                let mut data = self
-                    .runtime
-                    .user_computation_data_with_repository_host_inputs(
-                        None,
-                        prior.inputs.request.repository_environment.clone(),
-                        prior.repository_environment_frontier.clone(),
+            .block_on(repository_workspace_driver::command_source_cleanup(
+                command_scope.as_ref(),
+                async {
+                    let mut data = self
+                        .runtime
+                        .user_computation_data_with_repository_host_inputs(
+                            None,
+                            prior.inputs.request.repository_environment.clone(),
+                            prior.repository_environment_frontier.clone(),
+                        )
+                        .map_err(|error| {
+                            NativeDemandSessionError::Restoration(anyhow::anyhow!(
+                                error.to_string()
+                            ))
+                        })?;
+                    install_selected_extension_download_transaction(
+                        &mut data,
+                        &self.runtime.workspace,
+                        &prior.download_results,
                     )
-                    .map_err(|error| {
-                        NativeDemandSessionError::Restoration(anyhow::anyhow!(error.to_string()))
-                    })?;
-                install_selected_extension_download_transaction(
-                    &mut data,
-                    &self.runtime.workspace,
-                    &prior.download_results,
-                )
-                .map_err(NativeDemandSessionError::Restoration)?;
-                runtime_sources::install_declaration_transaction(
-                    &mut data,
-                    self.runtime,
-                    prior.inputs.request.runtime_sources.as_ref(),
-                )
-                .map_err(NativeDemandSessionError::Restoration)?;
-                guest_namespace::install_transaction(
-                    &mut data,
-                    self.runtime,
-                    prior.inputs.request.guest_namespace,
-                )
-                .map_err(NativeDemandSessionError::Restoration)?;
-                let mut updater = self.runtime.dice.updater_with_data(data);
-                inject_native_demand_snapshot(
-                    &mut updater,
-                    self.runtime,
-                    &prior.inputs,
-                    None,
-                    prior.repository_results,
-                    prior.path_observations,
-                    &self.path_input_ledger,
-                    &prior.repository_environment_frontier,
-                    &self.repository_environment_frontier,
-                )
-                .map_err(NativeDemandSessionError::Restoration)?;
-                inject_selected_extension_downloads(
-                    &mut updater,
-                    &self.runtime.workspace,
-                    &prior.download_results,
-                    &self.download_results,
-                )
-                .map_err(NativeDemandSessionError::Restoration)?;
-                if let Some(state) = &self.scratch_metadata {
-                    state.inject(&mut updater, true)?;
-                }
-                inject_repository_filesystem_epoch(
-                    &mut updater,
-                    &self.runtime.workspace,
-                    RepositoryFilesystemEpoch::revoked(),
-                )
-                .map_err(NativeDemandSessionError::Restoration)?;
-                inject_repository_execute_epoch(
-                    &mut updater,
-                    &self.runtime.workspace,
-                    RepositoryExecuteEpoch::revoked(),
-                )
-                .map_err(NativeDemandSessionError::Restoration)?;
-                inject_repository_workspace_epoch(
-                    &mut updater,
-                    &self.runtime.workspace,
-                    slug_bzlmod_v2::RepositoryWorkspaceEpoch::revoked(),
-                )
-                .map_err(NativeDemandSessionError::Restoration)?;
-                #[allow(unused_mut)]
-                let mut transaction = self.runtime.request_revision.commit(updater).await;
-                #[cfg(test)]
-                {
-                    self.restoration_host_inputs = Some(
-                        transaction
-                            .compute(&RepositoryHostRestorationProbeKey(self.lease.0))
-                            .await
-                            .map_err(|error| {
-                                NativeDemandSessionError::Restoration(anyhow::anyhow!(
-                                    error.to_string()
-                                ))
-                            })?,
-                    );
-                }
-                drop(transaction);
-                self.runtime.dice.wait_for_idle().await;
-                Ok::<_, NativeDemandSessionError>(())
-            }))?;
+                    .map_err(NativeDemandSessionError::Restoration)?;
+                    runtime_sources::install_declaration_transaction(
+                        &mut data,
+                        self.runtime,
+                        prior.inputs.request.runtime_sources.as_ref(),
+                    )
+                    .map_err(NativeDemandSessionError::Restoration)?;
+                    guest_namespace::install_transaction(
+                        &mut data,
+                        self.runtime,
+                        prior.inputs.request.guest_namespace,
+                    )
+                    .map_err(NativeDemandSessionError::Restoration)?;
+                    let mut updater = self.runtime.dice.updater_with_data(data);
+                    inject_native_demand_snapshot(
+                        &mut updater,
+                        self.runtime,
+                        &prior.inputs,
+                        None,
+                        prior.repository_results,
+                        prior.path_observations,
+                        &self.path_input_ledger,
+                        &prior.repository_environment_frontier,
+                        &self.repository_environment_frontier,
+                    )
+                    .map_err(NativeDemandSessionError::Restoration)?;
+                    inject_selected_extension_downloads(
+                        &mut updater,
+                        &self.runtime.workspace,
+                        &prior.download_results,
+                        &self.download_results,
+                    )
+                    .map_err(NativeDemandSessionError::Restoration)?;
+                    if let Some(state) = &self.scratch_metadata {
+                        state.inject(&mut updater, true)?;
+                    }
+                    inject_repository_filesystem_epoch(
+                        &mut updater,
+                        &self.runtime.workspace,
+                        RepositoryFilesystemEpoch::revoked(),
+                    )
+                    .map_err(NativeDemandSessionError::Restoration)?;
+                    inject_repository_execute_epoch(
+                        &mut updater,
+                        &self.runtime.workspace,
+                        RepositoryExecuteEpoch::revoked(),
+                    )
+                    .map_err(NativeDemandSessionError::Restoration)?;
+                    inject_repository_workspace_epoch(
+                        &mut updater,
+                        &self.runtime.workspace,
+                        slug_bzlmod_v2::RepositoryWorkspaceEpoch::revoked(),
+                    )
+                    .map_err(NativeDemandSessionError::Restoration)?;
+                    #[allow(unused_mut)]
+                    let mut transaction = self.runtime.request_revision.commit(updater).await;
+                    #[cfg(test)]
+                    {
+                        self.restoration_host_inputs = Some(
+                            transaction
+                                .compute(&RepositoryHostRestorationProbeKey(self.lease.0))
+                                .await
+                                .map_err(|error| {
+                                    NativeDemandSessionError::Restoration(anyhow::anyhow!(
+                                        error.to_string()
+                                    ))
+                                })?,
+                        );
+                    }
+                    drop(transaction);
+                    self.runtime.dice.wait_for_idle().await;
+                    Ok::<_, NativeDemandSessionError>(())
+                },
+            ))?;
         self.runtime
             .repository_materializer
             .discard(self.repository_session)
@@ -9139,6 +9174,9 @@ impl<'a> NativeDemandAbortGuard<'a> {
             .expect("native command is armed")
             .retire_general_workspace()
         {
+            return self.abort(error);
+        }
+        if let Err(error) = self.command().check_source_scope() {
             return self.abort(error);
         }
         #[cfg(test)]

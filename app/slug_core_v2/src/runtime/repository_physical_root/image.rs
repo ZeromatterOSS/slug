@@ -9,7 +9,8 @@ impl RepositoryPhysicalRoot {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<ScopedImageSource, InputImageCaptureError> {
-        check(scope, active).map_err(|_| InputImageCaptureError::Cancelled)?;
+        self.check_origin(scope, active)
+            .map_err(|_| InputImageCaptureError::Cancelled)?;
         // One retained source duplicate plus conservative bounded component-
         // walk/dirent/file-copy overlap, kept through all image/ELF work. The
         // image output's own descriptor/logical budgets remain independent.
@@ -34,7 +35,8 @@ impl RepositoryPhysicalRoot {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<(), InputImageCaptureError> {
-        check(scope, active).map_err(|_| InputImageCaptureError::Cancelled)?;
+        self.check_origin(scope, active)
+            .map_err(|_| InputImageCaptureError::Cancelled)?;
         self.validate_backing()
             .map_err(|_| InputImageCaptureError::StaleSource)?;
         if backing_identity(file, self.mode).map_err(|_| InputImageCaptureError::StaleSource)?
@@ -42,6 +44,7 @@ impl RepositoryPhysicalRoot {
         {
             return Err(InputImageCaptureError::StaleSource);
         }
-        check(scope, active).map_err(|_| InputImageCaptureError::Cancelled)
+        self.check_origin(scope, active)
+            .map_err(|_| InputImageCaptureError::Cancelled)
     }
 }

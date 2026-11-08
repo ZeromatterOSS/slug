@@ -49,9 +49,12 @@ The [original Loading join receipt](wp1225-original-loading-acceptance-2026-11-0
 adds the inactive policy/Need/replay route, actual original cquery with two fresh
 commands and normal process records, same-root adoption, anchored generic source
 producers, binary output delivery and command retirement through queued results
-and bootstrap/payload cancellation. Trusted construction still requires a
-Diagnostic source scope. Production per-command source scope and selected-source
-bridges are the next frontier, followed by original-route physical CAS/runfiles
+and bootstrap/payload cancellation. The [command scope receipt](wp1225-command-source-scope-acceptance-2026-11-08.json)
+adds trusted crate-internal configuration on ordinary Native services: fresh
+command scopes on one persistent bank, original data deadlines, foreign-scope/
+bank refusal, Args/RPC stop signals and bounded retirement. Default CLI activation
+remains Disabled. Selected-source bridges are the next frontier, followed by
+original-route physical CAS/runfiles
 proof and the complete activation gates below. Existing production process routes
 remain replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.
@@ -124,7 +127,7 @@ and [selected admission proof](wp1225-selected-view-admission-acceptance-2026-11
 cover shared owning namespaces, RO finalization/renewal, full child-visible
 manifests and complete native selected-set admission through ordinary Execute.
 Data-only history guards preserve source allocations without setup authority;
-source bodies never become mutable Process history. Original Loading, full
+source bodies never become mutable Process history. Original Loading source bridges, full
 Archive/public Rust, original-route physical CAS/runfiles and equivalent-memory
 gates remain. No production profile replacement is activated by this evidence.
 

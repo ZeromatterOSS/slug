@@ -147,7 +147,7 @@ impl<T: SourceActionTransport> NativeCommandRoot for SourceExecutionRoot<'_, T> 
         async move {
             terminal.inputs.check_execution_representative()?;
             let args_context =
-                RequestArgsContext::new(context.command.runtime.source_scope.as_deref());
+                RequestArgsContext::new(context.command.command_source_scope().map(Arc::as_ref));
             let native = context.native_source_inputs(terminal.inputs.clone())?;
             terminal.native = Some(native.clone());
             let staged = self

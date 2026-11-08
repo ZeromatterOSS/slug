@@ -34,6 +34,14 @@ use super::timeout_provenance::SourceTimeoutState;
 mod decoder_reservation;
 pub(in crate::runtime) use decoder_reservation::SourceDecoderReservation;
 
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+#[path = "command_scope.rs"]
+mod command_scope;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::runtime) enum SourceCounter {
     RegistryAttempts,
@@ -216,6 +224,22 @@ pub(in crate::runtime) struct SourceServiceScope {
     known_shas_root: Option<NormalizedAbsolutePath>,
     #[cfg(all(test, target_os = "linux"))]
     offline_archives: [Option<Arc<super::OfflineArchiveBacking>>; 5],
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    command: Option<command_scope::CommandScope>,
+}
+impl std::fmt::Debug for SourceServiceScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SourceServiceScope")
+            .field("workspace", &"<redacted>")
+            .field("work_deadline", &self.work_deadline)
+            .field("cleanup_deadline", &self.cleanup_deadline)
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
 }
 impl SourceServiceScope {
     /// Private helper bookkeeping only. The parent retains the original command
@@ -245,18 +269,7 @@ impl SourceServiceScope {
         cleanup_deadline: Instant,
         limits: SourceServiceLimits,
     ) -> Result<Arc<Self>, SourceServiceError> {
-        let now = Instant::now();
-        if !limits.valid()
-            || work_deadline <= now
-            || work_deadline > now + Duration::from_secs(27)
-            || cleanup_deadline < work_deadline
-            || cleanup_deadline
-                > work_deadline
-                    .checked_add(Duration::from_secs(3))
-                    .ok_or(SourceServiceError::InvalidLimits)?
-        {
-            return Err(SourceServiceError::InvalidLimits);
-        }
+        Self::validate(work_deadline, cleanup_deadline, limits)?;
         Ok(Arc::new(Self {
             workspace,
             work_deadline,
@@ -270,7 +283,32 @@ impl SourceServiceScope {
             known_shas_root: None,
             #[cfg(all(test, target_os = "linux"))]
             offline_archives: [None, None, None, None, None],
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            command: None,
         }))
+    }
+    fn validate(
+        work_deadline: Instant,
+        cleanup_deadline: Instant,
+        limits: SourceServiceLimits,
+    ) -> Result<(), SourceServiceError> {
+        let now = Instant::now();
+        if !limits.valid()
+            || work_deadline <= now
+            || work_deadline > now + Duration::from_secs(27)
+            || cleanup_deadline < work_deadline
+            || cleanup_deadline
+                > work_deadline
+                    .checked_add(Duration::from_secs(3))
+                    .ok_or(SourceServiceError::InvalidLimits)?
+        {
+            return Err(SourceServiceError::InvalidLimits);
+        }
+        Ok(())
     }
     #[cfg(test)]
     pub(in crate::runtime) fn new_for_test(
@@ -905,11 +943,36 @@ impl SourceServiceScope {
             self.cancelled.send_replace(true);
             return Err(SourceServiceError::BufferLimit);
         }
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        let command_credit = match bytes
+            .checked_add(std::mem::size_of::<SourceBufferReservation>())
+            .ok_or(SourceServiceError::Allocation)
+            .and_then(|bytes| self.reserve_command_bytes(bytes))
+        {
+            Ok(credit) => credit,
+            Err(error) => {
+                let first =
+                    Self::poison_locked(&mut state, error, SourceTimeoutOrigin::unattributed());
+                drop(state);
+                self.cancelled.send_replace(true);
+                return Err(first);
+            }
+        };
         state.counters.live_buffer_bytes = next;
         state.counters.peak_buffer_bytes = state.counters.peak_buffer_bytes.max(next);
         Ok(SourceBufferReservation {
             scope: Arc::clone(self),
             bytes,
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            _command_credit: command_credit,
         })
     }
     #[cfg(all(test, target_os = "linux"))]
@@ -1037,6 +1100,12 @@ impl SourceServiceScope {
 pub(in crate::runtime) struct SourceBufferReservation {
     scope: Arc<SourceServiceScope>,
     bytes: usize,
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    _command_credit: Option<crate::runtime::repository_physical_root::ResourceCredit>,
 }
 #[cfg(all(test, target_os = "linux"))]
 impl SourceBufferReservation {

@@ -53,6 +53,7 @@ use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 
+mod command_scope;
 mod local_request;
 pub(in crate::runtime) mod physical_roots;
 #[cfg(all(
@@ -193,6 +194,7 @@ struct RetainedRepositoryRoot {
 struct ActiveRepositorySession {
     token: RepositorySessionToken,
     workspace_lease: u64,
+    command_scope: Option<Arc<SourceServiceScope>>,
     validation: RepositorySessionValidation,
     reusable: Vec<AcceptedRepository>,
     entries: Vec<RepositoryMaterializationEpochEntry>,
@@ -460,30 +462,7 @@ impl RepositoryMaterializer {
     }
 
     pub(super) fn begin(&self) -> Result<RepositorySessionToken, RepositorySessionError> {
-        let mut state = self
-            .state
-            .lock()
-            .expect("repository materializer mutex poisoned");
-        if state.active.is_some() {
-            return Err(RepositorySessionError::Busy);
-        }
-        let token = RepositorySessionToken(
-            super::native_identity::next_repository_session()
-                .map_err(|_| RepositorySessionError::TokenExhausted)?,
-        );
-        let workspace_lease = super::native_identity::next_workspace_lease()
-            .map_err(|_| RepositorySessionError::TokenExhausted)?;
-        state.active = Some(ActiveRepositorySession {
-            token,
-            workspace_lease,
-            #[cfg(target_os = "linux")]
-            general: None,
-            validation: RepositorySessionValidation::Pending,
-            reusable: Vec::new(),
-            entries: Vec::new(),
-            provisional_roots: Vec::new(),
-        });
-        Ok(token)
+        self.begin_with_command_scope(self.source_scope.clone())
     }
 
     fn validate(
@@ -1108,6 +1087,7 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         selected: &[Arc<RepositoryMaterializationRequest>],
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        let command_scope = self.command_source_scope(token)?;
         self.check_source_scope(self.source_scope.as_ref())?;
         let snapshot = {
             let state = self
@@ -1222,7 +1202,7 @@ impl RepositoryMaterializer {
         let active = || self.session_is_active(token);
         let mut comparison = RepositoryRequestComparison::new(
             snapshot.comparison_resources.as_ref(),
-            self.source_scope.as_deref(),
+            command_scope.as_deref(),
             &active,
         )?;
         for (entry, request) in snapshot.entries.iter().zip(selected) {
@@ -1233,12 +1213,18 @@ impl RepositoryMaterializer {
             }
         }
         let epoch = complete_epoch(&self.workspace, &snapshot.entries)?;
+        self.command_source_scope(token)?;
         self.check_source_scope(self.source_scope.as_ref())?;
         let state = self
             .state
             .lock()
             .expect("repository materializer mutex poisoned");
         let current = matching_validated_active(&state, token)?;
+        if !command_scope::scope_is_current(current, command_scope.as_ref()) {
+            return Err(RepositorySessionError::SourceService(
+                SourceServiceError::ForeignScope,
+            ));
+        }
         if snapshot.entries.iter().any(|entry| {
             !current
                 .entries
@@ -1377,14 +1363,25 @@ impl RepositoryMaterializer {
         selected: &[Arc<RepositoryMaterializationRequest>],
         validation: Vec<RepositoryValidation>,
     ) -> Result<(), RepositorySessionError> {
+        let command_scope = self.command_source_scope(token)?;
         self.check_source_scope(self.source_scope.as_ref())?;
         let snapshot = {
             let state = self
                 .state
                 .lock()
                 .expect("repository materializer mutex poisoned");
+            if let Some(scope) = &command_scope {
+                scope
+                    .check()
+                    .map_err(RepositorySessionError::SourceService)?;
+            }
             self.check_source_scope(self.source_scope.as_ref())?;
             let active = matching_validated_active(&state, token)?;
+            if !command_scope::scope_is_current(active, command_scope.as_ref()) {
+                return Err(RepositorySessionError::SourceService(
+                    SourceServiceError::ForeignScope,
+                ));
+            }
             let cleanup_root_count = state
                 .accepted_roots
                 .len()
@@ -1489,7 +1486,7 @@ impl RepositoryMaterializer {
         let active = || self.session_is_active(token);
         let mut comparison = RepositoryRequestComparison::new(
             snapshot.comparison_resources.as_ref(),
-            self.source_scope.as_deref(),
+            command_scope.as_deref(),
             &active,
         )?;
         let accepted = selected_acceptance(
@@ -1503,8 +1500,18 @@ impl RepositoryMaterializer {
                 .state
                 .lock()
                 .expect("repository materializer mutex poisoned");
+            if let Some(scope) = &command_scope {
+                scope
+                    .check()
+                    .map_err(RepositorySessionError::SourceService)?;
+            }
             self.check_source_scope(self.source_scope.as_ref())?;
             let active = matching_validated_active(&state, token)?;
+            if !command_scope::scope_is_current(active, command_scope.as_ref()) {
+                return Err(RepositorySessionError::SourceService(
+                    SourceServiceError::ForeignScope,
+                ));
+            }
             if snapshot.entries.iter().any(|entry| {
                 !active.entries.iter().any(|now| {
                     Arc::ptr_eq(&now.request, &entry.request) && now.result == entry.result

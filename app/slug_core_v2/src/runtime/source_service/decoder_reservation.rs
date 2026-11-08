@@ -24,11 +24,36 @@ impl SourceServiceScope {
             self.cancelled.send_replace(true);
             return Err(first);
         };
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        let command_credit = match bytes
+            .checked_add(std::mem::size_of::<SourceDecoderReservation>())
+            .ok_or(SourceServiceError::Allocation)
+            .and_then(|bytes| self.reserve_command_bytes(bytes))
+        {
+            Ok(credit) => credit,
+            Err(error) => {
+                let first =
+                    Self::poison_locked(&mut state, error, SourceTimeoutOrigin::unattributed());
+                drop(state);
+                self.cancelled.send_replace(true);
+                return Err(first);
+            }
+        };
         state.counters.live_decoder_bytes = next;
         state.counters.peak_decoder_bytes = state.counters.peak_decoder_bytes.max(next);
         Ok(SourceDecoderReservation {
             scope: Arc::clone(self),
             bytes,
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            _command_credit: command_credit,
         })
     }
 }
@@ -37,6 +62,12 @@ impl SourceServiceScope {
 pub(in crate::runtime) struct SourceDecoderReservation {
     scope: Arc<SourceServiceScope>,
     bytes: usize,
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    _command_credit: Option<crate::runtime::repository_physical_root::ResourceCredit>,
 }
 
 impl Drop for SourceDecoderReservation {

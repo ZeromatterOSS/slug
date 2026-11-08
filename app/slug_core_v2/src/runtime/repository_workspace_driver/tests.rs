@@ -131,21 +131,26 @@ fn unretired_queued_owner_refuses_cleanup_and_keeps_session_busy() {
 }
 
 #[test]
-fn generic_policy_is_disabled_by_default_and_requires_original_scoped_owner() {
+fn generic_policy_is_disabled_by_default_and_scopes_native_commands_without_replacing_acquisition()
+{
     let workspace = tempfile::tempdir().unwrap();
-    let mut plain =
+    let mut runtime =
         WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
             .unwrap();
     assert_eq!(
-        plain.repository_workspace_policy(),
+        runtime.repository_workspace_policy(),
         slug_bzlmod_v2::RepositoryWorkspaceExecutionPolicy::Disabled
     );
-    assert!(
-        plain
-            .enable_general_repository_workspaces_for_test(bank(), limits())
-            .is_err()
+    assert!(runtime.source_scope.is_none());
+    let mut disabled = NativeDemandAbortGuard::new(
+        runtime
+            .begin_native_demand_command()
+            .unwrap()
+            .into_command(),
     );
-    let mut runtime = scoped(workspace.path());
+    assert!(disabled.command().command_source_scope().is_none());
+    disabled.discard().unwrap();
+    drop(disabled);
     let resources = bank();
     runtime
         .enable_general_repository_workspaces_for_test(resources.clone(), limits())
@@ -155,6 +160,7 @@ fn generic_policy_is_disabled_by_default_and_requires_original_scoped_owner() {
         slug_bzlmod_v2::RepositoryWorkspaceExecutionPolicy::LinuxReadOnlyHostV1
     );
     let mut leases = Vec::new();
+    let mut scopes = Vec::new();
     for _ in 0..2 {
         let mut guard = NativeDemandAbortGuard::new(
             runtime
@@ -162,6 +168,25 @@ fn generic_policy_is_disabled_by_default_and_requires_original_scoped_owner() {
                 .unwrap()
                 .into_command(),
         );
+        let scope = guard.command().command_source_scope().unwrap().clone();
+        assert!(guard.command().owns_command_scope);
+        assert!(
+            runtime.source_scope.is_none(),
+            "permanent Native acquisition owner must stay unscoped"
+        );
+        assert!(Arc::ptr_eq(
+            &scope,
+            &runtime
+                .repository_materializer
+                .command_source_scope(guard.command().repository_session)
+                .unwrap()
+                .unwrap()
+        ));
+        assert!(scopes.iter().all(|old| !Arc::ptr_eq(old, &scope)));
+        assert_eq!(scope.snapshot().source_attempts, 0);
+        scope
+            .charge(source_service::SourceCounter::SourceAttempts, 1)
+            .unwrap();
         guard.begin_attempt().unwrap();
         let (policy, epoch) = runtime.runtime.block_on(async {
             let mut updater = runtime
@@ -193,7 +218,121 @@ fn generic_policy_is_disabled_by_default_and_requires_original_scoped_owner() {
         assert!(!leases.contains(&epoch.lease().unwrap()));
         leases.push(epoch.lease().unwrap());
         guard.discard().unwrap();
+        assert_eq!(
+            scope.check(),
+            Err(source_service::SourceServiceError::Cancelled)
+        );
+        scopes.push(scope);
     }
+}
+
+#[test]
+fn diagnostic_command_scope_keeps_the_original_owner_without_refresh() {
+    let workspace = tempfile::tempdir().unwrap();
+    let mut runtime = scoped(workspace.path());
+    let original = runtime.source_scope.as_ref().unwrap().clone();
+    runtime
+        .enable_general_repository_workspaces_for_test(bank(), limits())
+        .unwrap();
+    for _ in 0..2 {
+        let mut guard = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        assert!(!guard.command().owns_command_scope);
+        assert!(Arc::ptr_eq(
+            guard.command().command_source_scope().unwrap(),
+            &original
+        ));
+        guard.discard().unwrap();
+        original.check().unwrap();
+    }
+}
+
+#[test]
+fn native_command_cancellation_interrupts_pending_work_and_drains_with_original_cleanup_clock() {
+    let workspace = tempfile::tempdir().unwrap();
+    let mut runtime =
+        WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
+            .unwrap();
+    let resources = bank();
+    let baseline = resources.snapshot().retained_bytes;
+    runtime
+        .enable_general_repository_workspaces_for_test(resources.clone(), limits())
+        .unwrap();
+    let mut guard = NativeDemandAbortGuard::new(
+        runtime
+            .begin_native_demand_command()
+            .unwrap()
+            .into_command(),
+    );
+    let scope = guard.command().command_source_scope().unwrap().clone();
+    let cleanup = scope.cleanup_deadline();
+    let args_a = super::super::source_execution::RequestArgsContext::new(Some(scope.as_ref()));
+    assert!(!slug_build_api_v2::ArgsDirectoryContext::is_cancelled(
+        &args_a
+    ));
+    let result: Result<(), _> = runtime.runtime.block_on(async {
+        let cancel = scope.clone();
+        let task = tokio::spawn(async move {
+            tokio::task::yield_now().await;
+            cancel.cancel();
+        });
+        let result = command_source_work(Some(&scope), std::future::pending()).await;
+        task.await.unwrap();
+        result
+    });
+    assert!(matches!(
+        result,
+        Err(NativeDemandSessionError::SourceService(
+            source_service::SourceServiceError::Cancelled
+        ))
+    ));
+    runtime
+        .runtime
+        .block_on(command_source_cleanup(Some(&scope), async { Ok(()) }))
+        .unwrap();
+    assert_eq!(scope.cleanup_deadline(), cleanup);
+    assert_eq!(
+        scope.check(),
+        Err(source_service::SourceServiceError::Cancelled)
+    );
+    assert!(slug_build_api_v2::ArgsDirectoryContext::is_cancelled(
+        &args_a
+    ));
+    guard.discard().unwrap();
+    drop(guard);
+    let mut next = NativeDemandAbortGuard::new(
+        runtime
+            .begin_native_demand_command()
+            .unwrap()
+            .into_command(),
+    );
+    assert!(!Arc::ptr_eq(
+        &scope,
+        next.command().command_source_scope().unwrap()
+    ));
+    next.command().check_source_scope().unwrap();
+    let args_b = super::super::source_execution::RequestArgsContext::new(
+        next.command().command_source_scope().map(Arc::as_ref),
+    );
+    assert!(!slug_build_api_v2::ArgsDirectoryContext::is_cancelled(
+        &args_b
+    ));
+    assert!(slug_build_api_v2::ArgsDirectoryContext::is_cancelled(
+        &args_a
+    ));
+    drop(args_b);
+    next.discard().unwrap();
+    drop(next);
+    drop(args_a);
+    drop(scope);
+    drop(runtime);
+    assert_eq!(resources.snapshot().retained_bytes, baseline);
+    assert_eq!(resources.snapshot().native_fds, 0);
+    assert_eq!(resources.snapshot().backing_bytes, 0);
 }
 
 #[test]
@@ -205,7 +344,9 @@ fn enabled_policy_rejects_legacy_realizations_in_complete_frontier_before_setup(
     use slug_bzlmod_v2::RepositoryFilesystemRequest;
     use slug_bzlmod_v2::RepositoryFilesystemResult;
     let workspace = tempfile::tempdir().unwrap();
-    let mut runtime = scoped(workspace.path());
+    let mut runtime =
+        WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
+            .unwrap();
     let resources = bank();
     runtime
         .enable_general_repository_workspaces_for_test(resources.clone(), limits())
@@ -370,7 +511,9 @@ ext = module_extension(implementation=_extension)
 #[ignore = "actual compiled CLI + original general Starlark + same-root adoption; finite native supervisor required"]
 fn native_original_starlark_uses_general_needs_normal_records_and_same_root_adoption() {
     let (workspace, policy) = original_workspace(ORIGINAL, "out");
-    let mut runtime = scoped(workspace.path());
+    let mut runtime =
+        WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
+            .unwrap();
     let resources = bank();
     runtime
         .enable_general_repository_workspaces_for_test(resources.clone(), limits())
@@ -392,7 +535,7 @@ fn native_original_starlark_uses_general_needs_normal_records_and_same_root_adop
                 panic!(
                     "original command {ordinal} failed at {}: {error}; source={:?}; native={:?}",
                     runtime.native_demand_sessions.workspace_stage(),
-                    runtime.source_scope.as_ref().unwrap().snapshot(),
+                    runtime.source_scope.as_ref().map(|scope| scope.snapshot()),
                     resources.snapshot()
                 )
             });
@@ -644,7 +787,9 @@ fn native_original_cancellation_keeps_session_open_until_bootstrap_or_payload_re
     use std::sync::atomic::Ordering;
     for (target, hold) in [(1, true), (3, false)] {
         let (workspace, policy) = original_workspace(CANCELLING_ORIGINAL, "late");
-        let mut runtime = scoped(workspace.path());
+        let mut runtime =
+            WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
+                .unwrap();
         let resources = bank();
         let baseline = resources.snapshot().retained_bytes;
         runtime
@@ -652,7 +797,7 @@ fn native_original_cancellation_keeps_session_open_until_bootstrap_or_payload_re
             .unwrap();
         let stage = Arc::new(AtomicUsize::new(0));
         let retirement = runtime.observe_general_processes_for_test(stage.clone(), hold);
-        let scope = runtime.source_scope.as_ref().unwrap().clone();
+        let materializer = runtime.repository_materializer.clone();
         let done = AtomicBool::new(false);
         std::thread::scope(|threads| {
             let sessions = &runtime.native_demand_sessions;
@@ -677,6 +822,14 @@ fn native_original_cancellation_keeps_session_open_until_bootstrap_or_payload_re
                     sessions.state.lock().unwrap().phase,
                     NativeDemandLeasePhase::Open { .. }
                 ));
+                let token = match sessions.state.lock().unwrap().phase {
+                    NativeDemandLeasePhase::Open {
+                        repository: Some(token),
+                        ..
+                    } => token,
+                    _ => panic!("native gate must retain its actor token"),
+                };
+                let scope = materializer.command_source_scope(token).unwrap().unwrap();
                 scope.cancel();
                 let until = Instant::now() + Duration::from_secs(10);
                 while !observer.wait_until(Instant::now() + Duration::from_millis(1)) {
@@ -736,6 +889,7 @@ fn native_original_cancellation_keeps_session_open_until_bootstrap_or_payload_re
         assert_eq!(resources.snapshot().native_fds, 0);
         assert_eq!(resources.snapshot().backing_bytes, 0);
         drop(retirement);
+        drop(materializer);
         drop(runtime);
         assert_eq!(resources.snapshot().retained_bytes, baseline);
     }

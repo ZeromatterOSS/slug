@@ -214,3 +214,65 @@ fn shared_backing_rejects_foreign_bank_and_mode_without_lending_quota() {
         (selected_base, 0)
     );
 }
+
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+#[test]
+fn command_scope_refuses_foreign_native_bank_before_control_admission() {
+    let selected = resources();
+    let foreign = resources();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let workspace = NormalizedAbsolutePath::new("/command-bank-test").unwrap();
+    let scope = SourceServiceScope::new_command(
+        workspace.clone(),
+        deadline,
+        deadline + Duration::from_secs(1),
+        SourceServiceLimits::default(),
+        selected.clone(),
+    )
+    .unwrap();
+    let before = foreign.snapshot();
+    let limits =
+        slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits::new(128, 16 << 20, ARCHIVE_BYTES)
+            .unwrap();
+    assert!(matches!(
+        RepositoryWorkspaceCommand::new(
+            workspace.clone(),
+            1,
+            limits,
+            foreign.clone(),
+            scope.clone(),
+            &|| true
+        ),
+        Err(PhysicalRootError::SourceService(
+            SourceServiceError::ForeignScope
+        ))
+    ));
+    // The builder uses the same pre-IO bank check, before backing admission.
+    assert!(matches!(
+        check_bank(&scope, &foreign),
+        Err(PhysicalRootError::SourceService(
+            SourceServiceError::ForeignScope
+        ))
+    ));
+    let after = foreign.snapshot();
+    assert_eq!(after.retained_bytes, before.retained_bytes);
+    assert_eq!(after.peak_retained_bytes, before.peak_retained_bytes);
+    assert_eq!(after.native_fds, 0);
+    assert_eq!(after.backing_bytes, 0);
+    scope.check().unwrap();
+    let command = RepositoryWorkspaceCommand::new(
+        workspace,
+        1,
+        limits,
+        selected.clone(),
+        scope.clone(),
+        &|| true,
+    )
+    .unwrap();
+    drop(command);
+    drop(scope);
+    assert_eq!(
+        selected.snapshot().retained_bytes,
+        foreign.snapshot().retained_bytes
+    );
+}

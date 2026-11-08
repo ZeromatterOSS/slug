@@ -36,7 +36,7 @@ pub(super) fn open(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<RepositoryRootReader, PhysicalRootError> {
-    check(scope, active)?;
+    root.check_origin(scope, active)?;
     let index = root
         .state
         .entries()
@@ -69,7 +69,7 @@ pub(super) fn open(
         return Err(PhysicalRootError::Snapshot);
     }
     root.validate_backing()?;
-    check(scope, active)?;
+    root.check_origin(scope, active)?;
     Ok(RepositoryRootReader {
         file,
         root: root.clone(),

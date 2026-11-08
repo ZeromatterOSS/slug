@@ -77,6 +77,15 @@ whole-workload memory reduction or fit. Anchored listing keys retain the full
 semantic anchor without a descriptor or mutable owner; unanchored keys retain
 None. See the [original Loading join evidence](wp1225-original-loading-acceptance-2026-11-08.json).
 
+Fresh Native command scopes reuse that persistent root bank. Scope control and
+live source-buffer/decoder guards additionally debit the same bank; old retained
+allocations constrain later commands without resetting counters or refunding
+live payloads. Conservative double charges remain. Builders and sealed data
+retain the original scope Arc, whose control credit follows strong ownership;
+no new weak scope registry, cache, interner or donor import is introduced. DICE
+retains no scope or native authority. This is bounded component ownership, not a
+completed-command RSS claim; see the [scope evidence](wp1225-command-source-scope-acceptance-2026-11-08.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

@@ -23,24 +23,18 @@ impl WorkspaceRuntime {
         slug_bzlmod_v2::RepositoryWorkspaceExecutionPolicy::Disabled
     }
 
-    /// Trusted inactive proof configuration, independent of caller/source/tool.
-    /// Native production has no original command scope yet and cannot enable it.
+    /// Trusted internal configuration. Public/default activation remains disabled.
     #[cfg(all(
-        test,
         target_os = "linux",
         target_arch = "x86_64",
         target_pointer_width = "64"
     ))]
-    pub(in crate::runtime) fn enable_general_repository_workspaces_for_test(
+    pub(in crate::runtime) fn configure_general_repository_workspaces(
         &mut self,
         resources: Arc<super::super::repository_physical_root::RepositoryRootResources>,
         limits: slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits,
     ) -> Result<(), NativeDemandSessionError> {
-        self.source_scope
-            .as_ref()
-            .ok_or_else(|| refusal("general workspace proof requires original diagnostic scope"))?
-            .check()
-            .map_err(NativeDemandSessionError::SourceService)?;
+        self.check_source_scope()?;
         if self.general_workspaces.is_some()
             || !matches!(
                 self.native_demand_sessions
@@ -56,9 +50,53 @@ impl WorkspaceRuntime {
         self.general_workspaces = Some(GeneralWorkspaceRuntime {
             resources,
             limits,
+            #[cfg(test)]
             probe: None,
         });
         Ok(())
+    }
+    #[cfg(all(
+        test,
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    pub(in crate::runtime) fn enable_general_repository_workspaces_for_test(
+        &mut self,
+        resources: Arc<super::super::repository_physical_root::RepositoryRootResources>,
+        limits: slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits,
+    ) -> Result<(), NativeDemandSessionError> {
+        self.configure_general_repository_workspaces(resources, limits)
+    }
+
+    pub(super) fn new_command_source_scope(
+        &self,
+    ) -> Result<(Option<Arc<source_service::SourceServiceScope>>, bool), NativeDemandSessionError>
+    {
+        if let Some(scope) = &self.source_scope {
+            scope
+                .check()
+                .map_err(NativeDemandSessionError::SourceService)?;
+            return Ok((Some(scope.clone()), false));
+        }
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        if let Some(config) = &self.general_workspaces {
+            let work = std::time::Instant::now() + std::time::Duration::from_secs(27);
+            let scope = source_service::SourceServiceScope::new_command(
+                self.repository_materializer.workspace().clone(),
+                work,
+                work + std::time::Duration::from_secs(3),
+                source_service::SourceServiceLimits::default(),
+                config.resources.clone(),
+            )
+            .map_err(NativeDemandSessionError::SourceService)?;
+            return Ok((Some(scope), true));
+        }
+        Ok((None, false))
     }
     #[cfg(all(
         test,
@@ -89,6 +127,27 @@ impl WorkspaceRuntime {
 }
 
 impl NativeDemandCommand<'_> {
+    pub(in crate::runtime::dice) fn command_source_scope(
+        &self,
+    ) -> Option<&Arc<source_service::SourceServiceScope>> {
+        self.command_scope.as_ref()
+    }
+    pub(super) fn cancel_owned_command_scope(&self) {
+        if self.owns_command_scope {
+            self.command_scope
+                .as_ref()
+                .expect("owned command scope")
+                .cancel();
+        }
+    }
+    pub(super) fn wait_command_idle(&self) -> Result<(), NativeDemandSessionError> {
+        self.runtime
+            .runtime
+            .block_on(command_source_cleanup(self.command_scope.as_ref(), async {
+                self.runtime.dice.wait_for_idle().await;
+                Ok(())
+            }))
+    }
     pub(super) fn repository_requests_equal(
         &self,
         left: &RepositoryMaterializationRequest,
@@ -219,6 +278,58 @@ impl NativeDemandCommand<'_> {
     }
 }
 
+pub(super) async fn command_source_work<T>(
+    scope: Option<&Arc<source_service::SourceServiceScope>>,
+    future: impl std::future::Future<Output = Result<T, NativeDemandSessionError>>,
+) -> Result<T, NativeDemandSessionError> {
+    let Some(scope) = scope else {
+        return future.await;
+    };
+    let mut outcome = None;
+    let completion = scope
+        .during(std::time::Duration::from_secs(27), async {
+            outcome = Some(future.await);
+            Ok(())
+        })
+        .await;
+    match outcome {
+        Some(Err(primary)) => Err(primary),
+        Some(Ok(value)) => completion
+            .map(|()| value)
+            .map_err(NativeDemandSessionError::SourceService),
+        None => Err(NativeDemandSessionError::SourceService(
+            completion.err().expect("unfinished command work refused"),
+        )),
+    }
+}
+
+pub(super) async fn command_source_cleanup<T>(
+    scope: Option<&Arc<source_service::SourceServiceScope>>,
+    future: impl std::future::Future<Output = Result<T, NativeDemandSessionError>>,
+) -> Result<T, NativeDemandSessionError> {
+    let Some(scope) = scope else {
+        return future.await;
+    };
+    let mut outcome = None;
+    let completion = scope
+        .during_cleanup(async {
+            outcome = Some(future.await);
+            Ok(())
+        })
+        .await;
+    match outcome {
+        Some(Err(primary)) => Err(primary),
+        Some(Ok(value)) => completion
+            .map(|()| value)
+            .map_err(NativeDemandSessionError::SourceService),
+        None => Err(NativeDemandSessionError::SourceService(
+            completion
+                .err()
+                .expect("unfinished command cleanup refused"),
+        )),
+    }
+}
+
 #[cfg(all(
     target_os = "linux",
     target_arch = "x86_64",
@@ -288,6 +399,7 @@ mod native {
         pub(in crate::runtime::dice) fn new(
             runtime: &WorkspaceRuntime,
             token: super::super::super::repository_io::RepositorySessionToken,
+            command_scope: Option<&Arc<source_service::SourceServiceScope>>,
         ) -> Result<Option<Self>, NativeDemandSessionError> {
             let Some(config) = &runtime.general_workspaces else {
                 return Ok(None);
@@ -296,10 +408,8 @@ mod native {
             runtime
                 .native_demand_sessions
                 .mark_workspace_stage("native_admission");
-            let scope = runtime
-                .source_scope
-                .as_ref()
-                .ok_or_else(|| refusal("general workspace requires original diagnostic scope"))?
+            let scope = command_scope
+                .ok_or_else(|| refusal("general workspace requires original command scope"))?
                 .clone();
             scope
                 .check()

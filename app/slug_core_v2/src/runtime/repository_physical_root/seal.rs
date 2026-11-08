@@ -13,7 +13,7 @@ pub(super) fn seal(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
-    check(scope, active)?;
+    builder.check_origin(scope, active)?;
     if realization.reservation().as_ref() != builder.reservation.as_ref()
         || realization.final_state().reservation().as_ref() != builder.reservation.as_ref()
     {
@@ -58,6 +58,7 @@ pub(super) fn seal(
         anchor,
         resources: builder.resources,
         backing: builder.backing,
+        origin_scope: builder.origin_scope,
         credit: builder.credit,
     }))
 }

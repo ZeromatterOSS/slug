@@ -292,7 +292,7 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
             let native = context.native_action_chain_inputs(terminal.inputs.clone())?;
             terminal.native = Some(native.clone());
             let args_context = super::source_execution::RequestArgsContext::new(
-                context.command.runtime.source_scope.as_deref(),
+                context.command.command_source_scope().map(Arc::as_ref),
             );
             let mut session = self
                 .transport

@@ -115,9 +115,7 @@ impl NativeSourceAccess {
                 let current = scope
                     .as_ref()
                     .ok_or_else(|| error("physical source requires current source scope"))?;
-                if current.workspace() != root.reservation().workspace() {
-                    return Err(error("foreign physical source scope"));
-                }
+                root.check_origin(current, &|| true).map_err(error)?;
             }
         }
         if let Some(scope) = &scope {

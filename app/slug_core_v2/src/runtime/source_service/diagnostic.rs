@@ -274,8 +274,12 @@ impl NativeDemandCommand<'_> {
     pub(in crate::runtime::dice) fn check_source_scope(
         &self,
     ) -> Result<(), NativeDemandSessionError> {
-        self.runtime.check_source_scope()?;
-        if self.runtime.source_scope().is_some()
+        if let Some(scope) = self.command_source_scope() {
+            scope
+                .check()
+                .map_err(NativeDemandSessionError::SourceService)?;
+        }
+        if self.command_source_scope().is_some()
             && !self
                 .runtime
                 .repository_materializer
@@ -290,7 +294,7 @@ impl NativeDemandCommand<'_> {
         &self,
         needs: &slug_bzlmod_v2::SourcePreparationNeeds,
     ) -> Result<(), NativeDemandSessionError> {
-        let Some(scope) = self.runtime.source_scope() else {
+        let Some(scope) = self.command_source_scope() else {
             return Ok(());
         };
         self.check_source_scope()?;

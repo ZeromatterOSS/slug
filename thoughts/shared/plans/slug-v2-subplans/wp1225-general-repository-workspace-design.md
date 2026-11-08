@@ -385,10 +385,11 @@ route/prepared reuse under both variants. Its ordinary DICE key computes
 Disabled unless Core explicitly injects the trusted policy; attempt, acceptance
 and restoration inject the current policy. LinuxReadOnlyHostV1 applies uniformly
 to original repository-rule invocations and never falls back to a GCC/Homebrew
-runner on refusal. Trusted test construction currently requires the already
-installed Diagnostic scope and one workspace-retained native bank. Native
-production still has no per-command source scope and cannot enable this route.
-Default activation remains gated below.
+runner on refusal. Trusted configuration requires one workspace-retained native
+bank. The crate-internal configuration
+boundary now also supports ordinary Native construction through the command
+scope below; fixed Diagnostic construction remains available. Default activation
+remains gated below.
 
 Enabled evaluation demands the fresh workspace observation before loading the
 original definition or returning a prepared effect, including zero-Execute
@@ -446,6 +447,45 @@ keeps the session Open/Busy with no restoration, early refund, cleanup-success
 claim or late publication. Credits may release after actual later retirement.
 No cleanup thread is spawned from Drop, and resource-bank counts are not used
 as a substitute for actual worker retirement.
+
+### Command-owned native source scope
+
+The [command scope receipt](wp1225-command-source-scope-acceptance-2026-11-08.json)
+records the inactive Native join. It keeps the Host/Registry acquisition owner and its
+permanent unscoped services unchanged. An explicitly configured General command
+mints one finite scope after Busy admission and binds its exact Arc to the actor
+token before preflight. Diagnostic construction retains its original fixed scope
+and never refreshes it. Default production policy stays Disabled; no CLI, caller,
+source name or environment switch enables this candidate.
+
+The command, General progress, workers and native completion capabilities retain
+that same scope across retries. Existing limits remain: at most 27 seconds of
+work and three seconds of cleanup, with no renewed clock. Command control and
+every live scoped buffer/decoder additionally debit the existing persistent root
+bank. Per-scope counters remain distinct and sticky; retained A allocations still
+constrain B admission until their actual guards drop. Conservative double charges
+are accepted. No resource owner enters DICE or a mutable runtime current-scope
+slot. Host/Registry acquisition keeps its existing counters and byte policy;
+command future supervision is a separate lifetime bound.
+
+Builders and sealed physical data bind their original scope. Readers, images and
+transport retain and check it, so B cannot remint A data under B's later deadline.
+Pure metadata or a retained data Arc grants no mount authority or scope renewal.
+Success drains computation/native/result custody and consumes the actor token
+without cancelling valid data leases; those retain A's original clock. Abort
+sticky-cancels the owned scope, drops the attempt and drains with its original
+cleanup deadline before restoring the canonical prior snapshot and discarding
+the actor session. Failed cleanup leaves Open/Busy. No kernel termination or
+whole-command memory guarantee follows from timer supervision.
+
+Proof must join two actual originals on a normal Native runtime, fresh A/B scopes
+on the same bank, original-reader lifetime and B-remint refusal, sticky abort
+isolation, shared retained-buffer/decoder admission, retries and queued worker/
+view retirement. Existing Native acquisition and consumed Diagnostic behavior
+remain protected within the recorded passing coverage. Five inherited Diagnostic
+full-caller/counter fixtures fail identically on the clean baseline and candidate;
+their success is not claimed. Source bridges, full archive, original-route CAS/runfiles,
+public Rust, equivalent-command memory and default activation remain open.
 
 ## Anchored source IO and native transport
 

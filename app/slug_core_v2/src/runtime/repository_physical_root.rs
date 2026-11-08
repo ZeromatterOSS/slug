@@ -190,6 +190,7 @@ pub(in crate::runtime) struct RepositoryPhysicalRootBuilder {
     mode: RepositoryWorkspaceMode,
     resources: Arc<RepositoryRootResources>,
     backing: Arc<RepositoryRootBacking>,
+    origin_scope: Arc<SourceServiceScope>,
     credit: resources::ResourceCredit,
     // A bootstrap result may remain queued after the awaiting future cancels.
     // Mutable authority and its credits retire before this counted guard.
@@ -208,17 +209,25 @@ pub(in crate::runtime) struct RepositoryPhysicalRoot {
     anchor: MaterializationPathAnchor,
     resources: Arc<RepositoryRootResources>,
     backing: Arc<RepositoryRootBacking>,
+    origin_scope: Arc<SourceServiceScope>,
     credit: resources::ResourceCredit,
 }
 
 impl RepositoryPhysicalRootBuilder {
+    pub(super) fn check_origin(
+        &self,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), PhysicalRootError> {
+        check_origin(&self.origin_scope, scope, active)
+    }
     pub(in crate::runtime) fn bind_source_claim(
         &mut self,
         claim: Arc<super::repository_io::reservations::SourceRootClaim>,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<(), PhysicalRootError> {
-        check(scope, active)?;
+        self.check_origin(scope, active)?;
         self.backing.bind_claim(&self.reservation, claim)
     }
     /// Native factory precondition: trusted setup has selected this full
@@ -234,6 +243,7 @@ impl RepositoryPhysicalRootBuilder {
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         check(scope, active)?;
+        check_bank(scope, &resources)?;
         let backing = RepositoryRootBacking::new(&resources, mode)?;
         Self::from_quiescent_tmpfs_with_backing(
             input,
@@ -266,6 +276,12 @@ impl RepositoryPhysicalRootBuilder {
             backing,
         };
         check(scope, active)?;
+        check_bank(scope, &resources)?;
+        if scope.workspace() != reservation.workspace() {
+            return Err(PhysicalRootError::SourceService(
+                SourceServiceError::ForeignScope,
+            ));
+        }
         incoming.backing.matches(&resources, mode)?;
         if reservation.instance().value() == 0 || reservation.lease() == 0 {
             return Err(PhysicalRootError::Reservation);
@@ -293,6 +309,7 @@ impl RepositoryPhysicalRootBuilder {
             mode,
             resources,
             backing: incoming.backing,
+            origin_scope: scope.clone(),
             credit,
             retirement: None,
         };
@@ -312,6 +329,13 @@ impl RepositoryPhysicalRootBuilder {
     }
 }
 impl RepositoryPhysicalRoot {
+    pub(in crate::runtime) fn check_origin(
+        &self,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), PhysicalRootError> {
+        check_origin(&self.origin_scope, scope, active)
+    }
     pub(in crate::runtime) fn source_claim(
         &self,
     ) -> Option<Arc<super::repository_io::reservations::SourceRootClaim>> {
@@ -332,7 +356,7 @@ impl RepositoryPhysicalRoot {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<PathObservationEpoch, PhysicalRootError> {
-        check(scope, active)?;
+        self.check_origin(scope, active)?;
         let _credit = self.resources.reserve(IO_SCRATCH, 3, 0)?;
         self.validate_backing()?;
         let io = RootIo::new(&self.file, io_limits(self.mode, &self.reservation))?;
@@ -345,7 +369,7 @@ impl RepositoryPhysicalRoot {
         )
         .map_err(PhysicalRootError::Observation)?;
         self.validate_backing()?;
-        check(scope, active)?;
+        self.check_origin(scope, active)?;
         Ok(result)
     }
     pub fn open_member(
@@ -362,6 +386,37 @@ impl RepositoryPhysicalRoot {
         }
         Ok(())
     }
+}
+
+fn check_origin(
+    original: &Arc<SourceServiceScope>,
+    supplied: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<(), PhysicalRootError> {
+    if !Arc::ptr_eq(original, supplied) {
+        return Err(PhysicalRootError::SourceService(
+            SourceServiceError::ForeignScope,
+        ));
+    }
+    check(original, active)
+}
+
+fn check_bank(
+    scope: &SourceServiceScope,
+    resources: &Arc<RepositoryRootResources>,
+) -> Result<(), PhysicalRootError> {
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    if scope
+        .command_resources()
+        .is_some_and(|bank| !Arc::ptr_eq(bank, resources))
+    {
+        return Err(PhysicalRootError::SourceService(
+            SourceServiceError::ForeignScope,
+        ));
+    }
+    #[cfg(not(all(target_arch = "x86_64", target_pointer_width = "64")))]
+    let _ = (scope, resources);
+    Ok(())
 }
 
 fn backing_identity(

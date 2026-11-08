@@ -132,6 +132,7 @@ impl RepositoryWorkspaceCommand {
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         check(&scope, active)?;
+        check_bank(&scope, &resources)?;
         if &workspace != scope.workspace() {
             return Err(PhysicalRootError::SourceService(
                 SourceServiceError::ForeignScope,

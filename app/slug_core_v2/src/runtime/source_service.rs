@@ -1,5 +1,5 @@
-//! Private, consumed diagnostic acquisition service. Ordinary native services
-//! do not install this scope; none of these limits are a total RSS guarantee.
+//! Private scoped acquisition for consumed diagnostics and fresh general commands.
+//! Ordinary unscoped services stay native; these limits are not a total RSS guarantee.
 
 #[path = "source_service/buffer_provenance.rs"]
 mod buffer_provenance;

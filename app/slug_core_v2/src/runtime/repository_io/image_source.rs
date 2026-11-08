@@ -12,6 +12,7 @@ impl RepositoryMaterializer {
             &slug_bzlmod_v2::RepositoryMaterialization,
         )>,
     ) -> Result<super::super::input_image::ScopedImageSource, RepositorySessionError> {
+        let command_scope = self.command_source_scope(token)?;
         self.check_source_scope(self.source_scope.as_ref())?;
         // Only constant-size Arc clones leave this mutex. Row's shared guard
         // continues paying for complete request/history while compared unlocked.
@@ -57,7 +58,7 @@ impl RepositoryMaterializer {
         let active = || self.session_is_active(token);
         let mut comparison = RepositoryRequestComparison::new(
             comparison_resources.as_ref(),
-            self.source_scope.as_deref(),
+            command_scope.as_deref(),
             &active,
         )?;
         if let Some(row) = &pin {
@@ -95,8 +96,7 @@ impl RepositoryMaterializer {
         let source = match pin.as_ref().map(|row| &row.root) {
             #[cfg(target_os = "linux")]
             Some(RetainedRootOwner::Physical(root)) => {
-                let scope = self
-                    .source_scope
+                let scope = command_scope
                     .as_ref()
                     .ok_or(RepositorySessionError::InvalidImageAuthority)?;
                 root.image_source(scope, &|| self.session_is_active(token))
@@ -126,12 +126,16 @@ impl RepositoryMaterializer {
                 .map_err(|_| RepositorySessionError::InvalidImageAuthority)?
             }
         };
+        self.command_source_scope(token)?;
         self.check_source_scope(self.source_scope.as_ref())?;
         let state = self
             .state
             .lock()
             .expect("repository materializer mutex poisoned");
         let active = matching_validated_active(&state, token)?;
+        if !super::command_scope::scope_is_current(active, command_scope.as_ref()) {
+            return Err(RepositorySessionError::InvalidImageAuthority);
+        }
         if let Some(row) = &pin {
             let entry = active
                 .entries
