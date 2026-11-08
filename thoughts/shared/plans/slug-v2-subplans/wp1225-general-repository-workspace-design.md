@@ -902,9 +902,72 @@ Existing exact/+1 regressions deliberately count each initial/successor state,
 including unchanged trees. Pinned Bazel registers/configures all toolchain
 labels, and the natural selected module registers37 remote-JDK configuration
 repositories. Filtering these by requested Rust type would change semantics.
-Storage sharing cannot reduce this logical count under the existing contract.
-An explicit retention admission decision remains open within this packet;
-the fixed limits and complete-history requirements are unchanged.
+Storage sharing cannot reduce this logical count under the predecessor contract.
+The reviewed replacement below changes logical admission explicitly; complete
+history and the byte/resource limits remain.
+
+### Retention admission dimensions
+
+The genuine frontier contradicts using one aggregate128 count for both roots
+and history. The selected **Slug-native** policy separates those dimensions.
+`RepositoryWorkspaceRetentionLimits::new(max_roots, metadata_bytes,
+archive_body_bytes)` retains the same explicit root capacity128 in Native
+configuration. Every native claim domain, root/source slot, dependency union,
+ticket forecast and controller uses `max_roots`, never a derived history bound.
+The pure epoch also refuses a new root beyond its declared capacity before
+initial-state allocation or native bootstrap. No caller identity selects limits.
+
+Each retained genesis and successor still increments `state_versions` exactly.
+Use one shared checked minimum metadata charge for State/Arc control and its
+mandatory root-entry allocation, both in state validation and history admission:
+
+```
+state_versions * minimum_state_metadata <= retained_metadata <= metadata_limit
+```
+
+The existing16MiB metadata limit therefore supplies a finite layout-derived
+history bound. All state/record tables, transfer overlap, operation/result
+metadata and canonicalization scratch remain charged. Residual command budgets
+subtract other transcripts' complete metadata/body charges once; they do not
+subtract version counts again from a metadata-derived residual ceiling.
+Keep every initial state, predecessor, successor and record; sealed, equal and
+deleted history receives no refund. This revises the independent logical-version
+admission policy; it does not raise byte limits or claim an allocation speedup.
+
+The old count also incidentally constrained aggregate execution. Preserve the
+per-transcript128-Execute check and add an explicit command-wide128-Execute
+bound. An exact checked retention counter starts at zero and increments only
+for a newly completed Execute. New-request admission checks the aggregate before
+effects; completion/publication forecasts check it again before allocation or
+publication. Authenticating an old record precedes replay without spending a
+new execution. A failed forecast leaves the old epoch and native credits intact.
+The new scalar participates in existing structural retention equality, not a
+separate cache, identity digest or native authority. Fresh epochs/invalidation
+and DICE ownership remain unchanged.
+
+Protocol implementation belongs to `repository_workspace.rs`, `state.rs`,
+`sequence.rs` and their focused tests. Core migrations are confined to
+`repository_io/reservations.rs`, `repository_workspace_command.rs` and
+`repository_workspace_driver.rs`, with root-controller boundary tests.
+Existing Arc/Allocative and compact containers remain; no donor or new pool.
+
+Discriminate more than128 fully retained versions across fewer than128 roots,
+unchanged/no-op counting and replay, metadata exact/+1 and multiplication
+overflow, root128/+1 before setup, and aggregate Execute128/+1 across roots.
+Reuse protected Source64, Process64MiB, full-history, scope, quota and retirement
+evidence, then repeat the unchanged original Rust cquery under the same Native
+bank/byte limits. Source/process/backing caps and default Disabled activation
+remain. The derived count bounds retained representation and traversal; it does
+not establish acceptable latency or the completed-command1.25x Bazel RSS gate.
+
+The [retention acceptance receipt](wp1225-retention-dimensions-acceptance-2026-11-08.json)
+records focused protocol/Core/Loading and protected original compiler proof.
+Unchanged original Rust now retains143 states under the same byte banks and
+reaches the existing work deadline before archive extraction. Next, attribute
+injection, graph compute, idle drain and actual progress wall/CPU costs using
+bounded nonsemantic observation. A global-epoch invalidation or helper-setup
+hypothesis requires measured evidence before implementation; developer-profile
+timing does not establish production latency or the memory ratio.
 
 ### Current captured Source transport (accepted inactive component)
 

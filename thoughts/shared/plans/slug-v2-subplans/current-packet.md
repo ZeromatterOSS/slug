@@ -3,17 +3,21 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: resolve the genuine aggregate retained-state admission conflict
-for unchanged `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its
-nightly setting. The [verified source/frontier component](wp1225-rust-frontier-acceptance-2026-11-08.json)
-stages natural BCR/tool inputs and reduces archive-candidate misses with one
-ordinary flat distdir. The same artifacts now reach43 generated roots/85 records,
-then refuse the next reservation at128 retained states, before Rust archive
-demand. Independent audits confirm one initial state per root and one successor
-per record; no duplicate-count correction is supported. Resolve this explicit
-admission-contract decision before choosing archive work. Keep full history;
-do not discount initial states, prune caller-specific registrations or substitute
-Source state to evade the limit. No admission-policy revision is accepted yet.
+Current delta: attribute the unchanged work deadline for original
+`rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
+The [retention-dimension component](wp1225-retention-dimensions-acceptance-2026-11-08.json)
+retains143 complete states across48 roots/95 records and then reaches the
+existing27-second scope deadline, before Rust archive demand. Use bounded phase
+timing on the same ordinary Native command and verified flat inputs before
+selecting a generic graph/native optimization; test builds currently use
+opt-level1. No caller-specific pruning or clock increase is selected.
+
+The [retention contract](wp1225-general-repository-workspace-design.md#retention-admission-dimensions)
+now separates root capacity128 from metadata-bounded exact history and enforces
+command-wide Execute128 explicitly. Keep every initial/successor state, complete
+structural identity and authenticated replay. The
+[verified source component](wp1225-rust-frontier-acceptance-2026-11-08.json)
+owns unchanged natural BCR/tool staging through one ordinary flat distdir.
 The existing default policy and all source/process/backing limits stay unchanged.
 [Source backing contraction](wp1225-source-quota-acceptance-2026-11-08.json)
 already closes the preceding warm compiler capacity gap; a stopped Rust probe

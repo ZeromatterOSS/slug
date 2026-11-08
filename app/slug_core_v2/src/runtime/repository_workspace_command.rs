@@ -167,8 +167,7 @@ impl RepositoryWorkspaceCommand {
         let credit = resources.reserve(add(bytes, std::mem::size_of::<CreditedEpoch>())?, 0, 0)?;
         let epoch = RepositoryWorkspaceEpoch::fresh(workspace, lease, limits)
             .map_err(PhysicalRootError::Protocol)?;
-        let dependencies =
-            NativeReadViewDependencies::empty(&resources, limits.max_state_versions())?;
+        let dependencies = NativeReadViewDependencies::empty(&resources, limits.max_roots())?;
         Ok(Self {
             roots: Vec::new(),
             source_slots: Vec::new(),
@@ -180,7 +179,7 @@ impl RepositoryWorkspaceCommand {
             source_dependencies: dependencies,
             scope,
             resources,
-            max_roots: limits.max_state_versions(),
+            max_roots: limits.max_roots(),
             #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
             process_probe: None,
             _control: control,
@@ -325,6 +324,18 @@ impl RepositoryWorkspaceCommand {
             || !claim.matches_reservation(reservation)
         {
             return Err(PhysicalRootError::Reservation);
+        }
+        // Source snapshots occupy the same native root capacity but have no
+        // General transcript. Refuse before bootstrap, independently of the
+        // metadata-derived history budget checked below.
+        if self
+            .roots
+            .len()
+            .checked_add(self.source_slots.len())
+            .ok_or(PhysicalRootError::Resource)?
+            >= self.max_roots
+        {
+            return Err(PhysicalRootError::Resource);
         }
         // Initial root mode changes no storage forecast. Actual root metadata
         // and the same admission are verified again when ownership returns.

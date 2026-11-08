@@ -436,6 +436,100 @@ fn enabled_policy_rejects_legacy_realizations_in_complete_frontier_before_setup(
 }
 
 #[test]
+fn combined_root_frontier_exact_capacity_and_plus_one_precede_native_setup() {
+    use slug_bzlmod_v2::RepositoryWorkspaceReservationDemand;
+    use slug_bzlmod_v2::source_preparation::RepositoryWorkspaceStableKey;
+    let workspace = tempfile::tempdir().unwrap();
+    let mut runtime = scoped(workspace.path());
+    let resources = bank();
+    let baseline = resources.snapshot().retained_bytes;
+    runtime
+        .enable_general_repository_workspaces_for_test(
+            resources.clone(),
+            slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits::new(
+                2,
+                16 * 1024 * 1024,
+                1024 * 1024 * 1024,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut guard = NativeDemandAbortGuard::new(
+        runtime
+            .begin_native_demand_command()
+            .unwrap()
+            .into_command(),
+    );
+    let progress = guard.command().workspace_progress.as_ref().unwrap();
+    let lease = progress.source_epoch.lease().unwrap();
+    // Only a genuine mapping producer supplies this source request. No native
+    // root, source state, claim or completion is fabricated for capacity tests.
+    let source = workspace_source_request_for_test(workspace.path(), lease);
+    let owner = physical_root_owner_for_test();
+    let spec = Arc::new(slug_bzlmod_v2::RepoSpec {
+        rule_id: slug_bzlmod_v2::RepoRuleId {
+            bzl_file: slug_identity_v2::CanonicalLabel::parse("@@//:ext.bzl").unwrap(),
+            rule_name: "ordinary".into(),
+        },
+        attributes: Arc::new(SmallMap::new()),
+    });
+    let reservation = |name: &str, ordinal| {
+        slug_bzlmod_v2::SourcePreparationNeeds::repository_workspace_reservation(Arc::new(
+            RepositoryWorkspaceReservationDemand::new(
+                Arc::new(
+                    RepositoryWorkspaceStableKey::new(
+                        runtime.repository_materializer.workspace().clone(),
+                        owner.clone(),
+                        slug_identity_v2::CanonicalRepoName::new(name).unwrap(),
+                        ordinal,
+                    )
+                    .unwrap(),
+                ),
+                spec.clone(),
+            )
+            .unwrap(),
+        ))
+    };
+    let exact = slug_bzlmod_v2::SourcePreparationNeeds::source_snapshot(source)
+        .try_union(&reservation("first", 0))
+        .unwrap();
+    let overflow = exact.try_union(&reservation("second", 1)).unwrap();
+    let before = resources.snapshot();
+    progress
+        .preflight_root_capacity(runtime.repository_materializer.workspace(), &exact)
+        .unwrap();
+    assert!(matches!(
+        guard.progress(&overflow),
+        Err(NativeDemandSessionError::Computation(error))
+            if error.to_string() == "combined source root count exceeds policy"
+    ));
+    let progress = guard.command().workspace_progress.as_ref().unwrap();
+    assert!(progress.source_epoch.states().unwrap().is_empty());
+    assert!(
+        guard
+            .command()
+            .current_workspace_epoch()
+            .transcripts()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        runtime.native_demand_sessions.workspace_stage(),
+        "frontier_preflight"
+    );
+    let after = resources.snapshot();
+    assert_eq!(after.retained_bytes, before.retained_bytes);
+    assert_eq!(after.native_fds, 0);
+    assert_eq!(after.peak_native_fds, before.peak_native_fds);
+    assert_eq!(after.backing_bytes, 0);
+    assert_eq!(after.peak_backing_bytes, before.peak_backing_bytes);
+    guard.discard().unwrap();
+    drop(guard);
+    drop(runtime);
+    assert_eq!(resources.snapshot().retained_bytes, baseline);
+}
+
+#[test]
 fn queued_and_refused_result_delivery_keep_retirement_armed_until_command_drop() {
     for queued in [true, false] {
         let workspace = tempfile::tempdir().unwrap();

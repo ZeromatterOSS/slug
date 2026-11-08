@@ -32,6 +32,8 @@ pub use sequence::*;
 pub use state::*;
 pub use state_path::RepositoryWorkspaceReadExpectation;
 
+const REPOSITORY_WORKSPACE_EXECUTES: usize = 128;
+
 pub const REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES: u64 = 64 * 1024 * 1024;
 pub const REPOSITORY_WORKSPACE_PROCESS_ENTRIES: usize = 8192;
 pub const REPOSITORY_WORKSPACE_PROCESS_NAMES: usize = 1024 * 1024;
@@ -68,35 +70,35 @@ impl std::error::Error for RepositoryWorkspaceError {}
 /// selection. Retained history is distinct from archive decode/full-tree caps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, dupe::Dupe)]
 pub struct RepositoryWorkspaceRetentionLimits {
-    max_state_versions: usize,
+    max_roots: usize,
     metadata_bytes: usize,
     archive_body_bytes: u64,
 }
 
 impl RepositoryWorkspaceRetentionLimits {
     pub fn new(
-        max_state_versions: usize,
+        max_roots: usize,
         metadata_bytes: usize,
         archive_body_bytes: u64,
     ) -> Result<Self, RepositoryWorkspaceError> {
-        if max_state_versions == 0
-            || metadata_bytes < std::mem::size_of::<RepositoryWorkspaceState>()
+        if max_roots == 0
+            || metadata_bytes < RepositoryWorkspaceState::minimum_metadata_bytes()?
             || archive_body_bytes == 0
             || usize::try_from(archive_body_bytes).is_err()
-            || max_state_versions
-                .checked_mul(std::mem::size_of::<RepositoryWorkspaceRecord>())
+            || max_roots
+                .checked_mul(std::mem::size_of::<RepositoryWorkspaceTranscript>())
                 .is_none()
         {
             return Err(RepositoryWorkspaceError::InvalidPolicy);
         }
         Ok(Self {
-            max_state_versions,
+            max_roots,
             metadata_bytes,
             archive_body_bytes,
         })
     }
-    pub fn max_state_versions(self) -> usize {
-        self.max_state_versions
+    pub fn max_roots(self) -> usize {
+        self.max_roots
     }
     pub fn metadata_bytes(self) -> usize {
         self.metadata_bytes

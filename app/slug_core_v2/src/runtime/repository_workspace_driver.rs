@@ -430,7 +430,7 @@ mod native {
             scope
                 .check()
                 .map_err(NativeDemandSessionError::SourceService)?;
-            let max_roots = config.limits.max_state_versions();
+            let max_roots = config.limits.max_roots();
             let bytes = max_roots
                 .checked_mul(
                     4 * (std::mem::size_of::<(
@@ -578,21 +578,13 @@ mod native {
                 _credit: credit,
             })
         }
-        pub(super) fn progress(
-            &mut self,
-            runtime: &WorkspaceRuntime,
-            token: super::super::super::repository_io::RepositorySessionToken,
+        /// Metadata-only admission for the whole combined General/Source
+        /// frontier. This remains independent of retained history capacity.
+        pub(super) fn preflight_root_capacity(
+            &self,
+            workspace: &NormalizedAbsolutePath,
             needs: &slug_bzlmod_v2::SourcePreparationNeeds,
-            environment: &slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
-            distdirs: &crate::runtime::ArchiveDistdirPolicy,
         ) -> Result<(), NativeDemandSessionError> {
-            #[cfg(test)]
-            runtime
-                .native_demand_sessions
-                .mark_workspace_stage("frontier_preflight");
-            self.scope
-                .check()
-                .map_err(NativeDemandSessionError::SourceService)?;
             if needs.workspace_operations().len() > self.max_roots
                 || self
                     .tickets
@@ -611,7 +603,7 @@ mod native {
             // Validate the complete frontier before setup or mutation. The pure
             // carrier's source declarations are independent of argv/manifest.
             for demand in needs.workspace_reservations().values() {
-                if demand.key().workspace() != runtime.repository_materializer.workspace() {
+                if demand.key().workspace() != workspace {
                     return Err(refusal("foreign workspace reservation demand"));
                 }
                 if let Some(ticket) = self.tickets.get(demand.key()) {
@@ -625,7 +617,7 @@ mod native {
                     .source_snapshots()
                     .values()
                     .try_fold(0usize, |count, request| {
-                        if request.workspace() != runtime.repository_materializer.workspace()
+                        if request.workspace() != workspace
                             || Some(request.lease()) != self.source_epoch.lease()
                         {
                             return Err(refusal("foreign source snapshot demand"));
@@ -654,6 +646,24 @@ mod native {
             if roots > self.max_roots {
                 return Err(refusal("combined source root count exceeds policy"));
             }
+            Ok(())
+        }
+        pub(super) fn progress(
+            &mut self,
+            runtime: &WorkspaceRuntime,
+            token: super::super::super::repository_io::RepositorySessionToken,
+            needs: &slug_bzlmod_v2::SourcePreparationNeeds,
+            environment: &slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+            distdirs: &crate::runtime::ArchiveDistdirPolicy,
+        ) -> Result<(), NativeDemandSessionError> {
+            #[cfg(test)]
+            runtime
+                .native_demand_sessions
+                .mark_workspace_stage("frontier_preflight");
+            self.scope
+                .check()
+                .map_err(NativeDemandSessionError::SourceService)?;
+            self.preflight_root_capacity(runtime.repository_materializer.workspace(), needs)?;
             let active = || runtime.repository_materializer.session_is_active(token);
             let mut comparison = crate::runtime::repository_physical_root::ViewComparison::new(
                 &self.resources,

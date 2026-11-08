@@ -1,0 +1,324 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "c810a3d644d8adde7f7e6d48ef4502b8de9ecdfc",
+  "classification": "Slug-native logical retention admission revision; pinned originals and generic APIs; default General activation remains Disabled",
+  "outcome": "The unchanged genuine Rust cquery crosses the predecessor 128-state boundary and retains 48 genesis states plus95 completed records (143 total). The existing27-second work deadline stops the command before Rust archive extraction. No completion, latency or RSS claim.",
+  "admission_contract": {
+    "max_roots": 128,
+    "metadata_bytes": 16777216,
+    "archive_body_bytes": 1073741824,
+    "history_policy": "Every genesis, predecessor, successor and record remains retained. Checked state_versions * shared State/Arc/root-entry metadata minimum <= retained_metadata <= metadata limit replaces the independent128-version proxy.",
+    "root_policy": "All claim-domain, controller, slot, ticket and dependency capacities use max_roots; combined General+Source capacity is checked before bootstrap.",
+    "execute_policy": "Exact checked completed-Execute count; per-transcript128 and command-wide128. New requests refuse before effects; direct completion and projected publication refuse before new epoch allocation/publication. Old replay authenticates and spends no new execution.",
+    "unchanged": [
+      "Source attempts64",
+      "Process tree/history64MiB",
+      "per-output-stream1MiB",
+      "work27s/cleanup3s",
+      "native retained bank512MiB",
+      "native FD bank512",
+      "native backing bank8GiB",
+      "complete structural Spec/state/history equality and command-fresh epochs",
+      "full source/archive/body/decoder quotas"
+    ],
+    "note": "The logical history admission contract intentionally changed. This is not a duplicate-count repair or proof that the completed command fits memory."
+  },
+  "source_pins": {
+    "app/slug_bzlmod_v2/src/repository_workspace.rs": "78d2563fa93476b8f54d1bcb53de09edd5a4a8221ae6e9bc0aa0b46293581a7e",
+    "app/slug_bzlmod_v2/src/repository_workspace/state.rs": "818c98743bf1c52c5fcfe2fbc2ee85211a9e7b22082bbbcf78a5d58b4810c281",
+    "app/slug_bzlmod_v2/src/repository_workspace/sequence.rs": "dafdc18c4a1ec4ec5e778e610ca928f96c34ee53b96511058b735eb7ebf22e09",
+    "app/slug_bzlmod_v2/src/repository_workspace/tests.rs": "3cb85567a79da1e8cc908f3ebbbff8576689f287480230cd645dd7cb6bcc7c62",
+    "app/slug_bzlmod_v2/src/repository_workspace/tests/retention_admission_tests.rs": "5ee2bb56a331ee1c57e48b4defe559f862a14702d4ad055ca9cfd5862536508d",
+    "app/slug_core_v2/src/runtime/repository_io/reservations.rs": "85ff6a455d23cbe6e9ed8682b628d263b0b7f10c2c0010b796f6085e1fd16953",
+    "app/slug_core_v2/src/runtime/repository_workspace_command.rs": "5e32ab89ca3f9b01c6c8a3a2e96aff73cdb6b5647a353affca661b3f5a51c5d4",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver.rs": "7c4aac41469e8221f2507f1eaa82b399607ba74008e9327486aa9457aac79e07",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver/tests.rs": "dc922ce2f68fc63d9eeaf67e6ca702ac5babeab5f78523c23021001a5ad95fcb"
+  },
+  "compile": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 115.91982487200585,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 74.95928199600894,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 67.6893926620105,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "ordinary_tests": [
+    {
+      "target": "slug_bzlmod_v2",
+      "selected": 54,
+      "passed": 54,
+      "exit_code": 0,
+      "elapsed_seconds": 0.34539017800125293,
+      "executable_sha256": "ff4a7d3bdf0d5a1c64823985197b486eca43514afc3e18704fb8e6090ea2e07b",
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-6ed4b973def1affc",
+      "exact_selectors": [
+        "repository_workspace::sequence::retention_floor_tests::intrinsic_state_floor_checks_exact_plus_one_and_overflow",
+        "repository_workspace::tests::all_position_arguments_environment_removal_empty_and_requested_timeout_are_literal",
+        "repository_workspace::tests::archive_deeper_than_256_preserves_lane_while_delete_and_process_keep_own_limits",
+        "repository_workspace::tests::argument_environment_archive_metadata_charge_actual_spare_storage_and_owner_arrays",
+        "repository_workspace::tests::demand_tests::operation_demand_authenticates_independent_source_declarations_against_execute_manifest",
+        "repository_workspace::tests::demand_tests::reservation_demand_requires_current_full_binding_and_conflicting_needs_refuse",
+        "repository_workspace::tests::demand_tests::source_declarations_keep_nonexecute_prefixes_and_refuse_alias_foreign_limit_and_need_conflicts",
+        "repository_workspace::tests::demand_tests::workspace_operation_need_preserves_independent_unsupported_rows_and_full_conflicts",
+        "repository_workspace::tests::demand_tests::workspace_policy_default_and_cached_switches_are_dice_observed",
+        "repository_workspace::tests::dice_observes_completed_state_fresh_commands_revocation_and_workspace_isolation",
+        "repository_workspace::tests::equal_argv_new_index_is_a_new_sample_not_replay",
+        "repository_workspace::tests::equal_foreign_bodies_are_compared_then_replaced_without_double_retention",
+        "repository_workspace::tests::equal_foreign_predecessor_and_reservation_are_released_before_retention",
+        "repository_workspace::tests::execute_count_exact_limit_replays_prior_indices_and_refuses_new_plus_one",
+        "repository_workspace::tests::execute_cwd_requires_selected_instance_and_repository_subtree_before_need",
+        "repository_workspace::tests::fresh_empty_revoked_epochs_reject_stale_reservations",
+        "repository_workspace::tests::incorrect_read_write_delete_results_and_reverse_mode_are_not_certificates",
+        "repository_workspace::tests::native_epoch_forecasts_cover_fresh_reservation_and_exact_completed_append",
+        "repository_workspace::tests::native_epoch_publication_cannot_bypass_other_process_root_history_admission",
+        "repository_workspace::tests::native_epoch_publication_rejects_equal_final_state_with_rewritten_or_skipped_history",
+        "repository_workspace::tests::native_storage_forecast_covers_initial_unique_and_reused_completion",
+        "repository_workspace::tests::native_storage_forecast_refuses_foreign_replay_and_invalid_effects",
+        "repository_workspace::tests::nonzero_exit_keeps_writes_deletions_modes_and_later_read",
+        "repository_workspace::tests::normal_exit_and_each_output_stream_have_independent_exact_plus_one_limits",
+        "repository_workspace::tests::owner_layout_rounds_byte_tails_and_refuses_impossible_array_layouts",
+        "repository_workspace::tests::process_body_exact_limit_and_new_version_plus_one_count_complete_history",
+        "repository_workspace::tests::process_entry_and_depth_exact_plus_one_do_not_lower_archive_admission",
+        "repository_workspace::tests::process_names_and_absolute_path_have_exact_plus_one_limits",
+        "repository_workspace::tests::protocol_debug_redacts_body_argv_environment_and_captured_bytes",
+        "repository_workspace::tests::read_view_tests::archive_source_storage_stays_outside_mutable_history_and_forecasts_remain_complete",
+        "repository_workspace::tests::read_view_tests::bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_fields",
+        "repository_workspace::tests::read_view_tests::exact_prefix_replay_keeps_old_views_and_rehomes_equal_foreign_state_without_copying",
+        "repository_workspace::tests::read_view_tests::manifest_canonicalizes_exact_bound_and_refuses_aliases_and_foreign_command_facts",
+        "repository_workspace::tests::read_view_tests::repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies",
+        "repository_workspace::tests::read_view_tests::source_digest_view_is_exact_bounded_and_not_mutable_process_body_history",
+        "repository_workspace::tests::read_view_tests::view_identity_uses_full_spec_state_mode_literal_link_and_instance",
+        "repository_workspace::tests::replay_requires_full_operation_index_predecessor_and_generation",
+        "repository_workspace::tests::reservation_binds_full_spec_without_changing_slot_or_coarse_hash",
+        "repository_workspace::tests::reservation_rejects_zero_and_retains_full_generation_policy_identity",
+        "repository_workspace::tests::retention_admission_tests::command_execute_128_is_independent_of_history_and_authenticates_old_replay",
+        "repository_workspace::tests::retention_admission_tests::history_beyond_128_versions_preserves_noops_and_exact_replay",
+        "repository_workspace::tests::retention_admission_tests::root_capacity_is_independent_and_refuses_forecast_before_new_state",
+        "repository_workspace::tests::source_link_tests::payload_links_use_only_exact_execute_prefix_not_future_source_discovery",
+        "repository_workspace::tests::source_link_tests::source_link_content_identity_hashes_full_image_and_prunes_deleted_source_images",
+        "repository_workspace::tests::source_link_tests::source_link_content_identity_ignores_fresh_incarnations_at_same_literal_display",
+        "repository_workspace::tests::source_link_tests::source_link_delete_filters_final_data_but_retains_historical_projection",
+        "repository_workspace::tests::source_link_tests::source_link_identity_and_callback_include_full_projection_not_just_target_text",
+        "repository_workspace::tests::source_link_tests::source_link_literal_escape_cycles_and_write_through_directory_refuse",
+        "repository_workspace::tests::source_link_tests::source_link_modeled_resolution_guard_stops_before_fact_and_reuses_bounded_read_route",
+        "repository_workspace::tests::source_link_tests::source_links_resolve_directory_internal_and_dangling_without_changing_logical_owner",
+        "repository_workspace::tests::source_link_tests::typed_symlink_source_requires_independent_declaration_and_full_binding",
+        "repository_workspace::tests::state_rejects_missing_parent_duplicate_special_modes_and_escaping_link",
+        "repository_workspace::tests::state_versions_metadata_and_retained_bodies_have_exact_plus_one_policies",
+        "repository_workspace::tests::template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equal"
+      ],
+      "execution_argv": "[executable, --exact, ...exact_selectors, --test-threads=1]",
+      "preflight_argv": "[python3, scripts/v2_test_preflight.py, executable, --exact, ...exact_selectors]"
+    },
+    {
+      "target": "slug_core_v2",
+      "selected": 11,
+      "passed": 11,
+      "exit_code": 0,
+      "elapsed_seconds": 1.668589619002887,
+      "executable_sha256": "e96220a804508f04dab540c565c1640f2b179be09b55269ae8c30656e49b5b41",
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "exact_selectors": [
+        "runtime::dice::repository_workspace_driver::tests::combined_root_frontier_exact_capacity_and_plus_one_precede_native_setup",
+        "runtime::dice::repository_workspace_driver::tests::diagnostic_command_scope_keeps_the_original_owner_without_refresh",
+        "runtime::dice::repository_workspace_driver::tests::enabled_policy_rejects_legacy_realizations_in_complete_frontier_before_setup",
+        "runtime::dice::repository_workspace_driver::tests::generic_policy_is_disabled_by_default_and_scopes_native_commands_without_replacing_acquisition",
+        "runtime::dice::repository_workspace_driver::tests::legacy_execute_retirement_tests::legacy_execute_refuses_complete_mixed_frontier_before_io_under_both_policies",
+        "runtime::dice::repository_workspace_driver::tests::native_command_cancellation_interrupts_pending_work_and_drains_with_original_cleanup_clock",
+        "runtime::dice::repository_workspace_driver::tests::queued_and_refused_result_delivery_keep_retirement_armed_until_command_drop",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::frontier_diagnostic_reason_and_config_are_bounded_and_never_emit_payload",
+        "runtime::dice::repository_workspace_driver::tests::unretired_queued_owner_refuses_cleanup_and_keeps_session_busy",
+        "runtime::repository_io::reservations::tests::live_full_key_collision_refuses_and_dead_weak_control_stays_paid_until_prune",
+        "runtime::repository_io::reservations::tests::reservation_binds_fresh_command_spec_scope_and_blocks_generic_success_before_callback"
+      ],
+      "execution_argv": "[executable, --exact, ...exact_selectors, --test-threads=1]",
+      "preflight_argv": "[python3, scripts/v2_test_preflight.py, executable, --exact, ...exact_selectors]"
+    },
+    {
+      "target": "slug_loading_v2",
+      "selected": 18,
+      "passed": 18,
+      "exit_code": 0,
+      "elapsed_seconds": 0.12779706699075177,
+      "executable_sha256": "591ef8305eb1822f47139e5a9e24869555603c133393ed5d7685fe5aa0ddea8e",
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+      "exact_selectors": [
+        "module_extension_repository_file_effect::tests::general_workspace_tests::disabled_original_execute_ignores_completed_legacy_epoch_and_policy_changes_invalidate",
+        "module_extension_repository_file_effect::tests::general_workspace_tests::general_template_enumerated_environment_invalidates_same_completed_epoch_a_b_a",
+        "module_extension_repository_file_effect::tests::general_workspace_tests::original_general_policy_invalidates_disabled_prepared_result_and_fresh_zero_execute_commands",
+        "repository_rule_context::tests::source_snapshot_tests::builtin_prepared_read_template_and_execute_require_matching_source_snapshot",
+        "repository_rule_context::tests::source_snapshot_tests::direct_external_read_and_template_demand_label_path_before_source_bytes",
+        "repository_rule_context::tests::source_snapshot_tests::general_source_alias_read_template_and_delete_use_logical_workspace_operations",
+        "repository_rule_context::tests::source_snapshot_tests::general_source_string_symlink_cannot_use_available_but_undeclared_or_future_source",
+        "repository_rule_context::tests::source_snapshot_tests::general_source_symlink_preserves_projection_and_admits_directory_and_dangling_without_body_need",
+        "repository_rule_context::tests::source_snapshot_tests::general_symlink_converts_own_string_path_and_label_before_exact_prefix_replay",
+        "repository_rule_context::tests::source_snapshot_tests::general_symlink_target_conversion_precedes_destination_and_stale_source_refuses",
+        "repository_rule_context::tests::source_snapshot_tests::invalid_execute_options_precede_unresolved_label_and_source_paths_never_fall_back_to_host",
+        "repository_rule_context::tests::workspace_tests::general_dirname_refuses_above_anchor_and_preserves_owned_parent",
+        "repository_rule_context::tests::workspace_tests::general_execute_validates_argv_before_timeout_and_all_environment_keys_before_values",
+        "repository_rule_context::tests::workspace_tests::general_normalized_foreign_displays_refuse_before_host_lookup_or_need",
+        "repository_rule_context::tests::workspace_tests::general_original_replays_nonzero_state_reads_template_delete_and_ordered_output",
+        "repository_rule_context::tests::workspace_tests::general_own_labels_resolve_before_terminal_materialization_in_every_argv_position",
+        "repository_rule_context::tests::workspace_tests::general_prefix_declarations_ignore_later_prepared_paths_and_refuse_unbridged_sources",
+        "repository_rule_context::tests::workspace_tests::general_replay_preserves_output_before_failure_and_never_host_opens_foreign_display"
+      ],
+      "execution_argv": "[executable, --exact, ...exact_selectors, --test-threads=1]",
+      "preflight_argv": "[python3, scripts/v2_test_preflight.py, executable, --exact, ...exact_selectors]"
+    }
+  ],
+  "ordinary_passed": 83,
+  "new_discriminators": [
+    "history_beyond_128_versions_preserves_noops_and_exact_replay:43+85 prefix admits next genesis129 with all old facts",
+    "root_capacity_is_independent_and_refuses_forecast_before_new_state:root128 exact/root129 forecast+reserve refusal",
+    "command_execute_128_is_independent_of_history_and_authenticates_old_replay:64+64 across roots; request/direct-complete/publish129 refuse; replay authenticates",
+    "intrinsic_state_floor_checks_exact_plus_one_and_overflow",
+    "combined_root_frontier_exact_capacity_and_plus_one_precede_native_setup:metadata preflight exact2, real guard progress Source1+General2 refuses without new epoch/native resource growth"
+  ],
+  "protected_original_compiler": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probes",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probes",
+      "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "selected": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 18.10318231700512,
+    "core_sha256": "e96220a804508f04dab540c565c1640f2b179be09b55269ae8c30656e49b5b41",
+    "cli_sha256": "840458937a7d93af9bf97394713d8965f255c8d2748123e108bb8f240a0ae607",
+    "actual_original_commands": 4,
+    "steady_backing_bytes": 335544320,
+    "peak_backing_bytes": 4467986432,
+    "qualification": "Original cc_autoconf/source links and normal loading/execution pass absent/Homebrew A/B/A cases; final refund assertions pass. This cold-runtime discriminator does not replace prior accepted warm-runtime evidence."
+  },
+  "original_rust": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+    ],
+    "selected_diagnostic_tests": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 27.084286156008602,
+    "core_sha256": "e96220a804508f04dab540c565c1640f2b179be09b55269ae8c30656e49b5b41",
+    "cli_sha256": "840458937a7d93af9bf97394713d8965f255c8d2748123e108bb8f240a0ae607",
+    "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+    "semantic_result": {
+      "error": {
+        "code": "WorkDeadline",
+        "kind": "source_service"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 681,
+    "last_completed_epoch": {
+      "roots": 48,
+      "records": 95,
+      "state_versions": 143
+    },
+    "scope_source_attempts_last": 59,
+    "workspace_source_attempts": 9,
+    "archive_progress_calls": 0,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "peak_backing_bytes": 5465182208,
+    "peak_retained_bytes": 24822529,
+    "supervisor_timed_out": false,
+    "output_overflow": false,
+    "invalid_counter_delta": false,
+    "content_identity_census_complete": false,
+    "qualification": "The original27-second scope deadline fires. The60-second/8GiB address-space supervisor does not fire. An incomplete identity census supports no universal repetition claim."
+  },
+  "architecture_validation": {
+    "command": [
+      "sh",
+      "scripts/v2_archive_status.sh"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.06080365300294943,
+    "result": "Archive tag/branch e218054d4c796655939b968d90208b185decb352 and clean V2 ownership/plan paths pass; no V1 restoration."
+  },
+  "review": "Independent consequential design, frozen source, direct Loading/Core/Bzlmod and original integration evidence, final receipt and9source pins ACCEPT. All completion/activation/latency/RSS gates remain explicitly open.",
+  "next": "Attribute the unchanged work deadline using existing bounded phase instrumentation before choosing a generic graph/native optimization; no caller-specific pruning or clock increase.",
+  "remaining": [
+    "Full Rust archive extraction/envelope",
+    "Derived Source Path and repeated Workspace publication",
+    "Authentic Rust cquery, action comparison and REAPI execution",
+    "General activation",
+    "Equivalent-command <=1.25x Bazel RSS",
+    "Full Slug closure, M7A/M8 and Stage10"
+  ]
+}

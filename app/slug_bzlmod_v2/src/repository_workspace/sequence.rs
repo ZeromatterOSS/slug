@@ -11,12 +11,16 @@ use super::*;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Allocative)]
 pub struct RepositoryWorkspaceRetention {
     state_versions: usize,
+    executes: usize,
     metadata_bytes: usize,
     body_bytes: u64,
 }
 impl RepositoryWorkspaceRetention {
     pub fn state_versions(self) -> usize {
         self.state_versions
+    }
+    pub fn executes(self) -> usize {
+        self.executes
     }
     pub fn metadata_bytes(self) -> usize {
         self.metadata_bytes
@@ -29,12 +33,19 @@ impl RepositoryWorkspaceRetention {
         limits: RepositoryWorkspaceRetentionLimits,
         process: bool,
     ) -> Result<(), RepositoryWorkspaceError> {
-        if self.state_versions > limits.max_state_versions
+        let minimum = self
+            .state_versions
+            .checked_mul(RepositoryWorkspaceState::minimum_metadata_bytes()?)
+            .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
+        if minimum > self.metadata_bytes
             || self.metadata_bytes > limits.metadata_bytes
             || self.body_bytes > limits.archive_body_bytes
             || (process && self.body_bytes > REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES)
         {
             return Err(RepositoryWorkspaceError::RetentionLimit);
+        }
+        if self.executes > REPOSITORY_WORKSPACE_EXECUTES {
+            return Err(RepositoryWorkspaceError::StateLimit);
         }
         Ok(())
     }
@@ -358,6 +369,7 @@ impl RepositoryWorkspaceTranscript {
         )?;
         let retention = RepositoryWorkspaceRetention {
             state_versions: 1,
+            executes: 0,
             metadata_bytes: add(
                 metadata,
                 add(
@@ -514,7 +526,7 @@ impl RepositoryWorkspaceTranscript {
                     )
                 })
                 .count()
-                >= 128
+                >= REPOSITORY_WORKSPACE_EXECUTES
             {
                 return Err(RepositoryWorkspaceError::StateLimit);
             }
@@ -638,6 +650,9 @@ impl RepositoryWorkspaceTranscript {
         )?;
         let mut retention = self.retention;
         retention.state_versions = add(retention.state_versions, 1)?;
+        if matches!(&request.operation, RepositoryWorkspaceOperation::Execute(_)) {
+            retention.executes = add(retention.executes, 1)?;
+        }
         // New Vec and Arc slice coexist during transfer. Old records are Arc
         // handles: no deep CompactString/SmallMap clone occurs on append.
         let table = array_bytes::<Arc<RepositoryWorkspaceRecord>>(add(self.records.len(), 1)?)?;
@@ -1198,6 +1213,9 @@ impl RepositoryWorkspaceEpoch {
         {
             return Err(RepositoryWorkspaceError::ForeignReservation);
         }
+        if active.transcripts.len() >= active.limits.max_roots {
+            return Err(RepositoryWorkspaceError::RetentionLimit);
+        }
         Ok(self.remaining_budget(None)?.0)
     }
     #[doc(hidden)]
@@ -1343,6 +1361,7 @@ impl RepositoryWorkspaceEpoch {
         if index == transcript.records.len()
             && matches!(&operation, RepositoryWorkspaceOperation::Execute(_))
         {
+            self.check_new_execute()?;
             let (_, process_limit) = self.remaining_budget(Some(slot))?;
             if transcript.retention.body_bytes > process_limit {
                 return Err(RepositoryWorkspaceError::RetentionLimit);
@@ -1366,6 +1385,11 @@ impl RepositoryWorkspaceEpoch {
             .iter()
             .position(|t| t.reservation == request.reservation)
             .ok_or(RepositoryWorkspaceError::ForeignReservation)?;
+        if request.index == active.transcripts[index].records.len()
+            && matches!(&request.operation, RepositoryWorkspaceOperation::Execute(_))
+        {
+            self.check_new_execute()?;
+        }
         let (budget, process_limit) = self.remaining_budget(Some(index))?;
         self.update(
             Some(index),
@@ -1379,6 +1403,20 @@ impl RepositoryWorkspaceEpoch {
             )?,
         )
     }
+    fn check_new_execute(&self) -> Result<(), RepositoryWorkspaceError> {
+        let active = self
+            .active
+            .as_ref()
+            .ok_or(RepositoryWorkspaceError::Revoked)?;
+        let mut executes = 0usize;
+        for transcript in active.transcripts.iter() {
+            executes = add(executes, transcript.retention.executes)?;
+        }
+        if executes >= REPOSITORY_WORKSPACE_EXECUTES {
+            return Err(RepositoryWorkspaceError::StateLimit);
+        }
+        Ok(())
+    }
     fn remaining_budget(
         &self,
         index: Option<usize>,
@@ -1388,6 +1426,9 @@ impl RepositoryWorkspaceEpoch {
             .as_ref()
             .ok_or(RepositoryWorkspaceError::Revoked)?;
         let count = add(active.transcripts.len(), usize::from(index.is_none()))?;
+        if count > active.limits.max_roots {
+            return Err(RepositoryWorkspaceError::RetentionLimit);
+        }
         let table = array_bytes::<RepositoryWorkspaceTranscript>(count)?;
         let overhead = add(
             active.overhead,
@@ -1403,10 +1444,6 @@ impl RepositoryWorkspaceEpoch {
             if Some(i) == index {
                 continue;
             }
-            budget.max_state_versions = budget
-                .max_state_versions
-                .checked_sub(item.retention.state_versions)
-                .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
             budget.metadata_bytes = budget
                 .metadata_bytes
                 .checked_sub(item.retention.metadata_bytes)
@@ -1434,6 +1471,9 @@ impl RepositoryWorkspaceEpoch {
             .as_ref()
             .ok_or(RepositoryWorkspaceError::Revoked)?;
         let count = add(active.transcripts.len(), usize::from(index.is_none()))?;
+        if count > active.limits.max_roots {
+            return Err(RepositoryWorkspaceError::RetentionLimit);
+        }
         let table = array_bytes::<RepositoryWorkspaceTranscript>(count)?;
         let overhead = add(
             active.overhead,
@@ -1453,6 +1493,7 @@ impl RepositoryWorkspaceEpoch {
             .chain(std::iter::once((replacement, mode)))
         {
             total.state_versions = add(total.state_versions, item.state_versions)?;
+            total.executes = add(total.executes, item.executes)?;
             total.metadata_bytes = add(total.metadata_bytes, item.metadata_bytes)?;
             total.body_bytes = total
                 .body_bytes
@@ -1548,5 +1589,56 @@ impl Key for RepositoryWorkspaceObservationKey {
     }
     fn validity(value: &Self::Value) -> bool {
         value.active.is_some()
+    }
+}
+
+#[cfg(test)]
+mod retention_floor_tests {
+    use super::*;
+
+    #[test]
+    fn intrinsic_state_floor_checks_exact_plus_one_and_overflow() {
+        let minimum = RepositoryWorkspaceState::minimum_metadata_bytes().unwrap();
+        let limits = RepositoryWorkspaceRetentionLimits::new(1, minimum, 1).unwrap();
+        let exact = RepositoryWorkspaceRetention {
+            state_versions: 1,
+            metadata_bytes: minimum,
+            ..Default::default()
+        };
+        assert_eq!(exact.check(limits, false), Ok(()));
+        assert_eq!(
+            RepositoryWorkspaceRetention {
+                metadata_bytes: minimum + 1,
+                ..exact
+            }
+            .check(limits, false),
+            Err(RepositoryWorkspaceError::RetentionLimit)
+        );
+        assert_eq!(
+            RepositoryWorkspaceRetention {
+                metadata_bytes: minimum - 1,
+                ..exact
+            }
+            .check(limits, false),
+            Err(RepositoryWorkspaceError::RetentionLimit)
+        );
+        assert_eq!(
+            RepositoryWorkspaceRetention {
+                state_versions: 2,
+                ..exact
+            }
+            .check(limits, false),
+            Err(RepositoryWorkspaceError::RetentionLimit)
+        );
+        assert_eq!(
+            RepositoryWorkspaceRetention {
+                state_versions: usize::MAX,
+                metadata_bytes: usize::MAX,
+                ..exact
+            }
+            .check(limits, false),
+            Err(RepositoryWorkspaceError::RetentionLimit)
+        );
+        assert!(RepositoryWorkspaceRetentionLimits::new(1, minimum - 1, 1).is_err());
     }
 }

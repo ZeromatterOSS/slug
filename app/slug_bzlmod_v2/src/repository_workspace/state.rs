@@ -68,6 +68,17 @@ pub struct RepositoryWorkspaceState {
     source_bindings: Arc<[RepositoryWorkspaceReadView]>,
 }
 impl RepositoryWorkspaceState {
+    /// Intrinsic allocation paid by every retained state, including empty trees.
+    /// This is also the history-count floor; no separate version policy exists.
+    pub(super) fn minimum_metadata_bytes() -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            add(
+                std::mem::size_of::<Self>(),
+                2 * std::mem::size_of::<usize>(),
+            )?,
+            array_bytes::<RepositoryWorkspaceEntry>(1)?,
+        )
+    }
     pub fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
         &self.reservation
     }
@@ -201,13 +212,10 @@ impl RepositoryWorkspaceState {
             .ok_or(RepositoryWorkspaceError::InvalidPath)?;
         let mut names = 0usize;
         let mut bodies = 0u64;
-        let mut metadata = add(
-            add(
-                std::mem::size_of::<Self>(),
-                2 * std::mem::size_of::<usize>(),
-            )?,
-            array_bytes::<RepositoryWorkspaceEntry>(entries.len())?,
-        )?;
+        let additional_entries = array_bytes::<RepositoryWorkspaceEntry>(entries.len())?
+            .checked_sub(array_bytes::<RepositoryWorkspaceEntry>(1)?)
+            .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
+        let mut metadata = add(Self::minimum_metadata_bytes()?, additional_entries)?;
         for (index, entry) in entries.iter().enumerate() {
             let path = entry.path();
             if !valid_relative(path, true) || entry.mode & !0o7777 != 0 {

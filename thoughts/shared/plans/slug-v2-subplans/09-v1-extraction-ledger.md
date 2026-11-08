@@ -26,6 +26,20 @@ interner, global cache or donor import is introduced. These component bounds
 and tests do not establish public-command memory fit; see the
 [protocol receipt](wp1225-workspace-protocol-acceptance-2026-11-07.json).
 
+History admission separates retained root cardinality from exact state history.
+The existing State/Arc/root-entry layout charge now supplies a shared checked
+minimum: every initial/successor version remains counted and its positive
+metadata is admitted within the unchanged aggregate byte budget. Root domains,
+controller slots and read-view dependency capacities retain their explicit root
+bound. An exact scalar Execute count independently enforces the command envelope
+before effects and publication. Existing Arc/Allocative owners, full structural
+comparison, body sharing and construction-overlap charges remain; no new pool,
+collection, donor import or digest-only history representation is introduced.
+This is a Slug-native admission-policy revision, not a completed-command memory
+or latency claim; the selected owner contract defines the discriminators and
+the [retention receipt](wp1225-retention-dimensions-acceptance-2026-11-08.json)
+records their execution.
+
 The inactive rooted source observer reuses RootIo and ordinary immutable path
 epochs. The credited regular-file reader now shares one FD capture kernel with
 the unchanged Host/Registry adapters; rooted bytes retain the same exact Arc

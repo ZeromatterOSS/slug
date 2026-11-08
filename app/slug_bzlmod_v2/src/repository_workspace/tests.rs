@@ -783,7 +783,7 @@ fn state_versions_metadata_and_retained_bodies_have_exact_plus_one_policies() {
 }
 
 #[test]
-fn fresh_empty_revoked_epochs_reject_stale_reservations_and_global_state_overflow() {
+fn fresh_empty_revoked_epochs_reject_stale_reservations() {
     let a = RepositoryWorkspaceEpoch::fresh(
         NormalizedAbsolutePath::new("/workspace").unwrap(),
         7,
@@ -845,15 +845,20 @@ fn fresh_empty_revoked_epochs_reject_stale_reservations_and_global_state_overflo
             RepositoryWorkspaceOperation::Exists("".into()),
         )
         .unwrap();
-    assert_eq!(
-        one.complete(
+    // One root can retain multiple states; root capacity is not history count.
+    let completed = one
+        .complete(
             r,
             RepositoryWorkspaceResult::Exists(true),
             RepositoryWorkspaceMode::Archive,
-            vec![root()]
+            vec![root()],
         )
-        .unwrap_err(),
-        RepositoryWorkspaceError::RetentionLimit
+        .unwrap();
+    assert_eq!(
+        completed.transcripts().unwrap()[0]
+            .retention()
+            .state_versions(),
+        2
     );
 }
 
@@ -1654,5 +1659,6 @@ fn native_epoch_publication_cannot_bypass_other_process_root_history_admission()
 
 mod demand_tests;
 mod read_view_tests;
+mod retention_admission_tests;
 
 mod source_link_tests;

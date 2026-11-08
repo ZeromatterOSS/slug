@@ -282,9 +282,7 @@ impl RepositoryMaterializer {
             return Ok(general.lease);
         }
         if let Some(domain) = &state.claim_domain {
-            if !Arc::ptr_eq(&domain.resources, &resources)
-                || domain.max != limits.max_state_versions()
-            {
+            if !Arc::ptr_eq(&domain.resources, &resources) || domain.max != limits.max_roots() {
                 return Err(refusal());
             }
         }
@@ -293,7 +291,7 @@ impl RepositoryMaterializer {
             .map_err(|_| refusal())?;
         let domain = match &state.claim_domain {
             Some(domain) => domain.clone(),
-            None => NativeSelectionDomain::new(resources.clone(), limits.max_state_versions())?,
+            None => NativeSelectionDomain::new(resources.clone(), limits.max_roots())?,
         };
         let lease = active.workspace_lease;
         state.claim_domain = Some(domain);
@@ -371,7 +369,7 @@ impl RepositoryMaterializer {
             &mut general.slots,
             &mut general.capacity_credit,
             &general.resources,
-            general.limits.max_state_versions(),
+            general.limits.max_roots(),
         )?;
         let reservation = Arc::new(
             RepositoryWorkspaceReservation::new(
@@ -474,13 +472,13 @@ impl RepositoryMaterializer {
             &mut active.provisional_roots,
             &mut general.root_credit,
             &general.resources,
-            general.limits.max_state_versions(),
+            general.limits.max_roots(),
         )?;
         reserve_capacity(
             &mut active.entries,
             &mut general.entry_credit,
             &general.resources,
-            general.limits.max_state_versions(),
+            general.limits.max_roots(),
         )?;
         let count = active.entries.len().checked_add(1).ok_or_else(refusal)?;
         let dynamic = cloned_epoch_dynamic_storage(&active.entries)?
