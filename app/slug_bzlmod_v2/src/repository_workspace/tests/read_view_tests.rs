@@ -506,6 +506,7 @@ fn bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_
             request: Arc::new(request.clone()),
             result: crate::RepositoryMaterializationResult::Success(
                 crate::RepositoryMaterializationSuccess::Immutable {
+                    path_policy: crate::RepositoryMaterializationPathPolicy::GenerationRoot,
                     source_identity: realization.source_identity().clone(),
                     generation_root: realization
                         .reservation()
@@ -582,6 +583,7 @@ fn bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_
         }),
         result: crate::RepositoryMaterializationResult::Success(
             crate::RepositoryMaterializationSuccess::Immutable {
+                path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from("retained"),
                 generation_root: "/retained/root".into(),
                 observation_instance: PathObservationInstanceId::new(777),

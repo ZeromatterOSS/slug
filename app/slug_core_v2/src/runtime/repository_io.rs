@@ -32,6 +32,7 @@ use slug_bzlmod_v2::RepositoryIoOutcome;
 use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
 use slug_bzlmod_v2::RepositoryMaterializationGeneration;
 use slug_bzlmod_v2::RepositoryMaterializationKind;
+use slug_bzlmod_v2::RepositoryMaterializationPathPolicy;
 use slug_bzlmod_v2::RepositoryMaterializationRequest;
 #[cfg(test)]
 use slug_bzlmod_v2::RepositoryMaterializationRequestId;
@@ -186,6 +187,7 @@ struct RetainedRepositoryRoot {
     observation_instance: PathObservationInstanceId,
     request: Arc<RepositoryMaterializationRequest>,
     source_identity: Arc<str>,
+    path_policy: RepositoryMaterializationPathPolicy,
     generation: RepositoryMaterializationGeneration,
     root: RetainedRootOwner,
     #[cfg(target_os = "linux")]
@@ -384,6 +386,7 @@ enum RepositoryMaterializationAttempt {
     GeneratedImmutable {
         source_identity: Arc<str>,
         root: tempfile::TempDir,
+        path_policy: RepositoryMaterializationPathPolicy,
     },
     SpecError(String),
     TransportError(String),
@@ -764,14 +767,17 @@ impl RepositoryMaterializer {
                 PreparedMaterializationAttempt::Immutable {
                     source_identity: identity,
                     root,
+                    path_policy: RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 }
             }
             RepositoryMaterializationAttempt::GeneratedImmutable {
                 source_identity,
                 root,
+                path_policy,
             } => PreparedMaterializationAttempt::Immutable {
                 source_identity,
                 root,
+                path_policy,
             },
             RepositoryMaterializationAttempt::Local => PreparedMaterializationAttempt::Local,
             RepositoryMaterializationAttempt::SpecError(message) => {
@@ -850,6 +856,7 @@ impl RepositoryMaterializer {
                 PreparedMaterializationAttempt::Immutable {
                     source_identity,
                     root,
+                    path_policy,
                 },
             ) => {
                 if let Err(error) = self.check_source_scope(scope) {
@@ -878,6 +885,7 @@ impl RepositoryMaterializer {
                         observation_instance,
                         request: request.clone(),
                         source_identity: source_identity.clone(),
+                        path_policy,
                         generation,
                         root: RetainedRootOwner::Legacy(Arc::new(LegacyRootOwner::new(
                             root,
@@ -891,6 +899,7 @@ impl RepositoryMaterializer {
                         source_identity,
                         generation_root,
                         observation_instance,
+                        path_policy,
                     },
                 )
             }
@@ -900,6 +909,7 @@ impl RepositoryMaterializer {
                 PreparedMaterializationAttempt::Immutable {
                     source_identity,
                     root,
+                    path_policy,
                 },
             ) => {
                 if let Err(error) = self.check_source_scope(scope) {
@@ -928,6 +938,7 @@ impl RepositoryMaterializer {
                         observation_instance,
                         request: request.clone(),
                         source_identity: source_identity.clone(),
+                        path_policy,
                         generation,
                         root: RetainedRootOwner::Legacy(Arc::new(LegacyRootOwner::new(
                             root,
@@ -941,6 +952,7 @@ impl RepositoryMaterializer {
                         source_identity,
                         generation_root,
                         observation_instance,
+                        path_policy,
                     },
                 )
             }
@@ -1170,8 +1182,8 @@ impl RepositoryMaterializer {
                 ) {
                     let mut matching = state.accepted_roots.iter().chain(&active.provisional_roots)
                         .filter(|row| Arc::ptr_eq(&row.request, &entry.request) && matches!(&entry.result,
-                            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {source_identity,generation_root,observation_instance})
-                            if source_identity==&row.source_identity && generation_root==row.root.path() && *observation_instance==row.observation_instance));
+                            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {source_identity,generation_root,observation_instance,path_policy})
+                            if source_identity==&row.source_identity && generation_root==row.root.path() && *observation_instance==row.observation_instance && *path_policy==row.path_policy));
                     let row = matching.next().ok_or_else(|| {
                         RepositorySessionError::NativeWorkspace(
                             "selected general epoch lacks native history guard".into(),
@@ -1634,6 +1646,7 @@ enum PreparedMaterializationAttempt {
     Immutable {
         source_identity: Arc<str>,
         root: tempfile::TempDir,
+        path_policy: RepositoryMaterializationPathPolicy,
     },
     Result(RepositoryMaterializationResult),
 }
@@ -2069,6 +2082,7 @@ impl RepositoryIo for LocalRepositoryIo {
             Materialized::AssociatedImmutable {
                 source_identity,
                 root,
+                ..
             } => {
                 let (generation_root, observation_instance) = self.retain(root)?;
                 Ok(RepositoryIoOutcome::Immutable {
@@ -2092,6 +2106,7 @@ pub(super) enum Materialized {
     AssociatedImmutable {
         source_identity: Arc<str>,
         root: tempfile::TempDir,
+        path_policy: RepositoryMaterializationPathPolicy,
     },
 }
 
@@ -2459,6 +2474,7 @@ fn materialize_generated_repository_file_effects(
     RepositoryMaterializationAttempt::GeneratedImmutable {
         source_identity,
         root,
+        path_policy: RepositoryMaterializationPathPolicy::LegacyUnbounded,
     }
 }
 
@@ -2629,6 +2645,7 @@ fn materialize_generated_repository_archive_effects(
     Ok(Materialized::AssociatedImmutable {
         source_identity: generated_repository_file_effect_source_association(plan),
         root,
+        path_policy: RepositoryMaterializationPathPolicy::LegacyUnbounded,
     })
 }
 
@@ -2796,9 +2813,11 @@ fn materialized_attempt(
         Ok(Materialized::AssociatedImmutable {
             source_identity,
             root,
+            path_policy,
         }) => RepositoryMaterializationAttempt::GeneratedImmutable {
             source_identity,
             root,
+            path_policy,
         },
         Err(error) => match error.stage {
             ArchiveFailureStage::Spec => RepositoryMaterializationAttempt::SpecError(error.message),
@@ -3318,10 +3337,15 @@ mod tests {
         let Materialized::AssociatedImmutable {
             source_identity,
             root,
+            path_policy,
         } = materialized
         else {
             panic!("expected associated immutable root");
         };
+        assert_eq!(
+            path_policy,
+            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded
+        );
         assert_eq!(
             source_identity,
             generated_repository_file_effect_source_association(&plan)
@@ -3458,10 +3482,15 @@ mod tests {
             let Materialized::AssociatedImmutable {
                 source_identity,
                 root,
+                path_policy,
             } = materialized
             else {
                 panic!("expected genuine generated archive repository")
             };
+            assert_eq!(
+                path_policy,
+                slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded
+            );
             assert_eq!(source_identity, expected_identity);
             assert_eq!(
                 fs::read(root.path().join("payload.txt")).unwrap(),
@@ -3598,6 +3627,7 @@ mod tests {
         let RepositoryMaterializationAttempt::GeneratedImmutable {
             source_identity,
             root,
+            path_policy,
         } = materialize_generated_repository_file_effects(
             &plan,
             &mut NativeGeneratedRepositoryFileEffectsIo,
@@ -3605,6 +3635,10 @@ mod tests {
         else {
             panic!("native generated plan must materialize immutably");
         };
+        assert_eq!(
+            path_policy,
+            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded
+        );
         assert_eq!(source_identity, first);
         assert_eq!(
             std::fs::read(root.path().join("BUILD.bazel")).unwrap(),
@@ -3704,6 +3738,7 @@ mod tests {
         let RepositoryMaterializationAttempt::GeneratedImmutable {
             source_identity,
             root,
+            path_policy,
         } = materialize_generated_repository_file_effects(
             &plan,
             &mut NativeGeneratedRepositoryFileEffectsIo,
@@ -3711,6 +3746,10 @@ mod tests {
         else {
             panic!("ordered symlink plan must materialize");
         };
+        assert_eq!(
+            path_policy,
+            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded
+        );
         assert_eq!(source_identity, association);
         assert_eq!(std::fs::read(root.path().join("FIRST")).unwrap(), b"first");
         assert_eq!(std::fs::read(root.path().join("LAST")).unwrap(), b"last");
@@ -3989,6 +4028,7 @@ mod tests {
                 token,
                 std::slice::from_ref(&chain_request),
                 &selected_epoch,
+                &slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked(),
                 &bank,
             )
             .unwrap();
@@ -4001,6 +4041,24 @@ mod tests {
             slug_workspace_v2::FileContentDigest::new([0; 32], 0).unwrap(),
         );
         let lease = selected.lease_for(&metadata).unwrap().unwrap();
+        let forged_bound = crate::runtime::SourceArtifactInput::for_native_lease_test(
+            metadata.label().clone(),
+            metadata.namespace(),
+            metadata.requested_path().clone(),
+            metadata.real_path().clone(),
+            Some(
+                slug_workspace_v2::MaterializationPathAnchor::new(
+                    metadata.namespace(),
+                    NormalizedAbsolutePath::new(&chain_root).unwrap(),
+                )
+                .unwrap(),
+            ),
+            metadata.digest(),
+        );
+        assert!(
+            selected.lease_for(&forged_bound).is_err(),
+            "a caller anchor cannot change Generated legacy path policy"
+        );
         drop(selected);
         materializer
             .accept(token, std::slice::from_ref(&chain_request), Vec::new())
@@ -4295,6 +4353,8 @@ mod tests {
                     provisional = Some(root.path().to_path_buf());
                     materializer.discard(token).unwrap();
                     RepositoryMaterializationAttempt::GeneratedImmutable {
+                        path_policy:
+                            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: generated_repository_file_effect_source_association(
                             &generated_plan([("BUILD.bazel", b"a" as &[u8], true)]),
                         ),
@@ -5667,6 +5727,7 @@ mod tests {
                     request: request_b.clone(),
                     result: RepositoryMaterializationResult::Success(
                         RepositoryMaterializationSuccess::Immutable {
+                            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                             source_identity: source_identity(b"new-b"),
                             generation_root: dirty_path.clone(),
                             observation_instance: replacement_instance_b,
@@ -5677,6 +5738,7 @@ mod tests {
                     request: request_a.clone(),
                     result: RepositoryMaterializationResult::Success(
                         RepositoryMaterializationSuccess::Immutable {
+                            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                             source_identity: source_identity(b"a"),
                             generation_root: accepted_path_a,
                             observation_instance: instance_a,

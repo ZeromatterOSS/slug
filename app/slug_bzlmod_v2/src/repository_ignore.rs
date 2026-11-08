@@ -4356,6 +4356,7 @@ mod tests {
         let instance = slug_workspace_v2::PathObservationInstanceId::new(9);
         let immutable =
             RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+                path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from("sha256-x"),
                 generation_root: "/immutable/9".into(),
                 observation_instance: instance,

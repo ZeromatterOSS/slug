@@ -270,6 +270,7 @@ fn route_immutable_material(
             request,
             result: RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                     source_identity: Arc::from(source_identity),
                     generation_root: PathBuf::from(generation_root),
                     observation_instance,
@@ -1520,6 +1521,7 @@ async fn observed_repository_source_prefixes_families_and_events_are_exact() {
     let namespace = PathObservationNamespace::Materialization(instance);
     let immutable =
         RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("sha256-immutable"),
             generation_root: PathBuf::from("/immutable/321"),
             observation_instance: instance,
@@ -1718,6 +1720,7 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
         archive,
         407,
         RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("sha256-invalid-root"),
             generation_root: PathBuf::from("relative"),
             observation_instance: instance,
@@ -1734,6 +1737,7 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
 
     let immutable =
         RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("sha256-lifecycle"),
             generation_root: PathBuf::from("/immutable/406"),
             observation_instance: instance,
@@ -10631,6 +10635,7 @@ async fn generic_workspace_path_and_source_read_keep_anchor_without_ancestor_dem
             request: material_request.clone(),
             result: RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy: crate::RepositoryMaterializationPathPolicy::GenerationRoot,
                     source_identity,
                     generation_root: root.as_path().to_path_buf(),
                     observation_instance: instance,
@@ -10840,4 +10845,334 @@ async fn generic_workspace_path_and_source_read_keep_anchor_without_ancestor_dem
             .keys()
             .all(|demand| demand.path() == &root)
     );
+}
+
+#[tokio::test]
+async fn immutable_archive_package_reads_and_listing_keep_generation_bound() {
+    use crate::host_package::ExternalRepositoryPackageLookupObservationKey;
+    use crate::repo_file::HostRouteRepoFileKey;
+    use crate::repo_file::HostRouteRepoFileObservationKey;
+    use crate::repository_ignore::HostRouteRepositoryIgnoreKey;
+    use crate::repository_ignore::HostRouteRepositoryIgnoreObservationKey;
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let route = immutable_route();
+    let root = NormalizedAbsolutePath::new("/tmp/archive-generation").unwrap();
+    let instance = PathObservationInstanceId::new(701);
+    let namespace = PathObservationNamespace::Materialization(instance);
+    let unbounded = route_immutable_material(
+        &route,
+        "verified-archive",
+        root.as_path().to_str().unwrap(),
+        instance,
+    );
+    let mut entry = unbounded
+        .entry_for_repository(route.canonical_repo())
+        .unwrap()
+        .clone();
+    let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+        path_policy,
+        ..
+    }) = &mut entry.result
+    else {
+        panic!("ordinary immutable success")
+    };
+    *path_policy = crate::RepositoryMaterializationPathPolicy::GenerationRoot;
+    let materialization =
+        RepositoryMaterializationResultEpoch::new(route.workspace().clone(), [entry]).unwrap();
+    assert_ne!(
+        materialization, unbounded,
+        "resolution policy participates in full result identity"
+    );
+    let request = materialization
+        .entry_for_repository(route.canonical_repo())
+        .unwrap()
+        .request
+        .clone();
+    assert!(matches!(
+        request.kind,
+        RepositoryMaterializationKind::Immutable
+    ));
+    let body: Arc<[u8]> = Arc::from(&b"archive contents\n"[..]);
+    let mut rows = Vec::new();
+    for (name, kind) in [
+        ("", Some(PathNodeKind::Directory)),
+        ("BUILD.bazel", Some(PathNodeKind::RegularFile)),
+        ("data", Some(PathNodeKind::RegularFile)),
+        ("link", Some(PathNodeKind::Symlink)),
+        ("REPO.bazel", None),
+        (".bazelignore", None),
+    ] {
+        rows.push((
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(root.as_path().join(name)).unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+            PathObservationResult::Lstat(kind.map_or(PathOperationResult::Missing, |kind| {
+                PathOperationResult::Present(PathLstat::new(kind, 1, 2, 3, 4, 0o755))
+            })),
+        ));
+    }
+    for (name, bytes) in [
+        (
+            "BUILD.bazel",
+            Arc::<[u8]>::from(&b"exports_files(['data','link'])\n"[..]),
+        ),
+        ("data", body.clone()),
+    ] {
+        rows.push((
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(root.as_path().join(name)).unwrap(),
+                PathObservationOperation::FileBytes,
+            ),
+            PathObservationResult::FileBytes(PathOperationResult::Present(bytes)),
+        ));
+    }
+    rows.push((
+        PathObservationDemand::new(
+            namespace,
+            NormalizedAbsolutePath::new(root.as_path().join("link")).unwrap(),
+            PathObservationOperation::ReadLink,
+        ),
+        PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(PathBuf::from(
+            "data",
+        )))),
+    ));
+    rows.push((
+        PathObservationDemand::new(
+            namespace,
+            root.clone(),
+            PathObservationOperation::DirectoryEntries,
+        ),
+        PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+            PathDirectoryEntries::new(
+                [
+                    ("BUILD.bazel", PathDirectoryEntryKind::File),
+                    ("data", PathDirectoryEntryKind::File),
+                    ("link", PathDirectoryEntryKind::Symlink),
+                ]
+                .map(|(name, kind)| {
+                    PathDirectoryEntry::new(PathDirectoryName::new(name).unwrap(), kind)
+                }),
+            ),
+        )),
+    ));
+    let available = PathObservationEpoch::new(rows).unwrap();
+    // Each actual shared producer starts with no supplied filesystem facts.
+    // Supply only its exact Needs; any ambient /tmp ancestor escapes this table.
+    macro_rules! bounded {
+        ($key:expr) => {{
+            let key = $key;
+            let mut epoch = PathObservationEpoch::empty();
+            let mut completed = None;
+            for _ in 0..16 {
+                let tx = observed_source_transaction(
+                    &dice,
+                    materialization.clone(),
+                    epoch.clone(),
+                    None,
+                )
+                .await;
+                let mut updater = tx.into_updater();
+                crate::inject_root_package_policy_inputs(
+                    &mut updater,
+                    crate::RootPackagePolicyInputs::new(
+                        NormalizedAbsolutePath::new("/workspace").unwrap(),
+                        [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                        std::iter::empty::<&str>(),
+                        None,
+                        Some("warning"),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+                let mut tx = updater.commit().await;
+                match tx.compute(&key).await.unwrap() {
+                    SourcePreparationOutcome::Need(needs) => {
+                        let demands = needs
+                            .path_observations()
+                            .expect("only rooted filesystem observations missing")
+                            .demands();
+                        assert!(!demands.is_empty());
+                        let mut next = epoch
+                            .observations()
+                            .iter()
+                            .map(|(d, r)| (d.clone(), r.clone()))
+                            .collect::<Vec<_>>();
+                        for demand in demands {
+                            assert_eq!(demand.namespace(), namespace);
+                            assert!(
+                                demand.path().as_path().starts_with(root.as_path()),
+                                "ambient ancestor demand: {demand:?}"
+                            );
+                            next.push((
+                                demand.clone(),
+                                available
+                                    .get(demand)
+                                    .expect("admitted archive member demand")
+                                    .clone(),
+                            ));
+                        }
+                        epoch = PathObservationEpoch::from_shared(next).unwrap();
+                    }
+                    SourcePreparationOutcome::Complete(Ok(value)) => {
+                        assert!(
+                            value.result().is_ok(),
+                            "producer failed: {:?}",
+                            value.result()
+                        );
+                        assert!(!value.observations().observations().is_empty());
+                        assert!(
+                            value
+                                .observations()
+                                .observations()
+                                .keys()
+                                .all(|d| d.namespace() == namespace
+                                    && d.path().as_path().starts_with(root.as_path()))
+                        );
+                        completed = Some(value);
+                        break;
+                    }
+                    SourcePreparationOutcome::Complete(Err(error)) => {
+                        panic!("unexpected frontier error: {error:?}")
+                    }
+                }
+            }
+            completed.expect("bounded archive producer must converge")
+        }};
+    }
+    let mut tx = observed_source_transaction(
+        &dice,
+        materialization.clone(),
+        PathObservationEpoch::empty(),
+        None,
+    )
+    .await;
+    let SourcePreparationOutcome::Complete(value) = tx
+        .compute(&RepositoryMaterializationResultKey { request })
+        .await
+        .unwrap()
+    else {
+        panic!("ordinary materialization projection")
+    };
+    let anchor = value.as_ref().as_ref().unwrap().path_anchor().unwrap();
+    assert_eq!(anchor.namespace(), namespace);
+    assert_eq!(anchor.root(), &root);
+    let path = bounded!(HostRepositoryPathObservationKey::from_source_route(
+        HostRepositorySourceRoute::root(route.clone()),
+        PathBuf::from("link")
+    ));
+    assert_eq!(
+        path.result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .resolved()
+            .real_path()
+            .as_path(),
+        root.as_path().join("data")
+    );
+    let read = bounded!(HostRepositorySourceFileObservationKey::new(
+        route.clone(),
+        PathBuf::from("link")
+    ));
+    assert!(
+        matches!(read.result().as_ref(), Ok(HostRepositorySourceFileValue::Present { bytes, .. }) if Arc::ptr_eq(bytes,&body))
+    );
+    bounded!(HostRepositoryDirectoryListingObservationKey::new(
+        route.clone(),
+        PackagePath::root()
+    ));
+    bounded!(HostRouteRepoFileObservationKey(HostRouteRepoFileKey::new(
+        route.clone()
+    )));
+    bounded!(HostRouteRepositoryIgnoreObservationKey(
+        HostRouteRepositoryIgnoreKey::new(route.clone())
+    ));
+    bounded!(
+        ExternalRepositoryPackageLookupObservationKey::new(
+            route.clone(),
+            slug_identity_v2::PackageIdentifier::new(
+                route.canonical_repo().clone(),
+                PackagePath::root()
+            )
+        )
+        .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn generation_root_policy_is_explicit_and_invalid_result_metadata_is_fallible() {
+    let route = immutable_route();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    for (root, instance, valid) in [
+        ("/tmp/closed", 703, true),
+        ("relative", 704, false),
+        ("/tmp/closed", 0, false),
+        ("/tmp/closed/../outside", 705, false),
+    ] {
+        let legacy = route_immutable_material(
+            &route,
+            "same-content",
+            root,
+            PathObservationInstanceId::new(instance),
+        );
+        let mut entry = legacy
+            .entry_for_repository(route.canonical_repo())
+            .unwrap()
+            .clone();
+        let request = entry.request.clone();
+        let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            path_policy,
+            ..
+        }) = &mut entry.result
+        else {
+            unreachable!()
+        };
+        *path_policy = crate::RepositoryMaterializationPathPolicy::GenerationRoot;
+        let bounded =
+            RepositoryMaterializationResultEpoch::new(route.workspace().clone(), [entry]).unwrap();
+        assert_ne!(legacy, bounded);
+        let mut tx =
+            observed_source_transaction(&dice, legacy, PathObservationEpoch::empty(), None).await;
+        let SourcePreparationOutcome::Complete(value) = tx
+            .compute(&RepositoryMaterializationResultKey {
+                request: request.clone(),
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("legacy materialization result projection")
+        };
+        assert!(
+            value.as_ref().as_ref().unwrap().path_anchor().is_none(),
+            "legacy Git/LocalTar/generated results are not implicitly confined"
+        );
+        let mut tx =
+            observed_source_transaction(&dice, bounded, PathObservationEpoch::empty(), None).await;
+        let SourcePreparationOutcome::Complete(value) = tx
+            .compute(&RepositoryMaterializationResultKey { request })
+            .await
+            .unwrap()
+        else {
+            panic!("bounded result projection must not request IO")
+        };
+        if valid {
+            let anchor = value.as_ref().as_ref().unwrap().path_anchor().unwrap();
+            assert_eq!(
+                anchor.namespace(),
+                PathObservationNamespace::Materialization(PathObservationInstanceId::new(instance))
+            );
+            assert_eq!(anchor.root().as_path(), Path::new(root));
+        } else {
+            assert!(
+                matches!(
+                    value.as_ref(),
+                    Err(RepositoryMaterializationError::Materialization(_))
+                ),
+                "invalid pure metadata must return an error, never panic"
+            );
+        }
+    }
 }

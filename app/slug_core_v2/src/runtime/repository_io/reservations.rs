@@ -433,6 +433,7 @@ impl RepositoryMaterializer {
                 source_identity,
                 generation_root,
                 observation_instance: ticket.reservation.instance(),
+                path_policy: RepositoryMaterializationPathPolicy::GenerationRoot,
             });
         let mut state = self
             .state
@@ -511,6 +512,7 @@ impl RepositoryMaterializer {
         let (request, root, credit) = sealed.into_parts();
         active.provisional_roots.push(RetainedRepositoryRoot {
             observation_instance: ticket.reservation.instance(),
+            path_policy: RepositoryMaterializationPathPolicy::GenerationRoot,
             request: request.clone(),
             source_identity: match &result {
                 RepositoryMaterializationResult::Success(

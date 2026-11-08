@@ -771,6 +771,15 @@ pub struct RepositoryMaterializationRequest {
     pub kind: RepositoryMaterializationKind,
 }
 
+/// A resource-free resolution guarantee reported by the actual producer.
+/// GenerationRoot is minted only by a producer that established a closed tree;
+/// it never grants native acquisition authority or replaces the full result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub enum RepositoryMaterializationPathPolicy {
+    LegacyUnbounded,
+    GenerationRoot,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum RepositoryMaterializationSuccess {
     Local,
@@ -778,6 +787,7 @@ pub enum RepositoryMaterializationSuccess {
         source_identity: Arc<str>,
         generation_root: PathBuf,
         observation_instance: PathObservationInstanceId,
+        path_policy: RepositoryMaterializationPathPolicy,
     },
 }
 
@@ -1058,6 +1068,7 @@ fn result_kind_matches(
         return match result {
             RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy: _,
                     generation_root,
                     observation_instance,
                     source_identity,
@@ -5981,6 +5992,35 @@ impl fmt::Display for RepositoryMaterializationResultKey {
     }
 }
 
+// Only the result producer reports confinement. Root spelling and incarnation
+// remain fallible metadata: a pure injected epoch alone grants no native owner.
+fn generation_root_anchor(
+    root: &Path,
+    instance: PathObservationInstanceId,
+) -> Result<slug_workspace_v2::MaterializationPathAnchor, RepositoryMaterializationError> {
+    let invalid = || {
+        RepositoryMaterializationError::Materialization(
+            "invalid bounded materialization generation root or instance".into(),
+        )
+    };
+    if !root.is_absolute()
+        || root.components().any(|component| {
+            !matches!(
+                component,
+                Component::Prefix(_) | Component::RootDir | Component::Normal(_)
+            )
+        })
+    {
+        return Err(invalid());
+    }
+    let root = NormalizedAbsolutePath::new(root.to_path_buf()).map_err(|_| invalid())?;
+    slug_workspace_v2::MaterializationPathAnchor::new(
+        PathObservationNamespace::Materialization(instance),
+        root,
+    )
+    .map_err(|_| invalid())
+}
+
 #[async_trait]
 impl Key for RepositoryMaterializationResultKey {
     type Value = SourcePreparationOutcome<
@@ -6025,29 +6065,36 @@ impl Key for RepositoryMaterializationResultKey {
             }
             RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy,
                     source_identity,
                     generation_root,
                     observation_instance,
                 },
-            ) => Ok(RepositoryMaterialization::Immutable {
-                canonical_repo: self.request.id.canonical_repo.clone(),
-                repo_spec: self.request.repo_spec.clone(),
-                source_identity: source_identity.clone(),
-                generation_root: generation_root.clone(),
-                observation_instance: *observation_instance,
-                anchor: match &self.request.kind {
-                    RepositoryMaterializationKind::GeneralWorkspace(realization) => Some(
-                        slug_workspace_v2::MaterializationPathAnchor::new(
-                            PathObservationNamespace::Materialization(
-                                realization.reservation().instance(),
-                            ),
-                            realization.reservation().display_root().clone(),
-                        )
-                        .expect("validated workspace reservation anchor"),
-                    ),
+            ) => (|| {
+                let anchor = match &self.request.kind {
+                    RepositoryMaterializationKind::GeneralWorkspace(realization) => {
+                        Some(generation_root_anchor(
+                            realization.reservation().display_root().as_path(),
+                            realization.reservation().instance(),
+                        )?)
+                    }
+                    _ if *path_policy == RepositoryMaterializationPathPolicy::GenerationRoot => {
+                        Some(generation_root_anchor(
+                            generation_root,
+                            *observation_instance,
+                        )?)
+                    }
                     _ => None,
-                },
-            }),
+                };
+                Ok(RepositoryMaterialization::Immutable {
+                    canonical_repo: self.request.id.canonical_repo.clone(),
+                    repo_spec: self.request.repo_spec.clone(),
+                    source_identity: source_identity.clone(),
+                    generation_root: generation_root.clone(),
+                    observation_instance: *observation_instance,
+                    anchor,
+                })
+            })(),
             RepositoryMaterializationResult::SpecError(message) => {
                 Err(RepositoryMaterializationError::Spec(message.clone()))
             }
@@ -12565,6 +12612,7 @@ mod tests {
                 }),
                 result: RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable {
+                        path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: Arc::from(source_identity),
                         generation_root: PathBuf::from(generation_root),
                         observation_instance,
@@ -18575,6 +18623,7 @@ mod tests {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let archive = "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n";
         let immutable = MResult::Success(RepositoryMaterializationSuccess::Immutable {
+            path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("sha256-a"),
             generation_root: PathBuf::from("/immutable/a"),
             observation_instance: PathObservationInstanceId::new(7),

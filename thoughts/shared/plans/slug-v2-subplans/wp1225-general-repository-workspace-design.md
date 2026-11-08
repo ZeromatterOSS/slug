@@ -566,6 +566,75 @@ Existing pinned Bazel9.2 StarlarkBaseExternalContext.getPath/getPathFromLabel,
 read and execute Label projections supply exact API source authority; physical
 identity, capture consistency and finite admission remain Slug-native.
 
+### Current captured Source transport (accepted inactive component)
+
+The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)
+records the original-to-Analysis/native join and the discriminators below.
+
+Analysis uses one tracked metadata projection per canonical repository. With the
+inactive General policy enabled, it observes the fresh workspace and Source
+snapshot epochs even when no Source is selected. It derives the full natural
+request through the ordinary observed route/root mapping. An exact captured
+state selects its anchored path for filesystem source existence, content and
+staging; conflicting, foreign or revoked state refuses. An uncaptured subject
+keeps its ordinary producer. A later real repository-context capture invalidates
+that earlier empty selection and recomputes the complete action preparation
+before effects. No exposed path is rebased. CatalogOnly remains an explicit
+byte-owner API; module and .bzl acquisition keep their existing producers.
+This is mixed acquisition for already required captures, not automatic capture
+of every Analysis input or a fully closed workspace policy.
+
+Native completion extends only the selected data lease with a Snapshot variant;
+materialization requests/rows and General exact-body histories are unchanged.
+The independent current Source epoch must match all actor Source rows and the
+exact workspace/lease/scope/bank. Full request/state comparisons happen outside
+actor locks; complete row/count and original-scope checks join the existing
+materialization recheck before leases return. Selected Source members require
+exact repository, namespace, anchor, containment, regular-file kind and digest.
+Any other namespace for a captured repository refuses, including Host and an
+older legacy materialization, even on a CAS hit. Local/BCR Source requests also
+compare against any current ordinary request for that repository; genuine
+absence is allowed, but a changed kind or full request refuses. Workspace and
+Builtin captures refuse any same-repository ordinary request. The final joint
+lock rechecks both request presence/absence and exact retained request Arcs.
+Foreign current requests prepay their complete retained metadata before cloning;
+shared requests reuse their Source root guard and retire before that guard.
+Opaque Source readers use the existing original-scope framed FD kernel,
+shared reader bank and whole blocking-job custody. CAS and durable runfiles
+backing still independently verify complete length/SHA/EOF and modes.
+
+Active Source rows and pure epochs retire as before. Already issued data leases
+retain their exact Source root and original scope without controller authority;
+fresh B cannot remint A. No accepted Source map, body Arc, source cache, resource
+cap increase or ambient reopen is added. Source InputImage remains unsupported
+before ambient IO and is not used by these action/runfiles consumers.
+
+Proof must discriminate None-to-Some invalidation, full natural conflicts,
+forged Host/anchor/digest/scope metadata and source/reader last-drop custody,
+plus actual original-to-Analysis-to-NativeLink transport for Workspace, Local,
+selected BCR and Builtin captures. Workspace capture still covers the complete
+tree and may refuse subsequent publication trees containing unadmitted links;
+no output/.git/target filter or test policy may conceal that boundary. A first
+admitted Workspace publication and fresh A/B for the other producers establish
+this bounded join; repeated Workspace publication, automatic capture, public
+activation, authentic Rust and matched-command memory remain separate gates.
+
+Ordinary selected BCR archive acquisition keeps its existing producer and bytes.
+Its successful realizer establishes a resource-free GenerationRoot path policy
+in the success and current native row. The path resolver projects that property
+fallibly into the exact generation root and observation instance, using the
+existing pure MaterializationPathAnchor. This Slug-native
+observation-frontier correction retains every root/child fact while excluding
+irrelevant ancestors such as the shared temporary directory. It is sound only
+for that acquired producer guarantee: archive admission already rejects
+absolute/escaping links and admits links only to extracted regular files.
+Legacy native leases and images authenticate the exact current success/row
+policy and bound, without changing their named legacy IO dispatch. Legacy Git,
+local tar and generated file/filesystem producers keep LegacyUnbounded/None
+and their existing link semantics; generated repositories retain their
+transitive cross-root symlink DAG. General keeps its own physical-root contract.
+Neither the policy nor an anchor carries physical IO or lifetime authority.
+
 ### Original General output transport (accepted inactive component)
 
 The [transport receipt](wp1225-original-transport-acceptance-2026-11-08.json)
@@ -591,8 +660,8 @@ runfiles after runtime/root retirement. A real CAS failure must suppress new
 publication and preserve prior visible outputs; restoring the original inputs
 must succeed through the original certificate/retry owners. Existing source
 scope/RPC/reader cancellation and full-certificate validation stay mandatory.
-Distinct digest-only SourceRoot snapshots remain a separate Analysis/transport
-join; this General output proof does not authorize them or close production,
+The distinct digest-only SourceRoot join has its own evidence above; this
+General output proof does not independently authorize it or close production,
 full archive, authentic Rust or matched-command memory gates.
 
 ## Anchored source IO and native transport
@@ -833,9 +902,9 @@ constructor after actual DICE anchor/digest production; it grants no root or
 transport authority and does not prove original Loading activation.
 Original General outputs now have the inactive original-to-analysis, real
 NativeLink CAS/runfiles and corruption/restoration proof linked above. The
-separate digest-only SourceRoot snapshot still needs its ordinary Analysis and
-native transport join. Remaining activation gates include that join and derived
-Source paths, full Archive envelope/inode workload, unrelated originals plus
+separate digest-only SourceRoot snapshot now has its own bounded ordinary
+Analysis/native proof above. Remaining activation gates include derived Source
+paths, repeated Workspace publication, full Archive envelope/inode workload, unrelated originals plus
 existing GCC/Homebrew through the same general route, all demanded freshness/
 event surfaces, authentic public Rust and equivalent-command memory.
 Independent final review and owner/direct-dependent checks apply to each accepted

@@ -217,7 +217,17 @@ fn generation_with_adoption_spec(
     drop(ticket);
     let results = adopted.unwrap();
     let roots = materializer
-        .pin_selected_roots(token, std::slice::from_ref(&request), &results, readers)
+        .pin_selected_roots(
+            token,
+            std::slice::from_ref(&request),
+            &results,
+            &slug_bzlmod_v2::RepositorySourceSnapshotEpoch::fresh(
+                materializer.workspace().clone(),
+                materializer.workspace_lease(token).unwrap(),
+            )
+            .unwrap(),
+            readers,
+        )
         .unwrap();
     // The anchor is projected by the ordinary DICE result producer from the
     // actual accepted native result, rather than reconstructed by this test.
@@ -684,6 +694,11 @@ fn native_claimed_registry_sources_keep_same_display_instances_separate_and_read
                 token_b,
                 std::slice::from_ref(&a.request),
                 &a.results,
+                &slug_bzlmod_v2::RepositorySourceSnapshotEpoch::fresh(
+                    materializer.workspace().clone(),
+                    materializer.workspace_lease(token_b).unwrap()
+                )
+                .unwrap(),
                 &readers
             )
             .is_err()

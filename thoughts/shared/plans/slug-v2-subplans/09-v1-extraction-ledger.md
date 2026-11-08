@@ -117,6 +117,20 @@ SourceAttempts. Full certificate IO remains. No cache, donor import, interner,
 cap increase or completed-workload memory claim is introduced; see the
 [original transport evidence](wp1225-original-transport-acceptance-2026-11-08.json).
 
+Current captured-source transport reuses the same checked lease/reader kernels,
+adding only a data-owner Snapshot variant and one tracked pure projection per
+canonical repository. Complete current Source epochs and structural requests
+compare outside actor locks; the final joint lock checks exact associations.
+Temporary selection vectors prepay reader-bank storage. Foreign ordinary
+requests prepay their complete retained metadata before cloning; shared exact
+request Arcs retire before the Source rows whose guards cover them. No Source
+owner enters a materialization row, accepted-source registry or mutable history.
+The acquired BCR generation bound is one resource-free result/row policy value;
+existing layout-based accounting includes it. Legacy Git, local tar and
+generated producers retain their unbounded acquisition/link semantics. No donor,
+interner, cache, cap increase or completed-command memory claim is introduced.
+See [captured-source transport evidence](wp1225-captured-source-transport-acceptance-2026-11-08.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

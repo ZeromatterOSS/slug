@@ -257,6 +257,7 @@ impl PriorInputs {
                 request: request.clone(),
                 result: RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable {
+                        path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: source_identity.clone(),
                         generation_root: generation_root.clone(),
                         observation_instance: *observation_instance,

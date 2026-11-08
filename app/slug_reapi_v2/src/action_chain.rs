@@ -594,3 +594,11 @@ mod artifact_symlink_tests;
     target_pointer_width = "64"
 ))]
 mod original_repository_tests;
+
+#[cfg(all(
+    test,
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+mod source_snapshot_tests;

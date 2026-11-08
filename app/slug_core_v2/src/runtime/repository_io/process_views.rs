@@ -223,6 +223,7 @@ impl RepositoryMaterializer {
                         observation_instance,
                         source_identity,
                         generation_root,
+                        path_policy,
                     },
                 ) = &entry.result
                 else {
@@ -242,6 +243,8 @@ impl RepositoryMaterializer {
                     || !Arc::ptr_eq(&entry.request, &row.request)
                     || row.guard.is_none()
                     || &row.source_identity != source_identity
+                    || &row.path_policy != path_policy
+                    || row.path_policy != RepositoryMaterializationPathPolicy::GenerationRoot
                     || row.root.path() != generation_root
                     || root.reservation().lease() != general.lease()
                 {

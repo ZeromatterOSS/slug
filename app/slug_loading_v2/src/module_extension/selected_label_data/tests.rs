@@ -901,6 +901,7 @@ async fn issued_data_labels_materialized_request_namespace_and_policy_a_b_a() {
                         request: request.dupe(),
                         result: RepositoryMaterializationResult::Success(
                             RepositoryMaterializationSuccess::Immutable {
+                                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                 source_identity: Arc::from("sha256-test"),
                                 generation_root: PathBuf::from("/registry-dep"),
                                 observation_instance: PathObservationInstanceId::new(instance),

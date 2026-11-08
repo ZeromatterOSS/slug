@@ -86,7 +86,14 @@ impl RepositoryMaterializer {
                 return Err(RepositorySessionError::InvalidImageAuthority);
             }
             match &row.root {
-                RetainedRootOwner::Legacy(_) if expected_anchor.is_none() => {}
+                RetainedRootOwner::Legacy(_)
+                    if row.path_policy == RepositoryMaterializationPathPolicy::GenerationRoot
+                        && expected_anchor.as_ref().is_some_and(|bound| {
+                            bound.namespace() == namespace && bound.root() == anchor
+                        }) => {}
+                RetainedRootOwner::Legacy(_)
+                    if row.path_policy == RepositoryMaterializationPathPolicy::LegacyUnbounded
+                        && expected_anchor.is_none() => {}
                 #[cfg(target_os = "linux")]
                 RetainedRootOwner::Physical(root)
                     if expected_anchor.as_ref() == Some(root.anchor()) => {}
@@ -152,6 +159,7 @@ impl RepositoryMaterializer {
                             && now.generation == row.generation
                             && Arc::ptr_eq(&now.request, &row.request)
                             && now.source_identity == row.source_identity
+                            && now.path_policy == row.path_policy
                             && now.root.same_owner(&row.root)
                     })
             {
@@ -167,7 +175,7 @@ fn image_binding_matches(
 ) -> bool {
     matches!(&entry.result,
         RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
-            source_identity, generation_root, observation_instance,
+            source_identity, generation_root, observation_instance, path_policy,
         }) if source_identity == &row.source_identity && generation_root == row.root.path()
-            && *observation_instance == row.observation_instance)
+            && *observation_instance == row.observation_instance && *path_policy == row.path_policy)
 }

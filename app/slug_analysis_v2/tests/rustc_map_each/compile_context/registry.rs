@@ -258,6 +258,7 @@ pub(super) async fn request(
             request,
             result: RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                     source_identity: Arc::from("sha256-test"),
                     generation_root: root.join(repository),
                     observation_instance: PathObservationInstanceId::new(7680 + index as u64),

@@ -117,6 +117,13 @@ impl NativeSourceAccess {
                     .ok_or_else(|| error("physical source requires current source scope"))?;
                 root.check_origin(current, &|| true).map_err(error)?;
             }
+            #[cfg(target_os = "linux")]
+            if let Some(root) = lease.as_ref().and_then(|l| l.source_snapshot()) {
+                let current = scope
+                    .as_ref()
+                    .ok_or_else(|| error("source snapshot requires current source scope"))?;
+                root.check_origin(current, &|| true).map_err(error)?;
+            }
         }
         if let Some(scope) = &scope {
             scope.check().map_err(error)?;

@@ -2898,6 +2898,7 @@ cc_autoconf = repository_rule(
                                 request: request.clone(),
                                 result: RepositoryMaterializationResult::Success(
                                     RepositoryMaterializationSuccess::Immutable {
+                                        path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                         source_identity: Arc::from("template-rules-cc-fixture"),
                                         generation_root: logical_root.to_owned(),
                                         observation_instance: instance,
@@ -5068,6 +5069,7 @@ ext = module_extension(implementation = impl)
                     request: source_request,
                     result: RepositoryMaterializationResult::Success(
                         RepositoryMaterializationSuccess::Immutable {
+                            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                             source_identity: Arc::from("symlink-rules-cc-reselected"),
                             generation_root: rerouted_root.clone(),
                             observation_instance: rerouted_instance,
@@ -5231,6 +5233,7 @@ ext = module_extension(implementation = impl)
                                     request: request.clone(),
                                     result: RepositoryMaterializationResult::Success(
                                         RepositoryMaterializationSuccess::Immutable {
+                                            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                             source_identity: Arc::from("effect-rules-cc-fixture"),
                                             generation_root: logical_root.clone(),
                                             observation_instance: instance,

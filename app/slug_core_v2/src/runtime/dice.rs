@@ -1367,6 +1367,7 @@ impl NativeCommandCompletionContext<'_, '_> {
                 self.command.repository_session,
                 self.selected_repository_requests,
                 self.selected_repository_results,
+                &self.command.current_source_snapshot_epoch(),
                 &self.command.runtime.source_readers,
             )
             .map_err(|error| {
@@ -1394,6 +1395,7 @@ impl NativeCommandCompletionContext<'_, '_> {
                 self.command.repository_session,
                 self.selected_repository_requests,
                 self.selected_repository_results,
+                &self.command.current_source_snapshot_epoch(),
                 &self.command.runtime.source_readers,
             )
             .map_err(|error| {
@@ -1419,6 +1421,7 @@ impl NativeCommandCompletionContext<'_, '_> {
                 self.command.repository_session,
                 self.selected_repository_requests,
                 self.selected_repository_results,
+                &self.command.current_source_snapshot_epoch(),
                 sources,
                 &self.command.runtime.source_readers,
             )
@@ -9864,6 +9867,15 @@ pub(in crate::runtime) fn workspace_source_request_for_test(
     lease: u64,
 ) -> Arc<slug_bzlmod_v2::RepositorySourceSnapshotRequest> {
     tests::source_snapshot_request_fixture::workspace_request(workspace, lease)
+}
+
+#[cfg(test)]
+pub(in crate::runtime) fn local_source_request_for_test(
+    workspace: &Path,
+    lease: u64,
+    local_root: &Path,
+) -> Arc<slug_bzlmod_v2::RepositorySourceSnapshotRequest> {
+    tests::source_snapshot_request_fixture::local_request(workspace, lease, local_root)
 }
 
 #[cfg(test)]

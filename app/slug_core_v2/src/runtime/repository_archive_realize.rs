@@ -100,6 +100,7 @@ pub(super) fn realize_selected_bcr(
     Ok(Materialized::AssociatedImmutable {
         source_identity: selected_bcr_source_association(plan),
         root,
+        path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::GenerationRoot,
     })
 }
 

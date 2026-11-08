@@ -2,7 +2,10 @@ use dice::DetectCycles;
 use dice::Dice;
 
 use super::*;
-async fn registration_transaction(dice: &Arc<dice::Dice>, module: String) -> dice::DiceTransaction {
+pub(super) async fn registration_transaction(
+    dice: &Arc<dice::Dice>,
+    module: String,
+) -> dice::DiceTransaction {
     use slug_bzlmod_v2::*;
     use slug_workspace_v2::*;
     use starlark_map::sorted_map::SortedMap;

@@ -405,6 +405,8 @@ async fn cpp_transaction_for_epoch(
             request,
             result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
                 slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                    path_policy:
+                        slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                     source_identity: Arc::from("sha256-test"),
                     generation_root: PathBuf::from(format!("/workspace/{name}")),
                     observation_instance: slug_workspace_v2::PathObservationInstanceId::new(

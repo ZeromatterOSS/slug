@@ -12,6 +12,10 @@ use super::*;
 use crate::runtime::repository_physical_root::RepositoryRootResources;
 use crate::runtime::repository_physical_root::ResourceCredit;
 
+#[path = "source_snapshots/selection.rs"]
+mod selection;
+pub(super) use selection::SelectedSourceSnapshots;
+
 fn refusal() -> RepositorySessionError {
     RepositorySessionError::NativeWorkspace("selected source snapshot association refused".into())
 }

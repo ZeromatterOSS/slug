@@ -760,6 +760,7 @@ pub use source_preparation::RepositoryMaterializationInstanceLookupError;
 pub use source_preparation::RepositoryMaterializationInstanceView;
 pub use source_preparation::RepositoryMaterializationKey;
 pub use source_preparation::RepositoryMaterializationKind;
+pub use source_preparation::RepositoryMaterializationPathPolicy;
 pub use source_preparation::RepositoryMaterializationRequest;
 pub use source_preparation::RepositoryMaterializationRequestId;
 pub use source_preparation::RepositoryMaterializationResult;

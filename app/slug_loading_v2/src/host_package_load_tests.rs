@@ -1151,6 +1151,7 @@ async fn selected_registry_visibility_transaction(
                     request,
                     result: RepositoryMaterializationResult::Success(
                         RepositoryMaterializationSuccess::Immutable {
+                            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                             source_identity: Arc::from("sha256-test"),
                             generation_root: PathBuf::from("/registry-dep"),
                             observation_instance: instance,
@@ -1317,6 +1318,7 @@ async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
                     request,
                     result: RepositoryMaterializationResult::Success(
                         RepositoryMaterializationSuccess::Immutable {
+                            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                             source_identity: Arc::from("sha256-test"),
                             generation_root: PathBuf::from("/registry-dep"),
                             observation_instance: instance,

@@ -53,8 +53,11 @@ selected BCR tar.gz and pinned Builtin sources through ordinary repository
 Starlark, with fresh command ownership and read-only digest manifests.
 Original General outputs now pass ordinary analysis and actual NativeLink
 CAS/runfiles, corruption/restoration and runtime-retirement proof. The distinct
-SourceRoot Analysis/transport join and profile removal are the frontier. Full
-archive-envelope, derived Source Path operations, public Rust and
+SourceRoot snapshots now pass ordinary Analysis and actual NativeLink transport
+for already captured Workspace, Local, selected BCR and Builtin inputs, with
+fresh-scope/lifetime proof. Profile removal is the next frontier. Full
+archive-envelope, derived Source Path operations, repeated Workspace publication,
+public Rust and
 matching-command memory gates still
 precede production activation.
 

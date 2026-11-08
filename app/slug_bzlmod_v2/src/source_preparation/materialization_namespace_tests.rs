@@ -37,6 +37,7 @@ fn success(
         request: request.clone(),
         result: RepositoryMaterializationResult::Success(
             RepositoryMaterializationSuccess::Immutable {
+                path_policy: crate::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from("phase-only-fixture"),
                 generation_root: PathBuf::from(root),
                 observation_instance: PathObservationInstanceId::new(instance),

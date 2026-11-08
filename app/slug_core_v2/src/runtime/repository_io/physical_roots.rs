@@ -74,9 +74,29 @@ impl RetainedRootOwner {
 struct SelectedRootData {
     repository: CanonicalRepoName,
     instance: PathObservationInstanceId,
-    root: RetainedRootOwner,
+    root: SelectedSourceOwner,
+    // The actual producer established this bound for a legacy data owner.
+    // Physical and Source owners retain their own sealed-member validation.
+    legacy_generation_bound: bool,
     // A source lease deliberately keeps no complete terminal request/history.
     _credit: NativeReaderCredit,
+}
+/// Selected data is distinct from materialization ownership: a captured Source
+/// has no invented materialization request, General state or terminal history.
+#[derive(Debug)]
+enum SelectedSourceOwner {
+    Materialized(RetainedRootOwner),
+    #[cfg(target_os = "linux")]
+    Snapshot(Arc<crate::runtime::repository_physical_root::source::RepositorySourceRoot>),
+}
+impl SelectedSourceOwner {
+    fn path(&self) -> &Path {
+        match self {
+            Self::Materialized(root) => root.path(),
+            #[cfg(target_os = "linux")]
+            Self::Snapshot(root) => root.reservation().display_root().as_path(),
+        }
+    }
 }
 #[derive(Clone, Debug)]
 pub(in crate::runtime) struct SelectedRootLease {
@@ -86,7 +106,16 @@ impl SelectedRootLease {
     #[cfg(target_os = "linux")]
     pub(in crate::runtime) fn physical(&self) -> Option<&Arc<RepositoryPhysicalRoot>> {
         match &self.data.root {
-            RetainedRootOwner::Physical(root) => Some(root),
+            SelectedSourceOwner::Materialized(RetainedRootOwner::Physical(root)) => Some(root),
+            _ => None,
+        }
+    }
+    #[cfg(target_os = "linux")]
+    pub(in crate::runtime) fn source_snapshot(
+        &self,
+    ) -> Option<&Arc<crate::runtime::repository_physical_root::source::RepositorySourceRoot>> {
+        match &self.data.root {
+            SelectedSourceOwner::Snapshot(root) => Some(root),
             _ => None,
         }
     }
@@ -105,6 +134,46 @@ impl SelectedRootLease {
                 .starts_with(self.generation_root())
         {
             return Err("source does not belong to the selected native root".into());
+        }
+        if self.data.legacy_generation_bound {
+            let Some(anchor) = source.anchor() else {
+                return Err("bounded legacy source lost its generation root bound".into());
+            };
+            if anchor.namespace() != self.namespace()
+                || anchor.root().as_path() != self.generation_root()
+                || !source
+                    .real_path()
+                    .as_path()
+                    .starts_with(self.generation_root())
+            {
+                return Err("bounded legacy source differs from its generation root bound".into());
+            }
+            return Ok(());
+        }
+        #[cfg(target_os = "linux")]
+        if let Some(root) = self.source_snapshot() {
+            if source.anchor() != Some(root.anchor()) {
+                return Err("captured source anchor differs from selected root".into());
+            }
+            let relative = source
+                .real_path()
+                .as_path()
+                .strip_prefix(self.generation_root())
+                .ok()
+                .and_then(Path::to_str)
+                .ok_or_else(|| {
+                    Arc::<str>::from("captured source real path escapes selected root")
+                })?;
+            let Some(entry) = root.state().entry(relative) else {
+                return Err("captured source is absent from sealed digest state".into());
+            };
+            let slug_bzlmod_v2::RepositorySourceSnapshotNode::File(digest) = entry.node() else {
+                return Err("captured source is not a sealed regular file".into());
+            };
+            if source.digest() != *digest {
+                return Err("captured source digest differs from sealed state".into());
+            }
+            return Ok(());
         }
         #[cfg(target_os = "linux")]
         match self.physical() {
@@ -167,6 +236,16 @@ impl SelectedRepositoryRoots {
         &self,
         source: &SourceArtifactInput,
     ) -> Result<Option<SelectedRootLease>, Arc<str>> {
+        #[cfg(target_os = "linux")]
+        if self.leases.iter().any(|lease| {
+            lease.source_snapshot().is_some()
+                && &lease.data.repository == source.label().package().repo()
+                && source.namespace() != lease.namespace()
+        }) {
+            return Err(
+                "captured repository source must use its current snapshot namespace".into(),
+            );
+        }
         if source.namespace() == PathObservationNamespace::Host {
             if self
                 .leases
@@ -331,11 +410,12 @@ impl RepositoryMaterializer {
                             && matches!(&entry.result,
                                 RepositoryMaterializationResult::Success(
                                     RepositoryMaterializationSuccess::Immutable {
-                                        observation_instance, generation_root, source_identity,
+                                        observation_instance, generation_root, source_identity, path_policy,
                                     }
                                 ) if *observation_instance == instance
                                     && generation_root == row.root.path()
-                                    && source_identity == &row.source_identity)
+                                    && source_identity == &row.source_identity
+                                    && path_policy == &row.path_policy)
                     })
                 {
                     return Err(RepositorySessionError::NativeWorkspace(
@@ -360,6 +440,7 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         selected: &[Arc<RepositoryMaterializationRequest>],
         results: &RepositoryMaterializationResultEpoch,
+        source_epoch: &slug_bzlmod_v2::RepositorySourceSnapshotEpoch,
         resources: &Arc<NativeReaderResources>,
     ) -> Result<SelectedRepositoryRoots, Arc<str>> {
         let command_scope = self
@@ -367,8 +448,22 @@ impl RepositoryMaterializer {
             .map_err(|_| Arc::<str>::from("selected session or command scope refused"))?;
         self.check_source_scope(self.source_scope.as_ref())
             .map_err(|_| Arc::<str>::from("selected root scope refused"))?;
+        #[cfg(target_os = "linux")]
+        let source_selection = super::source_snapshots::SelectedSourceSnapshots::new(
+            self,
+            token,
+            source_epoch,
+            resources,
+        )
+        .map_err(|_| Arc::<str>::from("selected captured source epoch refused"))?;
+        #[cfg(not(target_os = "linux"))]
+        if source_epoch.workspace().is_some() || source_epoch.states().is_some() {
+            return Err("captured source transport unsupported on this platform".into());
+        }
         let bytes = selected
             .len()
+            .checked_add(source_epoch.states().map_or(0, |states| states.len()))
+            .ok_or_else(|| Arc::<str>::from("selected root storage overflow"))?
             .checked_mul(
                 16 * std::mem::size_of::<RepositoryMaterializationEpochEntry>()
                     + std::mem::size_of::<RetainedRepositoryRoot>() * 4
@@ -474,7 +569,15 @@ impl RepositoryMaterializer {
         {
             return Err("selected result epoch differs from current results".into());
         }
-        let mut leases = Vec::with_capacity(rows.len());
+        #[cfg(target_os = "linux")]
+        let source_count = source_selection.rows.len();
+        #[cfg(not(target_os = "linux"))]
+        let source_count = 0;
+        let mut leases = Vec::with_capacity(
+            rows.len()
+                .checked_add(source_count)
+                .ok_or_else(|| Arc::<str>::from("selected root count overflow"))?,
+        );
         for row in &rows {
             let entry = entries
                 .iter()
@@ -485,6 +588,7 @@ impl RepositoryMaterializer {
                     observation_instance,
                     generation_root,
                     source_identity,
+                    path_policy,
                 },
             ) = &entry.result
             else {
@@ -494,6 +598,7 @@ impl RepositoryMaterializer {
                 || row.observation_instance != *observation_instance
                 || row.root.path() != generation_root
                 || &row.source_identity != source_identity
+                || &row.path_policy != path_policy
                 || matches!(
                     entry.request.kind,
                     RepositoryMaterializationKind::GeneralWorkspace(_)
@@ -522,7 +627,37 @@ impl RepositoryMaterializer {
                 data: Arc::new(SelectedRootData {
                     repository: entry.request.id.canonical_repo.clone(),
                     instance: *observation_instance,
-                    root: row.root.clone(),
+                    root: SelectedSourceOwner::Materialized(row.root.clone()),
+                    legacy_generation_bound: !row.root.is_physical()
+                        && row.path_policy == RepositoryMaterializationPathPolicy::GenerationRoot,
+                    _credit: credit,
+                }),
+            });
+        }
+        #[cfg(target_os = "linux")]
+        for row in &source_selection.rows {
+            let root = &row.root;
+            if leases
+                .iter()
+                .any(|lease| lease.namespace() == root.anchor().namespace())
+            {
+                return Err("captured and materialized root instances alias".into());
+            }
+            let credit = resources
+                .reserve(
+                    std::mem::size_of::<SelectedRootData>()
+                        + 64
+                        + root.reservation().repository().retained_capacity_bytes(),
+                    0,
+                    0,
+                )
+                .map_err(|_| Arc::<str>::from("captured source lease storage unavailable"))?;
+            leases.push(SelectedRootLease {
+                data: Arc::new(SelectedRootData {
+                    repository: root.reservation().repository().clone(),
+                    instance: root.reservation().instance(),
+                    root: SelectedSourceOwner::Snapshot(root.clone()),
+                    legacy_generation_bound: false,
                     _credit: credit,
                 }),
             });
@@ -531,6 +666,10 @@ impl RepositoryMaterializer {
             .map_err(|_| Arc::<str>::from("selected command scope expired"))?;
         self.check_source_scope(self.source_scope.as_ref())
             .map_err(|_| Arc::<str>::from("selected root scope changed"))?;
+        #[cfg(target_os = "linux")]
+        source_selection.recheck(self, token).map_err(|_| {
+            Arc::<str>::from("captured source selection changed during lease construction")
+        })?;
         let state = self
             .state
             .lock()
@@ -554,6 +693,10 @@ impl RepositoryMaterializer {
                 return Err("native root changed during lease construction".into());
             }
         }
+        #[cfg(target_os = "linux")]
+        source_selection.recheck_locked(active).map_err(|_| {
+            Arc::<str>::from("captured source association changed before lease publication")
+        })?;
         Ok(SelectedRepositoryRoots {
             leases: leases.into(),
             _credit: Some(Arc::new(SelectionCredits {
@@ -577,6 +720,7 @@ pub(super) fn association_current(
                 && row.generation == expected.generation
                 && Arc::ptr_eq(&row.request, &expected.request)
                 && row.source_identity == expected.source_identity
+                && row.path_policy == expected.path_policy
                 && row.root.same_owner(&expected.root)
         })
 }
@@ -713,8 +857,8 @@ fn row_matches_result(
     row: &RetainedRepositoryRoot,
     result: &RepositoryMaterializationResult,
 ) -> bool {
-    matches!(result,RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable{source_identity,generation_root,observation_instance})
-        if source_identity==&row.source_identity&&generation_root==row.root.path()&&*observation_instance==row.observation_instance)
+    matches!(result,RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable{source_identity,generation_root,observation_instance,path_policy})
+        if source_identity==&row.source_identity&&generation_root==row.root.path()&&*observation_instance==row.observation_instance&&path_policy==&row.path_policy)
 }
 #[cfg(target_os = "linux")]
 impl RepositoryMaterializer {

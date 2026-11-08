@@ -692,6 +692,7 @@ fn immutable_materialization_epoch_input(
                 request,
                 result: RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable {
+                        path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: Arc::from("immutable-test-source"),
                         generation_root: root,
                         observation_instance: instance,
@@ -1635,6 +1636,7 @@ fn result_epoch_rejects_wrong_workspace_duplicates_conflicts_and_success_kind_mi
     ));
     let immutable_success = || {
         RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("source"),
             generation_root: PathBuf::from("/immutable"),
             observation_instance: PathObservationInstanceId::new(1),
@@ -1728,6 +1730,7 @@ fn materialization_epoch_dice_identity_tracks_ordered_remote_patches_a_b_a() {
                 request,
                 result: RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable {
+                        path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: Arc::from("source"),
                         generation_root: PathBuf::from("/generation"),
                         observation_instance: PathObservationInstanceId::new(1),
@@ -1949,6 +1952,7 @@ async fn result_projection_prunes_unrelated_repositories_but_tracks_exact_immuta
             request,
             result: RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                     source_identity: Arc::from("source"),
                     generation_root: PathBuf::from(root),
                     observation_instance: PathObservationInstanceId::new(instance),

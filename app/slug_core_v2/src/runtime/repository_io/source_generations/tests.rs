@@ -11,6 +11,7 @@ struct Fixture {
     root: PathBuf,
     path: NormalizedAbsolutePath,
     instance: PathObservationInstanceId,
+    path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy,
 }
 
 fn request(
@@ -66,12 +67,21 @@ fn source(
     requested: &NormalizedAbsolutePath,
     real: &NormalizedAbsolutePath,
 ) -> SourceArtifactInput {
+    source_with_anchor(repo, namespace, requested, real, None)
+}
+fn source_with_anchor(
+    repo: &CanonicalRepoName,
+    namespace: PathObservationNamespace,
+    requested: &NormalizedAbsolutePath,
+    real: &NormalizedAbsolutePath,
+    anchor: Option<slug_workspace_v2::MaterializationPathAnchor>,
+) -> SourceArtifactInput {
     SourceArtifactInput::for_native_lease_test(
         CanonicalLabel::parse(&format!("@@{}//:input", repo.as_str())).unwrap(),
         namespace,
         requested.clone(),
         real.clone(),
-        None,
+        anchor,
         slug_workspace_v2::FileContentDigest::new([0; 32], 0).unwrap(),
     )
 }
@@ -80,6 +90,10 @@ fn readers() -> Arc<NativeReaderResources> {
 }
 impl Fixture {
     fn new() -> Self {
+        Self::with_path_policy(slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded)
+    }
+
+    fn with_path_policy(path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy) -> Self {
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
         let materializer = RepositoryMaterializer::new(workspace.clone());
         let token = materializer.begin().unwrap();
@@ -87,10 +101,32 @@ impl Fixture {
             .validate(token, &mut |_, _| panic!("no prior roots"))
             .unwrap();
         let request = request(&workspace, "a");
-        materialize(&materializer, token, request.clone(), b"a");
+        if path_policy == slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded {
+            materialize(&materializer, token, request.clone(), b"a");
+        } else {
+            // A private scripted producer result for the authorization seam;
+            // actual BCR parsing/closure is proven by its realizer/native tests.
+            materializer
+                .materialize_with(
+                    token,
+                    request.clone(),
+                    RepositoryMaterializationGeneration(1),
+                    || {
+                        let root = tempfile::tempdir().unwrap();
+                        std::fs::write(root.path().join("input"), b"a").unwrap();
+                        RepositoryMaterializationAttempt::GeneratedImmutable {
+                            source_identity: Arc::from("scripted-bounded-generation"),
+                            root,
+                            path_policy,
+                        }
+                    },
+                )
+                .unwrap();
+        }
         let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
             generation_root: root,
             observation_instance: instance,
+            path_policy,
             ..
         }) = materializer.active_result_for_test(token, "dep")
         else {
@@ -104,15 +140,25 @@ impl Fixture {
             root,
             path,
             instance,
+            path_policy,
         }
     }
 
     fn source(&self) -> SourceArtifactInput {
-        source(
+        source_with_anchor(
             &self.request.id.canonical_repo,
             PathObservationNamespace::Materialization(self.instance),
             &self.path,
             &self.path,
+            (self.path_policy
+                == slug_bzlmod_v2::RepositoryMaterializationPathPolicy::GenerationRoot)
+                .then(|| {
+                    slug_workspace_v2::MaterializationPathAnchor::new(
+                        PathObservationNamespace::Materialization(self.instance),
+                        NormalizedAbsolutePath::new(&self.root).unwrap(),
+                    )
+                    .unwrap()
+                }),
         )
     }
 
@@ -127,6 +173,7 @@ impl Fixture {
             self.token,
             std::slice::from_ref(&self.request),
             &self.epoch(),
+            &slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked(),
             sources.iter(),
             &readers(),
         )
@@ -188,7 +235,14 @@ fn source_leases_reject_unselected_forged_stale_and_escaping_provenance() {
                   sources: &[SourceArtifactInput]| {
         fixture
             .materializer
-            .retain_source_generations(token, selected, epoch, sources.iter(), &readers())
+            .retain_source_generations(
+                token,
+                selected,
+                epoch,
+                &slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked(),
+                sources.iter(),
+                &readers(),
+            )
             .unwrap_err()
     };
     assert!(
@@ -234,6 +288,28 @@ fn source_leases_reject_unselected_forged_stale_and_escaping_provenance() {
     let forged_epoch = complete_epoch(&fixture.materializer.workspace, &[forged]).unwrap();
     assert!(
         retain(fixture.token, selected, &forged_epoch, &sources).contains("result epoch differs")
+    );
+    let mut forged_policy = fixture
+        .materializer
+        .state
+        .lock()
+        .unwrap()
+        .active
+        .as_ref()
+        .unwrap()
+        .entries[0]
+        .clone();
+    let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+        path_policy,
+        ..
+    }) = &mut forged_policy.result
+    else {
+        unreachable!()
+    };
+    *path_policy = slug_bzlmod_v2::RepositoryMaterializationPathPolicy::GenerationRoot;
+    let forged_policy = complete_epoch(&fixture.materializer.workspace, &[forged_policy]).unwrap();
+    assert!(
+        retain(fixture.token, selected, &forged_policy, &sources).contains("result epoch differs")
     );
     let wrong_repo = CanonicalRepoName::new("other").unwrap();
     let wrong_source = source(
@@ -332,6 +408,7 @@ fn historical_and_virtual_generations_do_not_supply_current_native_authority() {
                 token,
                 selected,
                 &epoch,
+                &slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked(),
                 [fixture.source()].iter(),
                 &readers()
             )
@@ -357,6 +434,34 @@ fn historical_and_virtual_generations_do_not_supply_current_native_authority() {
             .retain(&[fixture.source()])
             .unwrap_err()
             .contains("association differs")
+    );
+    let fixture = Fixture::new();
+    let forged_policy_epoch = {
+        let mut state = fixture.materializer.state.lock().unwrap();
+        let entry = &mut state.active.as_mut().unwrap().entries[0];
+        let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            path_policy,
+            ..
+        }) = &mut entry.result
+        else {
+            unreachable!()
+        };
+        *path_policy = slug_bzlmod_v2::RepositoryMaterializationPathPolicy::GenerationRoot;
+        complete_epoch(&fixture.materializer.workspace, &[entry.clone()]).unwrap()
+    };
+    assert!(
+        fixture
+            .materializer
+            .pin_selected_roots(
+                fixture.token,
+                std::slice::from_ref(&fixture.request),
+                &forged_policy_epoch,
+                &slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked(),
+                &readers(),
+            )
+            .unwrap_err()
+            .contains("association differs"),
+        "changing the current result policy cannot relabel an unbounded retained owner"
     );
     let fixture = Fixture::new();
     let roots = {
@@ -395,4 +500,157 @@ fn requested_generation_path_can_retain_an_observed_symlink_to_an_external_targe
             .unwrap()
             .starts_with(&fixture.root)
     );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn immutable_generation_bound_requires_exact_selected_lease_and_image_association() {
+    use std::io::Read;
+
+    use slug_bzlmod_v2::RepositoryMaterialization;
+    use slug_workspace_v2::MaterializationPathAnchor;
+
+    // Explicit scripted producer metadata proves the policy/association seam,
+    // not BCR extraction or physical provenance. Generic Git stays unbounded.
+    let fixture = Fixture::with_path_policy(
+        slug_bzlmod_v2::RepositoryMaterializationPathPolicy::GenerationRoot,
+    );
+    let bank = readers();
+    let baseline = bank.snapshot().retained_bytes;
+    let epoch = fixture.epoch();
+    let selected = fixture
+        .materializer
+        .pin_selected_roots(
+            fixture.token,
+            std::slice::from_ref(&fixture.request),
+            &epoch,
+            &slug_bzlmod_v2::RepositorySourceSnapshotEpoch::revoked(),
+            &bank,
+        )
+        .unwrap();
+    let namespace = PathObservationNamespace::Materialization(fixture.instance);
+    let anchor = fixture.source().anchor().cloned().unwrap();
+    let correct_digest =
+        slug_workspace_v2::FileContentDigest::new(Sha256::digest(b"a").into(), 1).unwrap();
+    let metadata = |bound, requested: &NormalizedAbsolutePath, real: &NormalizedAbsolutePath| {
+        SourceArtifactInput::for_native_lease_test(
+            CanonicalLabel::parse("@@dep//:input").unwrap(),
+            namespace,
+            requested.clone(),
+            real.clone(),
+            bound,
+            correct_digest,
+        )
+    };
+    let source = metadata(Some(anchor.clone()), &fixture.path, &fixture.path);
+    let lease = selected.lease_for(&source).unwrap().unwrap();
+    assert!(lease.physical().is_none());
+    assert!(lease.source_snapshot().is_none());
+    let outside =
+        NormalizedAbsolutePath::new(fixture.root.parent().unwrap().join("outside")).unwrap();
+    let wrong_root = MaterializationPathAnchor::new(namespace, outside.clone()).unwrap();
+    let wrong_namespace = MaterializationPathAnchor::new(
+        PathObservationNamespace::Materialization(PathObservationInstanceId::new(
+            fixture.instance.value() + 1,
+        )),
+        anchor.root().clone(),
+    )
+    .unwrap();
+    for invalid in [
+        metadata(None, &fixture.path, &fixture.path),
+        metadata(Some(wrong_root.clone()), &fixture.path, &fixture.path),
+        metadata(Some(wrong_namespace.clone()), &fixture.path, &fixture.path),
+        metadata(Some(anchor.clone()), &fixture.path, &outside),
+        metadata(Some(anchor.clone()), &outside, &fixture.path),
+    ] {
+        assert!(selected.lease_for(&invalid).is_err());
+    }
+    let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+        source_identity,
+        ..
+    }) = fixture
+        .materializer
+        .active_result_for_test(fixture.token, "dep")
+    else {
+        panic!("actual fixture result")
+    };
+    let projected = RepositoryMaterialization::Immutable {
+        canonical_repo: fixture.request.id.canonical_repo.clone(),
+        repo_spec: fixture.request.repo_spec.clone(),
+        source_identity,
+        generation_root: fixture.root.clone(),
+        observation_instance: fixture.instance,
+        anchor: Some(anchor.clone()),
+    };
+    let image = fixture
+        .materializer
+        .image_source(
+            fixture.token,
+            namespace,
+            anchor.root(),
+            Some((&fixture.request, &projected)),
+        )
+        .unwrap();
+    crate::runtime::input_image::test_reset_anchor_open_count();
+    for bad_anchor in [None, Some(wrong_root), Some(wrong_namespace)] {
+        let mut bad = projected.clone();
+        let RepositoryMaterialization::Immutable { anchor, .. } = &mut bad else {
+            unreachable!()
+        };
+        *anchor = bad_anchor;
+        assert!(matches!(
+            fixture.materializer.image_source(
+                fixture.token,
+                namespace,
+                projected.path_anchor().unwrap().root(),
+                Some((&fixture.request, &bad)),
+            ),
+            Err(RepositorySessionError::InvalidImageAuthority)
+        ));
+    }
+    assert!(matches!(
+        fixture
+            .materializer
+            .image_source(fixture.token, namespace, anchor.root(), None),
+        Err(RepositorySessionError::InvalidImageAuthority)
+    ));
+    assert!(matches!(
+        fixture.materializer.image_source(
+            fixture.token,
+            PathObservationNamespace::Host,
+            anchor.root(),
+            Some((&fixture.request, &projected))
+        ),
+        Err(RepositorySessionError::InvalidImageAuthority)
+    ));
+    assert_eq!(
+        crate::runtime::input_image::test_anchor_open_count(),
+        0,
+        "forged bounds cannot open a named image root"
+    );
+    let mut reader =
+        crate::runtime::native_source_access::NativeSourceReader::open_selected_for_test(
+            &source,
+            &selected,
+            None,
+            bank.clone(),
+        )
+        .unwrap();
+    fixture.materializer.discard(fixture.token).unwrap();
+    let path = fixture.root.clone();
+    drop(fixture);
+    let mut body = Vec::new();
+    reader.read_to_end(&mut body).unwrap();
+    assert_eq!(body, b"a");
+    drop(reader);
+    drop(lease);
+    drop(selected);
+    assert!(
+        path.exists(),
+        "legacy image still retains the named TempDir owner"
+    );
+    drop(image);
+    assert!(!path.exists());
+    assert_eq!(bank.snapshot().native_fds, 0);
+    assert_eq!(bank.snapshot().retained_bytes, baseline);
 }

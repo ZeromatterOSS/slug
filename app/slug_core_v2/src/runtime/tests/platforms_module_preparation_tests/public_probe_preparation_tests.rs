@@ -2146,6 +2146,8 @@ fn namespace_test_epoch_at(
                 request,
                 result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
                     slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                        path_policy:
+                            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: Arc::from("test"),
                         generation_root: PathBuf::from(root),
                         observation_instance: instance,
@@ -6149,6 +6151,8 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
                 request,
                 result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
                     slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                        path_policy:
+                            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: Arc::from("test"),
                         generation_root: PathBuf::from(root),
                         observation_instance,
@@ -6746,6 +6750,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         request,
                         result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
                             slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                 source_identity: Arc::from("test"),
                                 generation_root: if index == 0 {
                                     original_root.take().unwrap()

@@ -1444,6 +1444,7 @@ pub(super) async fn external_update(
                     request: request.clone(),
                     result: RepositoryMaterializationResult::Success(
                         RepositoryMaterializationSuccess::Immutable {
+                            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                             source_identity: Arc::from("glob-fixture"),
                             generation_root: PathBuf::from(root),
                             observation_instance: PathObservationInstanceId::new(instance),

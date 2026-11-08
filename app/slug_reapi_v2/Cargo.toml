@@ -17,6 +17,9 @@ tokio = { workspace = true }
 tonic = { workspace = true, features = ["transport"] }
 
 [dev-dependencies]
+base64 = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
 slug_core_v2 = { workspace = true, features = ["resource-set-test-support", "repository-workspace-test-support"] }
 serde_json = { workspace = true }
 slug_configuration_v2 = { workspace = true }

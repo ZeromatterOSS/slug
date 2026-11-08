@@ -182,6 +182,7 @@ impl RepositoryFilesystemProgress {
         let identity = manifest::final_manifest(prefix.root.path(), active, scope)?;
         check(active, scope)?;
         Ok(Materialized::AssociatedImmutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: identity,
             root: prefix.root,
         })

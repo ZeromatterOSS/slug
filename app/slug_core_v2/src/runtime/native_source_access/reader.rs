@@ -10,12 +10,16 @@ use super::*;
 use crate::runtime::repository_io::physical_roots::SelectedRootLease;
 #[cfg(target_os = "linux")]
 use crate::runtime::repository_physical_root::RepositoryRootReader;
+#[cfg(target_os = "linux")]
+use crate::runtime::repository_physical_root::source::RepositorySourceReader;
 
 enum Input {
     #[cfg(target_os = "linux")]
     Host(File),
     #[cfg(target_os = "linux")]
     Physical(RepositoryRootReader),
+    #[cfg(target_os = "linux")]
+    SourceSnapshot(RepositorySourceReader),
     #[cfg(not(target_os = "linux"))]
     Unavailable,
 }
@@ -112,6 +116,27 @@ pub(super) fn open(
                 root.open_member(relative, scope, &|| true)
                     .map_err(refusal)?,
             )
+        } else if let Some(root) = lease.as_ref().and_then(|l| l.source_snapshot()) {
+            let scope = scope
+                .as_ref()
+                .ok_or_else(|| refusal("source snapshot requires current source scope"))?;
+            let anchor = source
+                .anchor()
+                .ok_or_else(|| refusal("source snapshot lost anchor"))?;
+            if anchor != root.anchor() || scope.workspace() != root.reservation().workspace() {
+                return Err(refusal("foreign source snapshot scope"));
+            }
+            let relative = source
+                .real_path()
+                .as_path()
+                .strip_prefix(anchor.root().as_path())
+                .ok()
+                .and_then(|p| p.to_str())
+                .ok_or_else(|| refusal("source snapshot escapes selected anchor"))?;
+            Input::SourceSnapshot(
+                root.open_member(relative, scope, &|| true)
+                    .map_err(refusal)?,
+            )
         } else {
             // Protected Host/legacy acquisition policy: ordinary observed real path,
             // nonblocking open, then regular-file validation. No new proc policy.
@@ -158,6 +183,8 @@ impl Read for NativeSourceReader {
             Input::Host(file) => file.read(out),
             #[cfg(target_os = "linux")]
             Input::Physical(reader) => reader.read(out),
+            #[cfg(target_os = "linux")]
+            Input::SourceSnapshot(reader) => reader.read(out),
             #[cfg(not(target_os = "linux"))]
             Input::Unavailable => Err(io::Error::new(
                 io::ErrorKind::Unsupported,
@@ -176,6 +203,8 @@ impl Seek for NativeSourceReader {
             Input::Host(file) => file.seek(from),
             #[cfg(target_os = "linux")]
             Input::Physical(reader) => reader.seek(from),
+            #[cfg(target_os = "linux")]
+            Input::SourceSnapshot(reader) => reader.seek(from),
             #[cfg(not(target_os = "linux"))]
             Input::Unavailable => Err(io::Error::new(
                 io::ErrorKind::Unsupported,

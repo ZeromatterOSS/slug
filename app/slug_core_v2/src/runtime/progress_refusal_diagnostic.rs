@@ -359,6 +359,7 @@ mod tests {
                         request,
                         result: RepositoryMaterializationResult::Success(
                             RepositoryMaterializationSuccess::Immutable {
+                                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                 source_identity: "proof".into(),
                                 generation_root: root.into(),
                                 observation_instance: PathObservationInstanceId::new(instance),
@@ -498,6 +499,7 @@ mod tests {
                         request: owner,
                         result: RepositoryMaterializationResult::Success(
                             RepositoryMaterializationSuccess::Immutable {
+                                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                 source_identity: "proof".into(),
                                 generation_root: if index == 0 {
                                     original_root.take().unwrap()

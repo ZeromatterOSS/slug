@@ -4344,6 +4344,7 @@ async fn archive_override_restores_unsupported_route_after_nonregistry_bridge_fa
     )
     .unwrap();
     let immutable = slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+        path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
         source_identity: Arc::from("sha256-archive"),
         generation_root: std::path::PathBuf::from("/immutable/archive-override"),
         observation_instance: slug_workspace_v2::PathObservationInstanceId::new(73),

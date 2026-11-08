@@ -10,6 +10,9 @@ use super::*;
 use crate::runtime::dice::source_service::SourceServiceLimits;
 use crate::runtime::repository_io::RepositoryMaterializer;
 
+#[path = "tests/transport.rs"]
+mod transport;
+
 fn bank() -> Arc<RepositoryRootResources> {
     RepositoryRootResources::new(
         RepositoryRootResourceLimits::new(512 * 1024 * 1024, 512, 8 * 1024 * 1024 * 1024).unwrap(),
@@ -345,6 +348,26 @@ fn initialize(
     ),
     PhysicalRootError,
 > {
+    initialize_requested(actor, path, resources, scope, runtime, mutate, |lease| {
+        request(path, lease)
+    })
+}
+fn initialize_requested(
+    actor: &RepositoryMaterializer,
+    path: &Path,
+    resources: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+    runtime: &tokio::runtime::Runtime,
+    mutate: bool,
+    make_request: impl FnOnce(u64) -> Arc<Request>,
+) -> Result<
+    (
+        crate::runtime::repository_io::RepositorySessionToken,
+        RepositoryWorkspaceCommand,
+        Arc<RepositorySourceRoot>,
+    ),
+    PhysicalRootError,
+> {
     let token = actor.begin_with_command_scope(Some(scope.clone())).unwrap();
     actor.preflight_native(token, []).unwrap();
     let bounds = slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits::new(
@@ -356,7 +379,7 @@ fn initialize(
     let lease = actor
         .begin_general_workspace(token, resources.clone(), bounds, scope)
         .unwrap();
-    let request = request(path, lease);
+    let request = make_request(lease);
     let ticket = actor
         .reserve_source_snapshot(token, request.clone(), scope)
         .unwrap();

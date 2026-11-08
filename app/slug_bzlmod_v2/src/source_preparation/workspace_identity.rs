@@ -519,6 +519,7 @@ mod tests {
             request: Arc::new(request),
             result: RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy: crate::RepositoryMaterializationPathPolicy::GenerationRoot,
                     source_identity: realized.source_identity().clone(),
                     generation_root: realized
                         .reservation()

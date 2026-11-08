@@ -15,11 +15,17 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         selected_requests: &[Arc<RepositoryMaterializationRequest>],
         selected_results: &RepositoryMaterializationResultEpoch,
+        source_epoch: &slug_bzlmod_v2::RepositorySourceSnapshotEpoch,
         sources: impl Iterator<Item = &'a SourceArtifactInput>,
         resources: &Arc<NativeReaderResources>,
     ) -> Result<NativeSourceGenerations, Arc<str>> {
-        let selected =
-            self.pin_selected_roots(token, selected_requests, selected_results, resources)?;
+        let selected = self.pin_selected_roots(
+            token,
+            selected_requests,
+            selected_results,
+            source_epoch,
+            resources,
+        )?;
         Ok(NativeSourceGenerations {
             _roots: selected.retain_sources(sources, resources)?,
         })

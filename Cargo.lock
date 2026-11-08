@@ -3625,6 +3625,8 @@ dependencies = [
 name = "slug_reapi_v2"
 version = "0.1.0"
 dependencies = [
+ "base64 0.21.7",
+ "flate2",
  "prost",
  "prost-types",
  "serde_json",
@@ -3635,6 +3637,7 @@ dependencies = [
  "slug_identity_v2",
  "slug_reapi_cache_v2",
  "slug_workspace_v2",
+ "tar",
  "tokio",
  "tonic",
 ]

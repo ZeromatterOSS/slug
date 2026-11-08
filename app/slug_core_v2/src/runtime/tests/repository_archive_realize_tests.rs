@@ -425,6 +425,7 @@ fn selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module() {
     let Materialized::AssociatedImmutable {
         source_identity,
         root,
+        path_policy,
     } = realize_selected_bcr(
         &plan,
         archive,
@@ -438,6 +439,10 @@ fn selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module() {
     else {
         panic!("selected BCR must be associated immutable")
     };
+    assert_eq!(
+        path_policy,
+        slug_bzlmod_v2::RepositoryMaterializationPathPolicy::GenerationRoot
+    );
     assert_eq!(
         std::fs::read(root.path().join("bin/tool")).unwrap(),
         b"tool bytes"
@@ -570,6 +575,7 @@ fn selected_bcr_realizes_regular_0555_build_and_nested_source_with_bytes_mode_mt
     let Materialized::AssociatedImmutable {
         source_identity,
         root,
+        path_policy,
     } = realize_selected_bcr(
         &plan,
         capture(&archive),
@@ -583,6 +589,10 @@ fn selected_bcr_realizes_regular_0555_build_and_nested_source_with_bytes_mode_mt
     else {
         panic!("regular 0555 BCR archive must publish an associated immutable root")
     };
+    assert_eq!(
+        path_policy,
+        slug_bzlmod_v2::RepositoryMaterializationPathPolicy::GenerationRoot
+    );
     assert_eq!(source_identity, selected_bcr_source_association(&plan));
     for (path, bytes, mtime) in [("BUILD.bazel", BUILD, 123), ("src/defs.bzl", SOURCE, 125)] {
         let path = root.path().join(path);

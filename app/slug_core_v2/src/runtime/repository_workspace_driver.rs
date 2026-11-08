@@ -707,6 +707,7 @@ mod native {
                             token,
                             &selected.requests,
                             &selected.epoch,
+                            &self.source_epoch,
                             &runtime.source_readers,
                         )
                         .map_err(|_| {

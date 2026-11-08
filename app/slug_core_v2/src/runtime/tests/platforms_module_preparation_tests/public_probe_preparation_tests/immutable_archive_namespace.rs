@@ -150,6 +150,7 @@ mod tests {
                         request,
                         result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
                             slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                 source_identity: Arc::from("test"),
                                 generation_root: PathBuf::from(root),
                                 observation_instance: PathObservationInstanceId::new(instance),

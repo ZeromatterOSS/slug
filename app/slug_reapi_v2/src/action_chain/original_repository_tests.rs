@@ -23,9 +23,9 @@ use slug_workspace_v2::PathObservationInstanceId;
 use super::*;
 
 #[path = "runfiles_fixture.rs"]
-mod authored;
+pub(super) mod authored;
 
-const REPOSITORY: &str = r#"def _impl(ctx):
+pub(super) const REPOSITORY: &str = r#"def _impl(ctx):
     ctx.file('seed', ctx.attr.content, executable=False)
     result = ctx.execute(['/usr/bin/python3', '-c', '''import pathlib, os
 body = pathlib.Path('seed').read_bytes()
@@ -52,15 +52,15 @@ def _consume(ctx):
 consume = rule(implementation=_consume, attrs={'tool': attr.label(), 'runner': attr.label(allow_single_file=True)})
 "#;
 
-struct Fixture {
-    root: PathBuf,
-    runtime: Option<WorkspaceRuntime>,
-    resources: slug_core_v2::runtime::RepositoryWorkspaceIntegrationTestResources,
-    module: String,
+pub(super) struct Fixture {
+    pub(super) root: PathBuf,
+    pub(super) runtime: Option<WorkspaceRuntime>,
+    pub(super) resources: slug_core_v2::runtime::RepositoryWorkspaceIntegrationTestResources,
+    pub(super) module: String,
     definitions: String,
 }
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
             "../../target/wp425/original-reapi-{}-{}",
@@ -119,9 +119,9 @@ impl Fixture {
         )
         .unwrap();
     }
-    fn publish(
+    pub(super) fn publish<T: ActionChainOutputTransport<Output = ActionChainRemoteResult>>(
         &self,
-        transport: &CheckedTransport,
+        transport: &T,
     ) -> Result<
         slug_core_v2::runtime::AcceptedCommand<
             Result<
@@ -328,7 +328,7 @@ impl ActionChainOutputTransport for CheckedTransport {
     }
 }
 
-fn published_root(
+pub(super) fn published_root(
     accepted: &slug_core_v2::runtime::RequestedActionResult<ActionChainRemoteResult>,
 ) -> PathBuf {
     accepted

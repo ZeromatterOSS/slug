@@ -1157,6 +1157,7 @@ compatibility=module_extension(implementation=impl)
             [(
                 request.clone(),
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                     source_identity: Arc::from("root-request-bzl-source"),
                     generation_root: PathBuf::from("/registry-parent"),
                     observation_instance: instance,
@@ -1313,6 +1314,7 @@ compatibility=module_extension(implementation=impl)
         let observations = merge_observations(&merge_observations(&host, &parent), &leaf);
         let tracker = Arc::new(DependencyTrace::default());
         let immutable = |source, root, instance| RepositoryMaterializationSuccess::Immutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from(source),
             generation_root: PathBuf::from(root),
             observation_instance: instance,
@@ -1416,6 +1418,7 @@ compatibility=module_extension(implementation=impl)
         );
         let tracker = Arc::new(DependencyTrace::default());
         let success = |source, root, instance| RepositoryMaterializationSuccess::Immutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from(source),
             generation_root: PathBuf::from(root),
             observation_instance: instance,
@@ -1697,6 +1700,7 @@ compatibility=module_extension(implementation=impl)
         let utility = b"load('//cc/private/toolchain:escape.bzl', _escape_string = 'escape_string')\nescape_string = _escape_string\n";
         let sources = builtin_rules_cc_source_epoch(instance, utility);
         let materialization = || RepositoryMaterializationSuccess::Immutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("builtin-public-load-rules-cc"),
             generation_root: PathBuf::from("/registry-rules-cc"),
             observation_instance: instance,
@@ -1730,6 +1734,7 @@ compatibility=module_extension(implementation=impl)
                 (
                     request.clone(),
                     RepositoryMaterializationSuccess::Immutable {
+                        path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: Arc::from("builtin-public-load-rules-cc"),
                         generation_root: PathBuf::from("/registry-rules-cc"),
                         observation_instance: instance,
@@ -2567,6 +2572,7 @@ compatibility=module_extension(implementation=impl)
             &input,
             tracker.clone(),
             RepositoryMaterializationSuccess::Immutable {
+                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from("parent-source"),
                 generation_root: PathBuf::from("/registry-parent"),
                 observation_instance: instance,
@@ -2638,6 +2644,7 @@ ext=module_extension(implementation=impl)
             &input,
             tracker.clone(),
             RepositoryMaterializationSuccess::Immutable {
+                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from("generated-source"),
                 generation_root: PathBuf::from("/generated-made"),
                 observation_instance: instance,
@@ -2756,6 +2763,7 @@ ext=module_extension(implementation=impl)
             &input,
             tracker.clone(),
             RepositoryMaterializationSuccess::Immutable {
+                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from("leaf-source-a"),
                 generation_root: PathBuf::from("/registry-leaf"),
                 observation_instance: instance,
@@ -3028,6 +3036,7 @@ ext=module_extension(implementation=impl)
     ) -> RepositoryMaterializationResultEpoch {
         let success = |source, root, instance| {
             RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from(source),
                 generation_root: PathBuf::from(root),
                 observation_instance: PathObservationInstanceId::new(instance),
@@ -3304,6 +3313,7 @@ ext=module_extension(implementation=impl)
                         request: leaf.clone(),
                         result: RepositoryMaterializationResult::Success(
                             RepositoryMaterializationSuccess::Immutable {
+                                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                 source_identity: Arc::from("leaf-load-source"),
                                 generation_root: PathBuf::from("/registry-leaf"),
                                 observation_instance: PathObservationInstanceId::new(71),
@@ -3379,6 +3389,7 @@ ext=module_extension(implementation=impl)
             request.clone(),
             tracker,
             RepositoryMaterializationSuccess::Immutable {
+                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from("canonical-bzl-error-source"),
                 generation_root: PathBuf::from("/registry-errors"),
                 observation_instance: instance,
@@ -3903,6 +3914,7 @@ ext=module_extension(implementation=impl)
             fixture.parent_request.clone(),
             tracker,
             RepositoryMaterializationSuccess::Immutable {
+                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: Arc::from("recursive-parent-source"),
                 generation_root: PathBuf::from("/generated-parent"),
                 observation_instance: PathObservationInstanceId::new(74),
@@ -4304,6 +4316,7 @@ ext=module_extension(implementation=impl)
         )
         .unwrap();
         let materialization = || RepositoryMaterializationSuccess::Immutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("leaf-source-cancellation"),
             generation_root: PathBuf::from("/registry-leaf-cancellation"),
             observation_instance: instance,
@@ -4378,6 +4391,7 @@ ext=module_extension(implementation=impl)
         let tracker = Arc::new(DependencyTrace::default());
         let instance = PathObservationInstanceId::new(74);
         let materialization = || RepositoryMaterializationSuccess::Immutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("canonical-package-cancellation"),
             generation_root: PathBuf::from("/registry-package-cancellation"),
             observation_instance: instance,
@@ -4440,6 +4454,7 @@ ext=module_extension(implementation=impl)
         let tracker = Arc::new(DependencyTrace::default());
         let instance = PathObservationInstanceId::new(75);
         let materialization = || RepositoryMaterializationSuccess::Immutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
             source_identity: Arc::from("canonical-bzl-cancellation"),
             generation_root: PathBuf::from("/registry-bzl-cancellation"),
             observation_instance: instance,

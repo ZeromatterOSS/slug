@@ -208,6 +208,72 @@ async fn resolve_source_with_observations(
     label: &CanonicalLabel,
     acquisition: SourceAcquisition,
 ) -> SourcePathOutcome {
+    let mut preference_observations = PathObservationEpoch::empty();
+    // This preference is confined to ordinary Source artifacts. Module/.bzl
+    // acquisition and the explicit catalog byte owner keep their existing keys.
+    if acquisition != SourceAcquisition::CatalogOnly {
+        let captured = match ctx
+            .compute(&captured_snapshot::CapturedSourceSnapshotKey::new(
+                workspace.dupe(),
+                label.package().repo().clone(),
+            ))
+            .await
+            .map(|value| value.as_ref().clone())
+        {
+            Ok(LoadingPreparationOutcome::Need(needs)) => {
+                return LoadingPreparationOutcome::Need(needs);
+            }
+            Ok(LoadingPreparationOutcome::Complete(Ok(value))) => value,
+            Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+                return complete(Err(error), PathObservationEpoch::empty());
+            }
+            Err(error) => {
+                return complete(
+                    Err(AnalysisError::message(format!(
+                        "selecting captured source for {label}: {error}"
+                    ))),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        };
+        if let Some(state) = &captured.state {
+            return captured_snapshot::resolve(
+                ctx,
+                mode,
+                label,
+                state,
+                captured.observations.dupe(),
+            )
+            .await;
+        }
+        preference_observations = captured.observations;
+    }
+    resolve_uncaptured_source_with_observations(ctx, mode, workspace, label, acquisition)
+        .await
+        .map(|result| {
+            result.and_then(|mut observed| {
+                if matches!(mode, ConfiguredAnalysisMode::Observed) {
+                    observed.observations = PathObservationEpoch::from_shared(
+                        preference_observations
+                            .observations()
+                            .iter()
+                            .chain(observed.observations.observations().iter())
+                            .map(|(d, r)| (d.dupe(), r.dupe())),
+                    )
+                    .map_err(ObservedPathFrontierError::from)?;
+                }
+                Ok(observed)
+            })
+        })
+}
+
+async fn resolve_uncaptured_source_with_observations(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    label: &CanonicalLabel,
+    acquisition: SourceAcquisition,
+) -> SourcePathOutcome {
     if label.package().repo().is_root() {
         if acquisition == SourceAcquisition::CatalogOnly {
             return complete(
@@ -474,6 +540,7 @@ async fn resolve_root_source_input(
     }
 }
 
+mod captured_snapshot;
 mod content;
 pub use content::ObservedSourceFile;
 pub use content::SourceFileContent;

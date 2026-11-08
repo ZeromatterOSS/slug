@@ -822,6 +822,7 @@ mod tests {
                             request,
                             result: RepositoryMaterializationResult::Success(
                                 RepositoryMaterializationSuccess::Immutable {
+                                    path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                                     source_identity: Arc::from("rules-cc-fixture"),
                                     generation_root: logical_root.clone(),
                                     observation_instance: instance,

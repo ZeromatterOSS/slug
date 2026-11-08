@@ -326,6 +326,7 @@ async fn general_prefix_declarations_ignore_later_prepared_paths_and_refuse_unbr
     });
     let result =
         RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::GenerationRoot,
             source_identity: realization.source_identity().clone(),
             generation_root: source.display_root().as_path().to_path_buf(),
             observation_instance: source.instance(),
@@ -393,6 +394,7 @@ async fn general_prefix_declarations_ignore_later_prepared_paths_and_refuse_unbr
             request: Arc::new(legacy),
             result: RepositoryMaterializationResult::Success(
                 RepositoryMaterializationSuccess::Immutable {
+                    path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                     source_identity: "legacy".into(),
                     generation_root: source.display_root().as_path().to_path_buf(),
                     observation_instance: source.instance(),

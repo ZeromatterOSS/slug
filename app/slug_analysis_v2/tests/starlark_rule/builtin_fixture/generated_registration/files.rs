@@ -197,6 +197,7 @@ pub(super) fn write(
         request: request.clone(),
         result: RepositoryMaterializationResult::Success(
             RepositoryMaterializationSuccess::Immutable {
+                path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                 source_identity: digest_module_file_content(identity).into(),
                 generation_root: root,
                 observation_instance: instance,

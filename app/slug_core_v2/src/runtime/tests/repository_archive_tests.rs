@@ -1597,6 +1597,8 @@ fn selected_bcr_capture_has_session_scoped_stage_reuse_recapture_and_stale_owner
                     assert!(active());
                     captures.set(captures.get() + 1);
                     Ok(Materialized::AssociatedImmutable {
+                        path_policy:
+                            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: expected_identity.clone(),
                         root: tempfile::tempdir().unwrap(),
                     })
@@ -1641,6 +1643,8 @@ fn selected_bcr_capture_has_session_scoped_stage_reuse_recapture_and_stale_owner
                     replacement.set(Some(next));
                     assert!(!active());
                     Ok(Materialized::AssociatedImmutable {
+                        path_policy:
+                            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: Arc::from("identity-stale"),
                         root: tempfile::tempdir().unwrap(),
                     })

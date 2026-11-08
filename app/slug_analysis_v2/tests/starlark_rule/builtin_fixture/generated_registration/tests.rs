@@ -148,6 +148,7 @@ async fn actual_file_batch_preserves_prior_inputs_and_distinct_request_guards() 
         assert!(Arc::ptr_eq(&entry.request, &original));
         let slug_bzlmod_v2::RepositoryMaterializationResult::Success(
             slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                path_policy: _,
                 source_identity,
                 generation_root,
                 observation_instance,

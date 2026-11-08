@@ -18,6 +18,7 @@ fn immutable(
     slug_workspace_v2::PathObservationInstanceId,
 ) {
     let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+        path_policy: _,
         source_identity,
         generation_root,
         observation_instance,
