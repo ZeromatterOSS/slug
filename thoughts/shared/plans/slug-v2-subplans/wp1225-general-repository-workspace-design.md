@@ -566,6 +566,35 @@ Existing pinned Bazel9.2 StarlarkBaseExternalContext.getPath/getPathFromLabel,
 read and execute Label projections supply exact API source authority; physical
 identity, capture consistency and finite admission remain Slug-native.
 
+### Original General output transport (accepted inactive component)
+
+The [transport receipt](wp1225-original-transport-acceptance-2026-11-08.json)
+follows authored repository Starlark through ordinary analysis,
+anchored digest observation and the existing checked Native completion wrappers
+into real NativeLink CAS/action transport and durable runfiles publication.
+General output source metadata must come from SourceArtifactInputObservationKey;
+a metadata fixture constructor cannot satisfy this gate. The same adopted root
+must supply opaque reader bytes even though its virtual display is absent.
+
+A narrowly opt-in `repository-workspace-test-support` Core feature supplies only
+fixed finite trusted test configuration on an ordinary Native runtime and rejects
+Diagnostic ownership before allocating a bank. It uses the existing shared-bank/
+configuration owner and compiled-CLI test selector;
+REAPI enables it through its dev dependency. It exposes primitive bank metrics,
+never roots, descriptors, scope renewal, native wrapper constructors or injected
+semantic results. Default builds keep Disabled and their existing executable
+selection. The feature is test harness wiring, not production activation.
+
+Proof covers cold upload, verified CAS bodies, all-hit reuse, changed/restored
+Host definitions, actual remote consumer bytes, and digest/mode-verified durable
+runfiles after runtime/root retirement. A real CAS failure must suppress new
+publication and preserve prior visible outputs; restoring the original inputs
+must succeed through the original certificate/retry owners. Existing source
+scope/RPC/reader cancellation and full-certificate validation stay mandatory.
+Distinct digest-only SourceRoot snapshots remain a separate Analysis/transport
+join; this General output proof does not authorize them or close production,
+full archive, authentic Rust or matched-command memory gates.
+
 ## Anchored source IO and native transport
 
 Add immutable selected MaterializationPathAnchor and anchored ResolvedPath key:
@@ -622,8 +651,14 @@ Regular-file capture shares one credited FD read kernel. The Host/Registry
 adapter retains its existing pin/reopen/name checks and diagnostics. The rooted
 adapter consumes an already-readable descriptor with positional reads from zero;
 it checks FD identity and rechecks the rooted name before publishing any result.
-The observer charges each attempt before opening, including missing/wrong-kind
-failures, and calls the private already-charged entry point. FileBytes keeps its
+The observer debits the unchanged64 SourceAttempts only for FileBytes/FileDigest
+content captures, before any IO and including missing/wrong-kind failures. This
+reviewed operation classification supersedes the initial charge for every rooted
+metadata operation: genuine original action transport otherwise exhausted capture
+admission during repeated full-certificate checks. Lstat/ReadLink/DirectoryEntries
+retain the existing complete batch/path/result, live-bank, native-FD and original
+deadline bounds; no certificate revalidation is skipped or cached. FileBytes
+calls the private already-charged entry point and keeps its
 existing 1 MiB object cap. Digest streams through RootIo's existing SHA kernel,
 with fixed scratch and cumulative byte charges up to the selected RootIo file
 bound; it does not allocate a FileBytes object or inherit that object's cap.
@@ -796,12 +831,13 @@ reader/image seams and protected Host/legacy NativeLink transport. Physical
 SourceArtifact metadata in the native fixture still uses a resource-free test
 constructor after actual DICE anchor/digest production; it grants no root or
 transport authority and does not prove original Loading activation.
-Remaining activation gates: full Archive envelope/inode workload; original
-Loading declaration-prefix integration with the complete selected-set API;
-original Loading-to-GeneralWorkspace selection and public physical source/CAS/
-runfiles through that route; generalSource certificate restore; unrelated
-originals plus existing GCC/Homebrew through SAME route; warm Host freshness;
-selected event replay; public Rust integration and equivalent-command memory.
+Original General outputs now have the inactive original-to-analysis, real
+NativeLink CAS/runfiles and corruption/restoration proof linked above. The
+separate digest-only SourceRoot snapshot still needs its ordinary Analysis and
+native transport join. Remaining activation gates include that join and derived
+Source paths, full Archive envelope/inode workload, unrelated originals plus
+existing GCC/Homebrew through the same general route, all demanded freshness/
+event surfaces, authentic public Rust and equivalent-command memory.
 Independent final review and owner/direct-dependent checks apply to each accepted
 implementation chunk.
 Root alone schedules Cargo/native proof, atomic integration, fresh CLI/cquery

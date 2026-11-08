@@ -83,10 +83,15 @@ async fn resolve_native(
                 let attempts = scope.snapshot().source_attempts;
                 let incoming =
                     observe_rooted(root, anchor, need.demands(), scope, &|| true).unwrap();
-                assert_eq!(
-                    scope.snapshot().source_attempts,
-                    attempts + need.demands().len() as u64
-                );
+                assert!(need.demands().iter().all(|demand| matches!(
+                    demand.operation(),
+                    PathObservationOperation::Lstat
+                        | PathObservationOperation::ReadLink
+                        | PathObservationOperation::DirectoryEntries
+                )));
+                // Resolution metadata is still actually observed, but no
+                // longer spends the content-acquisition SourceAttempts domain.
+                assert_eq!(scope.snapshot().source_attempts, attempts);
                 assert_eq!(scope.snapshot().live_buffer_bytes, 0);
                 merge(epoch, incoming);
             }
@@ -223,7 +228,7 @@ async fn actual_dice_needs_resolve_rooted_symlinks_and_distinct_same_display_gen
         scope.snapshot().decoded_bytes,
         2 * (bytes_a.len() + bytes_b.len()) as u64
     );
-    assert_eq!(scope.snapshot().source_attempts, 18);
+    assert_eq!(scope.snapshot().source_attempts, 4);
     // B's complete same-spelling epoch cannot answer A's root request.
     epoch = PathObservationEpoch::from_shared(
         epoch
@@ -255,7 +260,7 @@ async fn actual_dice_needs_resolve_rooted_symlinks_and_distinct_same_display_gen
             SourceServiceError::Cancelled
         ))
     ));
-    assert_eq!(scope.snapshot().source_attempts, 18);
+    assert_eq!(scope.snapshot().source_attempts, 4);
     assert_eq!(scope.snapshot().live_buffer_bytes, 0);
 }
 
@@ -279,7 +284,7 @@ async fn actual_dice_external_literal_link_refuses_before_any_host_fallback() {
         resolve_native(&dice, &root, &anchor, &mut epoch, &scope, &logical).await,
         Err(AnchoredPathResolutionError::EscapesAnchor { .. })
     ));
-    assert_eq!(scope.snapshot().source_attempts, 3);
+    assert_eq!(scope.snapshot().source_attempts, 0);
     assert_eq!(scope.snapshot().decoded_bytes, 0);
     assert_eq!(epoch.observations().len(), 3);
     assert!(

@@ -816,6 +816,8 @@ fn native_claimed_registry_sources_keep_same_display_instances_separate_and_read
         matches!(refused, Err(crate::runtime::repository_io::RepositorySessionError::NativeWorkspace(message)) if message.as_ref() == "physical observation association changed")
     );
     assert!(materializer.session_is_active(token_c));
+    // One Host FileBytes and one physical FileBytes remain two content
+    // attempts under the metadata/content classification.
     assert_eq!(
         scope.snapshot().source_attempts,
         before_recheck.source_attempts + 2

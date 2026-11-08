@@ -51,7 +51,9 @@ scopes while preserving the permanent Host/Registry owner and original data
 deadlines. The inactive selected-source bridge now captures Workspace, Local,
 selected BCR tar.gz and pinned Builtin sources through ordinary repository
 Starlark, with fresh command ownership and read-only digest manifests.
-Original-route physical CAS/runfiles and profile removal are the frontier. Full
+Original General outputs now pass ordinary analysis and actual NativeLink
+CAS/runfiles, corruption/restoration and runtime-retirement proof. The distinct
+SourceRoot Analysis/transport join and profile removal are the frontier. Full
 archive-envelope, derived Source Path operations, public Rust and
 matching-command memory gates still
 precede production activation.

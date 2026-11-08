@@ -11,6 +11,8 @@ default = []
 native-probe-observer = []
 # Closed callback-counter instrumentation; absent from ordinary builds.
 resource-set-test-support = []
+# Trusted original-repository integration probes; absent from ordinary builds.
+repository-workspace-test-support = []
 
 [dependencies]
 allocative = { workspace = true }

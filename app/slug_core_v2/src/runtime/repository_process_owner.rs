@@ -178,14 +178,17 @@ impl ProcessPlatform {
         self.hold_after_view_transfer = true;
         self
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "repository-workspace-test-support"))]
     pub(super) fn compiled_cli(helper: PathBuf, bwrap: PathBuf) -> Self {
         Self {
             bwrap,
             helper,
             test_images: true,
+            #[cfg(test)]
             observer: None,
+            #[cfg(test)]
             hold_before_hello: false,
+            #[cfg(test)]
             hold_after_view_transfer: false,
         }
     }

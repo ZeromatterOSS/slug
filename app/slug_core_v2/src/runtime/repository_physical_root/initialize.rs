@@ -6,7 +6,7 @@ use super::process_owner::{self};
 use super::progress::command::RepositoryWorkspaceCommand;
 use super::*;
 pub(super) fn platform() -> io::Result<ProcessPlatform> {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "repository-workspace-test-support"))]
     {
         let image = std::env::var_os("SLUG_V2_BIN").ok_or_else(|| {
             io::Error::new(
@@ -19,7 +19,7 @@ pub(super) fn platform() -> io::Result<ProcessPlatform> {
             "/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap".into(),
         ))
     }
-    #[cfg(not(test))]
+    #[cfg(not(any(test, feature = "repository-workspace-test-support")))]
     {
         ProcessPlatform::current()
     }

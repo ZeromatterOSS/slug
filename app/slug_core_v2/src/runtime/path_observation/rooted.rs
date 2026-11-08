@@ -223,9 +223,16 @@ pub(in crate::runtime) fn observe_rooted(
         check(scope, active)?;
         let demand = &demands[index];
         let path = relative(anchor, demand, index)?;
-        // FileBytes calls the shared after-attempt kernel; no operation double
-        // charges and missing/wrong-kind operations still consume their attempt.
-        scope.charge(SourceCounter::SourceAttempts, 1)?;
+        // SourceAttempts bounds actual content acquisition, not metadata
+        // revalidation. Charge before lstat as missing/wrong-kind/failed content
+        // captures are attempts too. FileBytes uses the after-attempt kernel.
+        // Metadata still has the full batch/path/live-credit/deadline guards.
+        if matches!(
+            demand.operation(),
+            PathObservationOperation::FileBytes | PathObservationOperation::FileDigest
+        ) {
+            scope.charge(SourceCounter::SourceAttempts, 1)?;
+        }
         let result = observe_one(root, path, demand.operation(), scope, active, &mut credits)?;
         check(scope, active)?;
         observations.push((demand.clone(), result));

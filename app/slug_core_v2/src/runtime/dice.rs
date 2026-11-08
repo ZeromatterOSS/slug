@@ -506,6 +506,28 @@ mod input_image_bridge;
 mod path_inputs;
 #[path = "repository_workspace_driver.rs"]
 mod repository_workspace_driver;
+#[cfg(all(
+    feature = "repository-workspace-test-support",
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+#[path = "repository_workspace_test_support.rs"]
+mod repository_workspace_test_support;
+#[cfg(all(
+    feature = "repository-workspace-test-support",
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+pub use repository_workspace_test_support::RepositoryWorkspaceIntegrationTestResources;
+#[cfg(all(
+    feature = "repository-workspace-test-support",
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+pub use repository_workspace_test_support::RepositoryWorkspaceIntegrationTestSnapshot;
 #[path = "runtime_sources.rs"]
 mod runtime_sources;
 #[path = "selected_label_data.rs"]

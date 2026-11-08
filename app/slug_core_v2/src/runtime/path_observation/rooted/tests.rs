@@ -106,7 +106,8 @@ fn rooted_observation_same_display_distinct_instances_ignore_absent_and_foreign_
     assert!(
         matches!(value(&epoch_a, &file_stat), PathObservationResult::Lstat(PathOperationResult::Present(stat)) if stat.permissions() == 0o751 && stat.size() == 3)
     );
-    assert_eq!(resources.snapshot().source_attempts, 4);
+    // The two metadata frames no longer consume the content-attempt domain.
+    assert_eq!(resources.snapshot().source_attempts, 2);
     assert_eq!(resources.snapshot().decoded_bytes, 6);
     assert_eq!(resources.snapshot().live_buffer_bytes, 0);
 
@@ -300,6 +301,9 @@ fn rooted_observation_missing_wrongkind_special_and_hardlink_results_do_not_foll
     );
     let not_link = demand(&selected, "file", PathObservationOperation::ReadLink);
     let special = demand(&selected, "fifo", PathObservationOperation::FileBytes);
+    let missing_digest = demand(&selected, "absent", PathObservationOperation::FileDigest);
+    let directory_digest = demand(&selected, "dir", PathObservationOperation::FileDigest);
+    let special_digest = demand(&selected, "fifo", PathObservationOperation::FileDigest);
     let epoch = observe_rooted(
         &root,
         &selected,
@@ -309,6 +313,9 @@ fn rooted_observation_missing_wrongkind_special_and_hardlink_results_do_not_foll
             not_directory.clone(),
             not_link.clone(),
             special.clone(),
+            missing_digest.clone(),
+            directory_digest.clone(),
+            special_digest.clone(),
         ],
         &resources,
         &|| true,
@@ -354,7 +361,24 @@ fn rooted_observation_missing_wrongkind_special_and_hardlink_results_do_not_foll
             }
         ))
     ));
-    assert_eq!(resources.snapshot().source_attempts, 5);
+    assert!(matches!(
+        value(&epoch, &missing_digest),
+        PathObservationResult::FileDigest(PathOperationResult::Missing)
+    ));
+    for (request, actual) in [
+        (&directory_digest, PathNodeKind::Directory),
+        (&special_digest, PathNodeKind::SpecialFile),
+    ] {
+        assert!(matches!(
+            value(&epoch, request),
+            PathObservationResult::FileDigest(PathOperationResult::Error(
+                PathObservationError::WrongKind { actual: found, .. }
+            )) if *found == actual
+        ));
+    }
+    // Both content families charge even without readable bytes; the two
+    // metadata wrong-kind facts are outside this superseded all-operation debit.
+    assert_eq!(resources.snapshot().source_attempts, 6);
     assert_eq!(resources.snapshot().decoded_bytes, 0);
     fs::hard_link(fixture.path().join("file"), fixture.path().join("alias")).unwrap();
     assert!(
@@ -371,6 +395,22 @@ fn rooted_observation_missing_wrongkind_special_and_hardlink_results_do_not_foll
         )
         .is_err()
     );
+    assert_eq!(resources.snapshot().source_attempts, 7);
+    assert!(
+        observe_rooted(
+            &root,
+            &selected,
+            &[demand(
+                &selected,
+                "file",
+                PathObservationOperation::FileDigest
+            )],
+            &resources,
+            &|| true,
+        )
+        .is_err()
+    );
+    assert_eq!(resources.snapshot().source_attempts, 8);
     assert_eq!(resources.snapshot().live_buffer_bytes, 0);
 }
 
@@ -439,6 +479,110 @@ fn rooted_observation_filebytes_exact_object_limit_and_digest_streaming_have_dis
     );
     assert_eq!(digest_scope.snapshot().live_buffer_bytes, 0);
     assert!(digest_scope.snapshot().peak_buffer_bytes < HOST_FILE_OBJECT_BYTES);
+}
+
+#[test]
+fn rooted_metadata_frontier_exceeds_content_attempt_cap_and_revalidates_actual_changes() {
+    let fixture = tempfile::tempdir().unwrap();
+    let descriptor = File::open(fixture.path()).unwrap();
+    let root = RootIo::new(&descriptor, limits()).unwrap();
+    let selected = anchor(Path::new("/absent/rooted-metadata"), 1);
+    let resources = scope(SourceServiceLimits::default());
+    let mut demands = Vec::new();
+    for index in 0..65 {
+        let name = format!("file{index}");
+        fs::write(fixture.path().join(&name), b"x").unwrap();
+        demands.push(demand(&selected, &name, PathObservationOperation::Lstat));
+    }
+    symlink("file0", fixture.path().join("link")).unwrap();
+    let link = demand(&selected, "link", PathObservationOperation::ReadLink);
+    let directory = demand(&selected, "", PathObservationOperation::DirectoryEntries);
+    demands.extend([link.clone(), directory.clone()]);
+    let first = observe_rooted(&root, &selected, &demands, &resources, &|| true).unwrap();
+    assert_eq!(first.observations().len(), 67);
+    assert_eq!(resources.snapshot().source_attempts, 0);
+    assert_eq!(resources.snapshot().decoded_bytes, 0);
+    assert_eq!(resources.snapshot().live_buffer_bytes, 0);
+
+    // Excluding metadata from SourceAttempts does not authorize an observation
+    // cache: every repeat still traverses the actual descriptor-selected tree.
+    fs::write(fixture.path().join("file0"), b"changed").unwrap();
+    fs::remove_file(fixture.path().join("link")).unwrap();
+    symlink("file1", fixture.path().join("link")).unwrap();
+    fs::create_dir(fixture.path().join("new-directory")).unwrap();
+    let second = observe_rooted(&root, &selected, &demands, &resources, &|| true).unwrap();
+    assert!(matches!(
+        value(&second, &demands[0]),
+        PathObservationResult::Lstat(PathOperationResult::Present(stat)) if stat.size() == 7
+    ));
+    assert!(matches!(
+        value(&second, &link),
+        PathObservationResult::ReadLink(PathOperationResult::Present(target)) if target.as_path() == Path::new("file1")
+    ));
+    assert!(matches!(
+        value(&second, &directory),
+        PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries))
+            if entries.entries().iter().any(|entry| entry.name().as_os_str() == "new-directory")
+    ));
+    assert_ne!(first, second);
+    assert_eq!(resources.snapshot().source_attempts, 0);
+    assert_eq!(resources.snapshot().decoded_bytes, 0);
+    assert_eq!(resources.snapshot().live_buffer_bytes, 0);
+    assert!(!selected.root().as_path().exists());
+}
+
+#[test]
+fn rooted_content_attempts_share_exact_64_boundary_and_refuse_65_before_lstat() {
+    let fixture = tempfile::tempdir().unwrap();
+    fs::write(fixture.path().join("file"), b"body").unwrap();
+    let descriptor = File::open(fixture.path()).unwrap();
+    let root = RootIo::new(&descriptor, limits()).unwrap();
+    let selected = anchor(fixture.path(), 1);
+    let resources = scope(SourceServiceLimits::default());
+    for index in 0..64 {
+        let operation = if index % 2 == 0 {
+            PathObservationOperation::FileBytes
+        } else {
+            PathObservationOperation::FileDigest
+        };
+        observe_rooted(
+            &root,
+            &selected,
+            &[demand(&selected, "file", operation)],
+            &resources,
+            &|| true,
+        )
+        .unwrap();
+        assert_eq!(resources.snapshot().source_attempts, index + 1);
+    }
+    let checks = Cell::new(0);
+    let active = || {
+        let prior = checks.get();
+        checks.set(prior + 1);
+        // The third check is immediately after the first lstat in observe_one.
+        assert!(prior < 2, "content-limit refusal must precede real lstat");
+        true
+    };
+    assert!(matches!(
+        observe_rooted(
+            &root,
+            &selected,
+            &[demand(
+                &selected,
+                "file",
+                PathObservationOperation::FileBytes
+            )],
+            &resources,
+            &active,
+        ),
+        Err(RootedObservationError::SourceService(
+            SourceServiceError::Limit(SourceCounter::SourceAttempts)
+        ))
+    ));
+    assert_eq!(checks.get(), 2);
+    assert_eq!(resources.snapshot().source_attempts, 64);
+    assert_eq!(resources.snapshot().decoded_bytes, 64 * 4);
+    assert_eq!(resources.snapshot().live_buffer_bytes, 0);
 }
 
 #[test]
@@ -583,7 +727,13 @@ fn rooted_observation_disappearance_after_typed_frame_never_publishes_missing_ep
             &active,
         );
         assert!(matches!(observed, Err(RootedObservationError::Unstable)));
-        assert_eq!(resources.snapshot().source_attempts, 1);
+        assert_eq!(
+            resources.snapshot().source_attempts,
+            u64::from(matches!(
+                operation,
+                PathObservationOperation::FileBytes | PathObservationOperation::FileDigest
+            ))
+        );
         assert_eq!(resources.snapshot().decoded_bytes, 0);
         assert_eq!(resources.snapshot().live_buffer_bytes, 0);
         assert!(!path.exists());

@@ -619,9 +619,9 @@ impl PhysicalObservationBatch {
             epochs.push(
                 root.observe(demands, scope, &|| actor.session_is_active(token))
                     .map_err(|error| {
-                        #[cfg(test)]
+                        #[cfg(any(test, feature = "repository-workspace-test-support"))]
                         report_physical_observation_refusal(&error);
-                        #[cfg(not(test))]
+                        #[cfg(not(any(test, feature = "repository-workspace-test-support")))]
                         let _ = error;
                         RepositorySessionError::NativeWorkspace(
                             "physical root observation refused".into(),
@@ -668,7 +668,10 @@ impl PhysicalObservationBatch {
         Ok(merged)
     }
 }
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(
+    any(test, feature = "repository-workspace-test-support"),
+    target_os = "linux"
+))]
 fn report_physical_observation_refusal(
     error: &crate::runtime::repository_physical_root::PhysicalRootError,
 ) {
@@ -698,7 +701,13 @@ fn report_physical_observation_refusal(
             O::Epoch(_) => ("observation_epoch", None),
         },
     };
-    eprintln!("physical observation refused: category={category} errno={errno:?}");
+    let source_service = match error {
+        E::SourceService(error) | E::Observation(O::SourceService(error)) => Some(*error),
+        _ => None,
+    };
+    eprintln!(
+        "physical observation refused: category={category} errno={errno:?} source_service={source_service:?}"
+    );
 }
 fn row_matches_result(
     row: &RetainedRepositoryRoot,

@@ -107,6 +107,16 @@ bank without carrying IO authority. Component admission and retained-byte
 counters do not establish completed-command RSS or the Bazel memory ratio. See
 the [selected-source bridge evidence](wp1225-selected-source-bridge-acceptance-2026-11-08.json).
 
+Original General transport reuses existing anchored source metadata, checked
+native lease wrappers, opaque readers, CAS verification and durable runfiles
+SourceBacking. The test-only feature retains the existing fixed bank through an
+opaque scalar-metrics handle; it creates no new semantic store or production
+activation path. Rooted metadata revalidation keeps its complete batch/path/
+result/credit/deadline bounds, while only content captures debit the unchanged64
+SourceAttempts. Full certificate IO remains. No cache, donor import, interner,
+cap increase or completed-workload memory claim is introduced; see the
+[original transport evidence](wp1225-original-transport-acceptance-2026-11-08.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

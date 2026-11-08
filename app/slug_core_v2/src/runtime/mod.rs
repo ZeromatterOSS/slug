@@ -111,6 +111,20 @@ pub use dice::PreparedRunfilesAction;
 pub use dice::PreparedRunfilesManifests;
 #[doc(hidden)]
 pub use dice::PreparedSourceActionInputs;
+#[cfg(all(
+    feature = "repository-workspace-test-support",
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+pub use dice::RepositoryWorkspaceIntegrationTestResources;
+#[cfg(all(
+    feature = "repository-workspace-test-support",
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+pub use dice::RepositoryWorkspaceIntegrationTestSnapshot;
 pub use dice::RequestedActionResult;
 pub use dice::RequestedArtifacts;
 pub use dice::RequestedOutputGroup;

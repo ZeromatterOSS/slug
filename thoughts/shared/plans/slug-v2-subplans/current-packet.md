@@ -57,8 +57,10 @@ remains Disabled. The [selected-source bridge receipt](wp1225-selected-source-br
 adds inactive Workspace, Local, selected BCR tar.gz and pinned Builtin snapshots
 through original repository Starlark. Digest-only Source data keeps its original
 scope; fresh commands recapture through the existing producers. Original-route
-physical CAS/runfiles proof and profile removal are the next frontier, alongside
-the complete activation gates below. Existing production process routes
+physical General outputs now have [ordinary analysis, NativeLink CAS/runfiles
+and restoration proof](wp1225-original-transport-acceptance-2026-11-08.json).
+Digest-only SourceRoot transport and profile removal are the next frontier,
+alongside the complete activation gates below. Existing production process routes
 remain replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
@@ -133,9 +135,9 @@ Data-only history guards preserve source allocations without setup authority;
 source bodies never become mutable Process history. The selected-source bridge
 admits direct Label/Path text, read/template and Execute; derived Source Path
 operations/listings, reserved string-read roundtrips, Legacy LocalTar and
-cross-source links remain unsupported. Full Archive/public Rust, original-route
-physical CAS/runfiles and equivalent-memory gates remain. No production profile
-replacement is activated by this evidence.
+cross-source links remain unsupported. Full Archive/public Rust, the distinct
+SourceRoot Analysis/transport join and equivalent-memory gates remain. No
+production profile replacement is activated by this evidence.
 
 Inactive protocol, anchored resolver, rooted observation/mutation and native
 reader candidates may proceed. Before untrusted activation, prove actual
