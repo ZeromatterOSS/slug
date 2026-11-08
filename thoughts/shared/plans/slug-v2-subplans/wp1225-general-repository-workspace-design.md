@@ -373,6 +373,62 @@ results may cut off semantic projections only AFTER actual sample; old physical
 instance authority stays distinct. Untracked Host helper changes before warm
 reuse must cause a new sample. Keep source/mapping/env/certificate dependencies.
 
+### Caller-profile retirement boundary
+
+The [retirement receipt](wp1225-profile-retirement-acceptance-2026-11-08.json)
+records the deletion, refusal/replay regressions and original environment proof.
+
+Retire the GCC and Homebrew adapters together, independently of enabling the
+General policy. Live AGENTS bans existing caller-specific recipes and gives the
+prototype no migration obligation. Removing prohibited fallbacks does not close
+any General activation gate. Default `Disabled` repository Execute becomes
+explicitly **unsupported**; prior adapter-dependent successes remain historical
+evidence and do not establish general compatibility or Rust/bootstrap closure.
+
+Loading refuses Disabled Execute before argument processing, legacy Need
+creation or completed-record replay. It removes Homebrew owner/name/source
+classification and template/environment vetoes. General remains the sole
+execution owner, reached only through trusted internal configuration; its normal
+environment observation and template APIs apply uniformly to every original.
+Core defensively rejects any legacy Execute descriptor as the first complete-
+frontier progress check under either policy, before observation, archive or
+filesystem staging, workspace reservation or child setup. Do not translate
+legacy records into Workspace histories. Unused pure legacy descriptor/epoch
+carriers grant no execution authority; removing their schema is not a
+compatibility requirement for this deletion boundary.
+
+Discriminate mixed legacy Execute plus path/filesystem/workspace Needs with
+untouched observations, transcript/state, resource admission and on-disk data,
+including an injected completed legacy record and normal abort/restoration.
+Protect Enabled legacy-realization refusal and the accepted general runner,
+source-link, selected-view and real CAS/runfiles gates. Extend the unchanged
+verified `unix_cc_configure.bzl` `get_env`/template proof with absent Homebrew
+and present A/B/A snapshots, undeclared environment changes, quote/percent
+escaping and `_`/dotted-key filtering; compare actual wrapper bytes/content
+identity. These four original invocations use fresh runtimes on the same
+workspace and one persistent bank, with exact complete refunds between cases.
+They prove actual outputs, not warm Native-runtime capacity. A separate pure
+General File/Read/Template A/B/A test keeps one DICE owner/reservation/lease and
+declared cells/frontier unchanged; changing only the full undeclared snapshot
+must invalidate completed A, refuse stale replay and restore matching B/A
+bodies/identity without a fresh-epoch confound.
+
+The attempted warm authentic sequence refused Resource at bootstrap after
+7.7508s within the unchanged 8GiB bank. Its aggregate peak was 6,883,905,536
+backing bytes; post-abort live backing was 2,415,919,104 bytes (one 2GiB Source
+plus four 64MiB General roots). Retained prior data plus new bootstrap
+reservations is the supported explanation, but the aggregate counters do not
+identify the exact rejected root. Preserve that refusal and leave repeated
+authentic commands within the shared backing budget open. No quota increase,
+Source contraction or eviction is introduced; neither this proof nor the
+refusal establishes equivalent-command RSS fit. Source authority, complete
+environment equality, caps, original clocks and lifecycle remain unchanged. This is retirement plus an inactive
+exact API slice, not production execution or equivalent-memory acceptance.
+Independent design and final review apply. The root owns the small DICE progress
+entry edit; the existing large owner files lose code without adding another
+central abstraction. No donor utility, retained representation or new cache is
+introduced.
+
 ### Original Loading candidate join
 
 The [scoped acceptance receipt](wp1225-original-loading-acceptance-2026-11-08.json)
@@ -417,7 +473,7 @@ later prepared values cannot expand an earlier Execute manifest. Unbridged
 Local/legacy sources and cross-root symlink operations refuse explicitly. Foreign
 Materialization Label get_child/dirname also remain unimplemented; above-anchor
 own dirname refuses rather than returning a false missing-parent value.
-They remain required integration work before original GCC/Homebrew replacement.
+They remain required integration work before default General activation.
 
 quiet=False contributes a binary completion-output event at its replay position,
 sharing captured result Arcs. stdout precedes stderr with no inserted newline or
@@ -1048,7 +1104,7 @@ Loading integration and production activation remain later gates.
 | Bzlmod protocol | `slug_bzlmod_v2/src/repository_{execute,filesystem}.rs`; new `repository_workspace.rs`; exports. |
 | Loading API/events | `slug_loading_v2/src/repository_rule_context.rs`, its `{filesystem,deletion,archive}.rs`; `module_extension_repository_file_effect.rs`. |
 | Anchor/shared route | `slug_workspace_v2/src/path_resolution.rs`; Bzlmod `source_preparation/repository_source_observation.rs`; root integrates `source_preparation.rs`. |
-| Core physical/snapshot | `slug_core_v2/src/runtime/repository_{process,filesystem_progress}.rs`; new `repository_{physical_root,workspace_snapshot,process_policy}.rs`; `repository_generated_archive.rs`, `repository_delete.rs`, `repository_filesystem_manifest.rs` and rooted generated-file application in `repository_io.rs`. |
+| Core physical/snapshot | `slug_core_v2/src/runtime/repository_filesystem_progress.rs`; new `repository_{physical_root,workspace_snapshot,process_policy}.rs`; `repository_generated_archive.rs`, `repository_delete.rs`, `repository_filesystem_manifest.rs` and rooted generated-file application in `repository_io.rs`. |
 | Core rooted observers | `runtime/path_observation.rs`, its `{file_digest,scoped_directory}.rs`; `source_service/regular_file.rs`; `input_image.rs`, `input_image/linux/fs.rs`. |
 | Native reader/REAPI | Core `repository_io/source_generations.rs`, `{source,action_chain}_{staging,execution}.rs`, `runfiles_manifest.rs`, `action_chain_staging/runfiles.rs`; new `native_source_access.rs`; REAPI `{source_staging,action_chain}.rs`. |
 | Root integration | Core `runtime/{repository_io,dice,mod}.rs`, Bzlmod `source_preparation.rs`, exports/acceptance/current epoch; atomic activation and scheduling. |
@@ -1066,9 +1122,10 @@ Original General outputs now have the inactive original-to-analysis, real
 NativeLink CAS/runfiles and corruption/restoration proof linked above. The
 separate digest-only SourceRoot snapshot now has its own bounded ordinary
 Analysis/native proof above. Remaining activation gates include derived Source
-paths, repeated Workspace publication, full Archive envelope/inode workload, unrelated originals plus
-existing GCC/Homebrew through the same general route, all demanded freshness/
-event surfaces, authentic public Rust and equivalent-command memory.
+paths, repeated Workspace publication, full Archive envelope/inode workload,
+all demanded freshness/event surfaces beyond the admitted slices, authentic
+public Rust and equivalent-command memory. The bounded unrelated-original and
+compiler/Homebrew proofs do not establish the complete activation envelope.
 Independent final review and owner/direct-dependent checks apply to each accepted
 implementation chunk.
 Root alone schedules Cargo/native proof, atomic integration, fresh CLI/cquery

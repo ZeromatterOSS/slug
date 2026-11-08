@@ -111,7 +111,6 @@ use slug_bzlmod_v2::RegistryRequestGenerationKey;
 use slug_bzlmod_v2::RegistryUrls;
 use slug_bzlmod_v2::RepositoryExecuteEpoch;
 use slug_bzlmod_v2::RepositoryExecuteEpochKey;
-use slug_bzlmod_v2::RepositoryExecuteRecord;
 use slug_bzlmod_v2::RepositoryExecuteTranscript;
 use slug_bzlmod_v2::RepositoryFilesystemEpoch;
 use slug_bzlmod_v2::RepositoryFilesystemEpochKey;
@@ -932,19 +931,17 @@ pub(in crate::runtime) enum NativeDemandSessionError {
         actual: NormalizedAbsolutePath,
     },
     PathInternalNonProgress,
-    ExecuteInternalNonProgress,
+    LegacyRepositoryExecuteUnsupported,
     ArchiveInternalNonProgress,
     RepositoryFilesystem(super::repository_io::ArchiveMaterializationError),
     ArchiveTranscript(slug_bzlmod_v2::RepositoryFilesystemTranscriptError),
     ExecuteEnvironmentMismatch,
-    RepositoryExecute(super::repository_process::RepositoryProcessError),
     #[cfg(all(
         target_os = "linux",
         target_arch = "x86_64",
         target_pointer_width = "64"
     ))]
     RepositoryWorkspace(super::repository_physical_root::PhysicalRootError),
-    ExecuteTranscript(slug_bzlmod_v2::RepositoryExecuteTranscriptError),
     RevisionInternalNonProgress,
     Revision(RequestRevisionError),
     AfterOutputPublication(Box<NativeDemandSessionError>),
@@ -1062,13 +1059,12 @@ impl fmt::Display for NativeDemandSessionError {
                 "repository environment need belongs to {actual}, expected {expected}"
             ),
             Self::PathInternalNonProgress => f.write_str("path preparation made no progress"),
-            Self::ExecuteInternalNonProgress => {
-                f.write_str("repository execution preparation made no progress")
+            Self::LegacyRepositoryExecuteUnsupported => {
+                f.write_str("legacy repository execution is unsupported; general repository execution remains gated")
             }
             Self::ExecuteEnvironmentMismatch => {
                 f.write_str("repository execution environment changed before launch")
             }
-            Self::RepositoryExecute(error) => write!(f, "{error}"),
             #[cfg(all(
                 target_os = "linux",
                 target_arch = "x86_64",
@@ -1082,7 +1078,6 @@ impl fmt::Display for NativeDemandSessionError {
                 write!(f, "repository filesystem: {}", error.message)
             }
             Self::ArchiveTranscript(_) => f.write_str("repository archive transcript conflict"),
-            Self::ExecuteTranscript(_) => f.write_str("repository execution transcript conflict"),
             Self::RevisionInternalNonProgress => {
                 f.write_str("request revision made no bounded progress")
             }
@@ -1134,7 +1129,6 @@ enum NativeDemandProgress {
     Environment,
     Downloads,
     Paths,
-    Executes,
     Archives,
     Workspaces,
 }
@@ -8201,6 +8195,12 @@ impl NativeDemandCommand<'_> {
         &mut self,
         needs: &slug_bzlmod_v2::SourcePreparationNeeds,
     ) -> Result<NativeDemandProgress, NativeDemandSessionError> {
+        // Reject the complete legacy frontier before any source observation,
+        // archive acquisition, root reservation or other progress I/O. The
+        // generic Workspace Execute protocol is the only execution owner.
+        if !needs.repository_executes().is_empty() {
+            return Err(NativeDemandSessionError::LegacyRepositoryExecuteUnsupported);
+        }
         self.validate_source_progress(needs)?;
         if let Some(progress) = self.progress_general_workspace(needs)? {
             return Ok(progress);
@@ -8433,9 +8433,7 @@ impl NativeDemandCommand<'_> {
                 finish_probe_phase!(need_phase);
                 return Ok(NativeDemandProgress::Paths);
             }
-            if needs.repository_executes().is_empty()
-                && needs.repository_filesystem_operations().is_empty()
-            {
+            if needs.repository_filesystem_operations().is_empty() {
                 return Err(NativeDemandSessionError::PathInternalNonProgress);
             }
             finish_probe_phase!(need_phase);
@@ -8496,71 +8494,6 @@ impl NativeDemandCommand<'_> {
                 Ok(NativeDemandProgress::Archives)
             } else {
                 Err(NativeDemandSessionError::ArchiveInternalNonProgress)
-            };
-        }
-
-        if !needs.repository_executes().is_empty() {
-            let mut requests = needs
-                .repository_executes()
-                .values()
-                .cloned()
-                .collect::<Vec<_>>();
-            requests.sort_by(|left, right| {
-                left.id()
-                    .owner()
-                    .unique_name()
-                    .cmp(right.id().owner().unique_name())
-                    .then_with(|| left.id().ordinal().cmp(&right.id().ordinal()))
-                    .then_with(|| left.id().call_index().cmp(&right.id().call_index()))
-            });
-            let mut advanced = false;
-            for request in requests {
-                if request.environment() != &self.inputs.request.repository_environment {
-                    return Err(NativeDemandSessionError::ExecuteEnvironmentMismatch);
-                }
-                if let Some(known) = self.execute_transcript.find(request.id()) {
-                    if known.request() != request.as_ref() {
-                        return Err(NativeDemandSessionError::ExecuteInternalNonProgress);
-                    }
-                    continue;
-                }
-                if self.execute_transcript.records().len()
-                    >= slug_bzlmod_v2::REPOSITORY_EXECUTE_MAX_CALLS
-                    || request.id().call_index()
-                        != self
-                            .execute_transcript
-                            .records_for(request.id().owner(), request.id().ordinal())
-                            .count()
-                {
-                    return Err(NativeDemandSessionError::ExecuteInternalNonProgress);
-                }
-                // The entire DICE transaction was dropped by drive_command
-                // before progress. No DICE lock or computation is held while
-                // the child is launched or awaited.
-                let bwrap = if Path::new("/usr/bin/bwrap").is_file() {
-                    Path::new("/usr/bin/bwrap")
-                } else {
-                    Path::new("/home/linuxbrew/.linuxbrew/bin/bwrap")
-                };
-                let result = self
-                    .runtime
-                    .runtime
-                    .block_on(super::repository_process::run_repository_execute(
-                        &request,
-                        &self.runtime.workspace,
-                        bwrap,
-                    ))
-                    .map_err(NativeDemandSessionError::RepositoryExecute)?;
-                self.execute_transcript = self
-                    .execute_transcript
-                    .append(RepositoryExecuteRecord::new(request, result))
-                    .map_err(NativeDemandSessionError::ExecuteTranscript)?;
-                advanced = true;
-            }
-            return if advanced {
-                Ok(NativeDemandProgress::Executes)
-            } else {
-                Err(NativeDemandSessionError::ExecuteInternalNonProgress)
             };
         }
 

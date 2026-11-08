@@ -71,9 +71,16 @@ contraction for eligible read-only General Archive roots keeps their real
 version/globals/proxy dependencies within the fixed bank without changing
 Archive history or Source quotas. The
 [selected design](wp1225-general-repository-workspace-design.md#source-backed-symlinks-inactive-implementation-contract)
-owns the admitted graph and exact-prefix authority. Profile removal remains the
-frontier, alongside the complete activation gates below. Existing production
-process routes remain replacement-required. The selected design links owner
+owns the admitted graph and exact-prefix authority.
+[Atomic profile retirement](wp1225-profile-retirement-acceptance-2026-11-08.json)
+removes both GCC and Homebrew selectors. Disabled Execute now refuses uniformly,
+including completed legacy replay and mixed native frontiers before progress IO.
+The inactive original compiler proof includes absent Homebrew then present
+A/B/A environment snapshots and actual wrapper changes/restoration across
+fresh runtimes on one bank, paired with same-DICE General environment/replay
+invalidation. Repeated authentic commands within the shared backing budget
+remain open after the warm attempt refused Resource; the recorded cap is
+unchanged. General production activation remains gated below. The selected design links owner
 contracts and evidence; component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.
@@ -119,7 +126,9 @@ normal nonzero exits retain their actual result and next tree.
 
 Root owns LIVE, projections, native/Cargo execution and atomic integration.
 Workers use disjoint inactive candidates under the selected design.
-All coupled semantic activation remains atomic after its complete gates.
+Both caller profiles retire atomically under the selected design's retirement
+boundary. Default Disabled Execute then refuses uniformly; later General
+activation remains atomic after its complete gates.
 Relevant owners: Bzlmod repository_execute/filesystem types; Loading repository
 context/path/file-effect leaves; Core repository_process/filesystem_progress/
 repository_io/source-generations and small private backing/confinement leaves.
@@ -149,7 +158,8 @@ admits direct Label/Path text, read/template and Execute; derived Source Path
 operations/listings, reserved string-read roundtrips, Legacy LocalTar and
 Source-to-Source external links remain unsupported. Full Archive/public Rust, repeated
 Workspace publication and equivalent-memory gates remain. No
-production profile replacement is activated by this evidence.
+General production execution is activated by this evidence; after profile
+retirement default Execute is explicitly unsupported.
 
 Inactive protocol, anchored resolver, rooted observation/mutation and native
 reader candidates may proceed. Before untrusted activation, prove actual

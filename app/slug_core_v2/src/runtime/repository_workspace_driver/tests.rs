@@ -900,3 +900,6 @@ mod source_snapshot_tests;
 
 #[path = "source_link_tests.rs"]
 mod source_link_tests;
+
+#[path = "legacy_execute_retirement_tests.rs"]
+mod legacy_execute_retirement_tests;

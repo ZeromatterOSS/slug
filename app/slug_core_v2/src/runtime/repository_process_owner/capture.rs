@@ -1,5 +1,5 @@
-//! Actual bounded output capture. Source anchor: repository_process.rs
-//! capture_bounded_with (EINTR/WouldBlock/EOF behavior), without its GCC policy.
+//! Actual bounded output capture. EINTR/WouldBlock/EOF behavior derives from
+//! the former repository_process.rs capture_bounded_with at aa86aee9e.
 use super::*;
 
 pub(super) const STREAM_LIMIT: usize = 1024 * 1024;

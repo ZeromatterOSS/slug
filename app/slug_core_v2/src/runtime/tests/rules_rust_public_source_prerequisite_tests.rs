@@ -69,9 +69,10 @@ fn native_kind(error: &NativeDemandSessionError) -> &'static str {
             "foreign_environment_workspace"
         }
         NativeDemandSessionError::PathInternalNonProgress => "path_nonprogress",
-        NativeDemandSessionError::ExecuteInternalNonProgress => "execute_nonprogress",
+        NativeDemandSessionError::LegacyRepositoryExecuteUnsupported => {
+            "legacy_execute_unsupported"
+        }
         NativeDemandSessionError::ExecuteEnvironmentMismatch => "execute_environment_mismatch",
-        NativeDemandSessionError::RepositoryExecute(_) => "repository_execute",
         #[cfg(all(
             target_os = "linux",
             target_arch = "x86_64",
@@ -81,7 +82,6 @@ fn native_kind(error: &NativeDemandSessionError) -> &'static str {
         NativeDemandSessionError::ArchiveInternalNonProgress => "archive_internal_non_progress",
         NativeDemandSessionError::RepositoryFilesystem(_) => "repository_archive",
         NativeDemandSessionError::ArchiveTranscript(_) => "filesystem_transcript",
-        NativeDemandSessionError::ExecuteTranscript(_) => "execute_transcript",
         NativeDemandSessionError::RevisionInternalNonProgress => "revision_nonprogress",
         NativeDemandSessionError::Revision(_) => "revision",
         NativeDemandSessionError::AfterOutputPublication(_) => "after_output_publication",

@@ -1,0 +1,651 @@
+{
+  "status": "ACCEPTED_PROFILE_RETIREMENT_GENERAL_INACTIVE",
+  "date": "2026-11-08",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "aa86aee9ee7cfc616b35b150a478352bbab7f285",
+  "capability_advanced": "Atomic retirement of both prohibited GCC and Homebrew semantic profiles; default Execute is uniformly unsupported, General remains internally configured and inactive by default.",
+  "compatibility": {
+    "exact_inactive_slice": "Unchanged rules_cc0.2.17 cc_autoconf originals, actual compiler Execute records, both Source-backed configuration links/normal .bzl Loading, and environment-rendered cc/deps wrappers including absent Homebrew then present A/B/A; generic environment/template/argv semantics only.",
+    "slug_native": "Finite rooted Linux process capabilities, structural identity and command-fresh observations under the existing resource banks and original scope clocks.",
+    "unsupported": "Default Disabled repository Execute; any legacy Execute descriptor including completed replay. No automatic policy activation, compatibility shim or synthesis of Workspace histories."
+  },
+  "implementation": [
+    "Delete the complete GCC ProbeForm/argv/expected-effect/environment/prefix runner, its20 dedicated tests, module declaration and sole scratch prefix-staging helper.",
+    "Remove Homebrew generated-name/defining-label/export classifier, environment declaration special case and template veto; ordinary full environment observation and general templates remain.",
+    "Disabled Loading refuses before body argument/options validation, legacy Need creation or completed-record replay. General policy fence remains before prepared effect reuse.",
+    "Core rejects any legacy Execute at the first complete-frontier progress entry under both policies, before source/path observations, filesystem/archive progress or workspace setup; remove the late launch/transcript branch.",
+    "Legacy immutable DTO/epoch/transcript carriers remain inert schema only. File-only effects, filesystem/archive acquisition, generic runner, source graph/transport, quotas, leases and lifecycle stay under their existing owners."
+  ],
+  "discriminating_evidence": [
+    "Loading invalid-argument/options calls under unrelated and historical caller names all return the same Disabled unsupported result.",
+    "A formerly valid exact Which-origin GCC completed record uses actual certificate canonical repository, owner/ordinal/index, environment, default options and file prefix; Disabled refuses, Enabled requests general reservation, Disabled restores refusal.",
+    "Core tests both policies against mixed legacy Execute plus path, filesystem and workspace Needs, with exact old completed record injected; source counters, observations, issued requests, filesystem/workspace transcripts, stage, root bank current/peak admission and fixture data stay untouched; discard/restoration allows a fresh command.",
+    "Native original compiler proof runs four fresh-runtime commands on the same workspace and one persistent bank: absent Homebrew, present EXTRA A, present changed EXTRA B, restored A. Every command contains actual compiler records and both original links/linked Loading. Both actual wrappers match upstream export block, quote and percent escaping; underscore/dotted names omitted, B changes bodies/content identity and A restores them. Every case refunds bank FD/backing/retained credits exactly. This is cold-per-runtime original output proof, not warm capacity acceptance."
+  ],
+  "warm_native_refusal": {
+    "record": "profile-retirement-native-authentic-same-runtime-refusal.json",
+    "exit_code": 101,
+    "selected": 1,
+    "elapsed_seconds": 7.750794013001723,
+    "stage": "bootstrap",
+    "error": "repository workspace Resource",
+    "backing_limit_bytes": 8589934592,
+    "post_abort_backing_bytes": 2415919104,
+    "peak_backing_bytes": 6883905536,
+    "interpretation": "Aggregate counters and surviving2GiB Source+4x64MiB General roots fit retained-prior/new-bootstrap overlap; exact rejected root is not identified. Repeated authentic commands remain an open capacity gate. No timeout/stream overflow, cap raise, eviction, Source quota change or RSS success claim."
+  },
+  "source_authority": {
+    "api_contract": "wp1225-repository-api-source-contract.md",
+    "design": "wp1225-general-repository-workspace-design.md#caller-profile-retirement-boundary",
+    "inherited_native_and_source_proofs": "wp1225-source-links-acceptance-2026-11-08.json at aa86aee9ee7cfc616b35b150a478352bbab7f285",
+    "bazel_revision": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "upstream": "Verified rules_cc0.2.17 archive; unix_cc_configure.bzl get_env237-254 and template calls451/469; lib_cc_configure.escape_string. No new oracle corpus/source rewrites."
+  },
+  "upstream_pins": [
+    {
+      "path": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz",
+      "sha256": "283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a",
+      "bytes": 380004
+    },
+    {
+      "member": "rules_cc-0.2.17/cc/private/toolchain/unix_cc_configure.bzl",
+      "sha256": "a84500ecbdd7eaad6b46218001ac86ee9d4c41419b9dd2016fdf2a3eb0524803",
+      "bytes": 29733
+    },
+    {
+      "member": "rules_cc-0.2.17/cc/private/toolchain/lib_cc_configure.bzl",
+      "sha256": "2153852db0e991a2d9c79ec7e0d3d209de46dd15c616d5ace984cae4d0bc708c",
+      "bytes": 11479
+    },
+    {
+      "member": "rules_cc-0.2.17/cc/private/toolchain/linux_cc_wrapper.sh.tpl",
+      "sha256": "91ab819c39ce1441d2d480cb39c176dcf78304a5f361eb934d923e42eb9a2205",
+      "bytes": 1398
+    },
+    {
+      "member": "rules_cc-0.2.17/cc/private/toolchain/gcc_deps_scanner_wrapper.sh.tpl",
+      "sha256": "91ed82d076a9d9f0c24f58887a2f3426aab0044b529d678f591a27a9d35865cd",
+      "bytes": 237
+    }
+  ],
+  "source_sha256": [
+    {
+      "path": "app/slug_core_v2/src/runtime/dice.rs",
+      "sha256": "460d149f6e6119cd684cc47fe664023bf801c81e083de86d21f680325aae620a",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/mod.rs",
+      "sha256": "65c0211f0e5bbba148f85845aee21d880e98adf96a0baad2eb4b1b6d71697127",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_io.rs",
+      "sha256": "b3e86a7f4e8f315e3981ef8210c455d9fd31270ee1d62693694a50925516633c",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_process.rs",
+      "sha256": null,
+      "deleted": true
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_process_owner/capture.rs",
+      "sha256": "cd9798f7450fc1068e0a274ad9880000248cb422e4ea8b1b4ea639dd6e436a84",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_workspace_driver/legacy_execute_retirement_tests.rs",
+      "sha256": "43d6de9b1b0476d378cb0cca5dd3eeafa40c7c1887d224d37a412d288d8ea6c1",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_workspace_driver/source_link_tests.rs",
+      "sha256": "b1e610b03b2ee6ac54241f0108246890a23804565413bcf1ab00053a1c1556b0",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_workspace_driver/tests.rs",
+      "sha256": "a85410e30aa1d5f396fa9f3ee3a6fb550dd16e5b680ca143ace64cb024371fd1",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/tests/rules_rust_public_source_prerequisite_tests.rs",
+      "sha256": "f886e4a967e08eea8c39fb90fa2dc0c91d3d8611e82b2d7b83f4dbde95babc50",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_loading_v2/src/module_extension_repository_file_effect.rs",
+      "sha256": "5bfb8cb2eb9d8fde563b1d9aeca463486a579422cb8be0893fb81d8efe3260a7",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_loading_v2/src/module_extension_repository_file_effect/tests/filesystem_replay_tests.rs",
+      "sha256": "8bb9c57d50e1726ad0fa0a191fe682f5455a479d059032c37dc8912ca230249e",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_loading_v2/src/module_extension_repository_file_effect/tests/general_workspace_tests.rs",
+      "sha256": "2ef827d6b1499128444fb2c0a13b38b6cbed2895773a0ea9c1883a5d775af807",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_loading_v2/src/repository_rule_context.rs",
+      "sha256": "72227a511e7162265f5232aed1bfef67e54e29eec694081fc1912faf660d2581",
+      "deleted": false
+    },
+    {
+      "path": "app/slug_loading_v2/src/repository_rule_context/filesystem.rs",
+      "sha256": "3f4132c9fab45a5ddcbac3b1d654a55cf53257db81000f07ba555fd12d6ca02c",
+      "deleted": false
+    }
+  ],
+  "validation": {
+    "unique_passing": 1408,
+    "ordinary_unique_passing": 1349,
+    "native_selected_ignored_passing": 59,
+    "inherited_failures": [
+      "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+      "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+      "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+      "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder",
+      "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error"
+    ],
+    "records": [
+      {
+        "package": "slug_bzlmod_v2",
+        "selected": 342,
+        "passed": 342,
+        "exit_code": 0,
+        "elapsed_seconds": 0.9965713359997608,
+        "executable_sha256": "2854afc0ff4060cb756cad2525e0a74888b100a93872bbd3d2b10d9ba766d8c8",
+        "record": "profile-retirement-pure-final.json",
+        "passing": 342,
+        "selection_sha256": "e069d3b06188d5818cf0c04a1ca636a1da7b34e889ca9b98396658c87b1ee1e5",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 342
+        }
+      },
+      {
+        "package": "slug_loading_v2",
+        "selected": 286,
+        "passed": 286,
+        "exit_code": 0,
+        "elapsed_seconds": 3.3572097519936506,
+        "executable_sha256": "2d129141c4d6ba38e442ff8db4a9e67174bb6be1ac9430b40d3bd35db01421b0",
+        "record": "profile-retirement-pure-final.json",
+        "passing": 286,
+        "selection_sha256": "dd91ebbef5bf556c8a0a13dffdfda9a8f45d6c9a8c8731e0a3922bdea80a3545",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 286
+        }
+      },
+      {
+        "package": "slug_analysis_v2",
+        "selected": 190,
+        "passed": 190,
+        "exit_code": 0,
+        "elapsed_seconds": 0.3016891000006581,
+        "executable_sha256": "0b45b5caf4797b843c143c493f99cf4ce53e71f02148b7582d19bd3757755d09",
+        "record": "profile-retirement-pure-final.json",
+        "passing": 190,
+        "selection_sha256": "33affe1c8c4b6d9492a682cfd588a30fe11b575897eb9c2126d3196d11adfe32",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 190
+        }
+      },
+      {
+        "package": "slug_loading_v2",
+        "selected": 3,
+        "passed": 3,
+        "exit_code": 0,
+        "elapsed_seconds": 0.02628166500653606,
+        "executable_sha256": "f9fad054f73e4e9a341be2d4e9644de642e4f25eca13119cb3653ccc123f0ac5",
+        "record": "profile-retirement-loading-env-final-run.json",
+        "passing": 3,
+        "selection_sha256": "6f9761de59c0ed46ac7f535f6d532eece6a74f319ef153fb09c35fcca44912d9",
+        "selectors": [
+          "module_extension_repository_file_effect::tests::general_workspace_tests::general_template_enumerated_environment_invalidates_same_completed_epoch_a_b_a",
+          "module_extension_repository_file_effect::tests::general_workspace_tests::disabled_original_execute_ignores_completed_legacy_epoch_and_policy_changes_invalidate",
+          "repository_rule_context::tests::disabled_execute_refuses_uniformly_before_argument_or_option_validation"
+        ]
+      },
+      {
+        "target": "slug_workspace_v2",
+        "selected": 111,
+        "passed": 111,
+        "exit_code": 0,
+        "elapsed_seconds": 0.44124810201174114,
+        "executable_sha256": "18566f0976fe3fe81e798fd0e842e1fbec196d9914e96309e3e2a7274acae93e",
+        "record": "profile-retirement-extra-final.json",
+        "passing": 111,
+        "selection_sha256": "a8ececcc337c34f94cb082aa01ecb3293da8ba4b7f787eb9de136883f7bb583f",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 111
+        }
+      },
+      {
+        "target": "slug_reapi_v2",
+        "selected": 53,
+        "passed": 53,
+        "exit_code": 0,
+        "elapsed_seconds": 3.2377254519960843,
+        "executable_sha256": "e154fb7540fe2f327256c609be6d75e21c03a2f4372489611d992e723bea1ccc",
+        "record": "profile-retirement-extra-final.json",
+        "passing": 53,
+        "selection_sha256": "8d5afa5afe326efbd57aeccd112671a6913bc2c652d208ee419b76f0c71da08a",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 53
+        }
+      },
+      {
+        "target": "slug_core_v2",
+        "selected": 22,
+        "passed": 22,
+        "exit_code": 0,
+        "elapsed_seconds": 1.267497059001471,
+        "executable_sha256": "4233503be0df04c53342c8b6741fc03956475ea7fa34a795b0f399f5a56b7674",
+        "record": "profile-retirement-extra-final.json",
+        "passing": 22,
+        "selection_sha256": "b2e2f3c11a196c9dd01d25c45411a44a9ad36c8b84af3151977b81341b8026ef",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 22
+        }
+      },
+      {
+        "selected": 309,
+        "exit_code": 101,
+        "elapsed_seconds": 18.411177646004944,
+        "executable_sha256": "4233503be0df04c53342c8b6741fc03956475ea7fa34a795b0f399f5a56b7674",
+        "failures": [
+          "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+          "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error"
+        ],
+        "known_baseline_failures": [
+          "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+          "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error"
+        ],
+        "record": "profile-retirement-core-final.json",
+        "passing": 304,
+        "selection_sha256": "048b8548d12931d6c02cab215a9fadb132020ff9fb9e329e50a37ef241e4ce65",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 309
+        }
+      },
+      {
+        "target": "source_preparation_dice",
+        "selected": 29,
+        "passed": 29,
+        "exit_code": 0,
+        "elapsed_seconds": 0.04647723700327333,
+        "executable_sha256": "fbc577011e91acd21d45a5b46827796ee3d3dcae7f85d47f9624804549481436",
+        "record": "profile-retirement-integrations-final.json",
+        "passing": 29,
+        "selection_sha256": "a15ff0e20151fb474ac95778809d2267576d101a64360812a8b9c334ee6481cc",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 29
+        }
+      },
+      {
+        "target": "starlark_rule",
+        "selected": 16,
+        "passed": 16,
+        "exit_code": 0,
+        "elapsed_seconds": 0.2047451450052904,
+        "executable_sha256": "ca957204be323c088eb54ec6e5440d50a9475d671afca0f221e3a32c2b4fb3f7",
+        "record": "profile-retirement-integrations-final.json",
+        "passing": 16,
+        "selection_sha256": "7bd7be52547997a1ab6b57956f99c4731dc7bb5d1a612a1ad73fc4c394082afa",
+        "selectors": [
+          "analysis_event_capture_is_target_local_empty_replacing_and_failure_prefix_preserving",
+          "builtin_fixture::generated_registration::stable_inputs::tests::changed_plan_and_attributes_never_reuse_stale_source_and_a_b_a_keeps_current_inputs",
+          "builtin_fixture::generated_registration::stable_inputs::tests::current_missing_and_host_withholding_override_saved_namespace_inputs",
+          "builtin_fixture::generated_registration::stable_inputs::tests::initial::automatic_sources_keep_active_and_retired_real_outputs_out_of_host_views",
+          "builtin_fixture::generated_registration::stable_inputs::tests::initial::explicit_epoch_missing_and_canonical_declarations_override_saved_inputs",
+          "builtin_fixture::generated_registration::stable_inputs::tests::initial::initial_inventory_preflight_refuses_before_guard_clones_or_updater_commit",
+          "builtin_fixture::generated_registration::stable_inputs::tests::initial::inventory_full_foreign_equality_and_exact_limit_preserve_original_guards",
+          "builtin_fixture::generated_registration::stable_inputs::tests::initial_injected_absence_is_precise_and_other_cancellations_propagate",
+          "builtin_fixture::generated_registration::stable_inputs::tests::refusal::work_bytes_floor_and_explicit_entry_refusals_precede_new_guards_or_writes",
+          "builtin_fixture::generated_registration::stable_inputs::tests::repeated_foreign_equal_requests_retain_actual_namespace_arcs_without_new_directories",
+          "builtin_fixture::generated_registration::tests::actual_file_batch_preserves_prior_inputs_and_distinct_request_guards",
+          "builtin_fixture::generated_registration::tests::materialization_request_prepayment_is_paid_before_guard_clone",
+          "builtin_fixture::generated_registration::tests::mixed_needs_and_file_tree_conflicts_are_refused_before_writes",
+          "rustc_map_each::compile_context::provider::build_info_transform::installed_template_source_keeps_catalog_authority_and_refuses_host_resolution",
+          "rustc_map_each::compile_context::registry::finite_registry_metadata_covers_actual_requested_versions_without_relocalizing_sources",
+          "rustc_map_each::compile_context::registry::version_inventory::tests::inventory_ignores_unneeded_kwargs_and_refuses_dynamic_required_inputs"
+        ]
+      },
+      {
+        "selected": 51,
+        "exit_code": 0,
+        "elapsed_seconds": 15.482309220009483,
+        "deadline_seconds": 60,
+        "stream_limit_bytes": 1048576,
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "umask": "0002",
+        "executable_sha256": "4233503be0df04c53342c8b6741fc03956475ea7fa34a795b0f399f5a56b7674",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "record": "profile-retirement-native-all-final.json",
+        "passing": 51,
+        "selection_sha256": "ff4ae918b66e03daf9994c370f49fec79690943d036f790f88f65f3ecf25d4ff",
+        "selectors": {
+          "complete_selection": "all recorded exact selectors; prefixes retained in validation selection contract",
+          "count": 51
+        }
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 19.3029808900028,
+        "deadline_seconds": 60,
+        "stream_limit_bytes": 1048576,
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "umask": "0002",
+        "executable_sha256": "1aee5f426a025691a0fbc74db5b178e1cf4a01d457e49ebaf2179fdc7fdde5b1",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "record": "profile-retirement-native-authentic-final.json",
+        "passing": 1,
+        "selection_sha256": "2f13d4017f02ef2fbfadf19f5a0e7f870c7c899ded257d5c9cfbec0ed00ff357",
+        "selectors": [
+          "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probes"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 1.6847906479961239,
+        "executable_sha256": "e154fb7540fe2f327256c609be6d75e21c03a2f4372489611d992e723bea1ccc",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "profile-retirement-original-transport-final.json",
+        "passing": 1,
+        "selection_sha256": "a7724aed9334c4138285907fb37d33fb7f202acd5ad8ff0e7258e46a328e1e2a",
+        "selectors": [
+          "action_chain::original_repository_tests::nativelink_original_repository_corrupt_cas_refuses_publication_and_restores"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 2.664960919995792,
+        "executable_sha256": "e154fb7540fe2f327256c609be6d75e21c03a2f4372489611d992e723bea1ccc",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "profile-retirement-original-transport-final.json",
+        "passing": 1,
+        "selection_sha256": "63f2433b83508fc8fa3a6e2a4286a8d460186b63758df87ff34808bd5d0c6bf2",
+        "selectors": [
+          "action_chain::original_repository_tests::nativelink_original_repository_execute_physical_sources_cache_and_runfiles_survive_shutdown"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 3.1761249780101934,
+        "executable_sha256": "e154fb7540fe2f327256c609be6d75e21c03a2f4372489611d992e723bea1ccc",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "profile-retirement-original-transport-final.json",
+        "passing": 1,
+        "selection_sha256": "5e4ddb7d4b4a46ada09997e309298abb83965b0da4236b3bdd68b061e7470e00",
+        "selectors": [
+          "action_chain::original_repository_tests::source_link_tests::nativelink_source_linked_general_artifacts_preserve_identity_cache_runfiles_and_retired_data"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 2.789351473998977,
+        "executable_sha256": "e154fb7540fe2f327256c609be6d75e21c03a2f4372489611d992e723bea1ccc",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "profile-retirement-captured-transport-final.json",
+        "passing": 1,
+        "selection_sha256": "2db6028040f87030f1eeb5fddbba9ab90f125d0614587d07aed98100412af8b1",
+        "selectors": [
+          "action_chain::source_snapshot_tests::nativelink_captured_bcr_sources_analysis_cas_runfiles_and_fresh_scope"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 3.115646389996982,
+        "executable_sha256": "e154fb7540fe2f327256c609be6d75e21c03a2f4372489611d992e723bea1ccc",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "profile-retirement-captured-transport-final.json",
+        "passing": 1,
+        "selection_sha256": "bf8f0280eff06943cecb9c5e8fc6b380b2bdcad480e89105f72b717aa2dc60c4",
+        "selectors": [
+          "action_chain::source_snapshot_tests::nativelink_captured_builtin_sources_analysis_cas_runfiles_and_fresh_scope"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 2.800482071994338,
+        "executable_sha256": "e154fb7540fe2f327256c609be6d75e21c03a2f4372489611d992e723bea1ccc",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "profile-retirement-captured-transport-final.json",
+        "passing": 1,
+        "selection_sha256": "d2c07bcf5d715ef10bee71587db33923f1fb1a82e6cf1f157d95c595512c7bbe",
+        "selectors": [
+          "action_chain::source_snapshot_tests::nativelink_captured_local_sources_analysis_cas_runfiles_and_fresh_scope"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 1.0598081079951953,
+        "executable_sha256": "e154fb7540fe2f327256c609be6d75e21c03a2f4372489611d992e723bea1ccc",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "profile-retirement-captured-transport-final.json",
+        "passing": 1,
+        "selection_sha256": "cee426ddfd3aae191dff4cac218944ee5129d1668e8622bdf3d971ed88fb7f22",
+        "selectors": [
+          "action_chain::source_snapshot_tests::nativelink_captured_workspace_sources_analysis_cas_runfiles_first_command"
+        ]
+      },
+      {
+        "selected": 3,
+        "exit_code": 0,
+        "elapsed_seconds": 1.6482338219939265,
+        "deadline_seconds": 60,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "executable_sha256": "931bb55904c81d2f6ac52c177b2e8f7d512aed36fb88e52caa9cccfdf690ea8e",
+        "cli_sha256": "686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b",
+        "record": "profile-retirement-public-cli-final.json",
+        "passing": 3,
+        "selection_sha256": "93a771352c2887055ffe1528edbebc90d248c43b40ffc6a4f080f124f7b9d91b",
+        "selectors": [
+          "typed_build_activation_publishes_cold_events_without_warm_daemon_replay",
+          "typed_query_activation_publishes_cold_events_without_warm_daemon_replay",
+          "cquery_label_and_starlark_modes_match_success_and_missing_contracts"
+        ]
+      }
+    ],
+    "builds": [
+      {
+        "record": "profile-retirement-owners-final-result.json",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--lib",
+          "-p",
+          "slug_bzlmod_v2",
+          "-p",
+          "slug_loading_v2",
+          "-p",
+          "slug_analysis_v2",
+          "-p",
+          "slug_workspace_v2",
+          "-p",
+          "slug_core_v2",
+          "-p",
+          "slug_reapi_v2",
+          "--offline",
+          "--locked",
+          "--target-dir",
+          "/run/media/system/Colossus/dev/slug/target",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 88.48732668100274,
+        "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+      },
+      {
+        "record": "profile-retirement-authentic-final-result.json",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--lib",
+          "-p",
+          "slug_core_v2",
+          "--offline",
+          "--locked",
+          "--target-dir",
+          "/run/media/system/Colossus/dev/slug/target",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 115.7855543709884,
+        "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+      },
+      {
+        "record": "profile-retirement-loading-env-final-result.json",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--lib",
+          "-p",
+          "slug_loading_v2",
+          "--offline",
+          "--locked",
+          "--target-dir",
+          "/run/media/system/Colossus/dev/slug/target",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 51.58482558699325,
+        "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+      },
+      {
+        "record": "profile-retirement-cli-final-result.json",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "build",
+          "-p",
+          "slug_cli_v2",
+          "--offline",
+          "--locked",
+          "--target-dir",
+          "/run/media/system/Colossus/dev/slug/target",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 8.0990381110023,
+        "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+      },
+      {
+        "record": "profile-retirement-integrations-build-final-result.json",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "-p",
+          "slug_bzlmod_v2",
+          "--test",
+          "source_preparation_dice",
+          "-p",
+          "slug_analysis_v2",
+          "--test",
+          "starlark_rule",
+          "-p",
+          "slug_cli_v2",
+          "--test",
+          "cli",
+          "--offline",
+          "--locked",
+          "--target-dir",
+          "/run/media/system/Colossus/dev/slug/target",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 41.25477366200357,
+        "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+      }
+    ],
+    "evidence_reuse": "All production code is unchanged after the six-owner final build and final CLI686c494cef0471f833393113f5f81b8d297c59f323646fd22b18fe037a46ca4b. Subsequent edits touch only the native authentic test body and the General environment test leaf; the affected Core and Loading test executables were rebuilt and their corrected/new exact gates executed with fresh preflight. Existing ordinary/protected native/REAPI/CLI results retain their recorded executable hashes and unchanged semantic coverage; no broad rerun was needed for sibling-test-only changes.",
+    "final_loading_discriminators": "profile-retirement-loading-env-final-run.json:3 selected/3 pass,0.026281665s, exit0, executable f9fad054f73e4e9a341be2d4e9644de642e4f25eca13119cb3653ccc123f0ac5. The extra same-DICE General environment test adds one unique pass; the two refusal cases overlap the earlier Loading owner selection."
+  },
+  "selection_contract": {
+    "owner_pure": "All nonignored exact tests under unchanged run-captured-transport-pure.py owner prefixes: Bzlmod Source/RepoFile/Ignore/HostPackage/Workspace, Loading canonical route/module extension/host glob/package/repository context/effects/innate, all Analysis.",
+    "extra": "All nonignored Workspace and REAPI; Core process_owner tests plus action_chain_staging/requested_artifacts::runfiles_/action_output_staging::linux::runfiles::. Deduplicate overlapping Core selectors in totals.",
+    "core": "Existing bounded source/physical/process-policy/wire/IO/events/driver/rooted-observer/diagnostic owner prefixes, including all five known baseline diagnostic failures.",
+    "native": "Exact supervised ignored owned physical/source/selected-view/General driver tests and separately the unchanged original compiler test. Actual compiled CLI, sequential freshness tests, 60s supervision, 1MiB output per stream, no bank/cap increase.",
+    "transport": "Existing real NativeLink original2+linked1 and captured Source4; fresh backend, actual CLI and verifying CAS/cache/runfiles/restoration.",
+    "integration": "Existing source_preparation_dice29 and selected starlark_rule16; default public CLI3."
+  },
+  "inherited_limitations": [
+    "Five unchanged Core diagnostic failures reproduced in aa86 and original clean baseline11c6bf4f; same five checked here.",
+    "Windows metadata build remains unproved: inherited repository_ignore.rs InputImage nonexhaustive arm failure; no unrelated rerun or success claim."
+  ],
+  "corrections": [
+    "Initial owner compile failed only for a missing RepositoryEnvironmentSnapshot import in the new Core test; fixed before final compilation/execution.",
+    "Independent review strengthened the Loading completed-record discriminator from an invalid legacy request to a formerly valid exact replay.",
+    "The warm authentic fixture exceeded the unchanged backing budget; independent review accepted cold-per-runtime actual output proof plus a pure same-DICE General environment discriminator while retaining warm capacity as an open gate.",
+    "An overbroad intermediate attribute-conversion deletion was restored byte-for-byte before the first compile; final review verified its preservation."
+  ],
+  "fixture_growth": "No archive, corpus, provider or generated-result additions. Existing verified authentic fixture and real backend reused. Six obsolete Loading adapter/replay tests and20 GCC runner tests retired; two replacement Loading refusal tests, one same-DICE General environment replay test and one Core mixed-frontier test added; existing native compiler proof expanded.",
+  "remaining_gates": [
+    "Default General activation and full Archive/resource/lifecycle envelope.",
+    "Derived Source Path/listing and reserved-string roundtrip APIs, Legacy LocalTar and unsupported cross-source graph cases.",
+    "Repeated Workspace publication and repeated authentic commands within one warm runtime/shared backing bank; authentic public Rust/bootstrap closure and equivalent-command Slug/Bazel memory ratio.",
+    "Full Rust action comparison/REAPI, complete Slug closure, Stage10/selfhost and whole-goal fit."
+  ],
+  "review": {
+    "design": "Independent ACCEPT: remove both banned profiles now; keep General Disabled and make unsupported explicit.",
+    "implementation": "Independent final ACCEPT after source/diff review, all14 source pins and raw validation records:1408 unique passes support profile retirement, default General Disabled and early fail-closed refusal. Five inherited failures and warm-runtime/full Archive/public Rust/matched-memory gates remain open."
+  },
+  "timing": {
+    "accepted_compile_elapsed_seconds": 305.21151841199026,
+    "accepted_test_record_elapsed_seconds": 82.01531101601722,
+    "scope": "Compilation separated from test/runtime measurements. Native/transport supervisors remain unchanged. Whole-turn/review elapsed not separately instrumented; no workflow-speed or equivalent-memory claim."
+  }
+}

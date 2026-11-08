@@ -6,9 +6,6 @@ pub(super) fn replay_operation(
     state: &RepositoryRuleInvocationState,
     operation: RepositoryFilesystemOperation,
 ) -> anyhow::Result<RepositoryFilesystemResult> {
-    if *state.execute_call_index.borrow() > 0 {
-        return Err(state.fail(RepositoryRuleInvocationError::FilesystemExecuteMix));
-    }
     let (owner, ordinal) = state
         .filesystem_owner
         .as_ref()

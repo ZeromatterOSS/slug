@@ -60,7 +60,6 @@ mod repository_io;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)] // Inactive WP425 ownership; native integration remains gated.
 mod repository_physical_root;
-mod repository_process;
 #[cfg(all(
     target_os = "linux",
     target_arch = "x86_64",

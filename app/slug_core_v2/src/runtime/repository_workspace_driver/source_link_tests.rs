@@ -131,19 +131,8 @@ fn native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probe
     module.push_str("\nbazel_dep(name='rules_cc',version='0.2.17')\nbazel_dep(name='bazel_skylib',version='1.8.2')\nrepo=use_repo_rule('@rules_cc//cc/private/toolchain:cc_configure.bzl','cc_autoconf')\nrepo(name='proof')\n");
     std::fs::write(workspace.path().join("MODULE.bazel"), module).unwrap();
     std::fs::remove_file(workspace.path().join("ext.bzl")).unwrap();
-    let mut runtime =
-        WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
-            .unwrap();
     let resources = bank();
     let baseline = resources.snapshot().retained_bytes;
-    runtime
-        .enable_general_repository_workspaces_for_test(resources.clone(), limits())
-        .unwrap();
-    let environment = RepositoryEnvironmentSnapshot::from_canonical(Arc::from([
-        RepositoryEnvironmentEntry::new("CC", "/usr/bin/gcc"),
-        RepositoryEnvironmentEntry::new("PATH", "/usr/bin:/bin"),
-    ]))
-    .unwrap();
     let archive = inputs.join("mirror/github.com/bazelbuild/rules_cc/releases/download/0.2.17");
     let distdirs = crate::runtime::ArchiveDistdirPolicy::from_request(
         workspace.path(),
@@ -153,119 +142,177 @@ fn native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probe
     let registries = [url::Url::from_directory_path(inputs.join("registry"))
         .unwrap()
         .to_string()];
-    let accepted = runtime
-        .cquery_command_with_repository_environment_and_distdirs(
-            "//:use",
-            true,
-            true,
-            policy,
-            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-            LockfileMode::Update,
-            &registries,
-            environment,
-            CommandConfigurationOverlay::new(Arc::from([])),
-            distdirs,
-        )
-        .unwrap_or_else(|error| {
-            panic!(
-                "authentic cc_autoconf stopped at {}: {error}; resources={:?}",
-                runtime.native_demand_sessions.workspace_stage(),
-                resources.snapshot()
-            )
-        });
-    assert!(
-        accepted.terminal_for_test().as_ref().is_ok(),
-        "{:#?}",
-        accepted.terminal_for_test()
-    );
+    let mut wrapper_observations = Vec::new();
+    // First protect the ordinary branch, then change an undeclared environment
+    // value under Homebrew A/B/A. Use fresh runtimes on one persistent bank,
+    // refunding every native owner between cases: retained prior Source roots
+    // plus this authentic bootstrap exceed the fixed bank on a warm runtime.
+    // Warm environment invalidation is proved separately on one DICE engine.
+    // Every case still samples original compiler calls and actual templates.
+    for (case, extra) in [None, Some("x'y%z"), Some("changed'percent%"), Some("x'y%z")]
+        .into_iter()
+        .enumerate()
     {
-        let state = runtime.native_demand_sessions.state.lock().unwrap();
-        let request = state
-            .accepted
-            .selected
-            .repository_requests()
-            .iter()
-            .find(|request| {
-                matches!(
-                    &request.kind,
-                    RepositoryMaterializationKind::GeneralWorkspace(_)
+        let mut entries = vec![RepositoryEnvironmentEntry::new("CC", "/usr/bin/gcc")];
+        if let Some(extra) = extra {
+            entries.extend([
+                RepositoryEnvironmentEntry::new("EXTRA", extra),
+                RepositoryEnvironmentEntry::new("HOMEBREW_RUBY_PATH", "/declared/ruby"),
+            ]);
+        }
+        entries.extend([
+            RepositoryEnvironmentEntry::new("PATH", "/usr/bin:/bin"),
+            RepositoryEnvironmentEntry::new("SKIP.DOT", "dot-must-be-filtered"),
+            RepositoryEnvironmentEntry::new("_", "underscore-must-be-filtered"),
+        ]);
+        let environment = RepositoryEnvironmentSnapshot::from_canonical(entries).unwrap();
+        let mut runtime =
+            WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
+                .unwrap();
+        runtime
+            .enable_general_repository_workspaces_for_test(resources.clone(), limits())
+            .unwrap();
+        let accepted = runtime
+            .cquery_command_with_repository_environment_and_distdirs(
+                "//:use",
+                true,
+                true,
+                policy.clone(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &registries,
+                environment,
+                CommandConfigurationOverlay::new(Arc::from([])),
+                distdirs.clone(),
+            )
+            .unwrap_or_else(|error| {
+                panic!(
+                    "authentic cc_autoconf case {case} stopped at {}: {error}; resources={:?}",
+                    runtime.native_demand_sessions.workspace_stage(),
+                    resources.snapshot()
                 )
-            })
-            .expect("original cc repository receipt");
-        let RepositoryMaterializationKind::GeneralWorkspace(realization) = &request.kind else {
-            unreachable!()
-        };
-        let mut source_links = 0;
-        let mut actual_processes = 0;
-        for record in realization.transcript().records() {
-            if let RepositoryWorkspaceOperation::Symlink {
-                path,
-                target,
-                source: Some(source),
-            } = record.request().operation()
-            {
-                if matches!(
-                    path.as_str(),
-                    "cc_toolchain_config.bzl" | "armeabi_cc_toolchain_config.bzl"
-                ) {
-                    source_links += 1;
-                    assert_eq!(
-                        source
-                            .source_state()
-                            .unwrap()
-                            .reservation()
-                            .request()
-                            .kind(),
-                        RepositorySourceSnapshotKind::Immutable
-                    );
-                    let member = if path == "cc_toolchain_config.bzl" {
-                        "unix_cc_toolchain_config.bzl"
-                    } else {
-                        "armeabi_cc_toolchain_config.bzl"
-                    };
-                    assert!(target.as_path().ends_with(member));
-                    assert!(
-                        matches!(realization.final_state().entry(path).unwrap().node(),RepositoryWorkspaceNode::Link(text) if Some(text.as_str())==target.as_path().to_str())
-                    );
+            });
+        assert!(
+            accepted.terminal_for_test().as_ref().is_ok(),
+            "{:#?}",
+            accepted.terminal_for_test()
+        );
+        {
+            let state = runtime.native_demand_sessions.state.lock().unwrap();
+            let request = state
+                .accepted
+                .selected
+                .repository_requests()
+                .iter()
+                .find(|request| {
+                    matches!(
+                        &request.kind,
+                        RepositoryMaterializationKind::GeneralWorkspace(_)
+                    )
+                })
+                .expect("original cc repository receipt");
+            let RepositoryMaterializationKind::GeneralWorkspace(realization) = &request.kind else {
+                unreachable!()
+            };
+            let mut source_links = 0;
+            let mut actual_processes = 0;
+            for record in realization.transcript().records() {
+                if let RepositoryWorkspaceOperation::Symlink {
+                    path,
+                    target,
+                    source: Some(source),
+                } = record.request().operation()
+                {
+                    if matches!(
+                        path.as_str(),
+                        "cc_toolchain_config.bzl" | "armeabi_cc_toolchain_config.bzl"
+                    ) {
+                        source_links += 1;
+                        assert_eq!(
+                            source
+                                .source_state()
+                                .unwrap()
+                                .reservation()
+                                .request()
+                                .kind(),
+                            RepositorySourceSnapshotKind::Immutable
+                        );
+                        let member = if path == "cc_toolchain_config.bzl" {
+                            "unix_cc_toolchain_config.bzl"
+                        } else {
+                            "armeabi_cc_toolchain_config.bzl"
+                        };
+                        assert!(target.as_path().ends_with(member));
+                        assert!(
+                            matches!(realization.final_state().entry(path).unwrap().node(),RepositoryWorkspaceNode::Link(text) if Some(text.as_str())==target.as_path().to_str())
+                        );
+                    }
+                }
+                if let RepositoryWorkspaceResult::Execute(result) = record.result() {
+                    actual_processes += 1;
+                    assert!((0..=255).contains(&result.return_code()));
                 }
             }
-            if let RepositoryWorkspaceResult::Execute(result) = record.result() {
-                actual_processes += 1;
-                assert!((0..=255).contains(&result.return_code()));
-            }
-        }
-        assert_eq!(source_links, 2, "both unchanged upstream symlink calls");
-        assert!(
-            actual_processes > 0,
-            "original compiler probes must actually execute"
-        );
-        let bindings = realization.final_state().source_bindings();
-        assert!(!bindings.is_empty());
-        // The requested generated package loads both linked .bzl files from its
-        // unchanged BUILD template. Its certificate must retain terminal Source
-        // bytes, with logical generated-repository ownership kept separately.
-        for member in [
-            "unix_cc_toolchain_config.bzl",
-            "armeabi_cc_toolchain_config.bzl",
-        ] {
+            assert_eq!(source_links, 2, "both unchanged upstream symlink calls");
             assert!(
-                state
-                    .accepted
-                    .path_observations
-                    .observations()
-                    .iter()
-                    .any(
+                actual_processes > 0,
+                "original compiler probes must actually execute"
+            );
+            let mut wrappers = Vec::new();
+            let env_block = extra.map_or_else(String::new, |extra| {
+            format!(
+                "export CC='/usr/bin/gcc'\nexport EXTRA='{}'\nexport HOMEBREW_RUBY_PATH='/declared/ruby'\nexport PATH='/usr/bin:/bin'",
+                extra.replace("'", "'\\''").replace('%', "%%")
+            )
+        });
+            for path in ["cc_wrapper.sh", "deps_scanner_wrapper.sh"] {
+                let entry = realization.final_state().entry(path).unwrap();
+                let RepositoryWorkspaceNode::File(body) = entry.node() else {
+                    panic!("original template did not produce {path}");
+                };
+                let text = std::str::from_utf8(body).unwrap();
+                let expected =
+                    format!("# Set-up the environment\n{env_block}\n\n# Call the C++ compiler");
+                assert!(text.contains(&expected), "{path}: {text:?}");
+                assert!(!text.contains("dot-must-be-filtered"));
+                assert!(!text.contains("underscore-must-be-filtered"));
+                assert!(!text.contains("%{env}"));
+                wrappers.push((entry.mode(), hex::encode(sha2::Sha256::digest(body))));
+            }
+            wrapper_observations.push((realization.source_identity().clone(), wrappers));
+            let bindings = realization.final_state().source_bindings();
+            assert!(!bindings.is_empty());
+            // The requested generated package loads both linked .bzl files from its
+            // unchanged BUILD template. Its certificate must retain terminal Source
+            // bytes, with logical generated-repository ownership kept separately.
+            for member in [
+                "unix_cc_toolchain_config.bzl",
+                "armeabi_cc_toolchain_config.bzl",
+            ] {
+                assert!(
+                    state.accepted.path_observations.observations().iter().any(
                         |(demand, _)| demand.operation() == PathObservationOperation::FileBytes
                             && demand.path().as_path().ends_with(member)
                             && bindings.iter().any(|view| demand.namespace()
                                 == PathObservationNamespace::Materialization(view.instance()))
                     ),
-                "normal linked .bzl loading must observe Source bytes: {member}"
-            );
+                    "normal linked .bzl loading must observe Source bytes: {member}"
+                );
+            }
         }
+        drop(accepted);
+        drop(runtime);
+        let snapshot = resources.snapshot();
+        assert_eq!(snapshot.native_fds, 0, "case {case}");
+        assert_eq!(snapshot.backing_bytes, 0, "case {case}");
+        assert_eq!(snapshot.retained_bytes, baseline, "case {case}");
     }
-    drop(accepted);
-    drop(runtime);
+    assert_ne!(wrapper_observations[0].1, wrapper_observations[1].1);
+    assert_ne!(wrapper_observations[1], wrapper_observations[2]);
+    assert_eq!(
+        wrapper_observations[1], wrapper_observations[3],
+        "restored full environment restores wrapper bytes and content identity"
+    );
     let snapshot = resources.snapshot();
     assert_eq!(snapshot.native_fds, 0);
     assert_eq!(snapshot.backing_bytes, 0);

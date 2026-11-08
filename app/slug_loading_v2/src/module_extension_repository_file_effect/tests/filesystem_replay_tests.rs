@@ -235,10 +235,8 @@ async fn delete_changed_path_prefix_kind_and_revoked_epoch_do_not_resume() {
 }
 
 #[tokio::test]
-async fn actual_callbacks_refuse_execute_filesystem_mix_in_all_four_orders_before_second_need() {
+async fn disabled_execute_refuses_in_all_filesystem_orders_without_process_need() {
     use slug_bzlmod_v2::RepositoryEnvironmentEntry;
-    use slug_bzlmod_v2::RepositoryExecuteRecord;
-    use slug_bzlmod_v2::RepositoryExecuteResult;
 
     use crate::repository_rule_context::PreparedRepositoryWhichCandidates;
     use crate::repository_rule_context::RepositoryRuleInvocationInput;
@@ -321,7 +319,6 @@ async fn actual_callbacks_refuse_execute_filesystem_mix_in_all_four_orders_befor
             Arc::from([]),
         )
         .unwrap()
-        .with_execute(owner.clone(), 0, RepositoryExecuteTranscript::empty())
         .with_filesystem_operations(owner.clone(), 0, RepositoryFilesystemTranscript::empty())
         .with_filesystem_lease_nonce(Some(83));
         let invoke = |input| {
@@ -340,54 +337,41 @@ async fn actual_callbacks_refuse_execute_filesystem_mix_in_all_four_orders_befor
         let first_need = invoke(base.clone())
             .err()
             .expect("first call must demand its actual result");
-        // Both successful and unsuccessful processes establish the unsupported
-        // composition boundary: neither result carries its physical tree.
-        for return_code in [0, 17] {
-            let input = match &first_need {
-                RepositoryRuleInvocationError::ExecuteNeed(request) => base.clone().with_execute(
+        let input = match first_need {
+            RepositoryRuleInvocationError::ExecuteUnsupported => {
+                assert_eq!(first, execute);
+                assert!(prints.0.borrow().is_empty());
+                continue;
+            }
+            RepositoryRuleInvocationError::FilesystemNeed(request) => {
+                let result = match request.operation() {
+                    RepositoryFilesystemOperation::Archive(effect) => {
+                        RepositoryFilesystemResult::Archive(effect.sha256())
+                    }
+                    RepositoryFilesystemOperation::Delete(_) => {
+                        RepositoryFilesystemResult::Delete(false)
+                    }
+                };
+                base.clone().with_filesystem_operations(
                     owner.clone(),
                     0,
-                    RepositoryExecuteTranscript::empty()
-                        .append(RepositoryExecuteRecord::new(
-                            request.clone(),
-                            RepositoryExecuteResult::new(
-                                return_code,
-                                Arc::from(&b""[..]),
-                                Arc::from(&b""[..]),
-                            ),
-                        ))
+                    RepositoryFilesystemTranscript::empty()
+                        .append(RepositoryFilesystemRecord::new(request.clone(), result))
                         .unwrap(),
-                ),
-                RepositoryRuleInvocationError::FilesystemNeed(request) => {
-                    let result = match request.operation() {
-                        RepositoryFilesystemOperation::Archive(effect) => {
-                            RepositoryFilesystemResult::Archive(effect.sha256())
-                        }
-                        RepositoryFilesystemOperation::Delete(_) => {
-                            RepositoryFilesystemResult::Delete(false)
-                        }
-                    };
-                    base.clone().with_filesystem_operations(
-                        owner.clone(),
-                        0,
-                        RepositoryFilesystemTranscript::empty()
-                            .append(RepositoryFilesystemRecord::new(request.clone(), result))
-                            .unwrap(),
-                    )
-                }
-                other => panic!("unexpected first boundary {other:?}"),
-            };
-            assert!(
-                matches!(
-                    invoke(input),
-                    Err(RepositoryRuleInvocationError::FilesystemExecuteMix)
-                ),
-                "{first} then {second}"
-            );
-            assert!(
-                prints.0.borrow().is_empty(),
-                "mixed operations must not run the continuation"
-            );
-        }
+                )
+            }
+            other => panic!("unexpected first boundary {other:?}"),
+        };
+        assert!(
+            matches!(
+                invoke(input),
+                Err(RepositoryRuleInvocationError::ExecuteUnsupported)
+            ),
+            "{first} then {second}"
+        );
+        assert!(
+            prints.0.borrow().is_empty(),
+            "disabled Execute must not run the continuation"
+        );
     }
 }

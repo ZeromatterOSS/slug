@@ -58,12 +58,13 @@ for already captured Workspace, Local, selected BCR and Builtin inputs, with
 fresh-scope/lifetime proof. [Source-backed links and generic read-only Archive
 quota contraction](./slug-v2-subplans/wp1225-source-links-acceptance-2026-11-08.json)
 now pass unchanged `cc_autoconf` generation/linked configuration Loading and
-linked Analysis/CAS/runfiles under the fixed bank. Profile removal remains the
-frontier. Full
-archive-envelope, derived Source Path operations, repeated Workspace publication,
-public Rust and
-matching-command memory gates still
-precede production activation.
+linked Analysis/CAS/runfiles under the fixed bank.
+[Atomic profile retirement](./slug-v2-subplans/wp1225-profile-retirement-acceptance-2026-11-08.json)
+removes both GCC/Homebrew adapters and makes default repository Execute
+explicitly unsupported; inactive originals now cover Homebrew environment A/B/A
+wrapper changes/restoration. Full archive-envelope, derived Source Path
+operations, repeated Workspace publication, public Rust and matching-command
+memory gates still precede General production activation.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.
