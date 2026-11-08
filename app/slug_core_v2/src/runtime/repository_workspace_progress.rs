@@ -22,6 +22,7 @@ pub(super) struct RepositoryWorkspaceProgress {
     delete_work: DeleteWork,
     decoded: u64,
     scope: Arc<SourceServiceScope>,
+    link_sources: Option<Arc<SourceLinkSet>>,
     // Retire actual descriptors and transcript allocations before control credit.
     _control: resources::ResourceCredit,
 }
@@ -71,6 +72,7 @@ impl RepositoryWorkspaceProgress {
             delete_work: DeleteWork::default(),
             decoded: 0,
             scope: scope.clone(),
+            link_sources: None,
             _control: control,
         })
     }
@@ -105,6 +107,10 @@ impl RepositoryWorkspaceProgress {
     ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope)?;
         check(scope, active)?;
+        if self.link_sources.is_none() {
+            let sources = SourceLinkSet::empty(&self.builder.resources, scope, active)?;
+            self.admit_link_sources(sources)?;
+        }
         if self
             .transcript()
             .replay(&request)
@@ -133,8 +139,17 @@ impl RepositoryWorkspaceProgress {
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         check(scope, active)?;
-        let snapshot =
-            snapshot::capture(&self.builder, self.transcript().current(), scope, active)?;
+        let sources = match &self.link_sources {
+            Some(sources) => sources.clone(),
+            None => SourceLinkSet::empty(&self.builder.resources, scope, active)?,
+        };
+        let snapshot = snapshot::capture_with_sources(
+            &self.builder,
+            self.transcript().current(),
+            sources,
+            scope,
+            active,
+        )?;
         let next = snapshot.complete_with_dependencies(
             self.transcript(),
             request,
@@ -142,6 +157,7 @@ impl RepositoryWorkspaceProgress {
             self.transcript.dependencies.clone(),
         )?;
         self.transcript = next;
+        self.link_sources = None;
         Ok(self)
     }
 
@@ -161,7 +177,36 @@ impl RepositoryWorkspaceProgress {
             return Err(PhysicalRootError::Reservation);
         }
         self.transcript.dependencies = Some(dependencies);
+        let views = match request.operation() {
+            RepositoryWorkspaceOperation::Execute(execute) => execute.read_views().views(),
+            _ => return Err(PhysicalRootError::UnsupportedOperation),
+        };
+        self.link_sources = Some(SourceLinkSet::from_views(
+            request.dependencies(),
+            views,
+            &self.builder.resources,
+            scope,
+            active,
+        )?);
         self.complete_snapshot(request.request().clone(), result, scope, active)
+    }
+    pub(super) fn admit_link_sources(
+        &mut self,
+        sources: Arc<SourceLinkSet>,
+    ) -> Result<(), PhysicalRootError> {
+        if !sources
+            .dependencies()
+            .covers_state(self.transcript().current())
+        {
+            return Err(PhysicalRootError::Reservation);
+        }
+        let deps = match &self.transcript.dependencies {
+            Some(old) => old.merge(sources.dependencies().owners(), &self.builder.resources)?,
+            None => sources.dependencies().clone(),
+        };
+        self.transcript.dependencies = Some(deps);
+        self.link_sources = Some(sources);
+        Ok(())
     }
 
     /// Incoming operation/argv/source storage is producer-credited already.
@@ -175,6 +220,10 @@ impl RepositoryWorkspaceProgress {
     ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope)?;
         check(scope, active)?;
+        if self.link_sources.is_none() {
+            let sources = SourceLinkSet::empty(&self.builder.resources, scope, active)?;
+            self.admit_link_sources(sources)?;
+        }
         if self
             .transcript()
             .replay(&request)
@@ -183,6 +232,7 @@ impl RepositoryWorkspaceProgress {
         {
             return Ok(self);
         }
+        let mut captured_read = None;
         let result = {
             let _scratch = self.builder.resources.reserve(IO_SCRATCH, 3, 0)?;
             if backing_identity(&self.builder.file, self.builder.mode)? != self.builder.identity {
@@ -212,29 +262,37 @@ impl RepositoryWorkspaceProgress {
                     RepositoryWorkspaceResult::Unit
                 }
                 RepositoryWorkspaceOperation::Read(path) => {
-                    // The full actual capture below authenticates these bytes;
-                    // complete also requires the whole tree remain unchanged.
-                    let Some(RepositoryWorkspaceNode::File(body)) = self
-                        .transcript()
-                        .current()
-                        .entry(path)
-                        .map(|entry| entry.node())
-                    else {
-                        return Err(PhysicalRootError::Snapshot);
-                    };
-                    RepositoryWorkspaceResult::Read(body.clone())
+                    let sources = self
+                        .link_sources
+                        .as_ref()
+                        .ok_or(PhysicalRootError::Reservation)?;
+                    let read = routed::RouteRoots::new(
+                        &self.builder.file,
+                        self.transcript().current(),
+                        sources,
+                        &self.builder.resources,
+                        scope,
+                        active,
+                    )
+                    .read(path)?;
+                    let result = read.result();
+                    captured_read = Some(read);
+                    result
                 }
                 RepositoryWorkspaceOperation::Exists(path) => {
-                    let exists = match io.lstat(Path::new(path.as_str())) {
-                        Ok(_) => true,
-                        Err(error)
-                            if error.kind() == io::ErrorKind::NotFound
-                                || error.raw_os_error() == Some(libc::ENOTDIR) =>
-                        {
-                            false
-                        }
-                        Err(error) => return Err(error.into()),
-                    };
+                    let sources = self
+                        .link_sources
+                        .as_ref()
+                        .ok_or(PhysicalRootError::Reservation)?;
+                    let exists = routed::RouteRoots::new(
+                        &self.builder.file,
+                        self.transcript().current(),
+                        sources,
+                        &self.builder.resources,
+                        scope,
+                        active,
+                    )
+                    .exists(path)?;
                     RepositoryWorkspaceResult::Exists(exists)
                 }
                 RepositoryWorkspaceOperation::Delete(path) => {
@@ -249,13 +307,29 @@ impl RepositoryWorkspaceProgress {
                         .map_err(PhysicalRootError::Mutation)?;
                     RepositoryWorkspaceResult::Delete(removed)
                 }
+                RepositoryWorkspaceOperation::Symlink { path, target, .. } => {
+                    let sources = self
+                        .link_sources
+                        .as_ref()
+                        .ok_or(PhysicalRootError::Reservation)?;
+                    let proof =
+                        sources.validate_absolute(&self.builder.reservation, path, target)?;
+                    let path = Path::new(path.as_str());
+                    if let Some(parent) = path.parent() {
+                        io.ensure_directory(parent, 0o777)?;
+                    }
+                    io.symlink_validated_absolute(path, &proof)?;
+                    RepositoryWorkspaceResult::Unit
+                }
                 RepositoryWorkspaceOperation::Archive(_)
                 | RepositoryWorkspaceOperation::Execute(_) => {
                     return Err(PhysicalRootError::UnsupportedOperation);
                 }
             }
         };
-        self.complete_snapshot(request, result, scope, active)
+        let completed = self.complete_snapshot(request, result, scope, active);
+        drop(captured_read);
+        completed
     }
 
     pub(super) fn seal_realization(
@@ -265,12 +339,16 @@ impl RepositoryWorkspaceProgress {
         active: &dyn Fn() -> bool,
     ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
         self.check_scope(scope)?;
-        if self.transcript() != realization.transcript() {
+        if !ViewComparison::new(&self.builder.resources, scope, active)?
+            .transcript_equal(self.transcript(), realization.transcript())?
+        {
             return Err(PhysicalRootError::Protocol(
                 slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
             ));
         }
-        self.builder.seal(realization, scope, active)
+        // Seal the native canonical transcript after exact foreign comparison;
+        // equal foreign Source allocations must not replace our covered data.
+        self.seal(realization.transcript().records().len(), scope, active)
     }
 
     pub(super) fn seal(
@@ -313,7 +391,12 @@ impl RepositoryWorkspaceProgress {
             .transcript()
             .realize(consumed_records)
             .map_err(PhysicalRootError::Protocol)?;
-        self.builder.seal(&realization, scope, active)
+        let deps = match &self.transcript.dependencies {
+            Some(deps) => deps.clone(),
+            None => NativeReadViewDependencies::empty(&self.builder.resources, 0)?,
+        };
+        self.builder
+            .seal_with_dependencies(&realization, deps, scope, active)
     }
 }
 

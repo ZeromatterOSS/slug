@@ -459,7 +459,7 @@ fn fixture(large: bool) -> Fixture {
 a=pathlib.Path(sys.argv[1])
 assert (a/'data').stat().st_mode & 0o777 == 0o666
 if (a/'large').exists(): assert (a/'large').stat().st_size == 65*1024*1024
-assert os.statvfs(a).f_blocks*os.statvfs(a).f_frsize == 2147483648
+assert os.statvfs(a).f_blocks*os.statvfs(a).f_frsize == (2147483648 if (a/'large').exists() else 67108864)
 assert os.statvfs('.').f_blocks*os.statvfs('.').f_frsize == 67108864
 try: os.open(a/'data',os.O_WRONLY|os.O_APPEND)
 except OSError as e: assert e.errno == errno.EROFS
@@ -655,7 +655,7 @@ fn native_readonly_transfer_cancellation_keeps_sole_source_backing_until_actual_
                 }
             }
         }).await.unwrap();
-        assert_eq!(bank.snapshot().backing_bytes,ARCHIVE_BYTES+PROCESS_BYTES+process_owner::temporary_backing_for_test());
+        assert_eq!(bank.snapshot().backing_bytes,PROCESS_BYTES+PROCESS_BYTES+process_owner::temporary_backing_for_test());
         assert!(bank.snapshot().native_fds>0);
         drop(future);
         tokio::time::timeout(Duration::from_secs(6),async {
@@ -664,3 +664,6 @@ fn native_readonly_transfer_cancellation_keeps_sole_source_backing_until_actual_
     });
     release(&bank, baseline);
 }
+
+#[path = "archive_compaction_tests.rs"]
+mod archive_compaction_tests;

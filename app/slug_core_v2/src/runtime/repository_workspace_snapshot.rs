@@ -153,6 +153,16 @@ pub(super) fn capture<'prior>(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
+    let sources = SourceLinkSet::empty(&builder.resources, scope, active)?;
+    capture_with_sources(builder, prior, sources, scope, active)
+}
+pub(super) fn capture_with_sources<'prior>(
+    builder: &RepositoryPhysicalRootBuilder,
+    prior: &'prior RepositoryWorkspaceState,
+    sources: Arc<SourceLinkSet>,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != builder.reservation.as_ref() {
         return Err(PhysicalRootError::Reservation);
@@ -167,7 +177,7 @@ pub(super) fn capture<'prior>(
         return Err(PhysicalRootError::RootIdentity);
     }
     let io = RootIo::new(&builder.file, io_limits(builder.mode, &builder.reservation))?;
-    let captured = capture_at(
+    let captured = capture_at_with_sources(
         &io,
         &builder.reservation,
         builder.mode,
@@ -176,6 +186,7 @@ pub(super) fn capture<'prior>(
         scope,
         active,
         Limits::for_mode(builder.mode),
+        Some(&sources),
     )?;
     if backing_identity(&builder.file, builder.mode)? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
@@ -186,6 +197,7 @@ pub(super) fn capture<'prior>(
 
 // RootIO-only seam for focused sampler tests. It is never a physical factory or
 // production Host fallback. Caller has already reserved the native scratch/FDs.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn capture_at<'prior>(
     io: &RootIo<'_>,
@@ -196,6 +208,30 @@ fn capture_at<'prior>(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
     limits: Limits,
+) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
+    capture_at_with_sources(
+        io,
+        reservation,
+        mode,
+        prior,
+        resources,
+        scope,
+        active,
+        limits,
+        None,
+    )
+}
+#[allow(clippy::too_many_arguments)]
+fn capture_at_with_sources<'prior>(
+    io: &RootIo<'_>,
+    reservation: &RepositoryWorkspaceReservation,
+    mode: RepositoryWorkspaceMode,
+    prior: &'prior RepositoryWorkspaceState,
+    resources: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+    limits: Limits,
+    sources: Option<&SourceLinkSet>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != reservation {
@@ -327,7 +363,12 @@ fn capture_at<'prior>(
                 check(scope, active)?;
                 let target =
                     std::str::from_utf8(target).map_err(|_| PhysicalRootError::Snapshot)?;
-                valid_link(reservation, text, target)?;
+                match sources {
+                    Some(sources) => {
+                        sources.classify(reservation, text, target)?;
+                    }
+                    None => valid_link(reservation, text, target)?,
+                }
                 names = add(names, target.len())?;
                 if names > limits.names {
                     return Err(PhysicalRootError::Snapshot);

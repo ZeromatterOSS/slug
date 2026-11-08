@@ -162,6 +162,7 @@ pub(super) struct RepositoryRootBacking {
 #[derive(Debug)]
 struct BackingState {
     mode: RepositoryWorkspaceMode,
+    frozen_archive_quota: Option<FrozenArchiveQuota>,
     binding: Option<(RootIdentity, Arc<RepositoryWorkspaceReservation>)>,
     // Stable spelling/domain claims follow every builder/root/token pin. They
     // contain no IO authority and keep collision control alive for old readers.
@@ -185,6 +186,7 @@ impl RepositoryRootBacking {
             resources: resources.clone(),
             state: Mutex::new(BackingState {
                 mode,
+                frozen_archive_quota: None,
                 binding: None,
                 claim: None,
                 source_binding: None,
@@ -236,10 +238,64 @@ impl RepositoryRootBacking {
         let state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
         if !Arc::ptr_eq(&self.resources, resources)
             || state.mode != mode
+            || state.frozen_archive_quota.is_some()
             || state.credit.slots.backing != quota(mode).0
         {
             return Err(PhysicalRootError::Backing);
         }
+        Ok(())
+    }
+    pub(super) fn matches_data(
+        &self,
+        resources: &Arc<RepositoryRootResources>,
+        mode: RepositoryWorkspaceMode,
+        frozen: Option<FrozenArchiveQuota>,
+    ) -> Result<(), PhysicalRootError> {
+        let state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        if !Arc::ptr_eq(&self.resources, resources)
+            || state.mode != mode
+            || state.frozen_archive_quota != frozen
+            || frozen.is_some() && mode != RepositoryWorkspaceMode::Archive
+            || state.credit.slots.backing
+                != frozen.map_or_else(|| quota(mode).0, |class| class.bytes())
+        {
+            return Err(PhysicalRootError::Backing);
+        }
+        Ok(())
+    }
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn freeze_archive(
+        &self,
+        proof: &super::mount_lease::readonly_quota::VerifiedReadOnlyCompaction<'_>,
+    ) -> Result<(), PhysicalRootError> {
+        let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        let (identity, reservation) = state.binding.as_ref().ok_or(PhysicalRootError::Backing)?;
+        if state.mode != RepositoryWorkspaceMode::Archive
+            || state.frozen_archive_quota.is_some()
+            || state.source_binding.is_some()
+            || state.credit.slots.backing != ARCHIVE_BYTES
+            || !proof.matches_binding(self, *identity, reservation)
+        {
+            return Err(PhysicalRootError::Backing);
+        }
+        let class = proof.class();
+        let delta = ARCHIVE_BYTES
+            .checked_sub(class.bytes())
+            .ok_or(PhysicalRootError::Resource)?;
+        let mut usage = self
+            .resources
+            .usage
+            .lock()
+            .map_err(|_| PhysicalRootError::Resource)?;
+        if usage.backing < state.credit.slots.backing {
+            return Err(PhysicalRootError::Resource);
+        }
+        usage.backing = usage
+            .backing
+            .checked_sub(delta)
+            .ok_or(PhysicalRootError::Resource)?;
+        state.credit.slots.backing = class.bytes();
+        state.frozen_archive_quota = Some(class);
         Ok(())
     }
     pub(super) fn bind(
@@ -339,6 +395,7 @@ impl RepositoryRootBacking {
         let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
         let (identity, reservation) = state.binding.as_ref().ok_or(PhysicalRootError::Backing)?;
         if state.mode != RepositoryWorkspaceMode::Archive
+            || state.frozen_archive_quota.is_some()
             || state.credit.slots.backing != ARCHIVE_BYTES
             || !proof.matches_binding(self, *identity, reservation)
         {

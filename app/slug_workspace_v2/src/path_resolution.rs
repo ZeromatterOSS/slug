@@ -11,6 +11,7 @@
 mod anchor;
 #[cfg(test)]
 mod anchored_tests;
+mod work;
 
 use std::ffi::OsStr;
 use std::fmt;
@@ -85,11 +86,15 @@ impl ObservedResolvedPath {
 /// One physical symlink followed while resolving a logical path.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct ResolvedSymlink {
+    namespace: PathObservationNamespace,
     path: NormalizedAbsolutePath,
     target: Arc<PathBuf>,
 }
 
 impl ResolvedSymlink {
+    pub const fn namespace(&self) -> PathObservationNamespace {
+        self.namespace
+    }
     pub fn path(&self) -> &NormalizedAbsolutePath {
         &self.path
     }
@@ -130,11 +135,40 @@ pub enum ResolvedPathState {
     Missing,
 }
 
+/// The terminal content location, distinct from the logical repository owner.
+/// It contains only immutable resolution metadata, never native IO authority.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ResolvedPathContentOrigin {
+    namespace: PathObservationNamespace,
+    anchor: Option<MaterializationPathAnchor>,
+}
+impl ResolvedPathContentOrigin {
+    pub fn new(
+        namespace: PathObservationNamespace,
+        anchor: Option<MaterializationPathAnchor>,
+    ) -> Result<Self, MaterializationPathAnchorError> {
+        if anchor
+            .as_ref()
+            .is_some_and(|anchor| anchor.namespace() != namespace)
+        {
+            return Err(MaterializationPathAnchorError::InvalidSourceContext);
+        }
+        Ok(Self { namespace, anchor })
+    }
+    pub const fn namespace(&self) -> PathObservationNamespace {
+        self.namespace
+    }
+    pub fn anchor(&self) -> Option<&MaterializationPathAnchor> {
+        self.anchor.as_ref()
+    }
+}
+
 /// One complete operational resolution.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct ResolvedPath {
     anchor: Option<MaterializationPathAnchor>,
     namespace: PathObservationNamespace,
+    content_origin: ResolvedPathContentOrigin,
     requested_path: NormalizedAbsolutePath,
     real_path: NormalizedAbsolutePath,
     state: ResolvedPathState,
@@ -144,6 +178,9 @@ pub struct ResolvedPath {
 }
 
 impl ResolvedPath {
+    pub fn content_origin(&self) -> &ResolvedPathContentOrigin {
+        &self.content_origin
+    }
     /// Immutable selected boundary, never a native lifetime or IO capability.
     pub fn anchor(&self) -> Option<&MaterializationPathAnchor> {
         self.anchor.as_ref()
@@ -317,10 +354,17 @@ struct ResolverFrame {
     sorted_logical_chain: Vec<NormalizedAbsolutePath>,
     symlinks: Vec<ResolvedSymlink>,
     ancestor_expansion: Option<PathResolutionChain>,
+    route_bytes: usize,
+    symlink_bytes: usize,
+    projection_bytes: usize,
+    content_origin: ResolvedPathContentOrigin,
 }
 
 impl ResolverFrame {
-    fn new(requested_path: NormalizedAbsolutePath) -> Self {
+    fn new(
+        requested_path: NormalizedAbsolutePath,
+        content_origin: ResolvedPathContentOrigin,
+    ) -> Self {
         Self {
             original_path: requested_path.dupe(),
             current_path: requested_path,
@@ -329,6 +373,10 @@ impl ResolverFrame {
             sorted_logical_chain: Vec::new(),
             symlinks: Vec::new(),
             ancestor_expansion: None,
+            route_bytes: 0,
+            symlink_bytes: 0,
+            projection_bytes: 0,
+            content_origin,
         }
     }
 
@@ -341,6 +389,7 @@ impl ResolverFrame {
         ResolvedPath {
             anchor: None,
             namespace,
+            content_origin: self.content_origin.dupe(),
             requested_path: self.original_path.dupe(),
             real_path,
             state,
@@ -409,6 +458,9 @@ impl ResolverFrame {
                     }
                 }
                 if admit {
+                    self.route_bytes = self
+                        .route_bytes
+                        .saturating_add(work::path_bytes(&candidate));
                     self.sorted_logical_chain
                         .insert(sorted_index, candidate.dupe());
                     self.logical_chain.push(candidate);
@@ -498,8 +550,19 @@ impl ResolutionMachine {
         Self {
             namespace,
             anchor: None,
-            frames: vec![ResolverFrame::new(requested_path)],
+            frames: vec![ResolverFrame::new(
+                requested_path,
+                ResolvedPathContentOrigin {
+                    namespace,
+                    anchor: None,
+                },
+            )],
         }
+    }
+
+    fn set_anchor(&mut self, anchor: Option<MaterializationPathAnchor>) {
+        self.frames[0].content_origin.anchor = anchor.dupe();
+        self.anchor = anchor;
     }
 
     fn demand(
@@ -507,69 +570,88 @@ impl ResolutionMachine {
         path: NormalizedAbsolutePath,
         operation: PathObservationOperation,
     ) -> MachineStep {
-        MachineStep::Observe(PathObservationDemand::new(self.namespace, path, operation))
+        let namespace = self
+            .frames
+            .last()
+            .expect("active resolver frame")
+            .content_origin
+            .namespace;
+        MachineStep::Observe(PathObservationDemand::new(namespace, path, operation))
     }
 
     fn transition(&mut self) -> MachineStep {
         loop {
-            let frame = self
-                .frames
-                .last_mut()
-                .expect("resolution machine always has an active frame");
-            match &mut frame.phase {
-                ResolverPhase::Begin => {
-                    let at_anchor = self
-                        .anchor
-                        .as_ref()
-                        .is_some_and(|anchor| anchor.root() == &frame.current_path);
-                    if !at_anchor {
-                        if let Some((parent, basename)) = parent_and_basename(&frame.current_path) {
-                            frame.phase = ResolverPhase::AwaitParent { basename };
-                            return MachineStep::PushParent(parent);
-                        }
-                    }
-                    match frame.admit(frame.current_path.dupe()) {
-                        RouteAdmission::Continue => {
-                            let root = frame.current_path.dupe();
-                            frame.phase = ResolverPhase::AwaitLstat {
-                                real_path: root.dupe(),
-                            };
-                            return self.demand(root, PathObservationOperation::Lstat);
-                        }
-                        RouteAdmission::Terminal(cause) => {
-                            return MachineStep::Complete(Err(cause));
-                        }
-                    }
-                }
-                ResolverPhase::ReplayParentRoute {
-                    entries,
-                    next,
-                    real_child,
-                } => {
-                    if *next == entries.len() {
-                        let real_path = real_child.dupe();
-                        frame.phase = ResolverPhase::AwaitLstat {
-                            real_path: real_path.dupe(),
-                        };
-                        return self.demand(real_path, PathObservationOperation::Lstat);
-                    }
-                    let candidate = entries[*next].dupe();
-                    *next += 1;
-                    if let RouteAdmission::Terminal(cause) = frame.admit(candidate) {
-                        return MachineStep::Complete(Err(cause));
-                    }
-                }
-                ResolverPhase::AwaitParent { .. }
-                | ResolverPhase::AwaitLstat { .. }
-                | ResolverPhase::AwaitReadLink { .. } => {
-                    unreachable!("transition requires a pending parent or observation result")
-                }
+            if let Some(step) = self.transition_one() {
+                return step;
             }
         }
     }
+    fn transition_one(&mut self) -> Option<MachineStep> {
+        let frame = self
+            .frames
+            .last_mut()
+            .expect("resolution machine always has an active frame");
+        match &mut frame.phase {
+            ResolverPhase::Begin => {
+                let at_anchor = frame
+                    .content_origin
+                    .anchor
+                    .as_ref()
+                    .is_some_and(|anchor| anchor.root() == &frame.current_path);
+                if !at_anchor {
+                    if let Some((parent, basename)) = parent_and_basename(&frame.current_path) {
+                        frame.phase = ResolverPhase::AwaitParent { basename };
+                        return Some(MachineStep::PushParent(parent));
+                    }
+                }
+                match frame.admit(frame.current_path.dupe()) {
+                    RouteAdmission::Continue => {
+                        let root = frame.current_path.dupe();
+                        frame.phase = ResolverPhase::AwaitLstat {
+                            real_path: root.dupe(),
+                        };
+                        return Some(self.demand(root, PathObservationOperation::Lstat));
+                    }
+                    RouteAdmission::Terminal(cause) => {
+                        return Some(MachineStep::Complete(Err(cause)));
+                    }
+                }
+            }
+            ResolverPhase::ReplayParentRoute {
+                entries,
+                next,
+                real_child,
+            } => {
+                if *next == entries.len() {
+                    let real_path = real_child.dupe();
+                    frame.phase = ResolverPhase::AwaitLstat {
+                        real_path: real_path.dupe(),
+                    };
+                    return Some(self.demand(real_path, PathObservationOperation::Lstat));
+                }
+                let candidate = entries[*next].dupe();
+                *next += 1;
+                if let RouteAdmission::Terminal(cause) = frame.admit(candidate) {
+                    return Some(MachineStep::Complete(Err(cause)));
+                }
+            }
+            ResolverPhase::AwaitParent { .. }
+            | ResolverPhase::AwaitLstat { .. }
+            | ResolverPhase::AwaitReadLink { .. } => {
+                unreachable!("transition requires a pending parent or observation result")
+            }
+        }
+        None
+    }
 
     fn push_parent(&mut self, parent: NormalizedAbsolutePath) {
-        self.frames.push(ResolverFrame::new(parent));
+        let origin = self
+            .frames
+            .last()
+            .expect("parent caller")
+            .content_origin
+            .dupe();
+        self.frames.push(ResolverFrame::new(parent, origin));
     }
 
     fn finish_frame(
@@ -589,6 +671,10 @@ impl ResolutionMachine {
         match result {
             Err(cause) => Some(MachineStep::Complete(Err(cause))),
             Ok(parent) => {
+                caller.content_origin = parent.content_origin.dupe();
+                caller.symlink_bytes = caller
+                    .symlink_bytes
+                    .saturating_add(work::symlink_bytes(parent.symlinks()));
                 caller.symlinks.extend(parent.symlinks.iter().cloned());
                 let real_child = join_normalized(parent.real_path(), basename.as_ref());
                 match parent.state() {
@@ -605,11 +691,15 @@ impl ResolutionMachine {
                         ))))
                     }
                     ResolvedPathState::Present(_) => {
-                        let entries = parent
+                        let entries: Vec<_> = parent
                             .route()
                             .iter()
                             .map(|path| join_normalized(path, basename.as_ref()))
                             .collect();
+                        caller.projection_bytes = entries
+                            .iter()
+                            .map(work::path_bytes)
+                            .fold(0, usize::saturating_add);
                         caller.phase = ResolverPhase::ReplayParentRoute {
                             entries,
                             next: 0,
@@ -628,11 +718,12 @@ impl ResolutionMachine {
         result: Arc<PathObservationResult>,
     ) -> Option<MachineStep> {
         let namespace = self.namespace;
-        let anchor = self.anchor.as_ref();
         let frame = self
             .frames
             .last_mut()
             .expect("observation requires an active frame");
+        let content_namespace = frame.content_origin.namespace;
+        let anchor = frame.content_origin.anchor.as_ref();
         match (frame.phase.clone(), result.as_ref()) {
             (ResolverPhase::AwaitLstat { real_path }, PathObservationResult::Lstat(result)) => {
                 match result {
@@ -656,7 +747,7 @@ impl ResolutionMachine {
                             lstat: *lstat,
                         };
                         Some(MachineStep::Observe(PathObservationDemand::new(
-                            namespace,
+                            content_namespace,
                             real_path,
                             PathObservationOperation::ReadLink,
                         )))
@@ -685,7 +776,13 @@ impl ResolutionMachine {
                 PathOperationResult::Present(target) => {
                     let target_path = if let Some(anchor) = anchor {
                         match anchor.link_target(&physical_link, target.as_path()) {
-                            Ok(path) => path,
+                            Ok((path, next_anchor)) => {
+                                frame.content_origin = ResolvedPathContentOrigin {
+                                    namespace: next_anchor.namespace(),
+                                    anchor: Some(next_anchor),
+                                };
+                                path
+                            }
                             Err(_) => {
                                 return Some(MachineStep::Complete(Err(
                                     ResolutionCause::AnchorEscape,
@@ -695,7 +792,13 @@ impl ResolutionMachine {
                     } else {
                         normalize_link_target(&physical_link, target.as_path())
                     };
+                    frame.symlink_bytes = frame
+                        .symlink_bytes
+                        .saturating_add(work::path_bytes(&physical_link))
+                        .saturating_add(target.capacity())
+                        .saturating_add(64);
                     frame.symlinks.push(ResolvedSymlink {
+                        namespace: content_namespace,
                         path: physical_link,
                         target: target.dupe(),
                     });
@@ -793,7 +896,7 @@ async fn drive_resolution(
     mut captured: Option<&mut Vec<(PathObservationDemand, Arc<PathObservationResult>)>>,
 ) -> Result<PathResult<ResolvedPath, ResolutionCause>, PathObservationEpochError> {
     let mut machine = ResolutionMachine::new(namespace, logical_path.dupe());
-    machine.anchor = anchor;
+    machine.set_anchor(anchor);
     let mut next = None;
     loop {
         let step = next.take().unwrap_or_else(|| machine.transition());
@@ -1152,7 +1255,7 @@ impl Key for PathFileBytesKey {
         };
 
         let demand = PathObservationDemand::new(
-            self.namespace,
+            resolved.content_origin().namespace(),
             resolved.real_path().dupe(),
             PathObservationOperation::FileBytes,
         );
@@ -1495,6 +1598,9 @@ async fn compute_directory_listing(
                     AnchoredPathResolutionError::Resolution(error) => {
                         PathDirectoryListingError::from_resolution(logical_path.dupe(), error)
                     }
+                    AnchoredPathResolutionError::WorkingStorageRefused => {
+                        unreachable!("guarded sync allocation error cannot come from DICE")
+                    }
                     AnchoredPathResolutionError::EscapesAnchor { anchor, .. } => {
                         PathDirectoryListingError::EscapesAnchor {
                             logical_path: logical_path.dupe(),
@@ -1563,7 +1669,7 @@ async fn compute_directory_listing(
         }
     };
     let demand = PathObservationDemand::new(
-        namespace,
+        resolved.content_origin().namespace(),
         resolved.real_path().dupe(),
         PathObservationOperation::DirectoryEntries,
     );
@@ -2390,7 +2496,10 @@ mod tests {
         assert_ne!(host_key, materialized_key);
         assert!(host_key.to_string().contains("resolved-path"));
 
-        let mut frame = super::ResolverFrame::new(path("/prefix"));
+        let mut frame = super::ResolverFrame::new(
+            path("/prefix"),
+            super::ResolvedPathContentOrigin::new(PathObservationNamespace::Host, None).unwrap(),
+        );
         assert!(matches!(
             frame.admit(path("/prefix")),
             super::RouteAdmission::Continue
@@ -2402,7 +2511,10 @@ mod tests {
         };
         assert_chain(&chain, &[], &["/prefix"]);
 
-        let mut frame = super::ResolverFrame::new(path("/prefix"));
+        let mut frame = super::ResolverFrame::new(
+            path("/prefix"),
+            super::ResolvedPathContentOrigin::new(PathObservationNamespace::Host, None).unwrap(),
+        );
         assert!(matches!(
             frame.admit(path("/prefix")),
             super::RouteAdmission::Continue
@@ -2414,7 +2526,10 @@ mod tests {
         };
         assert_chain(&chain, &[], &["/prefix", "/prefix/child"]);
 
-        let mut frame = super::ResolverFrame::new(path("/a/a"));
+        let mut frame = super::ResolverFrame::new(
+            path("/a/a"),
+            super::ResolvedPathContentOrigin::new(PathObservationNamespace::Host, None).unwrap(),
+        );
         assert!(matches!(
             frame.admit(path("/a/a")),
             super::RouteAdmission::Continue
@@ -2447,6 +2562,7 @@ mod tests {
     fn path_resolution_complete_equality_is_fully_structural_and_need_is_transient() {
         let ns = PathObservationNamespace::Host;
         let symlink = super::ResolvedSymlink {
+            namespace: ns,
             path: path("/link"),
             target: Arc::new(PathBuf::from("target")),
         };
@@ -2459,6 +2575,7 @@ mod tests {
         let baseline = ResolvedPath {
             anchor: None,
             namespace: ns,
+            content_origin: super::ResolvedPathContentOrigin::new(ns, None).unwrap(),
             requested_path: path("/link"),
             real_path: path("/target"),
             state: ResolvedPathState::Present(lstat(PathNodeKind::RegularFile)),
@@ -2479,6 +2596,13 @@ mod tests {
         changed.requested_path = path("/other");
         variants.push(changed);
         let mut changed = baseline.dupe();
+        changed.content_origin = super::ResolvedPathContentOrigin::new(
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(1)),
+            None,
+        )
+        .unwrap();
+        variants.push(changed);
+        let mut changed = baseline.dupe();
         changed.real_path = path("/other");
         variants.push(changed);
         let mut changed = baseline.dupe();
@@ -2489,6 +2613,7 @@ mod tests {
         variants.push(changed);
         let mut changed = baseline.dupe();
         changed.symlinks = Arc::from([super::ResolvedSymlink {
+            namespace: ns,
             path: path("/link"),
             target: Arc::new(PathBuf::from("other")),
         }]);

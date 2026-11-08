@@ -63,10 +63,18 @@ Already captured Workspace, Local, selected BCR and Builtin SourceRoot inputs no
 have [ordinary Analysis, NativeLink transport and fresh-scope proof](wp1225-captured-source-transport-acceptance-2026-11-08.json).
 This is mixed acquisition, with first-publication Workspace proof; it does not
 automatically capture every input or filter subsequent publication trees.
-Profile removal is the next frontier,
-alongside the complete activation gates below. Existing production process routes
-remain replacement-required. The selected design links owner
-contracts and evidence; prior component chronology stays in receipts and Git.
+[Source-backed links and read-only Archive quota proof](wp1225-source-links-acceptance-2026-11-08.json)
+now cover unchanged `cc_autoconf` compiler probes, both actual configuration
+links and normal linked `.bzl` Loading, plus logical General artifacts through
+Analysis, actual CAS/runfiles and retained Source data. Generic physical quota
+contraction for eligible read-only General Archive roots keeps their real
+version/globals/proxy dependencies within the fixed bank without changing
+Archive history or Source quotas. The
+[selected design](wp1225-general-repository-workspace-design.md#source-backed-symlinks-inactive-implementation-contract)
+owns the admitted graph and exact-prefix authority. Profile removal remains the
+frontier, alongside the complete activation gates below. Existing production
+process routes remain replacement-required. The selected design links owner
+contracts and evidence; component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.
 
@@ -139,7 +147,7 @@ Data-only history guards preserve source allocations without setup authority;
 source bodies never become mutable Process history. The selected-source bridge
 admits direct Label/Path text, read/template and Execute; derived Source Path
 operations/listings, reserved string-read roundtrips, Legacy LocalTar and
-cross-source links remain unsupported. Full Archive/public Rust, repeated
+Source-to-Source external links remain unsupported. Full Archive/public Rust, repeated
 Workspace publication and equivalent-memory gates remain. No
 production profile replacement is activated by this evidence.
 

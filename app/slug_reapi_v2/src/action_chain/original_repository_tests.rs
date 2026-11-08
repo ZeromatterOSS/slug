@@ -503,3 +503,6 @@ fn nativelink_original_repository_corrupt_cas_refuses_publication_and_restores()
     fixture.retired(&transport);
     authored::check_tree(&fixture.root, &root, b"aaa");
 }
+
+#[path = "original_repository_source_link_tests.rs"]
+mod source_link_tests;

@@ -616,7 +616,7 @@ fn drive<L: ProcessLaunch>(
                     }
                     Kind::Quota
                         if phase == Phase::Successor
-                            && owner.mode() == RunMode::FirstExecute
+                            && owner.mode().expects_quota()
                             && rights.is_empty() =>
                     {
                         quota = Some(frame.words);
@@ -624,10 +624,9 @@ fn drive<L: ProcessLaunch>(
                     }
                     Kind::Successor
                         if rights.len() == 3
-                            && ((phase == Phase::AfterQuota
-                                && owner.mode() == RunMode::FirstExecute)
+                            && ((phase == Phase::AfterQuota && owner.mode().expects_quota())
                                 || (phase == Phase::Successor
-                                    && owner.mode() != RunMode::FirstExecute)) =>
+                                    && !owner.mode().expects_quota())) =>
                     {
                         let array: [File; 3] = rights
                             .try_into()

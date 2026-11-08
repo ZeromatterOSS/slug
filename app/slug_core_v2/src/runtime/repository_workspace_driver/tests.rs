@@ -897,3 +897,6 @@ fn native_original_cancellation_keeps_session_open_until_bootstrap_or_payload_re
 
 #[path = "source_snapshot_tests.rs"]
 mod source_snapshot_tests;
+
+#[path = "source_link_tests.rs"]
+mod source_link_tests;

@@ -105,17 +105,39 @@ pub(super) fn open(
             if anchor != root.anchor() || scope.workspace() != root.reservation().workspace() {
                 return Err(refusal("foreign physical source scope"));
             }
-            let relative = source
-                .real_path()
-                .as_path()
-                .strip_prefix(anchor.root().as_path())
-                .ok()
-                .and_then(|p| p.to_str())
-                .ok_or_else(|| refusal("physical source escapes selected anchor"))?;
-            Input::Physical(
-                root.open_member(relative, scope, &|| true)
+            if !root.state().source_bindings().is_empty()
+                || source.requested_path() != source.real_path()
+            {
+                let relative = source
+                    .requested_path()
+                    .as_path()
+                    .strip_prefix(anchor.root().as_path())
+                    .ok()
+                    .and_then(|p| p.to_str())
+                    .ok_or_else(|| refusal("routed source escapes logical anchor"))?;
+                Input::Physical(
+                    root.open_routed_member(
+                        relative,
+                        source.content_origin(),
+                        source.real_path(),
+                        source.digest(),
+                        scope,
+                    )
                     .map_err(refusal)?,
-            )
+                )
+            } else {
+                let relative = source
+                    .real_path()
+                    .as_path()
+                    .strip_prefix(anchor.root().as_path())
+                    .ok()
+                    .and_then(|p| p.to_str())
+                    .ok_or_else(|| refusal("physical source escapes selected anchor"))?;
+                Input::Physical(
+                    root.open_member(relative, scope, &|| true)
+                        .map_err(refusal)?,
+                )
+            }
         } else if let Some(root) = lease.as_ref().and_then(|l| l.source_snapshot()) {
             let scope = scope
                 .as_ref()

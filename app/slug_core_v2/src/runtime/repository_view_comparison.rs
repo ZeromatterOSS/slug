@@ -176,7 +176,20 @@ impl<'a> ViewComparison<'a> {
         self.state_slot()?;
         let mut equal = left.reservation() == right.reservation()
             && left.mode() == right.mode()
+            && left.source_bindings().len() == right.source_bindings().len()
             && left.entries().len() == right.entries().len();
+        if equal {
+            for (a, b) in left.source_bindings().iter().zip(right.source_bindings()) {
+                self.check()?;
+                equal = match (a.source_state(), b.source_state()) {
+                    (Some(a), Some(b)) => self.source_state_equal(a, b)?,
+                    _ => false,
+                };
+                if !equal {
+                    break;
+                }
+            }
+        }
         if equal {
             for (a, b) in left.entries().iter().zip(right.entries()) {
                 self.check()?;

@@ -57,6 +57,12 @@ pub(super) async fn resolve(
                 Err(AnchoredPathResolutionError::EscapesAnchor { .. }) => {
                     Err(RepositorySourceFileError::InvalidMaterializedPath { repo_relative_path })
                 }
+                Err(AnchoredPathResolutionError::WorkingStorageRefused) => {
+                    Err(RepositorySourceFileError::ResolutionCompute {
+                        repo_relative_path,
+                        message: "bounded resolver working storage refused".into(),
+                    })
+                }
             };
             let observations = match mode {
                 HostRepositoryObservationMode::Legacy => PathObservationEpoch::empty(),

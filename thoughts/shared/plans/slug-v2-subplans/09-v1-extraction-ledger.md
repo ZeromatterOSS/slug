@@ -131,6 +131,29 @@ generated producers retain their unbounded acquisition/link semantics. No donor,
 interner, cache, cap increase or completed-command memory claim is introduced.
 See [captured-source transport evidence](wp1225-captured-source-transport-acceptance-2026-11-08.json).
 
+Source-backed General links reuse the common anchored resolution machine,
+Arc/Allocative semantic owners and data-only native dependency guards. The
+Source-only used-binding array and flat terminal-anchor context carry complete
+structural identity, while content-v2 hashes actual tree/image content and
+literal root association independently of scope/incarnation provenance. History
+retains its full Source union; the sealed DATA root filters only final used
+bindings. Exact-prefix admission and complete-current-epoch provenance remain
+separate, with comparisons outside actor locks and joint final association
+checks. Modeled and actual routes retain prepaid phase/route high-water credits
+and original scopes; copied Read bytes remain owned history. No donor, interner,
+cache, cap increase or completed-command memory claim is introduced.
+
+Read-only General Archive quota contraction reuses the trusted owning-namespace
+remount, physical quota facts and shared backing credit from the Process
+transition without its semantic Execute/history admission. A distinct private
+frozen quota class follows the exact concrete data root and read-only successor;
+it freezes before immutable publication. Actual quota lowering, parent
+re-attestation, full seal and real helper reap precede the shared debit change.
+Small eligibility uses charged block/inode units, with large/inode fallback to
+the full Archive quota. Pure State.mode/history and Source quotas stay unchanged.
+This introduces no donor, cache, interner, cap increase or whole-workload memory
+claim; physical quota capacity remains covered throughout handoff.
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

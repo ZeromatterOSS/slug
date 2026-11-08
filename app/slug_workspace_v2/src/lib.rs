@@ -70,6 +70,7 @@ pub use path_resolution::AnchoredResolvedPathKey;
 pub use path_resolution::AnchoredResolvedPathObservationKey;
 pub use path_resolution::MaterializationPathAnchor;
 pub use path_resolution::MaterializationPathAnchorError;
+pub use path_resolution::MaterializationTerminalAnchor;
 pub use path_resolution::ObservedAnchoredResolvedPath;
 #[doc(hidden)]
 pub use path_resolution::ObservedPathDirectoryListing;
@@ -88,6 +89,7 @@ pub use path_resolution::PathFileBytesKey;
 pub use path_resolution::PathResolutionChain;
 pub use path_resolution::PathResolutionError;
 pub use path_resolution::ResolvedPath;
+pub use path_resolution::ResolvedPathContentOrigin;
 pub use path_resolution::ResolvedPathKey;
 #[doc(hidden)]
 pub use path_resolution::ResolvedPathObservationKey;

@@ -230,15 +230,44 @@ fn run_checked(plan: &RunPlan) -> Result<()> {
             &[],
         )?;
     }
+    let compact_quota = if plan.mode == RunMode::FinalizeArchive {
+        let (before, after) = readonly_quota::compact_attached(
+            attached.as_ref().ok_or_else(|| invalid(6))?,
+            Path::new(plan.display.to_str().map_err(|_| invalid(6))?),
+            &resources,
+            &scope,
+            &|| true,
+        )
+        .map_err(|e| native(6, e))?;
+        send(
+            plan,
+            Kind::Quota,
+            [
+                before.bytes,
+                before.inodes,
+                before.allocated,
+                before.used_inodes,
+                after.bytes,
+                after.inodes,
+                after.allocated,
+                after.used_inodes,
+            ],
+            &[],
+        )?;
+        Some((after.bytes, after.inodes))
+    } else {
+        None
+    };
     let mode = if matches!(
         plan.mode,
-        RunMode::InitializeArchive | RunMode::FinalizeArchive
+        RunMode::InitializeArchive | RunMode::FinalizeArchive | RunMode::FinalizeSourceArchive
     ) {
         RepositoryWorkspaceMode::Archive
     } else {
         RepositoryWorkspaceMode::Process
     };
-    backing_identity(root, mode).map_err(|_| invalid(6))?;
+    backing_identity_for_quota(root, compact_quota.unwrap_or_else(|| quota(mode)))
+        .map_err(|_| invalid(6))?;
     let successor = if plan.mode.is_finalize() {
         readonly::clone_readonly_from_attached_root(
             root,

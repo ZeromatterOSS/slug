@@ -388,6 +388,12 @@ async fn resolve_source_path(
                                     repo_relative_path,
                                 }
                             }
+                            AnchoredPathResolutionError::WorkingStorageRefused => {
+                                RepositorySourceFileError::ResolutionCompute {
+                                    repo_relative_path,
+                                    message: "bounded resolver working storage refused".into(),
+                                }
+                            }
                         };
                         ControlFlow::Break(source_observation_complete(
                             key,

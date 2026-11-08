@@ -278,6 +278,22 @@ impl RepositoryWorkspaceCommand {
     pub(in crate::runtime) fn epoch(&self) -> &RepositoryWorkspaceEpoch {
         &self.epoch.epoch
     }
+    /// Component tests select only data already owned by an actual command.
+    /// This mints no Source root, result, controller or current actor authority.
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) fn source_link_set_for_test(
+        &self,
+        views: &[slug_bzlmod_v2::RepositoryWorkspaceReadView],
+        scope: &Arc<SourceServiceScope>,
+    ) -> Result<Arc<SourceLinkSet>, PhysicalRootError> {
+        SourceLinkSet::from_views(
+            &self.source_dependencies,
+            views,
+            &self.resources,
+            scope,
+            &|| true,
+        )
+    }
     pub(in crate::runtime::repository_physical_root) fn mount_domain(
         &self,
     ) -> Option<&Arc<NativeMountDomain>> {
@@ -521,14 +537,71 @@ impl RepositoryWorkspaceCommand {
     /// All native errors consume the entire command. Exact replay performs no
     /// IO, acquisition, transcript adoption or counter reset.
     pub(in crate::runtime) fn apply(
-        mut self,
+        self,
         request: RepositoryWorkspaceRequest,
         runtime: &tokio::runtime::Runtime,
         distdirs: &crate::runtime::ArchiveDistdirPolicy,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
+        let sources = SourceLinkSet::empty(&self.resources, scope, active)?;
+        self.apply_with_sources(request, sources, runtime, distdirs, scope, active)
+    }
+    pub(in crate::runtime) fn apply_with_sources(
+        mut self,
+        request: RepositoryWorkspaceRequest,
+        sources: Arc<SourceLinkSet>,
+        runtime: &tokio::runtime::Runtime,
+        distdirs: &crate::runtime::ArchiveDistdirPolicy,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope, active)?;
+        let partition = request
+            .storage_partition()
+            .map_err(PhysicalRootError::Protocol)?;
+        let bytes = if self.source_dependencies.covers_request(&request) {
+            partition.owned_bytes()
+        } else {
+            partition
+                .total_bytes()
+                .map_err(PhysicalRootError::Protocol)?
+        };
+        // Guards precede native canonicalization and the comparison memo's
+        // foreign Arc clones. Raw semantic owners retire before these guards.
+        let _incoming_credit = self.resources.reserve(
+            add(bytes, std::mem::size_of::<RepositoryWorkspaceRequest>())?,
+            0,
+            0,
+        )?;
+        let incoming = sources.canonicalize_request(request, scope, active)?;
+        let _expected_credit = self.resources.reserve(
+            add(
+                partition.owned_bytes(),
+                std::mem::size_of::<RepositoryWorkspaceRequest>(),
+            )?,
+            0,
+            0,
+        )?;
+        let expected = self
+            .epoch()
+            .request_at(
+                incoming.reservation(),
+                incoming.index(),
+                incoming.operation().clone(),
+            )
+            .map_err(PhysicalRootError::Protocol)?;
+        let mut comparison = ViewComparison::new(&self.resources, scope, active)?;
+        if !incoming.try_eq_with_states(&expected, &mut |a, b| comparison.state_ref_equal(a, b))? {
+            return Err(PhysicalRootError::Protocol(
+                slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
+            ));
+        }
+        drop(incoming);
+        let request = expected;
+        if !sources.dependencies().covers_state(request.predecessor()) {
+            return Err(PhysicalRootError::Reservation);
+        }
         let slot = self.root_slot(request.reservation())?;
         self.compare_transcript(slot)?;
         if self.roots[slot]
@@ -542,7 +615,11 @@ impl RepositoryWorkspaceCommand {
         {
             return Ok(self);
         }
-        let progress = self.roots[slot].progress.take().unwrap();
+        self.source_dependencies = self
+            .source_dependencies
+            .merge(sources.dependencies().owners(), &self.resources)?;
+        let mut progress = self.roots[slot].progress.take().unwrap();
+        progress.admit_link_sources(sources)?;
         let progress = if matches!(
             request.operation(),
             RepositoryWorkspaceOperation::Archive(_)

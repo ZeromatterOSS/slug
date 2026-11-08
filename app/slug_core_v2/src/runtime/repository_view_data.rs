@@ -88,7 +88,7 @@ impl NativeReadViewData {
             _ => false,
         }
     }
-    fn covers(&self, view: &RepositoryWorkspaceReadView) -> bool {
+    pub(super) fn covers(&self, view: &RepositoryWorkspaceReadView) -> bool {
         self.same_state_allocation(view) && self.projection.repo_spec() == view.repo_spec()
     }
 }
@@ -106,7 +106,7 @@ impl NativeReadViewDependencies {
     ) -> Result<Arc<Self>, PhysicalRootError> {
         Self::from_owners(Vec::new(), max_owners, resources)
     }
-    fn from_owners(
+    pub(super) fn from_owners(
         owners: Vec<Arc<NativeReadViewData>>,
         max_owners: usize,
         resources: &Arc<RepositoryRootResources>,
@@ -181,6 +181,27 @@ impl NativeReadViewDependencies {
             covered &= self.owners.iter().any(|owner| owner.covers(view))
         });
         covered
+    }
+    pub(super) fn covers_state(&self, state: &RepositoryWorkspaceState) -> bool {
+        state.source_bindings().iter().all(|view| {
+            self.owners
+                .iter()
+                .any(|owner| owner.source_root().is_some() && owner.covers(view))
+        })
+    }
+    pub(super) fn for_state(
+        &self,
+        state: &RepositoryWorkspaceState,
+        resources: &Arc<RepositoryRootResources>,
+    ) -> Result<Arc<Self>, PhysicalRootError> {
+        self.retain_references(
+            |visit| {
+                for view in state.source_bindings() {
+                    visit(view);
+                }
+            },
+            resources,
+        )
     }
     pub(super) fn covers_transcript(
         &self,

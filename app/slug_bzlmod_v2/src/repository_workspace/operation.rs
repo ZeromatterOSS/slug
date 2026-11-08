@@ -282,6 +282,11 @@ pub enum RepositoryWorkspaceOperation {
         source_body: Arc<[u8]>,
         substitutions: SmallMap<CompactString, CompactString>,
     },
+    Symlink {
+        path: CompactString,
+        target: NormalizedAbsolutePath,
+        source: Option<RepositoryWorkspaceReadView>,
+    },
     Read(CompactString),
     Exists(CompactString),
     Archive(GeneratedRepositoryArchiveEffect),
@@ -326,6 +331,18 @@ impl PartialEq for RepositoryWorkspaceOperation {
                     // selected source happens to render equal output bytes.
                     && substitutions.eq_ordered(other_substitutions)
             }
+            (
+                Self::Symlink {
+                    path,
+                    target,
+                    source,
+                },
+                Self::Symlink {
+                    path: p,
+                    target: t,
+                    source: s,
+                },
+            ) => path == p && target == t && source == s,
             (Self::Read(path), Self::Read(other))
             | (Self::Exists(path), Self::Exists(other))
             | (Self::Delete(path), Self::Delete(other)) => path == other,
@@ -340,6 +357,7 @@ impl fmt::Debug for RepositoryWorkspaceOperation {
         f.write_str(match self {
             Self::File { .. } => "File(<redacted>)",
             Self::Template { .. } => "Template(<redacted>)",
+            Self::Symlink { .. } => "Symlink(<redacted>)",
             Self::Read(_) => "Read(<redacted>)",
             Self::Exists(_) => "Exists(<redacted>)",
             Self::Archive(_) => "Archive(<redacted>)",
@@ -359,6 +377,27 @@ impl RepositoryWorkspaceOperation {
     ) -> Result<bool, E> {
         match (self, other) {
             (Self::Execute(left), Self::Execute(right)) => left.try_eq_with_states(right, compare),
+            (
+                Self::Symlink {
+                    path,
+                    target,
+                    source,
+                },
+                Self::Symlink {
+                    path: p,
+                    target: t,
+                    source: s,
+                },
+            ) => {
+                if path != p || target != t {
+                    return Ok(false);
+                }
+                match (source, s) {
+                    (None, None) => Ok(true),
+                    (Some(a), Some(b)) => a.try_eq_with_states(b, compare),
+                    _ => Ok(false),
+                }
+            }
             _ => Ok(self == other),
         }
     }
@@ -366,6 +405,21 @@ impl RepositoryWorkspaceOperation {
         match self {
             Self::File { path, mode, .. } | Self::Template { path, mode, .. } => {
                 if !valid_relative(path, false) || mode & !0o7777 != 0 {
+                    return Err(RepositoryWorkspaceError::InvalidOperation);
+                }
+            }
+            Self::Symlink {
+                path,
+                target,
+                source,
+            } => {
+                if !valid_relative(path, false)
+                    || target
+                        .as_path()
+                        .to_str()
+                        .is_none_or(|s| s.len() > 4096 || s.contains(['\0', '\\']))
+                    || source.as_ref().is_some_and(|v| v.source_state().is_none())
+                {
                     return Err(RepositoryWorkspaceError::InvalidOperation);
                 }
             }
@@ -384,11 +438,30 @@ impl RepositoryWorkspaceOperation {
         Ok(())
     }
     pub(super) fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        if let Self::Symlink {
+            source: Some(source),
+            ..
+        } = self
+        {
+            visit(source);
+        }
         if let Self::Execute(execute) = self {
             for view in execute.read_views.views() {
                 visit(view)
             }
         }
+    }
+    pub(super) fn direct_source_candidates(
+        &self,
+    ) -> impl Iterator<Item = &RepositoryWorkspaceReadView> {
+        let views: &[RepositoryWorkspaceReadView] = match self {
+            Self::Execute(execute) => execute.read_views().views(),
+            Self::Symlink {
+                source: Some(view), ..
+            } => std::slice::from_ref(view),
+            _ => &[],
+        };
+        views.iter().filter(|view| view.source_state().is_some())
     }
     pub(super) fn bodies(&self, visit: &mut impl FnMut(&Arc<[u8]>)) {
         match self {
@@ -447,6 +520,22 @@ impl RepositoryWorkspaceOperation {
                     size = add(size, add(key.capacity(), value.capacity())?)?;
                 }
                 Ok(size)
+            }
+            Self::Symlink {
+                path,
+                target,
+                source,
+            } => {
+                let mut bytes = add(
+                    path.capacity(),
+                    target
+                        .retained_storage_bytes()
+                        .ok_or(RepositoryWorkspaceError::RetentionLimit)?,
+                )?;
+                if let Some(view) = source {
+                    bytes = add(bytes, view.storage_partition()?.owned_bytes())?;
+                }
+                Ok(bytes)
             }
             Self::Execute(execute) => execute.metadata(),
             Self::Archive(archive) => {

@@ -580,3 +580,374 @@ async fn anchored_resolution_observed_epoch_tracks_complete_root_changes_and_res
         &values[0], &values[2]
     ));
 }
+
+fn source_context() -> (MaterializationPathAnchor, MaterializationPathAnchor) {
+    let source = anchor(302, "/source");
+    let logical = anchor(301, "/general")
+        .with_source_anchors(vec![
+            MaterializationTerminalAnchor::new(source.namespace(), source.root().dupe()).unwrap(),
+        ])
+        .unwrap();
+    (logical, source)
+}
+
+#[test]
+fn source_anchor_context_rejects_aliasing_overlap_and_extra_authority() {
+    let logical = anchor(301, "/general");
+    let leaf = |instance: u64, root: &str| {
+        MaterializationTerminalAnchor::new(
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(instance)),
+            path(root),
+        )
+        .unwrap()
+    };
+    for leaves in [
+        vec![leaf(301, "/source")],
+        vec![leaf(302, "/general/inside")],
+        vec![leaf(302, "/")],
+        vec![leaf(302, "/source"), leaf(303, "/source/inside")],
+        vec![leaf(302, "/source"), leaf(302, "/other")],
+        vec![leaf(302, "/source"), leaf(303, "/source")],
+    ] {
+        assert!(logical.dupe().with_source_anchors(leaves).is_err());
+    }
+    let too_many = (0..129).map(|i| leaf(400 + i, &format!("/s{i}"))).collect();
+    assert!(logical.dupe().with_source_anchors(too_many).is_err());
+    let a = logical
+        .dupe()
+        .with_source_anchors(vec![leaf(303, "/z"), leaf(302, "/a")])
+        .unwrap();
+    let b = logical
+        .with_source_anchors(vec![leaf(302, "/a"), leaf(303, "/z")])
+        .unwrap();
+    assert_eq!(a, b);
+    assert_eq!(a.source_anchors()[0].root(), &path("/a"));
+    assert!(a.with_source_anchors(Vec::new()).is_err());
+}
+
+#[tokio::test]
+async fn source_link_resolution_keeps_logical_owner_and_terminal_content_namespace() {
+    let (logical, source) = source_context();
+    let script = vec![
+        lstat(&logical, "/general", Some(PathNodeKind::Directory)),
+        lstat(&logical, "/general/link", Some(PathNodeKind::Symlink)),
+        link(&logical, "/general/link", "/source/file"),
+        lstat(&source, "/source", Some(PathNodeKind::Directory)),
+        lstat(&source, "/source/file", Some(PathNodeKind::RegularFile)),
+    ];
+    let value = resolve(logical.dupe(), "/general/link", script.clone()).await;
+    let result = value.result().as_ref().unwrap();
+    assert_eq!(result.namespace(), logical.namespace());
+    assert_eq!(result.anchor(), Some(&logical));
+    assert_eq!(result.requested_path(), &path("/general/link"));
+    assert_eq!(result.real_path(), &path("/source/file"));
+    assert_eq!(result.content_origin().namespace(), source.namespace());
+    assert_eq!(result.content_origin().anchor(), Some(&source));
+    assert_eq!(result.symlinks()[0].namespace(), logical.namespace());
+    let key = AnchoredResolvedPathKey::new(logical, "/general/link").unwrap();
+    let mut demands = Vec::new();
+    let synchronous = key
+        .resolve_sync::<std::convert::Infallible>(|demand| {
+            demands.push(demand.dupe());
+            Ok(script
+                .iter()
+                .find(|(d, _)| d == demand)
+                .expect("only admitted root facts")
+                .1
+                .clone())
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(&synchronous, result);
+    assert_eq!(
+        demands,
+        script.iter().map(|(d, _)| d.dupe()).collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn source_directory_links_keep_remaining_components_and_missing_origin() {
+    let (logical, source) = source_context();
+    let prefix = vec![
+        lstat(&logical, "/general", Some(PathNodeKind::Directory)),
+        lstat(&logical, "/general/link", Some(PathNodeKind::Symlink)),
+        link(&logical, "/general/link", "/source/dir"),
+        lstat(&source, "/source", Some(PathNodeKind::Directory)),
+        lstat(&source, "/source/dir", Some(PathNodeKind::Directory)),
+    ];
+    for kind in [Some(PathNodeKind::RegularFile), None] {
+        let mut script = prefix.clone();
+        script.push(lstat(&source, "/source/dir/child", kind));
+        let value = resolve(logical.dupe(), "/general/link/child", script).await;
+        let result = value.result().as_ref().unwrap();
+        assert_eq!(result.real_path(), &path("/source/dir/child"));
+        assert_eq!(result.namespace(), logical.namespace());
+        assert_eq!(result.content_origin().anchor(), Some(&source));
+        assert_eq!(
+            matches!(result.state(), ResolvedPathState::Missing),
+            kind.is_none()
+        );
+    }
+}
+
+#[tokio::test]
+async fn source_resolution_refuses_undeclared_roots_relative_escape_and_source_reentry() {
+    let (logical, source) = source_context();
+    for target in [
+        "/undeclared/file",
+        "../source/file",
+        "/source/absent/../file",
+        "/source//file",
+    ] {
+        let value = resolve(
+            logical.dupe(),
+            "/general/link",
+            vec![
+                lstat(&logical, "/general", Some(PathNodeKind::Directory)),
+                lstat(&logical, "/general/link", Some(PathNodeKind::Symlink)),
+                link(&logical, "/general/link", target),
+            ],
+        )
+        .await;
+        assert!(
+            matches!(
+                value.result(),
+                Err(AnchoredPathResolutionError::EscapesAnchor { .. })
+            ),
+            "{target}"
+        );
+    }
+    let value = resolve(
+        logical.dupe(),
+        "/general/link",
+        vec![
+            lstat(&logical, "/general", Some(PathNodeKind::Directory)),
+            lstat(&logical, "/general/link", Some(PathNodeKind::Symlink)),
+            link(&logical, "/general/link", "/source/back"),
+            lstat(&source, "/source", Some(PathNodeKind::Directory)),
+            lstat(&source, "/source/back", Some(PathNodeKind::Symlink)),
+            link(&source, "/source/back", "/general/link"),
+        ],
+    )
+    .await;
+    assert!(matches!(
+        value.result(),
+        Err(AnchoredPathResolutionError::EscapesAnchor { .. })
+    ));
+}
+
+#[tokio::test]
+async fn source_content_digest_and_listing_preserve_the_complete_mixed_frontier() {
+    use crate::AnchoredPathFileDigestObservationKey;
+    use crate::FileContentDigest;
+    use crate::PathFileDigest;
+    let (logical, source) = source_context();
+    let digest = FileContentDigest::new([8; 32], 1).unwrap();
+    let mut script = vec![
+        lstat(&logical, "/general", Some(PathNodeKind::Directory)),
+        lstat(&logical, "/general/link", Some(PathNodeKind::Symlink)),
+        link(&logical, "/general/link", "/source/file"),
+        lstat(&source, "/source", Some(PathNodeKind::Directory)),
+        lstat(&source, "/source/file", Some(PathNodeKind::RegularFile)),
+    ];
+    script.push((
+        PathObservationDemand::new(
+            source.namespace(),
+            path("/source/file"),
+            PathObservationOperation::FileDigest,
+        ),
+        PathObservationResult::FileDigest(PathOperationResult::Present(digest)),
+    ));
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::new(script.clone()).unwrap(),
+        )])
+        .unwrap();
+    let mut tx = updater.commit().await;
+    let key = AnchoredPathFileDigestObservationKey::new(logical.dupe(), "/general/link").unwrap();
+    let PathOutcome::Complete(Ok(value)) = tx.compute(&key).await.unwrap() else {
+        panic!("terminal digest must use Source namespace")
+    };
+    assert_eq!(value.result(), &Ok(PathFileDigest::Present(digest)));
+    assert_eq!(value.observations().observations().len(), script.len());
+    script.truncate(3);
+    script[2] = link(&logical, "/general/link", "/source/dir");
+    script.extend([
+        lstat(&source, "/source", Some(PathNodeKind::Directory)),
+        lstat(&source, "/source/dir", Some(PathNodeKind::Directory)),
+        listing(&source, "/source/dir"),
+    ]);
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::new(script.clone()).unwrap(),
+        )])
+        .unwrap();
+    let mut tx = updater.commit().await;
+    let key = PathDirectoryListingObservationKey::new_anchored(logical, "/general/link").unwrap();
+    let PathOutcome::Complete(Ok(value)) = tx.compute(&key).await.unwrap() else {
+        panic!("terminal listing must use Source namespace")
+    };
+    assert!(matches!(
+        value.result(),
+        Ok(PathDirectoryListing::Present(_))
+    ));
+    assert_eq!(value.observations().observations().len(), script.len());
+}
+
+#[test]
+fn guarded_sync_simple_path_uses_actual_small_work_peak_and_matches_unguarded() {
+    let anchor = anchor(41, "/repo");
+    let key = AnchoredResolvedPathKey::new(anchor, "/repo/file").unwrap();
+    let observe = |demand: &PathObservationDemand| -> Result<PathObservationResult, ()> {
+        assert_eq!(demand.operation(), PathObservationOperation::Lstat);
+        Ok(PathObservationResult::Lstat(PathOperationResult::Present(
+            PathLstat::new(
+                if demand.path().as_path() == Path::new("/repo") {
+                    PathNodeKind::Directory
+                } else {
+                    PathNodeKind::RegularFile
+                },
+                1,
+                0,
+                0,
+                0,
+                0o644,
+            ),
+        )))
+    };
+    let mut peak = 0;
+    let mut checkpoints = 0;
+    let guarded = key
+        .resolve_sync_with_work(observe, |bytes| {
+            assert!(bytes >= peak);
+            peak = bytes;
+            checkpoints += 1;
+            if bytes <= 8 * 1024 * 1024 {
+                Ok(())
+            } else {
+                Err(())
+            }
+        })
+        .unwrap()
+        .unwrap();
+    assert!(peak > 0 && peak < 8 * 1024 * 1024);
+    assert!(checkpoints > 2);
+    assert_eq!(guarded, key.resolve_sync(observe).unwrap().unwrap());
+}
+
+#[test]
+fn guarded_sync_parent_growth_refuses_or_cancels_before_first_fact() {
+    let key = AnchoredResolvedPathKey::new(
+        anchor(41, "/repo"),
+        format!("/repo{}", "/child".repeat(512)),
+    )
+    .unwrap();
+    let facts = std::cell::Cell::new(0);
+    let mut checkpoints = 0;
+    let refused = key.resolve_sync_with_work(
+        |_| -> Result<PathObservationResult, &str> {
+            facts.set(facts.get() + 1);
+            panic!("guard must stop before first fact")
+        },
+        |_| {
+            checkpoints += 1;
+            if checkpoints == 3 {
+                Err("scope canceled")
+            } else {
+                Ok(())
+            }
+        },
+    );
+    assert_eq!(refused, Err("scope canceled"));
+    assert_eq!(checkpoints, 3);
+    assert_eq!(facts.get(), 0);
+    let mut peak = 0;
+    let refused = key.resolve_sync_with_work(
+        |_| -> Result<PathObservationResult, &str> {
+            facts.set(facts.get() + 1);
+            panic!("frame budget must stop before first fact")
+        },
+        |bytes| {
+            peak = peak.max(bytes);
+            if bytes > 64 * 1024 {
+                Err("working credit")
+            } else {
+                Ok(())
+            }
+        },
+    );
+    assert_eq!(refused, Err("working credit"));
+    assert!(peak > 64 * 1024);
+    assert_eq!(facts.get(), 0);
+}
+
+#[test]
+fn guarded_sync_preserves_cycle_expansion_and_mixed_source_demand_order() {
+    fn compare(key: AnchoredResolvedPathKey, script: Vec<Entry>) {
+        let run = |guarded: bool| {
+            let mut demands = Vec::new();
+            let mut index = 0;
+            let mut peak = 0;
+            let mut observe =
+                |demand: &PathObservationDemand| -> Result<PathObservationResult, ()> {
+                    let (expected, result) =
+                        script.get(index).expect("unexpected extra resolver demand");
+                    assert_eq!(demand, expected, "demand {index}");
+                    index += 1;
+                    demands.push(demand.dupe());
+                    Ok(result.clone())
+                };
+            let result = if guarded {
+                key.resolve_sync_with_work(&mut observe, |bytes| {
+                    assert!(bytes >= peak);
+                    peak = bytes;
+                    Ok(())
+                })
+            } else {
+                key.resolve_sync(&mut observe)
+            }
+            .unwrap();
+            assert_eq!(index, script.len());
+            if guarded {
+                assert!(peak > 0);
+            }
+            (result, demands)
+        };
+        let plain = run(false);
+        let guarded = run(true);
+        assert_eq!(
+            guarded, plain,
+            "complete result includes literal hops, content origin and error chains"
+        );
+    }
+    let own = anchor(71, "/repo");
+    for target in ["link", "link/child"] {
+        compare(
+            AnchoredResolvedPathKey::new(own.dupe(), "/repo/link").unwrap(),
+            vec![
+                lstat(&own, "/repo", Some(PathNodeKind::Directory)),
+                lstat(&own, "/repo/link", Some(PathNodeKind::Symlink)),
+                link(&own, "/repo/link", target),
+            ],
+        );
+    }
+    let (logical, source) = source_context();
+    for kind in [Some(PathNodeKind::RegularFile), None] {
+        compare(
+            AnchoredResolvedPathKey::new(logical.dupe(), "/general/link/child").unwrap(),
+            vec![
+                lstat(&logical, "/general", Some(PathNodeKind::Directory)),
+                lstat(&logical, "/general/link", Some(PathNodeKind::Symlink)),
+                link(&logical, "/general/link", "/source/dir"),
+                lstat(&source, "/source", Some(PathNodeKind::Directory)),
+                lstat(&source, "/source/dir", Some(PathNodeKind::Directory)),
+                lstat(&source, "/source/dir/child", kind),
+            ],
+        );
+    }
+}

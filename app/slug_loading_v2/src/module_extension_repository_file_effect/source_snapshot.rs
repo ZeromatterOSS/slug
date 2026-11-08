@@ -194,14 +194,18 @@ pub(super) async fn read(
         .compute(&RepositorySourceSnapshotEpochKey::new(key.workspace.dupe()))
         .await
         .map_err(|e| fail(format!("{e:?}"), observations.dupe()))?;
-    let root = if let Some(source) = epoch.states().and_then(|states| {
+    let anchor = if let Some(source) = epoch.states().and_then(|states| {
         states.iter().find(|s| {
             s.reservation().repository() == repository
                 && path.namespace()
                     == PathObservationNamespace::Materialization(s.reservation().instance())
         })
     }) {
-        source.reservation().display_root().clone()
+        slug_workspace_v2::MaterializationPathAnchor::new(
+            path.namespace(),
+            source.reservation().display_root().clone(),
+        )
+        .map_err(|e| fail(format!("{e:?}"), observations.dupe()))?
     } else {
         let selected = ctx
             .compute(&slug_bzlmod_v2::RepositoryMaterializationResultEpochKey {
@@ -225,8 +229,21 @@ pub(super) async fn read(
             ) if path.namespace()
                 == PathObservationNamespace::Materialization(*observation_instance) =>
             {
-                NormalizedAbsolutePath::new(generation_root)
+                if let RepositoryMaterializationKind::GeneralWorkspace(realization) =
+                    &entry.request.kind
+                {
+                    realization
+                        .final_state()
+                        .resolution_anchor()
+                        .map_err(|e| fail(format!("{e:?}"), observations.dupe()))?
+                } else {
+                    slug_workspace_v2::MaterializationPathAnchor::new(
+                        path.namespace(),
+                        NormalizedAbsolutePath::new(generation_root)
+                            .map_err(|e| fail(format!("{e:?}"), observations.dupe()))?,
+                    )
                     .map_err(|e| fail(format!("{e:?}"), observations.dupe()))?
+                }
             }
             _ => {
                 return Err(fail(
@@ -236,8 +253,6 @@ pub(super) async fn read(
             }
         }
     };
-    let anchor = slug_workspace_v2::MaterializationPathAnchor::new(path.namespace(), root)
-        .map_err(|e| fail(format!("{e:?}"), observations.dupe()))?;
     let resolved_key =
         slug_workspace_v2::AnchoredResolvedPathObservationKey::new(anchor, path.path().as_path())
             .map_err(|e| fail(format!("{e:?}"), observations.dupe()))?;
@@ -275,7 +290,7 @@ pub(super) async fn read(
         ));
     }
     let demand = PathObservationDemand::new(
-        path.namespace(),
+        resolved.content_origin().namespace(),
         resolved.real_path().clone(),
         PathObservationOperation::FileBytes,
     );

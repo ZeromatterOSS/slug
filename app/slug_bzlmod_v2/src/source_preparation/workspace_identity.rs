@@ -308,7 +308,8 @@ pub(crate) fn derive_workspace_source_identity(
     state: &crate::RepositoryWorkspaceState,
 ) -> Arc<str> {
     let mut hash = Sha256::new();
-    hash.update(b"slug-general-workspace-content-v1\0");
+    hash.update(b"slug-general-workspace-content-v2\0");
+    hash.update((state.entries().len() as u64).to_le_bytes());
     for entry in state.entries() {
         hash.update((entry.path().len() as u64).to_le_bytes());
         hash.update(entry.path().as_bytes());
@@ -324,6 +325,36 @@ pub(crate) fn derive_workspace_source_identity(
                 hash.update([2]);
                 hash.update((target.len() as u64).to_le_bytes());
                 hash.update(target.as_bytes());
+            }
+        }
+    }
+    // These are image-content descriptors, not request or incarnation hashes.
+    // Full provenance, mapping, lease and instance remain structural identity.
+    hash.update((state.source_bindings().len() as u64).to_le_bytes());
+    for view in state.source_bindings() {
+        let root = view.display_root().as_path().as_os_str().as_encoded_bytes();
+        hash.update((root.len() as u64).to_le_bytes());
+        hash.update(root);
+        let source = view
+            .source_state()
+            .expect("validated Source-only state binding");
+        hash.update((source.entries().len() as u64).to_le_bytes());
+        for entry in source.entries() {
+            hash.update((entry.path().len() as u64).to_le_bytes());
+            hash.update(entry.path().as_bytes());
+            hash.update(entry.mode().to_le_bytes());
+            match entry.node() {
+                crate::RepositorySourceSnapshotNode::Directory => hash.update([0]),
+                crate::RepositorySourceSnapshotNode::File(digest) => {
+                    hash.update([1]);
+                    hash.update(digest.size_bytes().to_le_bytes());
+                    hash.update(digest.sha256());
+                }
+                crate::RepositorySourceSnapshotNode::Link(target) => {
+                    hash.update([2]);
+                    hash.update((target.len() as u64).to_le_bytes());
+                    hash.update(target.as_bytes());
+                }
             }
         }
     }

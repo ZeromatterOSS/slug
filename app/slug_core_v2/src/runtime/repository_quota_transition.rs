@@ -12,6 +12,12 @@ pub(in crate::runtime::repository_physical_root) struct QuotaFacts {
     pub used_inodes: u64,
 }
 fn facts(file: &File, mode: RepositoryWorkspaceMode) -> Result<QuotaFacts, PhysicalRootError> {
+    facts_for_quota(file, quota(mode))
+}
+pub(super) fn facts_for_quota(
+    file: &File,
+    expected: (u64, u64),
+) -> Result<QuotaFacts, PhysicalRootError> {
     let mut fs = std::mem::MaybeUninit::<libc::statfs>::zeroed();
     let mut vfs = std::mem::MaybeUninit::<libc::statvfs>::zeroed();
     if unsafe { libc::fstatfs(file.as_raw_fd(), fs.as_mut_ptr()) } != 0
@@ -21,7 +27,7 @@ fn facts(file: &File, mode: RepositoryWorkspaceMode) -> Result<QuotaFacts, Physi
     }
     let fs = unsafe { fs.assume_init() };
     let vfs = unsafe { vfs.assume_init() };
-    let (bytes, inodes) = quota(mode);
+    let (bytes, inodes) = expected;
     if unsafe { libc::sysconf(libc::_SC_PAGESIZE) } != 4096
         || fs.f_type != libc::TMPFS_MAGIC
         || fs.f_bsize != 4096

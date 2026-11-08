@@ -169,7 +169,7 @@ impl RepositoryWorkspaceReadView {
             Self::Source { state } => state.reservation().lease(),
         }
     }
-    fn owned_metadata_bytes_with(
+    pub(super) fn owned_metadata_bytes_with(
         &self,
         walk: &mut WorkspaceSpecStorageWalk,
     ) -> Result<usize, RepositoryWorkspaceError> {

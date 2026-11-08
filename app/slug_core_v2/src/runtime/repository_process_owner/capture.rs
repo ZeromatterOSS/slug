@@ -202,4 +202,16 @@ impl ReapedBinding {
         }
         Ok(())
     }
+    pub(in crate::runtime::repository_physical_root) fn verify_finalize_attempt(
+        &self,
+        root: RootIdentity,
+        mode: RunMode,
+        nonce: &[u8; 16],
+    ) -> Result<(), PhysicalRootError> {
+        self.verify_finalize(root, mode)?;
+        if &self.nonce != nonce {
+            return Err(PhysicalRootError::Reservation);
+        }
+        Ok(())
+    }
 }

@@ -6072,12 +6072,16 @@ impl Key for RepositoryMaterializationResultKey {
                 },
             ) => (|| {
                 let anchor = match &self.request.kind {
-                    RepositoryMaterializationKind::GeneralWorkspace(realization) => {
-                        Some(generation_root_anchor(
-                            realization.reservation().display_root().as_path(),
-                            realization.reservation().instance(),
-                        )?)
-                    }
+                    RepositoryMaterializationKind::GeneralWorkspace(realization) => Some(
+                        realization
+                            .final_state()
+                            .resolution_anchor()
+                            .map_err(|error| {
+                                RepositoryMaterializationError::Materialization(
+                                    error.to_string().into(),
+                                )
+                            })?,
+                    ),
                     _ if *path_policy == RepositoryMaterializationPathPolicy::GenerationRoot => {
                         Some(generation_root_anchor(
                             generation_root,
@@ -6899,7 +6903,7 @@ async fn drive_host_repository_source_from_resolved(
         }
     };
     let demand = PathObservationDemand::new(
-        resolved.namespace(),
+        resolved.content_origin().namespace(),
         resolved.real_path().dupe(),
         PathObservationOperation::FileBytes,
     );

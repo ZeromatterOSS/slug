@@ -699,21 +699,22 @@ mod native {
                             &|| runtime.repository_materializer.session_is_active(token),
                         )
                         .map_err(physical)?;
-                } else if !demand.selected_entries().is_empty() {
-                    let selected = self.selected(demand)?;
-                    runtime
-                        .repository_materializer
-                        .pin_selected_roots(
-                            token,
-                            &selected.requests,
-                            &selected.epoch,
-                            &self.source_epoch,
-                            &runtime.source_readers,
-                        )
-                        .map_err(|_| {
-                            refusal("workspace source declarations differ from current selection")
-                        })?;
                 }
+                // Authenticate the complete current Source epoch independently
+                // of the exact prefix that may grant this operation access.
+                let selected = self.selected(demand)?;
+                runtime
+                    .repository_materializer
+                    .pin_selected_roots(
+                        token,
+                        &selected.requests,
+                        &selected.epoch,
+                        &self.source_epoch,
+                        &runtime.source_readers,
+                    )
+                    .map_err(|_| {
+                        refusal("workspace source declarations differ from current selection")
+                    })?;
             }
             drop(comparison);
             let mut advanced = false;
@@ -841,13 +842,15 @@ mod native {
                             .block_on(
                                 runtime
                                     .repository_materializer
-                                    .execute_workspace_with_sources(
+                                    .execute_workspace_with_current_sources(
                                         token,
                                         command,
                                         demand.request().as_ref().clone(),
                                         &selected.requests,
                                         &selected.epoch,
                                         demand.declared_sources(),
+                                        &self.source_epoch,
+                                        &runtime.source_readers,
                                         &self.scope,
                                         &|| {
                                             runtime.repository_materializer.session_is_active(token)
@@ -860,9 +863,18 @@ mod native {
                         runtime
                             .native_demand_sessions
                             .mark_workspace_stage("trusted_operation");
-                        command
-                            .apply(
+                        let selected = self.selected(demand)?;
+                        runtime
+                            .repository_materializer
+                            .apply_workspace_with_sources(
+                                token,
+                                command,
                                 demand.request().as_ref().clone(),
+                                &selected.requests,
+                                &selected.epoch,
+                                demand.declared_sources(),
+                                &self.source_epoch,
+                                &runtime.source_readers,
                                 &runtime.runtime,
                                 distdirs,
                                 &self.scope,

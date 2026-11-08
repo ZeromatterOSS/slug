@@ -289,6 +289,17 @@ impl RepositoryWorkspaceOperationDemand {
                 return Err(RepositoryWorkspaceError::ReplayConflict);
             }
         }
+        if let RepositoryWorkspaceOperation::Symlink {
+            source: Some(view), ..
+        } = request.operation()
+        {
+            if !prefix_source_states
+                .iter()
+                .any(|declared| view.source_state() == Some(declared))
+            {
+                return Err(RepositoryWorkspaceError::ReplayConflict);
+            }
+        }
         let prefix_source_states = if prefix_source_states
             .windows(2)
             .all(|pair| pair[0].reservation().repository() < pair[1].reservation().repository())

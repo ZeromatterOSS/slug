@@ -21,6 +21,97 @@ enum ProcessViewSlot {
     Source(usize),
 }
 impl RepositoryWorkspaceCommand {
+    pub(in crate::runtime) fn source_links_for_declared(
+        &self,
+        snapshot: &SelectedProcessSources,
+        declared: &[Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>],
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Arc<SourceLinkSet>, PhysicalRootError> {
+        self.check_scope(scope, active)?;
+        if declared.len() > 128 {
+            return Err(PhysicalRootError::Resource);
+        }
+        // The borrowed scan allocates nothing. A comparison memo may retain
+        // foreign Arcs only after their complete allocation guard is admitted.
+        let mut foreign = 0usize;
+        for state in declared {
+            let slot = self
+                .source_slots
+                .iter()
+                .find(|slot| slot.reservation.instance() == state.reservation().instance())
+                .ok_or(PhysicalRootError::Reservation)?;
+            let retained = slot
+                .process_view
+                .as_ref()
+                .ok_or(PhysicalRootError::Reservation)?;
+            let canonical = retained
+                .data
+                .projection()
+                .source_state()
+                .ok_or(PhysicalRootError::Reservation)?;
+            if !Arc::ptr_eq(canonical, state) {
+                foreign = add(
+                    foreign,
+                    state
+                        .retained_storage_bytes()
+                        .map_err(PhysicalRootError::Protocol)?,
+                )?;
+            }
+        }
+        let _foreign = self.resources.reserve(foreign, 0, 0)?;
+        let _selection = self.resources.reserve(
+            add(
+                4096,
+                declared
+                    .len()
+                    .checked_mul(2 * std::mem::size_of::<Arc<NativeReadViewData>>())
+                    .ok_or(PhysicalRootError::Resource)?,
+            )?,
+            0,
+            0,
+        )?;
+        let mut comparison = ViewComparison::new(&self.resources, scope, active)?;
+        let mut owners = Vec::with_capacity(declared.len());
+        for state in declared {
+            self.check_scope(scope, active)?;
+            let slot = self
+                .source_slots
+                .iter()
+                .find(|slot| slot.reservation.instance() == state.reservation().instance())
+                .ok_or(PhysicalRootError::Reservation)?;
+            let retained = slot
+                .process_view
+                .as_ref()
+                .ok_or(PhysicalRootError::Reservation)?;
+            let canonical = retained
+                .data
+                .projection()
+                .source_state()
+                .ok_or(PhysicalRootError::Reservation)?;
+            if !snapshot.matches_data(&retained.data)
+                || !comparison.source_state_equal(state, canonical)?
+                || !Arc::ptr_eq(
+                    retained.view.domain(),
+                    self.mount_domain
+                        .as_ref()
+                        .ok_or(PhysicalRootError::Reservation)?,
+                )
+            {
+                return Err(PhysicalRootError::Reservation);
+            }
+            let source = retained
+                .data
+                .source_root()
+                .ok_or(PhysicalRootError::Reservation)?;
+            source.check_origin(scope, active)?;
+            if !Arc::ptr_eq(&source.resources, &self.resources) {
+                return Err(PhysicalRootError::Reservation);
+            }
+            owners.push(retained.data.clone());
+        }
+        SourceLinkSet::new(&owners, &self.resources, scope, active)
+    }
     fn process_view_slot(
         &self,
         projection: &slug_bzlmod_v2::RepositoryWorkspaceReadView,
@@ -238,6 +329,28 @@ impl RepositoryWorkspaceCommand {
             self.source_dependencies.clone(),
             &self.resources,
         )?;
+        if let RepositoryWorkspaceOperation::Execute(execute) = covered.operation() {
+            let sources = SourceLinkSet::from_views(
+                covered.dependencies(),
+                execute.read_views().views(),
+                &self.resources,
+                scope,
+                active,
+            )?;
+            if !sources.dependencies().covers_state(covered.predecessor()) {
+                return Err(PhysicalRootError::Reservation);
+            }
+            for view in execute.read_views().views() {
+                if view
+                    .workspace_state()
+                    .is_some_and(|state| !sources.dependencies().covers_state(state))
+                {
+                    // Data dependencies keep sealed bytes alive; they never
+                    // implicitly declare another child-visible mount view.
+                    return Err(PhysicalRootError::UnsupportedOperation);
+                }
+            }
+        }
         let progress = self.roots[slot]
             .progress
             .as_ref()

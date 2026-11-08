@@ -132,6 +132,16 @@ impl ViewDataRoot {
             Self::Source(_) => RepositoryWorkspaceMode::Archive,
         }
     }
+    fn frozen_quota(&self) -> Option<FrozenArchiveQuota> {
+        match self {
+            Self::Workspace(root) => root.frozen_archive_quota,
+            Self::Source(_) => None,
+        }
+    }
+    fn native_quota(&self) -> (u64, u64) {
+        self.frozen_quota()
+            .map_or_else(|| quota(self.mode()), |class| class.quota())
+    }
     fn display(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
         match self {
             Self::Workspace(r) => r.reservation.display_root(),
@@ -262,9 +272,12 @@ impl FinalizedRepositoryView {
             return Err(MountLeaseError::AttachedRoot);
         }
         self.root.validate_backing()?;
-        self.root
-            .backing()
-            .matches(self.root.resources(), self.root.mode())?;
+        super::quota::facts_for_quota(&self.mount.clone.token, self.root.native_quota())?;
+        self.root.backing().matches_data(
+            self.root.resources(),
+            self.root.mode(),
+            self.root.frozen_quota(),
+        )?;
         check_readonly(&self.mount.clone.token)?;
         Ok(())
     }

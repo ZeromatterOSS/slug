@@ -19,6 +19,7 @@ pub(in crate::runtime) struct SelectedProcessSources {
     lease: u64,
     scope: Arc<SourceServiceScope>,
     resources: Arc<RepositoryRootResources>,
+    current_sources: Option<super::source_snapshots::SelectedSourceSnapshots>,
     _credit: crate::runtime::repository_physical_root::ResourceCredit,
 }
 impl SelectedProcessSources {
@@ -100,6 +101,13 @@ impl SelectedProcessSources {
         &self,
         actor: &RepositoryMaterializer,
     ) -> Result<(), PhysicalRootError> {
+        self.recheck_with_sources(actor, self.current_sources.as_ref())
+    }
+    fn recheck_with_sources(
+        &self,
+        actor: &RepositoryMaterializer,
+        sources: Option<&super::source_snapshots::SelectedSourceSnapshots>,
+    ) -> Result<(), PhysicalRootError> {
         self.scope.check()?;
         actor
             .check_command_scope(self.token, &self.scope)
@@ -110,6 +118,11 @@ impl SelectedProcessSources {
             .expect("repository materializer mutex poisoned");
         let active = matching_validated_active(&state, self.token)
             .map_err(|_| PhysicalRootError::Reservation)?;
+        if let Some(sources) = sources {
+            sources
+                .recheck_locked(active)
+                .map_err(|_| PhysicalRootError::Reservation)?;
+        }
         let general = active
             .general
             .as_ref()
@@ -276,6 +289,7 @@ impl RepositoryMaterializer {
                 lease: general.lease(),
                 scope: scope.clone(),
                 resources: general.resources().clone(),
+                current_sources: None,
                 _credit: credit,
             }
         };
@@ -321,8 +335,10 @@ impl RepositoryMaterializer {
             selected,
             results,
             &[],
+            None,
             scope,
             active,
+            || {},
             |_| {},
         )
         .await
@@ -346,8 +362,10 @@ impl RepositoryMaterializer {
             selected,
             results,
             &[],
+            None,
             scope,
             active,
+            || {},
             after_reap,
         )
         .await
@@ -370,11 +388,114 @@ impl RepositoryMaterializer {
             selected,
             results,
             declared_sources,
+            None,
             scope,
             active,
+            || {},
             |_| {},
         )
         .await
+    }
+    /// Ordinary driver entry: the complete current Source epoch authenticates
+    /// provenance, while only the independent declaration prefix grants access.
+    pub(in crate::runtime) async fn execute_workspace_with_current_sources(
+        &self,
+        token: RepositorySessionToken,
+        command: RepositoryWorkspaceCommand,
+        request: RepositoryWorkspaceRequest,
+        selected: &[Arc<RepositoryMaterializationRequest>],
+        results: &RepositoryMaterializationResultEpoch,
+        declared_sources: &[Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>],
+        source_epoch: &slug_bzlmod_v2::RepositorySourceSnapshotEpoch,
+        readers: &Arc<crate::runtime::native_source_access::NativeReaderResources>,
+        scope: &Arc<SourceServiceScope>,
+        active: &(dyn Fn() -> bool + Sync),
+    ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
+        self.execute_workspace_impl(
+            token,
+            command,
+            request,
+            selected,
+            results,
+            declared_sources,
+            Some((source_epoch, readers)),
+            scope,
+            active,
+            || {},
+            |_| {},
+        )
+        .await
+    }
+    #[cfg(test)]
+    pub(in crate::runtime) async fn execute_workspace_with_current_sources_before_launch_for_test(
+        &self,
+        token: RepositorySessionToken,
+        command: RepositoryWorkspaceCommand,
+        request: RepositoryWorkspaceRequest,
+        selected: &[Arc<RepositoryMaterializationRequest>],
+        results: &RepositoryMaterializationResultEpoch,
+        declared_sources: &[Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>],
+        source_epoch: &slug_bzlmod_v2::RepositorySourceSnapshotEpoch,
+        readers: &Arc<crate::runtime::native_source_access::NativeReaderResources>,
+        scope: &Arc<SourceServiceScope>,
+        active: &(dyn Fn() -> bool + Sync),
+        before_launch: impl FnOnce(),
+    ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
+        self.execute_workspace_impl(
+            token,
+            command,
+            request,
+            selected,
+            results,
+            declared_sources,
+            Some((source_epoch, readers)),
+            scope,
+            active,
+            before_launch,
+            |_| {},
+        )
+        .await
+    }
+    pub(in crate::runtime) fn apply_workspace_with_sources(
+        &self,
+        token: RepositorySessionToken,
+        command: RepositoryWorkspaceCommand,
+        request: RepositoryWorkspaceRequest,
+        selected: &[Arc<RepositoryMaterializationRequest>],
+        results: &RepositoryMaterializationResultEpoch,
+        declared_sources: &[Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>],
+        source_epoch: &slug_bzlmod_v2::RepositorySourceSnapshotEpoch,
+        readers: &Arc<crate::runtime::native_source_access::NativeReaderResources>,
+        runtime: &tokio::runtime::Runtime,
+        distdirs: &crate::runtime::ArchiveDistdirPolicy,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
+        let current = super::source_snapshots::SelectedSourceSnapshots::new(
+            self,
+            token,
+            source_epoch,
+            readers,
+        )
+        .map_err(|_| PhysicalRootError::Reservation)?;
+        let mut snapshot = self.selected_process_sources(
+            token,
+            selected,
+            results,
+            declared_sources,
+            scope,
+            active,
+        )?;
+        let sources =
+            command.source_links_for_declared(&snapshot, declared_sources, scope, active)?;
+        snapshot.current_sources = Some(current);
+        snapshot.recheck(self)?;
+        let command =
+            command.apply_with_sources(request, sources, runtime, distdirs, scope, &|| {
+                active() && self.session_is_active(token)
+            })?;
+        snapshot.recheck(self)?;
+        Ok(command)
     }
     async fn execute_workspace_impl(
         &self,
@@ -384,8 +505,13 @@ impl RepositoryMaterializer {
         selected: &[Arc<RepositoryMaterializationRequest>],
         results: &RepositoryMaterializationResultEpoch,
         declared_sources: &[Arc<slug_bzlmod_v2::RepositorySourceSnapshotState>],
+        current_sources: Option<(
+            &slug_bzlmod_v2::RepositorySourceSnapshotEpoch,
+            &Arc<crate::runtime::native_source_access::NativeReaderResources>,
+        )>,
         scope: &Arc<SourceServiceScope>,
         active: &(dyn Fn() -> bool + Sync),
+        before_launch: impl FnOnce(),
         after_reap: impl FnOnce(&RepositoryWorkspaceCommand),
     ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
         if !active() {
@@ -395,7 +521,13 @@ impl RepositoryMaterializer {
         else {
             return Err(PhysicalRootError::Mode);
         };
-        let snapshot = self.selected_process_sources(
+        let current = current_sources
+            .map(|(epoch, readers)| {
+                super::source_snapshots::SelectedSourceSnapshots::new(self, token, epoch, readers)
+                    .map_err(|_| PhysicalRootError::Reservation)
+            })
+            .transpose()?;
+        let mut snapshot = self.selected_process_sources(
             token,
             selected,
             results,
@@ -410,6 +542,9 @@ impl RepositoryMaterializer {
             scope,
             active,
         )?;
+        snapshot.current_sources = current;
+        before_launch();
+        snapshot.recheck(self)?;
         let command = command
             .execute_selected_sources(request, &snapshot, self, scope, &|| {
                 active() && self.session_is_active(token)

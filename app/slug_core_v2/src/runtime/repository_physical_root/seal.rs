@@ -10,6 +10,7 @@ use super::*;
 pub(super) fn seal(
     mut builder: RepositoryPhysicalRootBuilder,
     realization: &RepositoryWorkspaceRealization,
+    dependencies: Arc<NativeReadViewDependencies>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
@@ -20,6 +21,16 @@ pub(super) fn seal(
         return Err(PhysicalRootError::Reservation);
     }
     let state = realization.final_state();
+    if !dependencies.covers_state(state) {
+        return Err(PhysicalRootError::Reservation);
+    }
+    let source_dependencies = dependencies.for_state(state, &builder.resources)?;
+    let sources = SourceLinkSet::new(
+        source_dependencies.owners(),
+        &builder.resources,
+        scope,
+        active,
+    )?;
     if state.mode() != builder.mode {
         return Err(PhysicalRootError::Mode);
     }
@@ -27,28 +38,34 @@ pub(super) fn seal(
     // This producer bound includes full foreign reservation guards and may
     // conservatively count shared file bodies repeatedly. No transcript kept.
     let retained = state
-        .retained_storage_bytes()
+        .storage_partition()
         .map_err(|_| PhysicalRootError::Resource)?;
+    let anchor_bound = state
+        .resolution_anchor_storage_bytes()
+        .map_err(PhysicalRootError::Protocol)?;
     builder
         .credit
         .bytes
-        .try_grow(retained)
+        .try_grow(add(retained.owned_bytes(), anchor_bound)?)
         .map_err(|_| PhysicalRootError::Resource)?;
     let _scratch = builder.resources.reserve(IO_SCRATCH, 3, 0)?;
-    if backing_identity(&builder.file, builder.mode)? != builder.identity {
+    if backing_identity_for_quota(&builder.file, builder.native_quota())? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
     }
     let io = RootIo::new(&builder.file, io_limits(builder.mode, &builder.reservation))?;
     verify(&io, state, scope, active)?;
-    if backing_identity(&builder.file, builder.mode)? != builder.identity {
+    for entry in state.entries() {
+        if let RepositoryWorkspaceNode::Link(target) = entry.node() {
+            sources.classify(&builder.reservation, entry.path(), target)?;
+        }
+    }
+    if backing_identity_for_quota(&builder.file, builder.native_quota())? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
     }
     check(scope, active)?;
-    let anchor = MaterializationPathAnchor::new(
-        PathObservationNamespace::Materialization(builder.reservation.instance()),
-        builder.reservation.display_root().clone(),
-    )
-    .map_err(|_| PhysicalRootError::Reservation)?;
+    let anchor = state
+        .resolution_anchor()
+        .map_err(PhysicalRootError::Protocol)?;
     Ok(Arc::new(RepositoryPhysicalRoot {
         file: builder.file,
         state: state.clone(),
@@ -59,6 +76,8 @@ pub(super) fn seal(
         resources: builder.resources,
         backing: builder.backing,
         origin_scope: builder.origin_scope,
+        frozen_archive_quota: builder.frozen_archive_quota,
+        source_dependencies,
         credit: builder.credit,
     }))
 }

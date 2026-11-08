@@ -103,6 +103,9 @@ impl RepositoryMaterializer {
         let source = match pin.as_ref().map(|row| &row.root) {
             #[cfg(target_os = "linux")]
             Some(RetainedRootOwner::Physical(root)) => {
+                if !root.state().source_bindings().is_empty() {
+                    return Err(RepositorySessionError::InvalidImageAuthority);
+                }
                 let scope = command_scope
                     .as_ref()
                     .ok_or(RepositorySessionError::InvalidImageAuthority)?;

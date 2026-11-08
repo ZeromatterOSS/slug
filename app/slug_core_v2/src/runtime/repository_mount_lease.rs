@@ -37,6 +37,8 @@ pub(super) mod launch;
 pub(super) mod quota;
 #[path = "repository_process_views.rs"]
 pub(super) mod readonly;
+#[path = "repository_readonly_quota.rs"]
+pub(super) mod readonly_quota;
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 #[path = "repository_source_root/launch.rs"]
 pub(super) mod source;
@@ -370,6 +372,7 @@ impl InitialRepositoryMount {
     ) -> Result<(), MountLeaseError> {
         check(scope, active)?;
         if root.mode != RepositoryWorkspaceMode::Archive
+            || root.frozen_archive_quota.is_some()
             || self.clone.attached != root.identity
             || identity(&root.file)? != root.identity
             || !same_backing(self.clone.detached, root.identity)

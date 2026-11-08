@@ -227,7 +227,7 @@ impl SourceFinalize {
 impl ProcessLaunch for SourceFinalize {
     type Output = FinalizedSource;
     fn mode(&self) -> RunMode {
-        RunMode::FinalizeArchive
+        RunMode::FinalizeSourceArchive
     }
     fn workspace(&self) -> &slug_workspace_v2::NormalizedAbsolutePath {
         self.builder.reservation.workspace()
@@ -325,7 +325,7 @@ impl ProcessLaunch for SourceFinalize {
     ) -> Result<FinalizedSource, PhysicalRootError> {
         capture
             .binding()
-            .verify_finalize(self.builder.identity, RunMode::FinalizeArchive)?;
+            .verify_finalize(self.builder.identity, RunMode::FinalizeSourceArchive)?;
         if capture.return_code() != 0
             || !capture.stdout().is_empty()
             || !capture.stderr().is_empty()

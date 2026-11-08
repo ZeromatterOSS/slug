@@ -108,7 +108,7 @@ impl RepositoryWorkspaceRequest {
             add(
                 self.reservation.retained_storage_bytes()?,
                 add(
-                    self.predecessor.retained_storage_bytes()?,
+                    self.predecessor.storage_partition()?.owned_bytes(),
                     self.operation.metadata()?,
                 )?,
             )?,
@@ -136,7 +136,87 @@ impl RepositoryWorkspaceRequest {
         self.storage_partition()?.total_bytes()
     }
     pub fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        self.predecessor.visit_read_views(visit);
         self.operation.visit_read_views(visit)
+    }
+    /// Prepay the candidate Vec before calling source_candidates; no source body is copied.
+    pub fn source_candidates_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        state_sources::BindingSelection::new(
+            &self.reservation,
+            &[],
+            self.predecessor
+                .source_bindings()
+                .iter()
+                .chain(self.operation.direct_source_candidates()),
+        )?;
+        let count = self
+            .predecessor
+            .source_bindings()
+            .len()
+            .checked_add(self.operation.direct_source_candidates().count())
+            .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
+        let mut bytes = array_bytes::<RepositoryWorkspaceReadView>(count)?;
+        for view in self
+            .predecessor
+            .source_bindings()
+            .iter()
+            .chain(self.operation.direct_source_candidates())
+        {
+            bytes = add(bytes, view.storage_partition()?.owned_bytes())?;
+        }
+        Ok(bytes)
+    }
+    pub fn source_candidates(
+        &self,
+    ) -> Result<Vec<RepositoryWorkspaceReadView>, RepositoryWorkspaceError> {
+        self.source_candidates_storage_bytes()?;
+        let capacity = add(
+            self.predecessor.source_bindings().len(),
+            self.operation.direct_source_candidates().count(),
+        )?;
+        let mut rows = Vec::with_capacity(capacity);
+        for view in self
+            .predecessor
+            .source_bindings()
+            .iter()
+            .chain(self.operation.direct_source_candidates())
+        {
+            if !rows.iter().any(|old| old == view) {
+                rows.push(view.clone());
+            }
+        }
+        Ok(rows)
+    }
+    pub fn with_symlink_source(
+        mut self,
+        source: RepositoryWorkspaceReadView,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        let RepositoryWorkspaceOperation::Symlink { source: slot, .. } = &mut self.operation else {
+            return Err(RepositoryWorkspaceError::InvalidOperation);
+        };
+        if source.source_state().is_none() {
+            return Err(RepositoryWorkspaceError::InvalidOperation);
+        }
+        *slot = Some(source);
+        self.validate_symlink()?;
+        Ok(self)
+    }
+    fn validate_symlink(&self) -> Result<(), RepositoryWorkspaceError> {
+        let RepositoryWorkspaceOperation::Symlink { target, source, .. } = &self.operation else {
+            return Ok(());
+        };
+        if let Some(view) = source {
+            state_sources::BindingSelection::new(&self.reservation, &[], std::iter::once(view))?;
+            if !target.as_path().starts_with(view.display_root().as_path()) {
+                return Err(RepositoryWorkspaceError::InvalidPath);
+            }
+        } else if !target
+            .as_path()
+            .starts_with(self.reservation.display_root().as_path())
+        {
+            return Err(RepositoryWorkspaceError::InvalidPath);
+        }
+        Ok(())
     }
     /// Rehome an independently validated equal source projection without
     /// changing argv/env/cwd or copying any source body. Core checks full Eq.
@@ -370,6 +450,7 @@ impl RepositoryWorkspaceTranscript {
         let path = match &operation {
             RepositoryWorkspaceOperation::File { path, .. }
             | RepositoryWorkspaceOperation::Template { path, .. }
+            | RepositoryWorkspaceOperation::Symlink { path, .. }
             | RepositoryWorkspaceOperation::Read(path)
             | RepositoryWorkspaceOperation::Exists(path)
             | RepositoryWorkspaceOperation::Delete(path) => Some(path.as_str()),
@@ -437,20 +518,23 @@ impl RepositoryWorkspaceTranscript {
             {
                 return Err(RepositoryWorkspaceError::StateLimit);
             }
-            RepositoryWorkspaceState::validate(
+            RepositoryWorkspaceState::validate_base(
                 &self.reservation,
                 RepositoryWorkspaceMode::Process,
                 predecessor.entries(),
             )?;
+            state_sources::BindingSelection::for_state(predecessor)?;
             // Check ALL retained history, not just the latest body lengths.
             self.retention.check(self.reservation.limits, true)?;
         }
-        Ok(RepositoryWorkspaceRequest {
+        let request = RepositoryWorkspaceRequest {
             reservation: self.reservation.clone(),
             index,
             predecessor: predecessor.clone(),
             operation,
-        })
+        };
+        request.validate_symlink()?;
+        Ok(request)
     }
     pub fn replay(
         &self,
@@ -517,7 +601,10 @@ impl RepositoryWorkspaceTranscript {
         {
             return Err(RepositoryWorkspaceError::InvalidMode);
         }
-        let state_metadata = RepositoryWorkspaceState::validate(&self.reservation, mode, entries)?;
+        let state_metadata = add(
+            RepositoryWorkspaceState::validate_base(&self.reservation, mode, entries)?,
+            state_sources::BindingSelection::for_request(request, entries)?.owned_bytes()?,
+        )?;
         validate_result(request, result, entries)?;
         let mut refs = 0usize;
         self.visit_bodies(&mut |_| {
@@ -595,8 +682,10 @@ impl RepositoryWorkspaceTranscript {
         self.storage_partition()?.total_bytes()
     }
     pub fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        self.initial.visit_read_views(visit);
         for record in self.records.iter() {
-            record.request.visit_read_views(visit)
+            record.request.visit_read_views(visit);
+            record.next.visit_read_views(visit);
         }
     }
 
@@ -648,9 +737,11 @@ impl RepositoryWorkspaceTranscript {
         if let Some(error) = failure {
             return Err(error);
         }
+        let next_sources = state_sources::BindingSelection::for_request(request, entries)?;
         let sources = read_views::source_storage_bytes(|visit| {
             self.visit_read_views(&mut |view| visit(view));
             request.visit_read_views(&mut |view| visit(view));
+            next_sources.visit(&mut |view| visit(view));
         })?;
         RepositoryWorkspaceStoragePartition::new(bytes, sources)
     }
@@ -757,10 +848,12 @@ impl RepositoryWorkspaceTranscript {
                 canonicalize(body)?;
             }
         }
-        let next = Arc::new(RepositoryWorkspaceState::from_admitted(
+        let sources = state_sources::BindingSelection::for_request(&request, &entries)?.into_vec();
+        let next = Arc::new(RepositoryWorkspaceState::from_admitted_with_sources(
             self.reservation.clone(),
             mode,
             entries,
+            sources,
         ));
         let mut records = Vec::with_capacity(self.records.len() + 1);
         records.extend(self.records.iter().cloned());
@@ -826,13 +919,17 @@ fn validate_result(
         ) if archive.sha256() == *digest => {}
         (RepositoryWorkspaceOperation::Read(path), RepositoryWorkspaceResult::Read(body)) => {
             if next != previous
-                || !matches!(request.predecessor.entry(path).map(|e| e.node()), Some(RepositoryWorkspaceNode::File(actual)) if actual == body)
+                || request
+                    .predecessor
+                    .read_expectation(path)?
+                    .validate(body)
+                    .is_err()
             {
                 return Err(RepositoryWorkspaceError::InvalidResult);
             }
         }
         (RepositoryWorkspaceOperation::Exists(path), RepositoryWorkspaceResult::Exists(exists)) => {
-            if next != previous || *exists != request.predecessor.entry(path).is_some() {
+            if next != previous || *exists != request.predecessor.exists(path)? {
                 return Err(RepositoryWorkspaceError::InvalidResult);
             }
         }
@@ -857,6 +954,31 @@ fn validate_result(
             }
             if kept.next().is_some() {
                 return Err(RepositoryWorkspaceError::InvalidResult);
+            }
+        }
+        (
+            RepositoryWorkspaceOperation::Symlink { path, target, .. },
+            RepositoryWorkspaceResult::Unit,
+        ) => {
+            if !matches!(lookup(path), Some(entry) if entry.mode()==0o777 && matches!(entry.node(),RepositoryWorkspaceNode::Link(actual) if Some(actual.as_str())==target.as_path().to_str()))
+            {
+                return Err(RepositoryWorkspaceError::InvalidResult);
+            }
+            for entry in previous {
+                if entry.path() != path && lookup(entry.path()) != Some(entry) {
+                    return Err(RepositoryWorkspaceError::InvalidResult);
+                }
+            }
+            for entry in next {
+                if entry.path() != path
+                    && request.predecessor.entry(entry.path()).is_none()
+                    && !(matches!(entry.node(), RepositoryWorkspaceNode::Directory)
+                        && path
+                            .strip_prefix(entry.path())
+                            .is_some_and(|tail| tail.starts_with('/')))
+                {
+                    return Err(RepositoryWorkspaceError::InvalidResult);
+                }
             }
         }
         (

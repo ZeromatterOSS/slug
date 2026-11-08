@@ -1139,7 +1139,8 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
             .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
         if state.workspace.is_some() {
-            return Err(state.fail(RepositoryRuleInvocationError::WorkspaceUnsupported));
+            workspace::symlink(state, target, link_name)?;
+            return Ok(NoneType);
         }
         let Some(RepositoryStarlarkPath::Label { address, path }) =
             RepositoryStarlarkPath::from_value(target)

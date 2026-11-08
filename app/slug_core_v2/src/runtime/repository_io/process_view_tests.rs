@@ -257,7 +257,7 @@ impl Fixture {
         RepositoryWorkspaceOperation::Execute(RepositoryWorkspaceExecute::new(
             ["/usr/bin/python3","-c",r#"import errno,os,pathlib,subprocess,sys
 a=pathlib.Path(sys.argv[1])
-assert os.statvfs(a).f_blocks*os.statvfs(a).f_frsize == 2147483648
+assert os.statvfs(a).f_blocks*os.statvfs(a).f_frsize == (2147483648 if (a/'large').exists() else 67108864)
 assert os.statvfs('.').f_blocks*os.statvfs('.').f_frsize == 67108864
 try: os.open(a/'data',os.O_WRONLY|os.O_APPEND)
 except OSError as e: assert e.errno == errno.EROFS
@@ -448,8 +448,8 @@ fn native_selected_execute_records_replays_and_retains_data_after_controller_dro
         RepositoryMaterializationResultEpoch::new(fixture.actor.workspace().clone(), []).unwrap();
     assert_eq!(
         fixture.bank.snapshot().backing_bytes,
-        2 * ARCHIVE + PROCESS,
-        "B's native history keeps both declared source data roots after their rows/controllers retire"
+        ARCHIVE + 2 * PROCESS,
+        "B's native history keeps one full and one compact Archive source root after their rows/controllers retire"
     );
     assert_eq!(
         fixture.bank.snapshot().native_fds,

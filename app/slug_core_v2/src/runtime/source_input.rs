@@ -45,6 +45,7 @@ pub struct SourceArtifactInput {
     namespace: PathObservationNamespace,
     requested_path: NormalizedAbsolutePath,
     real_path: NormalizedAbsolutePath,
+    content_origin: slug_workspace_v2::ResolvedPathContentOrigin,
     digest: FileContentDigest,
 }
 
@@ -60,12 +61,23 @@ impl SourceArtifactInput {
         anchor: Option<MaterializationPathAnchor>,
         digest: FileContentDigest,
     ) -> Self {
+        // Malformed logical metadata remains representable by this negative
+        // fixture seam; it must still be refused by the selected native lease.
+        let content_origin = slug_workspace_v2::ResolvedPathContentOrigin::new(
+            namespace,
+            anchor
+                .as_ref()
+                .filter(|a| a.namespace() == namespace)
+                .cloned(),
+        )
+        .expect("fixture content origin has a matching namespace");
         Self {
             label,
             namespace,
             requested_path,
             real_path,
             anchor,
+            content_origin,
             digest,
         }
     }
@@ -83,6 +95,9 @@ impl SourceArtifactInput {
     }
     pub fn real_path(&self) -> &NormalizedAbsolutePath {
         &self.real_path
+    }
+    pub fn content_origin(&self) -> &slug_workspace_v2::ResolvedPathContentOrigin {
+        &self.content_origin
     }
     pub fn digest(&self) -> FileContentDigest {
         self.digest
@@ -237,6 +252,7 @@ async fn finish_source_input(
             namespace: resolved.namespace(),
             requested_path: resolved.requested_path().dupe(),
             real_path: resolved.real_path().dupe(),
+            content_origin: resolved.content_origin().dupe(),
             digest: *digest,
         }),
         Ok(PathFileDigest::Missing) => Err(SourceArtifactInputError::Missing),

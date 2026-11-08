@@ -136,6 +136,11 @@ impl SelectedRootLease {
             return Err("source does not belong to the selected native root".into());
         }
         if self.data.legacy_generation_bound {
+            if source.content_origin().namespace() != source.namespace()
+                || source.content_origin().anchor() != source.anchor()
+            {
+                return Err("bounded legacy source cannot change content origin".into());
+            }
             let Some(anchor) = source.anchor() else {
                 return Err("bounded legacy source lost its generation root bound".into());
             };
@@ -152,6 +157,11 @@ impl SelectedRootLease {
         }
         #[cfg(target_os = "linux")]
         if let Some(root) = self.source_snapshot() {
+            if source.content_origin().namespace() != source.namespace()
+                || source.content_origin().anchor() != source.anchor()
+            {
+                return Err("captured source cannot change its content origin".into());
+            }
             if source.anchor() != Some(root.anchor()) {
                 return Err("captured source anchor differs from selected root".into());
             }
@@ -178,6 +188,35 @@ impl SelectedRootLease {
         #[cfg(target_os = "linux")]
         match self.physical() {
             Some(root) => {
+                if source.anchor() != Some(root.anchor()) {
+                    return Err("physical source anchor differs from selected root".into());
+                }
+                if !root.state().source_bindings().is_empty()
+                    || source.requested_path() != source.real_path()
+                {
+                    let relative = source
+                        .requested_path()
+                        .as_path()
+                        .strip_prefix(self.generation_root())
+                        .ok()
+                        .and_then(Path::to_str)
+                        .ok_or_else(|| Arc::<str>::from("routed source is outside logical root"))?;
+                    return root
+                        .verify_routed_source_metadata(
+                            relative,
+                            source.content_origin(),
+                            source.real_path(),
+                            source.digest(),
+                        )
+                        .map_err(|_| {
+                            Arc::<str>::from("routed source differs from sealed logical route")
+                        });
+                }
+                if source.content_origin().namespace() != source.namespace()
+                    || source.content_origin().anchor() != source.anchor()
+                {
+                    return Err("unbound physical source cannot change content origin".into());
+                }
                 if !source
                     .real_path()
                     .as_path()
@@ -209,6 +248,11 @@ impl SelectedRootLease {
                 }
             }
             None => {
+                if source.content_origin().namespace() != source.namespace()
+                    || source.content_origin().anchor() != source.anchor()
+                {
+                    return Err("legacy source cannot change content origin".into());
+                }
                 if source.anchor().is_some() {
                     return Err("legacy root cannot authorize a physical source anchor".into());
                 }
@@ -247,6 +291,11 @@ impl SelectedRepositoryRoots {
             );
         }
         if source.namespace() == PathObservationNamespace::Host {
+            if source.content_origin().namespace() != PathObservationNamespace::Host
+                || source.content_origin().anchor().is_some()
+            {
+                return Err("Host source cannot change content origin".into());
+            }
             if self
                 .leases
                 .iter()

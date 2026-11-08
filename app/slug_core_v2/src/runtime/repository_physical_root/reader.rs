@@ -6,19 +6,32 @@ use std::io::SeekFrom;
 use std::os::unix::fs::FileExt;
 use std::path::Path;
 
+use sha2::Digest;
+use sha2::Sha256;
 use slug_bzlmod_v2::RepositoryWorkspaceNode;
+use slug_workspace_v2::FileContentDigest;
+use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::ResolvedPathContentOrigin;
+use slug_workspace_v2::ResolvedPathState;
 
 use super::*;
 
 pub(in crate::runtime) struct RepositoryRootReader {
     // Handle and retained root/body owners drop before their credit.
-    file: File,
+    file: Option<File>,
+    route: Option<RoutedRead>,
     root: Arc<RepositoryPhysicalRoot>,
     scope: Arc<SourceServiceScope>,
     entry: usize,
     framed: libc::stat,
     offset: u64,
     _credit: resources::ResourceCredit,
+}
+struct RoutedRead {
+    source: Option<source::RepositorySourceReader>,
+    frames: routed::CapturedRoute,
+    sources: Arc<SourceLinkSet>,
 }
 
 impl std::fmt::Debug for RepositoryRootReader {
@@ -71,7 +84,8 @@ pub(super) fn open(
     root.validate_backing()?;
     root.check_origin(scope, active)?;
     Ok(RepositoryRootReader {
-        file,
+        file: Some(file),
+        route: None,
         root: root.clone(),
         scope: scope.clone(),
         entry: index,
@@ -85,7 +99,21 @@ impl RepositoryRootReader {
     fn validate(&self) -> Result<(), PhysicalRootError> {
         self.scope.check()?;
         self.root.validate_backing()?;
-        let opened = nix::sys::stat::fstat(&self.file).map_err(io::Error::from)?;
+        if let Some(route) = &self.route {
+            route.frames.validate(&routed::RouteRoots::new(
+                &self.root.file,
+                &self.root.state,
+                &route.sources,
+                &self.root.resources,
+                &self.scope,
+                &|| true,
+            ))?;
+            if route.source.is_some() {
+                return Ok(());
+            }
+        }
+        let opened = nix::sys::stat::fstat(self.file.as_ref().ok_or(PhysicalRootError::Snapshot)?)
+            .map_err(io::Error::from)?;
         let io = RootIo::new(
             &self.root.file,
             io_limits(self.root.mode, &self.root.reservation),
@@ -123,6 +151,22 @@ impl Read for RepositoryRootReader {
             .reserve(IO_SCRATCH, 3, 0)
             .map_err(read_error)?;
         self.validate().map_err(read_error)?;
+        if self
+            .route
+            .as_ref()
+            .is_some_and(|route| route.source.is_some())
+        {
+            let count = self
+                .route
+                .as_mut()
+                .unwrap()
+                .source
+                .as_mut()
+                .unwrap()
+                .read(out)?;
+            self.validate().map_err(read_error)?;
+            return Ok(count);
+        }
         let RepositoryWorkspaceNode::File(body) = self.root.state.entries()[self.entry].node()
         else {
             return Err(read_error(PhysicalRootError::Snapshot));
@@ -130,14 +174,24 @@ impl Read for RepositoryRootReader {
         let available = (body.len() as u64).saturating_sub(self.offset);
         if available == 0 {
             let mut probe = [0u8; 1];
-            if self.file.read_at(&mut probe, self.offset)? != 0 {
+            if self
+                .file
+                .as_ref()
+                .unwrap()
+                .read_at(&mut probe, self.offset)?
+                != 0
+            {
                 return Err(read_error(PhysicalRootError::Snapshot));
             }
             self.validate().map_err(read_error)?;
             return Ok(0);
         }
         let requested = out.len().min(available.try_into().unwrap_or(usize::MAX));
-        let count = self.file.read_at(&mut out[..requested], self.offset)?;
+        let count = self
+            .file
+            .as_ref()
+            .unwrap()
+            .read_at(&mut out[..requested], self.offset)?;
         let start =
             usize::try_from(self.offset).map_err(|_| read_error(PhysicalRootError::Snapshot))?;
         if count == 0 || out[..count] != body[start..start + count] {
@@ -151,6 +205,188 @@ impl Read for RepositoryRootReader {
         Ok(count)
     }
 }
+
+impl RepositoryPhysicalRoot {
+    pub(in crate::runtime) fn verify_routed_source_metadata(
+        &self,
+        logical_relative: &str,
+        origin: &ResolvedPathContentOrigin,
+        real_path: &NormalizedAbsolutePath,
+        digest: FileContentDigest,
+    ) -> Result<(), PhysicalRootError> {
+        self.verify_routed_source(
+            logical_relative,
+            origin,
+            real_path,
+            digest,
+            &self.origin_scope,
+        )
+    }
+    /// Pure sealed-membership verification. Logical ownership remains this
+    /// General root even when the immutable terminal content is a Source.
+    pub(in crate::runtime) fn verify_routed_source(
+        &self,
+        logical_relative: &str,
+        origin: &ResolvedPathContentOrigin,
+        real_path: &NormalizedAbsolutePath,
+        digest: FileContentDigest,
+        scope: &Arc<SourceServiceScope>,
+    ) -> Result<(), PhysicalRootError> {
+        self.check_origin(scope, &|| true)?;
+        let _scratch = self.resources.reserve(
+            add(
+                IO_SCRATCH,
+                self.state
+                    .source_bindings()
+                    .len()
+                    .checked_mul(4 * (8192 + 256))
+                    .ok_or(PhysicalRootError::Resource)?,
+            )?,
+            0,
+            0,
+        )?;
+        if !self.source_dependencies.covers_state(&self.state) {
+            return Err(PhysicalRootError::Reservation);
+        }
+        let modeled = routed::model(
+            &self.state,
+            logical_relative,
+            &self.resources,
+            scope,
+            &|| true,
+        )?;
+        let resolved = &modeled.resolved;
+        if resolved.content_origin() != origin
+            || resolved.real_path() != real_path
+            || !matches!(resolved.state(),ResolvedPathState::Present(stat) if stat.kind()==PathNodeKind::RegularFile)
+        {
+            return Err(PhysicalRootError::Snapshot);
+        }
+        let expected = if origin.namespace() == self.anchor.namespace() {
+            let relative = real_path
+                .as_path()
+                .strip_prefix(self.anchor.root().as_path())
+                .ok()
+                .and_then(|path| path.to_str())
+                .ok_or(PhysicalRootError::Snapshot)?;
+            let Some(RepositoryWorkspaceNode::File(body)) =
+                self.state.entry(relative).map(|entry| entry.node())
+            else {
+                return Err(PhysicalRootError::Snapshot);
+            };
+            let mut hash = Sha256::new();
+            for chunk in body.chunks(64 * 1024) {
+                scope.check()?;
+                hash.update(chunk);
+            }
+            FileContentDigest::new(hash.finalize().into(), body.len() as u64)
+                .ok_or(PhysicalRootError::Snapshot)?
+        } else {
+            let owner = self
+                .source_dependencies
+                .owners()
+                .iter()
+                .filter_map(|owner| owner.source_root())
+                .find(|root| root.anchor().namespace() == origin.namespace())
+                .ok_or(PhysicalRootError::Reservation)?;
+            owner.check_origin(scope, &|| true)?;
+            if origin.anchor() != Some(owner.anchor()) {
+                return Err(PhysicalRootError::Snapshot);
+            }
+            let relative = real_path
+                .as_path()
+                .strip_prefix(owner.anchor().root().as_path())
+                .ok()
+                .and_then(|path| path.to_str())
+                .ok_or(PhysicalRootError::Snapshot)?;
+            let Some(slug_bzlmod_v2::RepositorySourceSnapshotNode::File(expected)) =
+                owner.state().entry(relative).map(|entry| entry.node())
+            else {
+                return Err(PhysicalRootError::Snapshot);
+            };
+            *expected
+        };
+        if digest != expected {
+            return Err(PhysicalRootError::Snapshot);
+        }
+        self.check_origin(scope, &|| true)
+    }
+    pub(in crate::runtime) fn open_routed_member(
+        self: &Arc<Self>,
+        logical_relative: &str,
+        origin: &ResolvedPathContentOrigin,
+        real_path: &NormalizedAbsolutePath,
+        digest: FileContentDigest,
+        scope: &Arc<SourceServiceScope>,
+    ) -> Result<RepositoryRootReader, PhysicalRootError> {
+        self.verify_routed_source(logical_relative, origin, real_path, digest, scope)?;
+        let sources = SourceLinkSet::new(
+            self.source_dependencies.owners(),
+            &self.resources,
+            scope,
+            &|| true,
+        )?;
+        self.validate_backing()?;
+        let frames = routed::RouteRoots::new(
+            &self.file,
+            &self.state,
+            &sources,
+            &self.resources,
+            scope,
+            &|| true,
+        )
+        .resolve(logical_relative)?;
+        if frames.resolved.content_origin() != origin || frames.resolved.real_path() != real_path {
+            return Err(PhysicalRootError::Snapshot);
+        }
+        let mut reader = if origin.namespace() == self.anchor.namespace() {
+            let relative = real_path
+                .as_path()
+                .strip_prefix(self.anchor.root().as_path())
+                .ok()
+                .and_then(|path| path.to_str())
+                .ok_or(PhysicalRootError::Snapshot)?;
+            open(self, relative, scope, &|| true)?
+        } else {
+            let credit = self.resources.reserve(
+                std::mem::size_of::<RepositoryRootReader>() + std::mem::size_of::<RoutedRead>(),
+                0,
+                0,
+            )?;
+            let target = sources.source(origin.namespace())?;
+            let relative = real_path
+                .as_path()
+                .strip_prefix(target.anchor().root().as_path())
+                .ok()
+                .and_then(|path| path.to_str())
+                .ok_or(PhysicalRootError::Snapshot)?;
+            let source = target.open_member(relative, scope, &|| true)?;
+            let reader = RepositoryRootReader {
+                file: None,
+                route: Some(RoutedRead {
+                    source: Some(source),
+                    frames,
+                    sources,
+                }),
+                root: self.clone(),
+                scope: scope.clone(),
+                entry: 0,
+                framed: unsafe { std::mem::zeroed() },
+                offset: 0,
+                _credit: credit,
+            };
+            reader.validate()?;
+            return Ok(reader);
+        };
+        reader.route = Some(RoutedRead {
+            source: None,
+            frames,
+            sources,
+        });
+        reader.validate()?;
+        Ok(reader)
+    }
+}
 impl Seek for RepositoryRootReader {
     fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
         let _scratch = self
@@ -159,6 +395,22 @@ impl Seek for RepositoryRootReader {
             .reserve(IO_SCRATCH, 3, 0)
             .map_err(read_error)?;
         self.validate().map_err(read_error)?;
+        if self
+            .route
+            .as_ref()
+            .is_some_and(|route| route.source.is_some())
+        {
+            let position = self
+                .route
+                .as_mut()
+                .unwrap()
+                .source
+                .as_mut()
+                .unwrap()
+                .seek(from)?;
+            self.validate().map_err(read_error)?;
+            return Ok(position);
+        }
         let length = self.framed.st_size as u64;
         let position = match from {
             SeekFrom::Start(position) => position as i128,

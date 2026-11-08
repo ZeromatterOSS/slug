@@ -6,9 +6,9 @@ pub enum RepositoryWorkspaceMode {
     Process,
 }
 
-/// Literal symlink bytes are preserved as valid-Unicode text; only links whose
-/// lexical target remains below the same root are initially admitted. Semantic
-/// resolution still records actual links and handles cycles separately.
+/// Literal symlink text is preserved. External targets require an exact Source
+/// binding in the same immutable state; resolution handles internal links,
+/// one-way Source transitions, missing targets and cycles separately.
 #[derive(Clone, PartialEq, Eq, Allocative)]
 pub enum RepositoryWorkspaceNode {
     Directory,
@@ -65,6 +65,7 @@ pub struct RepositoryWorkspaceState {
     reservation: Arc<RepositoryWorkspaceReservation>,
     mode: RepositoryWorkspaceMode,
     entries: Arc<[RepositoryWorkspaceEntry]>,
+    source_bindings: Arc<[RepositoryWorkspaceReadView]>,
 }
 impl RepositoryWorkspaceState {
     pub fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
@@ -83,13 +84,25 @@ impl RepositoryWorkspaceState {
             .map(|i| &self.entries[i])
     }
 
+    pub fn source_bindings(&self) -> &[RepositoryWorkspaceReadView] {
+        &self.source_bindings
+    }
+    pub fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        for view in self.source_bindings.iter() {
+            visit(view);
+        }
+    }
+
     /// Complete state/entry/path/link and reservation guard, excluding the
     /// allocations owned by File bodies. Borrows existing storage only.
     #[doc(hidden)]
     pub fn retained_metadata_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
         add(
             self.reservation.metadata()?,
-            Self::validate(&self.reservation, self.mode, &self.entries)?,
+            add(
+                Self::validate_base(&self.reservation, self.mode, &self.entries)?,
+                state_sources::BindingSelection::for_state(self)?.owned_bytes()?,
+            )?,
         )
     }
 
@@ -103,7 +116,25 @@ impl RepositoryWorkspaceState {
                 bytes = add(bytes, array_bytes::<u8>(body.len())?)?;
             }
         }
-        Ok(bytes)
+        add(
+            bytes,
+            read_views::source_storage_bytes(|visit| self.visit_read_views(&mut |v| visit(v)))?,
+        )
+    }
+
+    pub fn storage_partition(
+        &self,
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
+        let mut owned = self.retained_metadata_bytes()?;
+        for entry in self.entries.iter() {
+            if let RepositoryWorkspaceNode::File(body) = entry.node() {
+                owned = add(owned, array_bytes::<u8>(body.len())?)?;
+            }
+        }
+        RepositoryWorkspaceStoragePartition::new(
+            owned,
+            read_views::source_storage_bytes(|visit| self.visit_read_views(&mut |v| visit(v)))?,
+        )
     }
 
     pub(super) fn from_admitted(
@@ -115,9 +146,34 @@ impl RepositoryWorkspaceState {
             reservation,
             mode,
             entries: entries.into(),
+            source_bindings: Arc::from([]),
+        }
+    }
+    pub(super) fn from_admitted_with_sources(
+        reservation: Arc<RepositoryWorkspaceReservation>,
+        mode: RepositoryWorkspaceMode,
+        entries: Vec<RepositoryWorkspaceEntry>,
+        source_bindings: Vec<RepositoryWorkspaceReadView>,
+    ) -> Self {
+        Self {
+            reservation,
+            mode,
+            entries: entries.into(),
+            source_bindings: source_bindings.into(),
         }
     }
     pub(super) fn validate(
+        reservation: &RepositoryWorkspaceReservation,
+        mode: RepositoryWorkspaceMode,
+        entries: &[RepositoryWorkspaceEntry],
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            Self::validate_base(reservation, mode, entries)?,
+            state_sources::BindingSelection::new(reservation, entries, std::iter::empty())?
+                .owned_bytes()?,
+        )
+    }
+    pub(super) fn validate_base(
         reservation: &RepositoryWorkspaceReservation,
         mode: RepositoryWorkspaceMode,
         entries: &[RepositoryWorkspaceEntry],
@@ -206,7 +262,7 @@ impl RepositoryWorkspaceState {
                                     tail.strip_prefix('/')
                                 }
                             })
-                            .ok_or(RepositoryWorkspaceError::InvalidPath)?
+                            .unwrap_or("")
                     } else {
                         target.as_str()
                     };

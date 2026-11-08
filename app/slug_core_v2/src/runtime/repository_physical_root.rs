@@ -30,6 +30,7 @@ use super::repository_root_io::RootIoLimits;
 mod archive;
 #[path = "repository_mount_lease.rs"]
 mod mount_lease;
+use mount_lease::readonly_quota::FrozenArchiveQuota;
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 #[path = "repository_process_owner.rs"]
 mod process_owner;
@@ -44,7 +45,11 @@ mod materialization;
 pub(in crate::runtime) use materialization::SealedWorkspaceMaterialization;
 mod reader;
 mod resources;
+mod routed;
 mod seal;
+mod source_links;
+pub(in crate::runtime) use source_links::SourceLinkSet;
+pub(in crate::runtime) use source_links::ValidatedAbsoluteLink;
 #[path = "repository_workspace_snapshot.rs"]
 mod snapshot;
 pub(in crate::runtime) use reader::RepositoryRootReader;
@@ -194,6 +199,7 @@ pub(in crate::runtime) struct RepositoryPhysicalRootBuilder {
     resources: Arc<RepositoryRootResources>,
     backing: Arc<RepositoryRootBacking>,
     origin_scope: Arc<SourceServiceScope>,
+    frozen_archive_quota: Option<FrozenArchiveQuota>,
     credit: resources::ResourceCredit,
     // A bootstrap result may remain queued after the awaiting future cancels.
     // Mutable authority and its credits retire before this counted guard.
@@ -213,10 +219,16 @@ pub(in crate::runtime) struct RepositoryPhysicalRoot {
     resources: Arc<RepositoryRootResources>,
     backing: Arc<RepositoryRootBacking>,
     origin_scope: Arc<SourceServiceScope>,
+    frozen_archive_quota: Option<FrozenArchiveQuota>,
+    source_dependencies: Arc<NativeReadViewDependencies>,
     credit: resources::ResourceCredit,
 }
 
 impl RepositoryPhysicalRootBuilder {
+    fn native_quota(&self) -> (u64, u64) {
+        self.frozen_archive_quota
+            .map_or_else(|| quota(self.mode), |class| class.quota())
+    }
     pub(super) fn check_origin(
         &self,
         scope: &Arc<SourceServiceScope>,
@@ -313,6 +325,7 @@ impl RepositoryPhysicalRootBuilder {
             resources,
             backing: incoming.backing,
             origin_scope: scope.clone(),
+            frozen_archive_quota: None,
             credit,
             retirement: None,
         };
@@ -328,10 +341,29 @@ impl RepositoryPhysicalRootBuilder {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
-        seal::seal(self, realization, scope, active)
+        let dependencies = NativeReadViewDependencies::empty(&self.resources, 0)?;
+        seal::seal(self, realization, dependencies, scope, active)
+    }
+    fn seal_with_dependencies(
+        self,
+        realization: &RepositoryWorkspaceRealization,
+        dependencies: Arc<NativeReadViewDependencies>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
+        seal::seal(self, realization, dependencies, scope, active)
     }
 }
 impl RepositoryPhysicalRoot {
+    fn native_quota(&self) -> (u64, u64) {
+        self.frozen_archive_quota
+            .map_or_else(|| quota(self.mode), |class| class.quota())
+    }
+    pub(in crate::runtime::repository_physical_root) fn frozen_archive_quota(
+        &self,
+    ) -> Option<FrozenArchiveQuota> {
+        self.frozen_archive_quota
+    }
     pub(in crate::runtime) fn check_origin(
         &self,
         scope: &Arc<SourceServiceScope>,
@@ -384,10 +416,11 @@ impl RepositoryPhysicalRoot {
         reader::open(self, relative, scope, active)
     }
     fn validate_backing(&self) -> Result<(), PhysicalRootError> {
-        if backing_identity(&self.file, self.mode)? != self.identity {
+        if backing_identity_for_quota(&self.file, self.native_quota())? != self.identity {
             return Err(PhysicalRootError::RootIdentity);
         }
-        Ok(())
+        self.backing
+            .matches_data(&self.resources, self.mode, self.frozen_archive_quota)
     }
 }
 
@@ -425,6 +458,12 @@ fn check_bank(
 fn backing_identity(
     file: &File,
     mode: RepositoryWorkspaceMode,
+) -> Result<RootIdentity, PhysicalRootError> {
+    backing_identity_for_quota(file, quota(mode))
+}
+fn backing_identity_for_quota(
+    file: &File,
+    expected: (u64, u64),
 ) -> Result<RootIdentity, PhysicalRootError> {
     let fd = file.as_raw_fd();
     let stat = nix::sys::stat::fstat(file).map_err(io::Error::from)?;
@@ -479,7 +518,7 @@ fn backing_identity(
     }
     let fs = unsafe { fs.assume_init() };
     let vfs = unsafe { vfs.assume_init() };
-    let (bytes, inodes) = quota(mode);
+    let (bytes, inodes) = expected;
     if page != 4096
         || fs.f_type != libc::TMPFS_MAGIC
         || fs.f_bsize != 4096

@@ -11,6 +11,7 @@ use super::quota::ProcessQuotaTransition;
 use super::quota::QuotaFacts;
 use super::readonly::FinalizedRepositoryView;
 use super::readonly::ReadOnlyMountClone;
+use super::readonly_quota::PendingReadOnlyCompaction;
 use super::*;
 use crate::runtime::repository_process_wire::RunMode;
 
@@ -614,6 +615,8 @@ pub(in crate::runtime::repository_physical_root) struct FinalizeLaunch {
     admission: NativeViewFinalization,
     incoming: Option<AttachedMountClone>,
     pending: Option<ReadOnlyMountClone>,
+    compaction: Option<PendingReadOnlyCompaction>,
+    nonce: Option<[u8; 16]>,
 }
 impl FinalizeLaunch {
     pub(in crate::runtime::repository_physical_root) fn new(
@@ -629,10 +632,18 @@ impl FinalizeLaunch {
             admission,
             incoming: Some(incoming),
             pending: None,
+            compaction: None,
+            nonce: None,
         })
     }
 }
 impl ProcessLaunch for FinalizeLaunch {
+    fn bind_attempt(&mut self, nonce: &[u8; 16]) -> Result<(), PhysicalRootError> {
+        if self.nonce.replace(*nonce).is_some() {
+            return Err(PhysicalRootError::Reservation);
+        }
+        Ok(())
+    }
     #[cfg(test)]
     fn process_probe(
         &self,
@@ -707,7 +718,7 @@ impl ProcessLaunch for FinalizeLaunch {
         words: [u64; 8],
         quota: Option<[u64; 8]>,
     ) -> Result<(), PhysicalRootError> {
-        if quota.is_some() || self.pending.is_some() {
+        if self.pending.is_some() || self.compaction.is_some() {
             return Err(PhysicalRootError::Mode);
         }
         let root = self.admission.builder();
@@ -730,10 +741,28 @@ impl ProcessLaunch for FinalizeLaunch {
                 .ok_or(PhysicalRootError::Mode)?
                 .detached
             || !same_backing(successor.attached, root.identity)
-            || backing_identity(&attached, root.mode)? != successor.attached
-            || backing_identity(&root.file, root.mode)? != root.identity
         {
             return Err(PhysicalRootError::Backing);
+        }
+        match (root.mode, quota) {
+            (RepositoryWorkspaceMode::Archive, Some(words)) => {
+                self.compaction = Some(PendingReadOnlyCompaction::receive(
+                    root,
+                    &successor,
+                    &attached,
+                    words,
+                    self.nonce.ok_or(PhysicalRootError::Reservation)?,
+                    self.scope(),
+                )?);
+            }
+            (RepositoryWorkspaceMode::Process, None) => {
+                if backing_identity(&attached, root.mode)? != successor.attached
+                    || backing_identity(&root.file, root.mode)? != root.identity
+                {
+                    return Err(PhysicalRootError::Backing);
+                }
+            }
+            _ => return Err(PhysicalRootError::Mode),
         }
         self.pending = Some(
             ReadOnlyMountClone::from_received_clone(successor).map_err(PhysicalRootError::mount)?,
@@ -741,9 +770,11 @@ impl ProcessLaunch for FinalizeLaunch {
         Ok(())
     }
     fn finish_reaped(mut self, capture: ReapedCapture) -> Result<Self::Output, PhysicalRootError> {
-        capture
-            .binding()
-            .verify_finalize(self.admission.builder().identity, self.mode())?;
+        capture.binding().verify_finalize_attempt(
+            self.admission.builder().identity,
+            self.mode(),
+            &self.nonce.ok_or(PhysicalRootError::Reservation)?,
+        )?;
         if capture.return_code() != 0
             || !capture.stdout().is_empty()
             || !capture.stderr().is_empty()
@@ -753,7 +784,8 @@ impl ProcessLaunch for FinalizeLaunch {
         let pending = self.pending.take().ok_or(PhysicalRootError::Mode)?;
         // Final sealing sees no retained writable mount token.
         drop(self.incoming.take());
-        self.admission.finish_reaped(capture, pending)
+        self.admission
+            .finish_reaped(capture, pending, self.compaction.take())
     }
 }
 

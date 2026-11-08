@@ -477,6 +477,33 @@ impl<'root> RootIo<'root> {
         Ok(())
     }
 
+    /// Install an absolute literal whose own/current-Source membership was
+    /// admitted by the closed native prefix owner. Destination components stay
+    /// nofollow; this creates no general absolute-link or traversal authority.
+    pub fn symlink_validated_absolute(
+        &self,
+        relative: &Path,
+        proof: &super::repository_physical_root::ValidatedAbsoluteLink<'_>,
+    ) -> io::Result<()> {
+        self.validate_path(relative, false)?;
+        let target = proof.literal();
+        let bytes = target.as_os_str().as_bytes();
+        if !target.is_absolute()
+            || bytes.is_empty()
+            || bytes.len() > self.limits.max_link_bytes
+            || bytes.contains(&0)
+        {
+            return Err(invalid("invalid admitted absolute link"));
+        }
+        let (parent, name) = self.parent(relative)?;
+        linux::symlink(&parent, name, target)?;
+        let mut actual = [0u8; 4097];
+        if self.read_link(relative, &mut actual)? != bytes {
+            return Err(stale());
+        }
+        Ok(())
+    }
+
     /// Commit a privately staged regular replacement. Both names are walked
     /// without following links; caller retains the exact staged file handle.
     pub fn replace_regular(&self, staged: &Path, target: &Path, file: &File) -> io::Result<()> {

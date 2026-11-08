@@ -37,13 +37,20 @@ pub(super) enum RunMode {
     ContinueExecute = 3,
     FinalizeArchive = 4,
     FinalizeProcess = 5,
+    FinalizeSourceArchive = 6,
 }
 impl RunMode {
     pub fn has_payload(self) -> bool {
         matches!(self, Self::FirstExecute | Self::ContinueExecute)
     }
     pub fn is_finalize(self) -> bool {
-        matches!(self, Self::FinalizeArchive | Self::FinalizeProcess)
+        matches!(
+            self,
+            Self::FinalizeArchive | Self::FinalizeProcess | Self::FinalizeSourceArchive
+        )
+    }
+    pub fn expects_quota(self) -> bool {
+        matches!(self, Self::FirstExecute | Self::FinalizeArchive)
     }
 }
 impl TryFrom<u8> for RunMode {
@@ -55,6 +62,7 @@ impl TryFrom<u8> for RunMode {
             3 => Ok(Self::ContinueExecute),
             4 => Ok(Self::FinalizeArchive),
             5 => Ok(Self::FinalizeProcess),
+            6 => Ok(Self::FinalizeSourceArchive),
             _ => Err(invalid()),
         }
     }

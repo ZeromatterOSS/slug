@@ -156,7 +156,7 @@ pub async fn resolve_source_file_input_observed(
         }
     }
     let demand = PathObservationDemand::new(
-        resolved.namespace(),
+        resolved.content_origin().namespace(),
         resolved.real_path().dupe(),
         PathObservationOperation::FileBytes,
     );

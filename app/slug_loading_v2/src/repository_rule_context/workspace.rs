@@ -20,6 +20,10 @@ use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
 
 use super::*;
 
+#[path = "workspace/symlink.rs"]
+mod symlink;
+pub(super) use symlink::create as symlink;
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(super) struct WorkspaceInput {
     epoch: RepositoryWorkspaceEpoch,

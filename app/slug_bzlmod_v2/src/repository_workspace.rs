@@ -22,12 +22,15 @@ mod operation;
 mod read_views;
 mod sequence;
 mod state;
+mod state_path;
+mod state_sources;
 
 pub use demand::*;
 pub use operation::*;
 pub use read_views::*;
 pub use sequence::*;
 pub use state::*;
+pub use state_path::RepositoryWorkspaceReadExpectation;
 
 pub const REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES: u64 = 64 * 1024 * 1024;
 pub const REPOSITORY_WORKSPACE_PROCESS_ENTRIES: usize = 8192;

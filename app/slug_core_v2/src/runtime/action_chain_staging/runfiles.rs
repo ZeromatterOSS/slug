@@ -47,7 +47,7 @@ impl PreparedActionChainInputs {
         source: &SourceArtifactInput,
     ) -> Result<i32, Arc<str>> {
         let demand = PathObservationDemand::new(
-            source.namespace(),
+            source.content_origin().namespace(),
             source.real_path().clone(),
             PathObservationOperation::Lstat,
         );

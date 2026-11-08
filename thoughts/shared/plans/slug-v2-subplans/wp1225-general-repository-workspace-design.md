@@ -566,6 +566,168 @@ Existing pinned Bazel9.2 StarlarkBaseExternalContext.getPath/getPathFromLabel,
 read and execute Label projections supply exact API source authority; physical
 identity, capture consistency and finite admission remain Slug-native.
 
+### Source-backed symlinks (inactive implementation contract)
+
+The inactive slice now covers the two source configuration links in
+the unchanged `rules_cc/0.2.17` `unix_cc_configure.bzl:350-372`, before its first
+compiler Execute. Pinned Bazel 9.2 `StarlarkRepositoryContext.java:197-240`
+converts target and destination through `getPath`, checks the output directory,
+creates parents and creates the actual symbolic link to the resulting absolute
+target. The admitted exact slice preserves String/Label/Path conversion order,
+literal link text, directory/dangling links and subsequent reads/existence.
+Cross-root authority, quotas and refusal classes remain Slug-native. No profile
+removal or default activation follows from this prerequisite alone.
+
+Admit own-root links and canonical absolute targets under current, already
+declared Source snapshots (Workspace, Local, selected BCR and Builtin). Host,
+General-to-General and escaping relative external targets remain unsupported.
+Source snapshots keep their existing internal-only link policy, so the external
+graph is one-way and nonrecursive. No copying to a regular file substitutes for
+a link, and no reserved prefix or available-but-undeclared Source grants access.
+
+`RepositoryWorkspaceOperation::Symlink` owns the destination, actual absolute
+target and optional typed Source read view. The pure request validates own-root
+or exact Source bounds; native admission independently authenticates the full
+Source projection against the operation's declared prefix and current Source
+epoch/rows, lease, original scope, bank and claim. Full comparison remains
+outside actor locks with final same-lock association rechecks. Every operation's
+prefix is independent: later Need discovery cannot enlarge an earlier Execute.
+
+General State retains literal Link nodes plus one sorted, unique, Source-only
+binding table for roots referenced by actual external links. The complete-tree
+sampler uses the same checked classifier as trusted Symlink creation, including
+for payload-created links. It retains bindings for directory and missing
+targets without traversing them. State binding construction requires a complete
+independently admitted prefix; the full Source epoch authenticates that prefix
+but never enlarges it. Unsupported/foreign/stale/overlapping targets refuse
+before publication. Existing archive link admission is unchanged.
+
+Operation and every predecessor/next/terminal State participate in full
+structural equality, exact comparison visitors and source-state coverage.
+Literal bytes, reference arrays and operation metadata remain positively owned;
+Source allocations occupy the referenced partition only while exact canonical
+data guards cover them. Copied Read/template bytes remain owned body history.
+Historical guards retain the complete Source union after deletion. Seal filters
+only the final DATA root's dependencies according to final State bindings;
+terminal request/history guards retain their historical union until they drop.
+Data dependencies contain neither controllers nor owning namespace authority.
+
+The existing pure `MaterializationPathAnchor` gains an optional shared array of
+at most128 flat terminal Source anchors, with checked canonical order, distinct
+namespaces, disjoint roots and no nested contexts. Empty contexts retain current
+behavior. Bzlmod's General materialization projection and actual native seal
+derive identical contexts from used State bindings. Prepay the leaf array,
+conversion peak and retained native context before allocation/cloning. No Spec,
+body, scope, descriptor or controller enters this Workspace metadata type.
+
+The common resolver retains the logical General namespace, requested path and
+anchor, every exact link hop and mixed-namespace observation, and a distinct
+terminal content origin. Only an actual canonical absolute ReadLink may cross
+from General to one listed Source anchor; Source traversal remains internal.
+Rooted traversal and Host resolution stay unchanged. Digest/read/listing use
+the terminal origin while preserving the full General route certificate.
+Existing cycle/expansion behavior and finite path/frame/work admission apply.
+The synchronous native adapter prepays allocation peaks at machine phases,
+including parent-frame construction, route growth, completion slices and joined
+parent-route projection. Original scope/activity checks run at those phases and
+within projection loops. A retained high-water credit covers modeled results;
+direct small Own reads do not reserve a blanket Archive-sized working buffer.
+The existing131072 demanded-fact and4MiB demanded-path limits remain demand
+limits; internal allocation checkpoints do not consume those counters.
+
+Native artifacts preserve General label/logical ownership and carry terminal
+content origin separately. A General lease reconstructs and authenticates its
+exact sealed link route and Source binding before accepting terminal origin,
+path, regular-file kind or digest. A linked reader retains the General owner,
+credited route frames and original scope beside its Source reader, checking
+them before/after reads and seeks. All content opens use retained Source FDs.
+Mutable-prefix Read/Exists follow the same bounded route; missing targets make
+Exists false, reads enforce the existing2MiB limit and full size/SHA/EOF checks.
+Their transient mutable facts do not enter an immutable final certificate.
+Writes through a Source directory link refuse; Delete unlinks the General link.
+General InputImage with external bindings refuses before IO. A selected General
+Execute read view with Source bindings additionally requires every bound Source
+to appear independently in that operation's exact declared Source manifest.
+Available epochs or retained DATA dependencies never synthesize controllers or
+enlarge that manifest; missing independent declarations refuse before replay,
+quota IO or controller transfer.
+
+Proof must cover the unchanged original's two links followed by normal linked
+configuration Loading and general execution, then actual CAS/runfiles use.
+Reuse existing original/reader/native fixtures for unrelated authored and
+payload-created file/directory/dangling links, internal cycles, undeclared and
+available-but-not-prefix targets, prefix replay after later discovery, immutable
+route/digest forgery, link deletion with historical ownership, same-display
+A/B, cancellation and exact last-drop refunds. Default/profile deletion,
+General-target links, derived Source Path APIs, full Archive/public Rust and
+matched-command memory remain separate gates. No new donor, cache, interner,
+cap increase or whole-workload memory claim is selected.
+The [source-link receipt](wp1225-source-links-acceptance-2026-11-08.json) records
+the genuine original, declared fixture dependency graph, protected transport and
+native ownership/resource discriminators. It closes this inactive prerequisite,
+not production profile removal or default activation.
+
+### Read-only General Archive quota contraction (inactive prerequisite)
+
+The unchanged `cc_autoconf` configuration loads genuine `bazel_features`
+version/globals repositories and the `rules_cc` compatibility proxy. The
+[bounded role diagnostic](wp1225-source-links-acceptance-2026-11-08.json)
+identifies a Process proof root, one immutable Source image and two tiny
+non-Execute General roots retaining full Archive quotas before the next General
+bootstrap. The fixed8GiB bank correctly refuses that next2GiB reservation.
+No named-root eviction, synthetic globals, fake Execute, upstream rewrite or
+cap increase may bypass this pressure.
+
+Add optional physical quota contraction at the consuming read-only finalization
+of every eligible General Archive root. This is a Slug-native lifecycle/resource
+operation. Pure State.mode remains Archive, its exact history and logical
+Archive envelope remain unchanged, and no Execute/index/result is invented.
+Source snapshots retain their existing quota. Process finalization is unchanged.
+The eligibility decision uses actual quiescent tmpfs allocated block bytes and
+used inode units: if they fit64MiB and8192 inodes, the trusted owner may lower
+the SAME superblock to that sealed quota class; otherwise it keeps the full2GiB
+Archive class. Apply by actual owner/lifecycle facts, never caller or repository
+names. No performance or completed-command memory claim follows.
+
+The private native frozen-quota class is distinct from semantic mutable mode.
+Before contraction, authenticate the consuming full finalization request,
+original scope/bank, exact root/devino/mount identity and sole current setup
+custody. There are no live payload writers. Trusted setup remounts in the
+existing owning user namespace, verifies exact new quotas plus unchanged
+identity, allocated bytes and used inode units, then makes the successor view
+read-only. The parent independently checks its original FD and received
+successor/attestation against the same admitted owner and nonce/correlation.
+Keep the full old debit through actual helper reap, parent original-FD quota and
+identity re-attestation, and acceptance of the exact matching read-only successor.
+Only that closed verified proof may atomically shrink the one shared backing
+debit before sealed publication; root/token/data clones keep that same debit
+until last drop. Physical quota
+attestation, source/reader/image checks and read-only controller/domain checks
+carry the actual frozen class; none may infer it from State.mode or a path.
+
+Contraction is admitted only by consuming read-only finalization after real
+quiescence. There is no path from its frozen class back to a mutable builder,
+initial seed or rolling execution token. Every retained root, shared backing
+guard and read-only successor carries and checks the same closed quota proof;
+measured usage on a later read cannot mint the class. Existing Process64MiB
+roots retain their distinct existing class. The quota class freezes before any
+immutable namespace/data publication; mutable-prefix facts remain transient and
+cannot become an immutable certificate. The existing fresh concrete instance
+and exact native association bind that one frozen class for its whole lifetime;
+content identity and pure Archive mode do not become quota authority. No data
+root gains remount or mutable admission authority. Failure or ambiguous handoff
+before the closed proof retains
+the conservative old debit until existing kill/reap/drop cleanup settles. After
+proof and debit commit, a later view-control allocation or validation failure
+disposes the actual compacted owner under its new matching debit. Neither path
+publishes a partial owner. Cancellation and deadlines retain their
+original clocks. Verify actual quota/identity contraction and shared debit,
+non-Execute Archive history preservation, large/over-inode fallback, forged or
+foreign facts/owners/scopes, failure/cancel/last-drop behavior and an actual
+read-only child. Reuse the existing Process transition and finalized-view
+fixtures. The final original `cc_autoconf` and linked-artifact gates must then
+pass within the unchanged bank before this prerequisite is accepted.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

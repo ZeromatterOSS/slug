@@ -256,7 +256,7 @@ impl Key for AnchoredPathFileDigestObservationKey {
 }
 async fn finish_resolved_digest(
     ctx: &mut DiceComputations<'_>,
-    namespace: PathObservationNamespace,
+    _namespace: PathObservationNamespace,
     logical_path: &NormalizedAbsolutePath,
     resolved: Result<&ResolvedPath, PathFileDigestError>,
     mut observations: PathObservationEpoch,
@@ -289,7 +289,7 @@ async fn finish_resolved_digest(
         }
     };
     let demand = PathObservationDemand::new(
-        namespace,
+        resolved.content_origin().namespace(),
         resolved.real_path().dupe(),
         PathObservationOperation::FileDigest,
     );

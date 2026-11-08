@@ -10,6 +10,10 @@ use super::*;
 use crate::runtime::dice::source_service::SourceServiceLimits;
 use crate::runtime::repository_io::RepositoryMaterializer;
 
+#[path = "tests/source_link_actor.rs"]
+mod source_link_actor;
+#[path = "tests/source_links.rs"]
+mod source_links;
 #[path = "tests/transport.rs"]
 mod transport;
 

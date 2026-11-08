@@ -7,6 +7,7 @@ use super::super::super::mount_lease::AttachedMountClone;
 use super::super::super::mount_lease::launch::FinalizeLaunch;
 use super::super::super::mount_lease::readonly::FinalizedRepositoryView;
 use super::super::super::mount_lease::readonly::ReadOnlyMountClone;
+use super::super::super::mount_lease::readonly_quota::PendingReadOnlyCompaction;
 use super::super::super::process_owner;
 use super::super::super::process_owner::ReapedCapture;
 use super::*;
@@ -21,6 +22,15 @@ pub(in crate::runtime::repository_physical_root) struct NativeViewFinalization {
     _credit: resources::ResourceCredit,
 }
 impl RepositoryWorkspaceCommand {
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) fn admit_view_finalization_for_test(
+        self,
+        request: Arc<RepositoryMaterializationRequest>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<NativeViewFinalization, PhysicalRootError> {
+        self.admit_view_finalization(request, scope, active)
+    }
     fn admit_view_finalization(
         self,
         request: Arc<RepositoryMaterializationRequest>,
@@ -169,9 +179,10 @@ impl NativeViewFinalization {
         result.map_err(PhysicalRootError::mount)
     }
     pub(in crate::runtime::repository_physical_root) fn finish_reaped(
-        self,
+        mut self,
         capture: ReapedCapture,
         pending: ReadOnlyMountClone,
+        compaction: Option<PendingReadOnlyCompaction>,
     ) -> Result<
         (
             RepositoryWorkspaceCommand,
@@ -196,9 +207,26 @@ impl NativeViewFinalization {
         let scope = self.scope().clone();
         let domain = self.domain().clone();
         let retirement = self.command.retirement_observer();
+        match (self.builder().mode, compaction.as_ref()) {
+            (RepositoryWorkspaceMode::Archive, Some(proof)) => proof.stage_after_reap(
+                &mut self.command.roots[self.slot]
+                    .progress
+                    .as_mut()
+                    .ok_or(PhysicalRootError::Reservation)?
+                    .builder,
+                &capture,
+            )?,
+            (RepositoryWorkspaceMode::Process, None) => (),
+            _ => return Err(PhysicalRootError::Mode),
+        }
         let (command, sealed) =
             self.command
                 .seal_for_materialization(self.request, &scope, &|| true)?;
+        // No debit is reduced until actual bound reap, complete native seal
+        // and exact readonly successor/parent-FD re-attestation all succeeded.
+        if let Some(proof) = compaction {
+            proof.commit(sealed.root(), &pending, &capture)?;
+        }
         let view = FinalizedRepositoryView::bind(&sealed, pending, domain, &scope, &|| true)
             .map_err(PhysicalRootError::mount)?
             .with_retirement_observer(retirement);
