@@ -1465,6 +1465,16 @@ trait NativeCommandRoot: Clone {
     type Terminal: Clone;
 
     #[cfg(all(test, target_os = "linux"))]
+    fn progress_observed(
+        &self,
+        _needs: &slug_bzlmod_v2::SourcePreparationNeeds,
+        _command: &NativeDemandCommand<'_>,
+        _attempt: usize,
+        _result: Option<&Result<NativeDemandProgress, NativeDemandSessionError>>,
+    ) {
+    }
+
+    #[cfg(all(test, target_os = "linux"))]
     fn progress_refused(
         &self,
         _needs: &slug_bzlmod_v2::SourcePreparationNeeds,
@@ -7024,7 +7034,12 @@ impl WorkspaceRuntime {
             }
             match attempt {
                 CommandAttemptResult::Retry(needs) => {
-                    if let Err(error) = guard.progress(&needs) {
+                    #[cfg(all(test, target_os = "linux"))]
+                    root.progress_observed(&needs, guard.command(), attempts, None);
+                    let progress = guard.progress(&needs);
+                    #[cfg(all(test, target_os = "linux"))]
+                    root.progress_observed(&needs, guard.command(), attempts, Some(&progress));
+                    if let Err(error) = progress {
                         #[cfg(all(test, target_os = "linux"))]
                         root.progress_refused(&needs, guard.command(), attempts, &error);
                         return guard.abort(error);

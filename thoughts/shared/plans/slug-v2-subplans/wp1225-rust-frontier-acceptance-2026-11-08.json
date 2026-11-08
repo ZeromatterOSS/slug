@@ -1,0 +1,286 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "6aa6cff0a3c2e69305182edd682527dd30cc6042",
+  "classification": "Slug-native bounded verified source preparation and test-only diagnostics; pinned original sources; no production activation",
+  "outcome": "Unchanged original Rust cquery progresses from 31 generated roots/61 records to 43 roots/85 records after reducing ordinary archive candidate misses. It stops at the existing aggregate 128-state admission limit before Rust tool archive extraction.",
+  "request": {
+    "target": "//pkg:probe",
+    "fixture": "rules-rust-073-toolchain-owner",
+    "setting": "@rules_rust//rust/toolchain/channel=nightly",
+    "lockfile_mode": "off",
+    "module_overrides": 0,
+    "repository_environment_names": [
+      "CC",
+      "PATH"
+    ],
+    "services": "ordinary Native with fresh original command scope and inactive uniform General configuration"
+  },
+  "source_pins": {
+    "app/slug_core_v2/src/runtime/dice.rs": "f2fc8f93d5952f1a829e0fa542f52442b09c12f210ddaaaa2d5065172fbe3dd0",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver/tests.rs": "ac01b4ec9bc33c62baba08f15c69961801af6af1e907ccbc77dbef33edcbab9e",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests.rs": "c2e2062dec5d2fd26ac50aed3617b038f85e767e1103e3183aea4eb461e7983c",
+    "tools/v2_oracle/rust_toolchain_fixture.py": "aee4a6bf85d3c145d78f9c22493fe014169dd19aed1c982f948af7df19a2104e",
+    "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/native-inputs.json": "3c7484ba726f1ccedcbbd2f78cfdf6f97f2b2146c02d70adaa689c08d3111490"
+  },
+  "source_preparation": {
+    "command": [
+      "python3",
+      "-B",
+      "tools/v2_oracle/rust_toolchain_fixture.py",
+      "--cache-root",
+      "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/content_addressable/sha256",
+      "--output",
+      "/tmp/slug-wp425-rust-inputs-fourth-flat-dirfd-aee4a6bf85d3"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.7578134369978216,
+    "config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+    "cache_objects": 26,
+    "workspace_files": 6,
+    "unchanged_original_workspace": true,
+    "additional_verified_natural_patches": 5,
+    "new_patch_bytes": 5771,
+    "flat_distdirs": 1,
+    "archive_paths": 20,
+    "unique_archive_inode_bytes": 270900382,
+    "logical_archive_path_bytes": 541800764,
+    "additional_archive_payload_copies": 0,
+    "hardlink_origin": "fresh owned verified staging copies only; never external cache",
+    "integrity": "held ancestor/name/FD identity, full size/SHA/EOF, pinned source and destination directories during link creation; all cache objects and prior preparations unchanged"
+  },
+  "negative_validation": {
+    "existing_stager_cases": 9,
+    "flat_cases": 11,
+    "passed": 20,
+    "cases": [
+      "wrong SHA/short/extra EOF",
+      "leaf/ancestor symlink",
+      "same-byte name replacement",
+      "failure removes only newly owned destination",
+      "existing output preserved",
+      "cross-inventory conflicting basename",
+      "same-hash basename association",
+      "flat regular-file/inode/content association",
+      "source/flat replacement or mutation",
+      "source-parent/flat-parent swaps keep side effects in held owned directories"
+    ]
+  },
+  "compile": {
+    "command": [
+      "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "test",
+      "-p",
+      "slug_core_v2",
+      "--lib",
+      "--no-run",
+      "--offline",
+      "--locked",
+      "--target-dir",
+      "/run/media/system/Colossus/dev/slug/target",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 71.89928080199752,
+    "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+  },
+  "artifact_pins": {
+    "core_test_sha256": "f0a2633e08912d8495b596583b46d189aa44ba8154b5760961e39acd9789f43c",
+    "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+    "cli_reuse": "Native helper production owners are unchanged from accepted baseline; driver instrumentation is cfg(test,Linux), around the same single progress invocation."
+  },
+  "ordinary_validation": {
+    "boundary_test": {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::frontier_diagnostic_reason_and_config_are_bounded_and_never_emit_payload",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 1,
+      "passed": 1,
+      "elapsed_seconds": 0.769715387999895
+    },
+    "protected_native_scope_controls": {
+      "preflight_command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::diagnostic_command_scope_keeps_the_original_owner_without_refresh",
+        "runtime::dice::repository_workspace_driver::tests::generic_policy_is_disabled_by_default_and_scopes_native_commands_without_replacing_acquisition",
+        "runtime::dice::repository_workspace_driver::tests::native_command_cancellation_interrupts_pending_work_and_drains_with_original_cleanup_clock"
+      ],
+      "selected": 3,
+      "passed": 3,
+      "elapsed_seconds": 0.01777645299443975
+    }
+  },
+  "same_artifact_native_comparison": [
+    {
+      "layout": "fifteen_distdirs",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "exit_code": 0,
+      "diagnostic_tests_passed": 1,
+      "elapsed_seconds": 16.03101656799845,
+      "semantic_outcome": {
+        "error": {
+          "detail": {
+            "detail": {
+              "reason": "unclassified"
+            },
+            "kind": "native_workspace"
+          },
+          "kind": "repository"
+        },
+        "status": "driver_refusal"
+      },
+      "computes": 529,
+      "workspace_progress": {
+        "calls": 91,
+        "decoded_bytes": 3020800,
+        "registry_attempts": 0,
+        "registry_bytes": 0,
+        "source_attempts": 31,
+        "transferred_bytes": 489826,
+        "written_bytes": 3062354
+      },
+      "path_progress": {
+        "calls": 394,
+        "decoded_bytes": 72897,
+        "registry_attempts": 0,
+        "registry_bytes": 0,
+        "source_attempts": 33,
+        "transferred_bytes": 0,
+        "written_bytes": 0
+      },
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "peak_backing_bytes": 5071966208,
+      "peak_retained_bytes": 24819329,
+      "identity_census_complete": false
+    },
+    {
+      "layout": "one_flat_distdir",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "exit_code": 0,
+      "diagnostic_tests_passed": 1,
+      "elapsed_seconds": 23.097580183006357,
+      "semantic_outcome": {
+        "error": {
+          "detail": {
+            "code": "RetentionLimit",
+            "kind": "protocol"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      "computes": 638,
+      "workspace_progress": {
+        "calls": 127,
+        "decoded_bytes": 3020800,
+        "registry_attempts": 0,
+        "registry_bytes": 0,
+        "source_attempts": 9,
+        "transferred_bytes": 489826,
+        "written_bytes": 3062354
+      },
+      "path_progress": {
+        "calls": 455,
+        "decoded_bytes": 91685,
+        "registry_attempts": 0,
+        "registry_bytes": 0,
+        "source_attempts": 46,
+        "transferred_bytes": 0,
+        "written_bytes": 0
+      },
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "peak_backing_bytes": 5129637888,
+      "peak_retained_bytes": 24820193,
+      "identity_census_complete": false
+    }
+  ],
+  "diagnostic_bounds": {
+    "supervisor_seconds": 60,
+    "address_space_bytes": 8589934592,
+    "output_bytes_per_stream": 1048576,
+    "frontier_encoded_bytes": 524288,
+    "events": 128,
+    "private_content_identities": 65,
+    "private_content_path_bytes": 266240,
+    "scope_work_cleanup_seconds": [
+      27,
+      3
+    ],
+    "note": "Operational bounds, not an equivalent-command RSS comparison. Content identity census is explicitly incomplete due to unscoped legacy Needs; progress-family scalar deltas are complete, with no invalid delta."
+  },
+  "retention_boundary": {
+    "dimension": "aggregate state versions",
+    "initial_states": 43,
+    "completed_records": 85,
+    "retained_versions": 128,
+    "limit": 128,
+    "next_reservation_requires": 129,
+    "before_bootstrap_launch": true,
+    "scope_source_attempts": 55,
+    "scope_first_error": null,
+    "independent_audits": "root, protocol, rooted_consumers and reviewer agree no duplicate counting; genesis and every successor intentionally count, including unchanged trees",
+    "policy_changed": false
+  },
+  "pinned_source_evidence": {
+    "bazel_release": "9.2.0",
+    "registered_toolchains_source": "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/RegisteredToolchainsFunction.java:95-118,181-224",
+    "registered_toolchains_source_sha256": "9051a88a992d48be6d0afcfdf3edb147cf6d3d634325e7512a3e8eef2abcec3d",
+    "registration_behavior": "Expand all registered patterns and configure every resulting label before target-setting validation; requested Rust type does not authorize pruning other registered patterns.",
+    "builtin_module_sha256": "a51e647c77be3c7dcb861131e339f2b65301bb572d2a9ac3d7eef30ca5b8a523",
+    "builtin_matches_pinned_src_MODULE_tools": true,
+    "selected_rules_java_module_sha256": "ee63f27e36a3fada80342869361182f120a9819c74320e8e65b1e04ba0cd7a9d",
+    "remote_jdk_registered_repositories": 37,
+    "jdk_platform_counts": {
+      "8": 6,
+      "11": 8,
+      "17": 8,
+      "21": 9,
+      "25": 6
+    },
+    "retention_source": "app/slug_bzlmod_v2/src/repository_workspace/sequence.rs:359,640,1382-1460",
+    "existing_discriminators": [
+      "state_versions_metadata_and_retained_bodies_have_exact_plus_one_policies",
+      "fresh_empty_revoked_epochs_reject_stale_reservations_and_global_state_overflow"
+    ]
+  },
+  "review": "Independent design, affected source, bounded diagnostic, flat-link lifecycle, same-artifact comparison and final receipt/pin reviews ACCEPT. Packet stays active for the admission-contract decision; no capacity or public-command closure claimed.",
+  "remaining_gates": [
+    "Explicit admission-contract decision for the genuine aggregate version ceiling without discounting history or caller-specific pruning",
+    "Rust tool archive extraction and complete archive workload envelope",
+    "Derived Source Path and repeated Workspace publication",
+    "Authentic Rust cquery, required action comparison and REAPI execution",
+    "General production activation",
+    "Equivalent-command <=1.25x Bazel RSS",
+    "M7A/M8, full Slug closure and Stage 10"
+  ]
+}

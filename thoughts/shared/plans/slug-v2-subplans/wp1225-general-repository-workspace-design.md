@@ -853,6 +853,59 @@ bank, without eviction or scope renewal; cold proof remains protected. This
 closes only that specific capacity gap. Full Archive, public Rust and equivalent-
 command RSS gates remain. Independent design and final review are required.
 
+### Authentic Rust archive frontier
+
+Use the existing Bazel9.2 `rules-rust-073-toolchain-owner` MODULE/BUILD and
+`//pkg:probe` with `@rules_rust//rust/toolchain/channel=nightly`, lockfile off.
+The unchanged fixture declares nightly2025-09-14 and ordinary toolchain
+registration. No callback/toolchain-proof bodies, inert compilers, module-only
+dependency stand-ins, forced extraction effects or source rewrites enter this
+probe. Ordinary Native acquisition and private General configuration retain
+current policies, banks and27s+3s clocks; default public activation stays Disabled.
+
+The source-only streaming stager reuses the configured fixture's unchanged
+bounded assembler and natural BCR corpus. A separate small inventory records
+six unchanged workspace files plus26 cached metadata/patch/archive candidates;
+64KiB copies check exact declared size/SHA/EOF and held nofollow FD/ancestor
+identity. Full rules_rust release/tool payloads remain ordinary distdir inputs,
+not semantic replacement outputs. One flat distdir contains verified hardlinks
+from fresh owned staging copies; hierarchical mirrors and URLs remain intact.
+All base/extra basename associations compare exact size/SHA before assembly.
+Held source/flat directory descriptors constrain link creation; fresh checks
+verify regular-file identity and complete bytes after the expected ctime change.
+Logical pathname bytes and unique inode payload bytes are reported separately;
+external cache objects are never linked. No large artifact is added to Git. The
+unchanged owner's possible July2026 rustfmt registration does not force an
+archive demand; actual Needs govern. Base fixture limits are not raised.
+
+A private test wrapper delegates the genuine Cquery command-root contract and
+normal owner. It may record bounded Need/operation/index/format summaries and
+original-scope counters at completion, refusal and a default-no-op test-only
+before/after progress hook. No lock spans compute/IO. A bounded private exact
+content-demand census emits only ordinals and static namespace/owner classes;
+overflow is explicitly incomplete. Progress deltas identify the actual returned
+progress family, independently of demand-census completeness. Freeform errors
+map to static diagnostic codes; input configuration is capped before allocation.
+Distinguish typed driver
+failure from accepted terminal semantic error and real success; retain exact
+retirement/refund evidence. A finite supervised run chooses the next generic
+API/archive implementation from its actual outcome, not inferred cap arithmetic.
+General's exact-body state/history must not be replaced with digest-only Source
+state to make extraction fit. Fixture preparation, input corrections and that
+API work stay in this capability. Full Archive, authentic Rust completion and
+equivalent-command RSS remain unproved until their own evidence is complete.
+
+The [frontier receipt](wp1225-rust-frontier-acceptance-2026-11-08.json) establishes
+a genuine admission conflict:43 initial states plus85 completed records fill
+the aggregate128-version policy; the next root needs129 before bootstrap launch.
+Existing exact/+1 regressions deliberately count each initial/successor state,
+including unchanged trees. Pinned Bazel registers/configures all toolchain
+labels, and the natural selected module registers37 remote-JDK configuration
+repositories. Filtering these by requested Rust type would change semantics.
+Storage sharing cannot reduce this logical count under the existing contract.
+An explicit retention admission decision remains open within this packet;
+the fixed limits and complete-history requirements are unchanged.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

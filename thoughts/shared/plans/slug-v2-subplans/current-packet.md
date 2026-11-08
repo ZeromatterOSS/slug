@@ -3,13 +3,21 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [read-only Source backing quota contraction](wp1225-general-repository-workspace-design.md#read-only-source-backing-quota-contraction).
-The Source-specific closed finalization proof now reduces eligible physical
-backing after complete seal/reap while preserving logical limits and large
-fallback. Its [acceptance receipt](wp1225-source-quota-acceptance-2026-11-08.json)
-records repeated authentic compiler/Homebrew A/B/A on one runtime and the fixed
-bank. The next frontier is the actual authentic Rust toolchain archive path;
-derived Source Path APIs are not assumed to be its first prerequisite.
+Current delta: resolve the genuine aggregate retained-state admission conflict
+for unchanged `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its
+nightly setting. The [verified source/frontier component](wp1225-rust-frontier-acceptance-2026-11-08.json)
+stages natural BCR/tool inputs and reduces archive-candidate misses with one
+ordinary flat distdir. The same artifacts now reach43 generated roots/85 records,
+then refuse the next reservation at128 retained states, before Rust archive
+demand. Independent audits confirm one initial state per root and one successor
+per record; no duplicate-count correction is supported. Resolve this explicit
+admission-contract decision before choosing archive work. Keep full history;
+do not discount initial states, prune caller-specific registrations or substitute
+Source state to evade the limit. No admission-policy revision is accepted yet.
+The existing default policy and all source/process/backing limits stay unchanged.
+[Source backing contraction](wp1225-source-quota-acceptance-2026-11-08.json)
+already closes the preceding warm compiler capacity gap; a stopped Rust probe
+does not close authentic Rust, production activation or equivalent-memory gates.
 Baseline: d202a77e29b4fda077e69bc17ea4874c4635e22a.
 The [selected implementation design](wp1225-general-repository-workspace-design.md)
 owns the concrete protocol, rooted IO, quotas and file split.

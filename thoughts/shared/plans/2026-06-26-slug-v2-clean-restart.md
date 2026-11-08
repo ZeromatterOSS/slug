@@ -67,6 +67,10 @@ now closes the warm compiler capacity refusal: four actual commands pass on one
 runtime and the unchanged bank. Full archive-envelope, derived Source Path
 operations, repeated Workspace publication, public Rust and matching-command
 memory gates still precede General production activation.
+The [verified Rust source/frontier component](./slug-v2-subplans/wp1225-rust-frontier-acceptance-2026-11-08.json)
+now advances unchanged cquery to43 generated roots/85 records under the same
+limits. The next reservation reaches the genuine128-state admission boundary;
+that explicit retention-policy decision precedes Rust archive extraction.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

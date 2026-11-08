@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "fixture": "rules-rust-073-toolchain-owner",
+  "classification": "Source-only staged inputs; unchanged original sources and fixture workspace. Archive candidates do not force demand or establish runtime admission.",
+  "aggregate_cache_bytes": 239012719,
+  "aggregate_workspace_bytes": 1729,
+  "provenance": {
+    "MODULE.bazel": "109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c",
+    "MODULE.bazel.lock": "bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302",
+    "rules_rust_archive_sha256": "2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2",
+    "configured_fixture_manifest_sha256": "7f346b8bcdb2a7d3de715343a059dcff2eeb2f092f5263de136cfea19c76f5b7"
+  },
+  "workspace": [
+    {
+      "path": "MODULE.bazel",
+      "size": 426,
+      "sha256": "a357133030b94360b37061f380984caa374f7383841fabdc8c5d26bc114e3b10"
+    },
+    {
+      "path": "cquery_format.bzl",
+      "size": 877,
+      "sha256": "55a02be9e72fe3ce20739888ef7157db6f7d995463e5fee2d4456942390c0818"
+    },
+    {
+      "path": "pkg/BUILD.bazel",
+      "size": 292,
+      "sha256": "443b4798a3e113748cf14b22a9fdca51121a1d31b92d833a7006bedf1ea7fa4a"
+    },
+    {
+      "path": "pkg/data.txt",
+      "size": 21,
+      "sha256": "e2fe7ce696d221cc9335e55806c0c51e3b356cad25954477591722edac6b7899"
+    },
+    {
+      "path": "pkg/lib.rs",
+      "size": 59,
+      "sha256": "3850931daa5cb4e2a7fb77808c7ef9a481b8214fb118606e7cdb303f03f21ece"
+    },
+    {
+      "path": "pkg/main.rs",
+      "size": 54,
+      "sha256": "7c1e6f2d79b79c74fe6442b1ad99fa1fe38c97feb6238b362c05dff20d6e977b"
+    }
+  ],
+  "objects": [
+    {
+      "destination": "registry/modules/apple_support/1.24.1/MODULE.bazel",
+      "source_url": "https://bcr.bazel.build/modules/apple_support/1.24.1/MODULE.bazel",
+      "sha256": "f46e8ddad60aef170ee92b2f3d00ef66c147ceafea68b6877cb45bd91737f5f8",
+      "size": 1104,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/bazel_features/1.50.0/MODULE.bazel",
+      "source_url": "https://bcr.bazel.build/modules/bazel_features/1.50.0/MODULE.bazel",
+      "sha256": "2083ef9c7a469f520890483ccf8e0189d6e71e2117e7752e15e6554433d5ae3e",
+      "size": 346,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/bazel_features/1.50.0/source.json",
+      "source_url": "https://bcr.bazel.build/modules/bazel_features/1.50.0/source.json",
+      "sha256": "e0ee3debde2789ff56e4452e612d126925ba9ab64d4bde79c67f099d2902df9b",
+      "size": 508,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/package_metadata/0.0.3/MODULE.bazel",
+      "source_url": "https://bcr.bazel.build/modules/package_metadata/0.0.3/MODULE.bazel",
+      "sha256": "77890552ecea9e284b5424c9de827a58099348763a4359e975c359a83d4faa83",
+      "size": 235,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/package_metadata/0.0.3/source.json",
+      "source_url": "https://bcr.bazel.build/modules/package_metadata/0.0.3/source.json",
+      "sha256": "742075a428ad12a3fa18a69014c2f57f01af910c6d9d18646c990200853e641a",
+      "size": 238,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/platforms/1.1.0/MODULE.bazel",
+      "source_url": "https://bcr.bazel.build/modules/platforms/1.1.0/MODULE.bazel",
+      "sha256": "1c0c09f5bdcf4b3f924720d2478a3711cb39f4977019ca5988685e5b7e18b3d2",
+      "size": 416,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/platforms/1.1.0/source.json",
+      "source_url": "https://bcr.bazel.build/modules/platforms/1.1.0/source.json",
+      "sha256": "fcf351c47596c939140ab0d333dfdd08ed1ea6ce33c2fe70c12493a301cf1344",
+      "size": 176,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/rules_cc/0.2.4/MODULE.bazel",
+      "source_url": "https://bcr.bazel.build/modules/rules_cc/0.2.4/MODULE.bazel",
+      "sha256": "1ff1223dfd24f3ecf8f028446d4a27608aa43c3f41e346d22838a4223980b8cc",
+      "size": 1036,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/rules_rust/0.73.0/MODULE.bazel",
+      "source_url": "https://bcr.bazel.build/modules/rules_rust/0.73.0/MODULE.bazel",
+      "sha256": "25e3b077128612754c4add1b4c90d20a6be06566b623dee6e32038d0e8f93062",
+      "size": 4481,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "registry/modules/rules_rust/0.73.0/source.json",
+      "source_url": "https://bcr.bazel.build/modules/rules_rust/0.73.0/source.json",
+      "sha256": "8eeb3d9ba7c57916b63887a651e8f84c2f68b7243af9e712d728c2a0b7882255",
+      "size": 204,
+      "kind": "registry",
+      "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "mirror/github.com/bazelbuild/rules_rust/releases/download/0.73.0/rules_rust-0.73.0.tar.gz",
+      "source_url": "https://github.com/bazelbuild/rules_rust/releases/download/0.73.0/rules_rust-0.73.0.tar.gz",
+      "sha256": "2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2",
+      "size": 67196890,
+      "kind": "archive",
+      "provenance": "https://bcr.bazel.build/modules/rules_rust/0.73.0/source.json integrity"
+    },
+    {
+      "destination": "mirror/github.com/bazelbuild/platforms/releases/download/1.1.0/platforms-1.1.0.tar.gz",
+      "source_url": "https://github.com/bazelbuild/platforms/releases/download/1.1.0/platforms-1.1.0.tar.gz",
+      "sha256": "dbad4a23abcca6171e47b79edc53bd6a41067a3b75f9e8b104656b459ff25046",
+      "size": 8295,
+      "kind": "archive",
+      "provenance": "https://bcr.bazel.build/modules/platforms/1.1.0/source.json integrity"
+    },
+    {
+      "destination": "mirror/github.com/bazel-contrib/bazel_features/releases/download/v1.50.0/bazel_features-v1.50.0.tar.gz",
+      "source_url": "https://github.com/bazel-contrib/bazel_features/releases/download/v1.50.0/bazel_features-v1.50.0.tar.gz",
+      "sha256": "094367e732ece23f334eaf84089a720b861d053beeba6a6a68356d3aee1dc32b",
+      "size": 19148,
+      "kind": "archive",
+      "provenance": "https://bcr.bazel.build/modules/bazel_features/1.50.0/source.json integrity"
+    },
+    {
+      "destination": "registry/modules/bazel_features/1.50.0/patches/module_dot_bazel_version.patch",
+      "source_url": "https://bcr.bazel.build/modules/bazel_features/1.50.0/patches/module_dot_bazel_version.patch",
+      "sha256": "a9339c4684b9691dba04ac4ab4334ae55f4eb7dfd305dbb054d9c850f03f8d1c",
+      "size": 270,
+      "kind": "patch",
+      "provenance": "https://bcr.bazel.build/modules/bazel_features/1.50.0/source.json patches"
+    },
+    {
+      "destination": "mirror/github.com/bazel-contrib/supply-chain/releases/download/v0.0.3/supply-chain-v0.0.3.tar.gz",
+      "source_url": "https://github.com/bazel-contrib/supply-chain/releases/download/v0.0.3/supply-chain-v0.0.3.tar.gz",
+      "sha256": "0e89367f1cb6d93a5a1afea4b55b11ea6b28f63f653b47154153677ca7d4afea",
+      "size": 36325,
+      "kind": "archive",
+      "provenance": "https://bcr.bazel.build/modules/package_metadata/0.0.3/source.json integrity"
+    },
+    {
+      "destination": "distdir/rust/cargo-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "source_url": "https://static.rust-lang.org/dist/2025-09-14/cargo-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "cbc76e93946fb4658b692f9d71dbd4861f942b5b2bf6e34b072ba708d00e89e8",
+      "size": 10713480,
+      "kind": "tool_archive",
+      "provenance": "MODULE.bazel sha256s; unchanged fixture selected nightly2025-09-14"
+    },
+    {
+      "destination": "distdir/rust/clippy-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "source_url": "https://static.rust-lang.org/dist/2025-09-14/clippy-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "98bb5375ef6648d6e59fe8558e12df854e73653db2b6c7ee8891ffa0336f7622",
+      "size": 4589980,
+      "kind": "tool_archive",
+      "provenance": "MODULE.bazel sha256s; unchanged fixture selected nightly2025-09-14"
+    },
+    {
+      "destination": "distdir/rust/llvm-tools-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "source_url": "https://static.rust-lang.org/dist/2025-09-14/llvm-tools-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "7302ec9a0447d5e21d918428b629a1d76ff934a562660e19b275fad707cf83dc",
+      "size": 40619320,
+      "kind": "tool_archive",
+      "provenance": "MODULE.bazel sha256s; unchanged fixture selected nightly2025-09-14"
+    },
+    {
+      "destination": "distdir/rust/rust-std-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "source_url": "https://static.rust-lang.org/dist/2025-09-14/rust-std-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "9a0a34cc7a11eb74f408ab7a5eafd063bcce3726c9bb89351ed7f2811fa35b1a",
+      "size": 29467756,
+      "kind": "tool_archive",
+      "provenance": "MODULE.bazel sha256s; unchanged fixture selected nightly2025-09-14"
+    },
+    {
+      "destination": "distdir/rust/rustc-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "source_url": "https://static.rust-lang.org/dist/2025-09-14/rustc-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "0aa143cf401827874af7114f6466c0c87d4e31dfd6a2355c50db2e0c71bd45c7",
+      "size": 83872880,
+      "kind": "tool_archive",
+      "provenance": "MODULE.bazel sha256s; unchanged fixture selected nightly2025-09-14"
+    },
+    {
+      "destination": "distdir/rust/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "source_url": "https://static.rust-lang.org/dist/2026-07-16/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "bb48a8124f84818dab540701952e4cf5506045000baa975b6046d54aeac87d5d",
+      "size": 2473860,
+      "kind": "tool_archive",
+      "provenance": "rules_rust0.73 rust/private/common.bzl default + known_shas.bzl; candidate only, not forced"
+    },
+    {
+      "destination": "registry/modules/apple_support/1.24.2/patches/module_dot_bazel_version.patch",
+      "source_url": "https://bcr.bazel.build/modules/apple_support/1.24.2/patches/module_dot_bazel_version.patch",
+      "sha256": "037651b4a7e9463942177b2691e26b362294612e4c2c7abf7bde3133eae85a2e",
+      "size": 347,
+      "kind": "patch",
+      "provenance": "registry/modules/apple_support/1.24.2/source.json patches; audited natural registry Source.json declaration"
+    },
+    {
+      "destination": "registry/modules/buildozer/8.5.1/patches/module_dot_bazel_version.patch",
+      "source_url": "https://bcr.bazel.build/modules/buildozer/8.5.1/patches/module_dot_bazel_version.patch",
+      "sha256": "3264d826794ff8770d49e949ce16614800c73c5447d389aeb9f2b6bf569afa1d",
+      "size": 305,
+      "kind": "patch",
+      "provenance": "registry/modules/buildozer/8.5.1/source.json patches; audited natural registry Source.json declaration"
+    },
+    {
+      "destination": "registry/modules/rules_apple/4.1.0/patches/module_dot_bazel_version.patch",
+      "source_url": "https://bcr.bazel.build/modules/rules_apple/4.1.0/patches/module_dot_bazel_version.patch",
+      "sha256": "ed11f9a5883b0b7d9895811fda5c83e62807f273c621641dbf9484bae3f4d053",
+      "size": 316,
+      "kind": "patch",
+      "provenance": "registry/modules/rules_apple/4.1.0/source.json patches; audited natural registry Source.json declaration"
+    },
+    {
+      "destination": "registry/modules/zlib/1.3.1.bcr.5/patches/add_build_file.patch",
+      "source_url": "https://bcr.bazel.build/modules/zlib/1.3.1.bcr.5/patches/add_build_file.patch",
+      "sha256": "49d6e28aa38a37d75c7abc7c13e9850b63ddfd0d8ab8bebbff7fb9d16c4224b7",
+      "size": 4508,
+      "kind": "patch",
+      "provenance": "registry/modules/zlib/1.3.1.bcr.5/source.json patches; audited natural registry Source.json declaration"
+    },
+    {
+      "destination": "registry/modules/zlib/1.3.1.bcr.5/patches/module_dot_bazel.patch",
+      "source_url": "https://bcr.bazel.build/modules/zlib/1.3.1.bcr.5/patches/module_dot_bazel.patch",
+      "sha256": "967ea2597bb7ef445c940d1ec41cd4d986e807ab03227efa96c03390d5d6baf9",
+      "size": 295,
+      "kind": "patch",
+      "provenance": "registry/modules/zlib/1.3.1.bcr.5/source.json patches; audited natural registry Source.json declaration"
+    }
+  ]
+}
