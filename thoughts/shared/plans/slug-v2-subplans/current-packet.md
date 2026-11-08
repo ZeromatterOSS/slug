@@ -9,20 +9,19 @@ owns the concrete protocol, rooted IO, quotas and file split.
 [Fixed backing evidence](wp1225-repository-root-backing-2026-11-07.json) proves
 three-launch rolling attachment and scaled same-backing quota shrink; it closes
 no production, confinement or public-command gate.
-[Inactive foundations](wp1225-rooted-foundations-acceptance-2026-11-07.json)
-implement anchored resolution and private rooted IO/shared archive extraction.
-The clean owned source view passes 96 workspace tests (two ignored) and all 26
-filesystem/archive guards. The inactive rooted delete/terminal-manifest
-consumers now have [their own acceptance receipt](wp1225-rooted-consumers-acceptance-2026-11-07.json).
-The [immutable workspace protocol](wp1225-workspace-protocol-acceptance-2026-11-07.json)
-now owns inactive reservation, ordered operation/state replay, command epochs
-and cumulative retention admission. Native process/source integration remains
-inactive; Loading and Core still use their prior production routes.
-The [rooted source-IO component](wp1225-rooted-source-io-acceptance-2026-11-07.json)
-adds shared credited FD capture and borrowed rooted lstat/link/directory/bytes/
-digest observations, including actual anchored DICE Need/retry proof. Selected
-physical-root ownership/registry, InputImage/native transport and production
-source routing are still unintegrated.
+Accepted inactive components cover anchored resolution, rooted IO/archive/delete/
+manifest operations, immutable workspace replay/epochs, and rooted source
+observations. The [physical-root ownership receipt](wp1225-physical-root-acceptance-2026-11-07.json)
+adds actual quota-backed root attestation, consuming complete-tree sealing and
+read-only source leases with descriptor/retained/backing credits. Its fixed Rust
+native fixtures prove namespace-exit lifetime and rejection boundaries, not
+untrusted execution, full archive exhaustion or whole-command memory fit.
+
+The next integration frontier is native mutable progress/rolling lease transfer,
+selected physical-root registry and InputImage/native source transport, followed
+by original Loading/process activation under the complete gates below. Existing
+production routes remain replacement-required. The selected design links owner
+contracts and evidence; prior component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.
 

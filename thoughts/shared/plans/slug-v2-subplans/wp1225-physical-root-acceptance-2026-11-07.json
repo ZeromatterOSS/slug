@@ -1,0 +1,249 @@
+{
+  "status": "INACTIVE_PHYSICAL_ROOT_OWNERSHIP_ACCEPTED",
+  "date": "2026-11-07",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "1a4428ca8fa3f4e260a316fa2f47efb2e88ba815",
+  "source_view": "Twelve pinned Rust source files over the clean pushed baseline. Core-only Linux test bridge reuses an existing genuine owner producer; inherited dirty source excluded.",
+  "source_sha256": {
+    "app/slug_bzlmod_v2/src/repository_workspace.rs": "193c70794790ff8d6bbd4969fd3ab45c44aad6283c59c6f101d540905320bcbf",
+    "app/slug_bzlmod_v2/src/repository_workspace/state.rs": "22036276badb30fbab26e857a914c33dd8fbd590e1547f3a32272c2954e2de0f",
+    "app/slug_core_v2/src/runtime/dice.rs": "b6b301a22de83a8024675b5cb76fe65d7cc4cfa9900d92a1294059aaf4042dcb",
+    "app/slug_core_v2/src/runtime/mod.rs": "0da88c7bb0c8cc587196a50c9966a0dc2cc9493a7c44a36e6beac7c8c51f2aad",
+    "app/slug_core_v2/src/runtime/repository_physical_root.rs": "03e627181e449d976a830619e105e077a90ee3188e25fc1acf1414d3406a06f5",
+    "app/slug_core_v2/src/runtime/repository_physical_root/native_fixture.rs": "d396fc3225f0f02c091b686bec6db9fe63bb138464c50e0ce143aa61f20bbd1d",
+    "app/slug_core_v2/src/runtime/repository_physical_root/native_tests.rs": "a2f2a990390ecea7f33aaec2a0cd599d470e017b00122fee6faceed943bb815d",
+    "app/slug_core_v2/src/runtime/repository_physical_root/reader.rs": "c60b3d70c6f4c2943c59e8471292692803f9d8829b3d59e8dadaa4261f15bfa0",
+    "app/slug_core_v2/src/runtime/repository_physical_root/resources.rs": "635eb542ae46649acb6f691b539014fdb8eee57881112129456a69f496ae0c16",
+    "app/slug_core_v2/src/runtime/repository_physical_root/seal.rs": "358d6b0e8d16298d7085ac773ee8081ca72891f5cea4720304b646f90f410e95",
+    "app/slug_core_v2/src/runtime/repository_physical_root/tests.rs": "36a790ad84f43449756bea1fae029935f27757ec461ddd6397f250cb437cfbff",
+    "app/slug_core_v2/src/runtime/repository_physical_root/verification_tests.rs": "bb908d7c80f63bbab787782c51e5a34e92ac3506ca5aee64d571cb85cbf75033"
+  },
+  "compatibility": {
+    "Slug-native": [
+      "Actual tmpfs mount-root identity and fixed Linux quota/platform admission",
+      "Closed FD-root ownership, complete snapshot verification and finite native resource policy",
+      "Read-only snapshot-member source leases and nonretryable infrastructure cancellation"
+    ],
+    "protected_existing": [
+      "Workspace structural reservation/state/replay identity and body accounting",
+      "Host/Registry readers, legacy plain archive materialization and existing production routes"
+    ],
+    "unsupported_or_inactive": [
+      "Native mutable progress and rolling mount-token integration",
+      "Factory provenance, child/writer quiescence and selected current root registry integration",
+      "Rooted InputImage/native source transport migration and original Starlark/process activation",
+      "Full archive/process exhaustion/envelope, confinement, public bootstrap and equivalent-command memory fit"
+    ]
+  },
+  "design_review": "Independent design ACCEPT for closed physical owner/resource/seal/reader contract and fixed trusted Rust native fixture.",
+  "behavior": [
+    "Factory consumes a producer-credited readable CLOEXEC FD and verifies tmpfs type, directory inode1, supported statx MOUNT_ROOT/mount-ID, actual4096page and exact selected quota",
+    "Archive quota2GiB/262144inodes or Process64MiB/8192inodes; a quota-sharing bind-subdirectory with MOUNT_ROOT is rejected",
+    "Consuming seal checks full reservation/mode, all expected nodes and all actual children, actual modes/types/single-link regularity, literal links, exact body chunks/EOF and stable metadata; mount/quota/root checks repeat",
+    "Sealed owner retains only final state and canonical reservation, not transcript/history; source leases expose no File/rawFD/RootIo/mutation/mount authority",
+    "ImageDescriptorBudget accounts complete retained guards/control/scratch; finite FD slots and virtual backing-capacity counters are separate",
+    "Root Arc clones duplicate no descriptor; each positional Read/Seek reader holds its exact root, scope and FD/retained credits, compares bytes to immutable snapshot and validates named/open/root identity",
+    "Sticky cancellation returns nonretryable IO error so standard Read helpers terminate; failed factory ownership and last-reader destruction close handles before credits retire"
+  ],
+  "native_evidence": {
+    "test_run": {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--ignored",
+        "--exact",
+        "runtime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release",
+        "runtime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root",
+        "runtime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 3,
+      "elapsed_seconds": 0.26410656300049595,
+      "executable_sha256": "a0644c0756f3880d615737ef7565ef5cf43c0ba36239cac387cef036ef060a57"
+    },
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release",
+      "runtime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root",
+      "runtime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "preflight_listing": "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper: test\nruntime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release: test\nruntime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits: test\nruntime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root: test\n\n4 tests, 0 benchmarks\n",
+    "socket_capability": "AF_UNIX SOCK_SEQPACKET confirmed before invocation",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+    "kernel": "7.2.7-ogc1.1.fc44.x86_64",
+    "frame": "Fixed74byte LE schema with nonce, mode/view and independent FD metadata; exact1right, bounded harness text/stderr, all received rights owned before validation",
+    "fixture": "Trusted Rust Core-test helper under unprivileged bwrap namespaces; fixed tiny dir/body/internal-link payload only, no arbitrary original/payload or Python production helper",
+    "proof": [
+      "Archive and Process actual mount quota facts and FD survival after helper/launcher namespace exit",
+      "Same-length body mismatch, foreign reservation, enum mode mismatch, actual quota mismatch and real bind-subdirectory refusal",
+      "Source observation with absent/foreign Host display, snapshot-member refusal, no-FD Arc clone, independent readers/Seek and last-reader root lifetime",
+      "Cancelled standard read_to_end returns promptly and all tested byte/FD/backing credits return to baseline"
+    ],
+    "cleanup": "Each fixture reaps owned helper/launcher before returning File; RAII kill/wait covers refusal. Every tested failed root FD closes and last source reader releases backing/retained/native-FD credits.",
+    "qualification": "Quota metadata and tiny actual payload proof only; not full-envelope exhaustion, rolling transfer, untrusted confinement, all kernel-memory bounds or public-command RSS proof."
+  },
+  "compile_gates": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 68.11895664399981,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.098435317999247,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "-p",
+        "slug_reapi_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 18.990469769999436,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "evidence_reuse": "Final change gates the genuine-owner test bridge to Linux, matching its existing test-only dependency. Core artifact/preflight and all9Core owner/native selections were refreshed. Bzlmod25 and CLI/REAPI checks remain current for unchanged production/Bzlmod source.",
+  "test_runs": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--exact",
+        "runtime::repository_physical_root::seal::verification_tests::complete_tree_verification_rejects_extra_root_and_nested_children",
+        "runtime::repository_physical_root::seal::verification_tests::complete_tree_verification_rejects_mode_and_equivalent_literal_link_changes",
+        "runtime::repository_physical_root::tests::ordinary_host_directories_and_regular_files_cannot_become_physical_roots",
+        "runtime::repository_physical_root::tests::resource_policy_and_bank_control_require_positive_exact_credits",
+        "runtime::repository_physical_root::tests::resource_reservation_checks_all_domains_atomically_and_releases_on_last_owner",
+        "runtime::repository_physical_root::tests::scope_refusal_precedes_inactive_authority_and_allocations",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 6,
+      "elapsed_seconds": 0.03214425599981041,
+      "executable_sha256": "a0644c0756f3880d615737ef7565ef5cf43c0ba36239cac387cef036ef060a57"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-6ed4b973def1affc",
+        "--exact",
+        "module_version::repository_workspace_storage_tests::complete_version_storage_includes_both_shared_identifier_arrays",
+        "repository_workspace::tests::all_position_arguments_environment_removal_empty_and_requested_timeout_are_literal",
+        "repository_workspace::tests::archive_deeper_than_256_preserves_lane_while_delete_and_process_keep_own_limits",
+        "repository_workspace::tests::argument_environment_archive_metadata_charge_actual_spare_storage_and_owner_arrays",
+        "repository_workspace::tests::dice_observes_completed_state_fresh_commands_revocation_and_workspace_isolation",
+        "repository_workspace::tests::equal_argv_new_index_is_a_new_sample_not_replay",
+        "repository_workspace::tests::equal_foreign_bodies_are_compared_then_replaced_without_double_retention",
+        "repository_workspace::tests::equal_foreign_predecessor_and_reservation_are_released_before_retention",
+        "repository_workspace::tests::execute_count_exact_limit_replays_prior_indices_and_refuses_new_plus_one",
+        "repository_workspace::tests::execute_cwd_requires_selected_instance_and_repository_subtree_before_need",
+        "repository_workspace::tests::fresh_empty_revoked_epochs_reject_stale_reservations_and_global_state_overflow",
+        "repository_workspace::tests::incorrect_read_write_delete_results_and_reverse_mode_are_not_certificates",
+        "repository_workspace::tests::nonzero_exit_keeps_writes_deletions_modes_and_later_read",
+        "repository_workspace::tests::normal_exit_and_each_output_stream_have_independent_exact_plus_one_limits",
+        "repository_workspace::tests::owner_layout_rounds_byte_tails_and_refuses_impossible_array_layouts",
+        "repository_workspace::tests::process_body_exact_limit_and_new_version_plus_one_count_complete_history",
+        "repository_workspace::tests::process_entry_and_depth_exact_plus_one_do_not_lower_archive_admission",
+        "repository_workspace::tests::process_names_and_absolute_path_have_exact_plus_one_limits",
+        "repository_workspace::tests::protocol_debug_redacts_body_argv_environment_and_captured_bytes",
+        "repository_workspace::tests::replay_requires_full_operation_index_predecessor_and_generation",
+        "repository_workspace::tests::reservation_rejects_zero_and_retains_full_generation_policy_identity",
+        "repository_workspace::tests::state_rejects_missing_parent_duplicate_special_modes_and_escaping_link",
+        "repository_workspace::tests::state_versions_metadata_and_retained_bodies_have_exact_plus_one_policies",
+        "repository_workspace::tests::template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equal",
+        "selected_repo_spec::selected_extension_demand::repository_workspace_storage_tests::complete_owner_storage_covers_foreign_spare_strings_and_version_guards",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 25,
+      "elapsed_seconds": 0.2037267329997121,
+      "executable_sha256": "aac865b6d6af1a5f6b7c686722b4f18cd886f5dc6e4956a3472c3b4dc7c6f5d0"
+    }
+  ],
+  "test_scope": {
+    "core_nonignored": 6,
+    "protected_bzlmod": 25,
+    "explicit_ignored_native_parents": 3,
+    "internal_helper_selected_only_by_parents": 1,
+    "passed_parent_tests": 34,
+    "failed": 0
+  },
+  "compile_json_sha256": {
+    "physical-owner-compile-initial-failure.jsonl": "a64408257d970fc29305bba9d4f6022c81ecc04311d2d57eadf4d46743123825",
+    "physical-owner-compile-before-linux-test-guard.jsonl": "cd70a728ce7ccb47e340cd4e3720c47b05b3342e3de979ba3e6f34b67ff3300e",
+    "physical-owner-compile.jsonl": "7152bda5c666944b85f4229bfac943598a0a38d232a4a24133fc55b5f1785d41",
+    "physical-owner-dependents.jsonl": "f90d98e1252d4dc09c0221f1abc79a3a4c9bf26e580f3dfa7ea05325af28ebc2"
+  },
+  "raw_test_output_sha256": {
+    "physical-owner-slug_core_v2-unit": {
+      "stdout": "7403c3d17ebaa633ae298ab614f48c0cbe7cfd9e205b2f83c0870b49d9e593bc",
+      "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "physical-owner-slug_bzlmod_v2-unit": {
+      "stdout": "179dc5e3af3b9df81404fe2e379db4dc4a606a75c3ae43fe2d84650e5ba8efe6",
+      "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "physical-owner-native": {
+      "stdout": "e49682ef63274361d8d76f53629d1c6c81a2c6f0830eadba932dd423c01c1a0b",
+      "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "corrections": [
+    "Bounded manual reader Debug omits native scope",
+    "Sticky source refusal cannot map to retried Interrupted",
+    "Factory arms owner-before-credit drop order before fallible native attestation",
+    "Complete-tree extra-node/mode/literal-link controls and wrong actual quota/bind-subdirectory native controls",
+    "Linux-only test bridge matches its existing fixture dependency"
+  ],
+  "final_review": "Independent final source/correction and compiled-artifact/preflight/raw-result/native/dependent review ACCEPT.",
+  "static_gates": [
+    "Pinned rustfmt",
+    "git diff --check",
+    "scripts/v2_archive_status.sh",
+    "python3 scripts/v2_plan_status.py",
+    "Changed plan links resolve"
+  ],
+  "residual": "Inactive component acceptance only. Factory/seal require trusted selected-generation provenance and exclusion of all external writers; verifying a snapshot is not proof of descendant death. No live root registry, mount lease, arbitrary payload or production execution is activated. The active WP425 integration and public/bootstrap/memory gates remain open."
+}

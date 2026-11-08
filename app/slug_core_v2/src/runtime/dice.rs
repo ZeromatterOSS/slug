@@ -9378,6 +9378,14 @@ pub fn package_path_for_target(
     Ok(workspace.join(package.as_str()))
 }
 
+#[cfg(all(test, target_os = "linux"))]
+pub(super) fn physical_root_owner_for_test() -> Arc<slug_bzlmod_v2::HostSelectedExtensionOwner> {
+    let fixture = selected_tool_source::tests::Fixture::new(
+        "def _impl(ctx):\n    pass\next = module_extension(implementation = _impl)\n",
+    );
+    selected_tool_source::tests::discover_owner(&fixture.runtime)
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;

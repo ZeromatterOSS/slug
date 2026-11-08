@@ -66,6 +66,34 @@ durable SourceBacking until a real alias has separate access/lifetime/ABA proof.
 
 ## Archive envelope and irreversible process transition
 
+The inactive physical-root owner consumes a producer-credited FD from trusted
+quiescent setup. It independently checks a directory at the actual tmpfs root
+(inode 1 and supported statx mount-root/mount-ID facts), 4096-byte pages and
+the exact selected quota pair. A mount-root bit alone does not admit a bind
+of a tmpfs subdirectory. It never opens a display path or retains mount tokens.
+An explicit native resource bank pays syscall scratch, complete retained guards,
+FD slots and declared backing-capacity allowances. Rooted observation also keeps
+its existing source-scope capture credits; no source-bank cap is increased.
+Retained-byte reservations reuse the existing descriptor-budget utility. Backing
+allowance is a virtual quota reservation, not a kernel/slab or RSS bound.
+
+Consuming seal compares the full reservation and final mode, verifies every
+expected node and every actual directory child, compares file chunks directly
+with existing immutable bodies, and checks literal links, modes, EOF and identity.
+Mount, root identity and quota facts must still match after verification. The
+sealed owner keeps only the final state, not the transcript/history. Its shared
+read-only surface offers observation and snapshot-member readers; it exposes
+neither File/raw FDs, RootIo, mutation nor mount authority. Each reader holds its
+exact root lease and positive credits, compares bytes to the sealed snapshot,
+and checks current rooted/FD identity. Descriptors and owned payloads close before
+their credits can be reused.
+
+This owner has no generic mutation closure. Future native progress must supply
+closed mutation/launch operations and prove all external writers quiescent.
+Snapshot equality alone does not prove descendant death or absence of write
+aliases. Registry association, rolling-token integration, quota transition,
+confinement and production activation remain separate packet gates.
+
 Legacy plain archive behavior remains 512 MiB/call, 1 GiB cumulative DECODED,
 with its existing bounds. Select general-root Archive mode with **tmpfs size=
 2 GiB, nr_inodes=262144, actual page size4096 ONLY**. Keep unchanged decoded

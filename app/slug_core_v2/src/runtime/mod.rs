@@ -46,11 +46,14 @@ mod repository_archive;
 mod repository_archive_file;
 mod repository_archive_http;
 mod repository_archive_patch;
-mod repository_filesystem_progress;
 mod repository_archive_realize;
+mod repository_filesystem_progress;
 mod repository_generated_archive;
 mod repository_host_input;
 mod repository_io;
+#[cfg(target_os = "linux")]
+#[allow(dead_code)] // Inactive WP425 ownership; native integration remains gated.
+mod repository_physical_root;
 mod repository_process;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)] // Inactive WP425 primitives; owners are integrated separately.

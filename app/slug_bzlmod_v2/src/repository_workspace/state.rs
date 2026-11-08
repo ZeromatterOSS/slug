@@ -82,6 +82,30 @@ impl RepositoryWorkspaceState {
             .ok()
             .map(|i| &self.entries[i])
     }
+
+    /// Complete state/entry/path/link and reservation guard, excluding the
+    /// allocations owned by File bodies. Borrows existing storage only.
+    #[doc(hidden)]
+    pub fn retained_metadata_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            self.reservation.metadata()?,
+            Self::validate(&self.reservation, self.mode, &self.entries)?,
+        )
+    }
+
+    /// Complete conservative retained state guard. Every File occurrence pays
+    /// its full Arc allocation header, padding and payload, even when shared.
+    #[doc(hidden)]
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        let mut bytes = self.retained_metadata_bytes()?;
+        for entry in self.entries.iter() {
+            if let RepositoryWorkspaceNode::File(body) = entry.node() {
+                bytes = add(bytes, array_bytes::<u8>(body.len())?)?;
+            }
+        }
+        Ok(bytes)
+    }
+
     pub(super) fn from_admitted(
         reservation: Arc<RepositoryWorkspaceReservation>,
         mode: RepositoryWorkspaceMode,

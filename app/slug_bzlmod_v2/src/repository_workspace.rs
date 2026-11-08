@@ -166,6 +166,14 @@ impl RepositoryWorkspaceReservation {
     pub fn limits(&self) -> RepositoryWorkspaceRetentionLimits {
         self.limits
     }
+
+    /// Conservative complete reservation guard, including nested shared owners
+    /// and spare string capacity. Equal foreign guards are not assumed shared.
+    #[doc(hidden)]
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        self.metadata()
+    }
+
     fn metadata(&self) -> Result<usize, RepositoryWorkspaceError> {
         add(
             array_bytes::<Self>(1)?,

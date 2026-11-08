@@ -38,6 +38,19 @@ interner or global cache. The source bank is an operational component bound,
 not a physical-FD, kernel-memory or completed-command RSS claim. See the
 [rooted source-IO receipt](wp1225-rooted-source-io-acceptance-2026-11-07.json).
 
+The inactive physical-root owner wraps the existing ImageDescriptorBudget for
+complete retained-state/control credits, with separate finite native-FD and
+virtual backing-capacity counters. Producer-owned conservative bounds include
+full nested reservation guards and every final body Arc header/padding/payload;
+sharing may overcharge. Consuming seal retains only the final state, not prior
+transcript history, and compares actual file chunks without another body copy.
+Root Arc clones duplicate no descriptor. Read-only readers keep their exact root
+and FD credits until last release; failure destruction closes handles and drops
+owned payloads before retiring credits. No new interner, cache or donor import
+is introduced. The [physical-root receipt](wp1225-physical-root-acceptance-2026-11-07.json)
+records actual tmpfs fixture proof; virtual quota reservations do not establish
+kernel-memory or completed-command RSS bounds.
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior
