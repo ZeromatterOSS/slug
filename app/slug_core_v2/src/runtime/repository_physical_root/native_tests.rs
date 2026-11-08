@@ -188,11 +188,21 @@ fn native_archive_and_process_roots_seal_same_backing_and_readers_own_last_relea
             NormalizedAbsolutePath::new(display.join("dir/body")).unwrap(),
             PathObservationOperation::FileBytes,
         );
+        let before = scope.snapshot();
         let observed = root.observe(&[bytes.clone()], &scope, &|| true).unwrap();
+        let RepositoryWorkspaceNode::File(canonical) =
+            root.state().entry("dir/body").unwrap().node()
+        else {
+            panic!("sealed fixture owns the regular body")
+        };
         assert!(
-            matches!(observed.get(&bytes).unwrap().as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(body)) if body.as_ref() == BODY)
+            matches!(observed.get(&bytes).unwrap().as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(body)) if body.as_ref() == BODY && Arc::ptr_eq(body,canonical))
         );
-        assert_eq!(scope.snapshot().source_attempts, 1);
+        assert_eq!(scope.snapshot().source_attempts, 0);
+        assert_eq!(
+            scope.snapshot().decoded_bytes - before.decoded_bytes,
+            BODY.len() as u64
+        );
         // The selected spelling can later name a foreign Host tree. Neither
         // sealed membership nor reader IO may reopen that tree.
         std::fs::create_dir_all(display.join("dir")).unwrap();

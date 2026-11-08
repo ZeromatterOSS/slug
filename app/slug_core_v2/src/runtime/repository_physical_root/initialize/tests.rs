@@ -50,6 +50,9 @@ use crate::runtime::native_source_access::new_reader_resources;
 use crate::runtime::repository_io::RepositoryMaterializer;
 use crate::runtime::repository_io::physical_roots::SelectedRepositoryRoots;
 
+#[path = "tests/owned_observation_tests.rs"]
+mod owned_observation_tests;
+
 struct Generation {
     request: Arc<RepositoryMaterializationRequest>,
     results: RepositoryMaterializationResultEpoch,
@@ -831,11 +834,11 @@ fn native_claimed_registry_sources_keep_same_display_instances_separate_and_read
         matches!(refused, Err(crate::runtime::repository_io::RepositorySessionError::NativeWorkspace(message)) if message.as_ref() == "physical observation association changed")
     );
     assert!(materializer.session_is_active(token_c));
-    // One Host FileBytes and one physical FileBytes remain two content
-    // attempts under the metadata/content classification.
+    // Host FileBytes is a new acquisition; the actual sealed General file is
+    // owned-body verification. Both still charge decoded bytes before recheck.
     assert_eq!(
         scope.snapshot().source_attempts,
-        before_recheck.source_attempts + 2
+        before_recheck.source_attempts + 1
     );
     assert!(scope.snapshot().decoded_bytes > before_recheck.decoded_bytes);
     materializer.discard(token_c).unwrap();

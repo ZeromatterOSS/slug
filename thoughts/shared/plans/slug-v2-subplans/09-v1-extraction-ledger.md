@@ -53,6 +53,21 @@ observer and adds fixed progress counters, without a production hook or donor
 import. This component does not establish completed-command memory fit; its
 validation belongs to the selected observation-cutoff acceptance receipt.
 
+Owned-file observation verification borrows a closed carrier from the actual
+sealed native owner and reuses RootIo's nofollow stream, byte comparison and
+actual SHA-256. Only complete direct File bodies may select this class; Source
+digests and unowned content remain acquisitions. Successful FileBytes clones
+the existing canonical Arc after complete fresh verification, with full actual
+DecodedBytes history accounting and unchanged metadata/scratch/FD bounds.
+The borrowed carrier and verifier add no retained container, interner, cache,
+donor import or semantic hash shortcut. A pure body may outlive native-owner
+credit under the existing decoded-history class; this is no claim of permanent
+live-bank/RSS coverage. SourceAttempts64 remains the acquisition limit; the new
+verification classification and contradictory-State refusal are explicit
+Slug-native policy changes under the selected owner contract. Native ownership,
+body-alias lifetime and bounded original-command evidence are recorded in the
+[acceptance receipt](wp1225-owned-observation-acceptance-2026-11-08.json).
+
 The inactive rooted source observer reuses RootIo and ordinary immutable path
 epochs. The credited regular-file reader now shares one FD capture kernel with
 the unchanged Host/Registry adapters; rooted bytes retain the same exact Arc

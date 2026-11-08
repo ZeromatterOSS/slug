@@ -43,7 +43,9 @@ mod image;
 mod initialize;
 mod materialization;
 pub(in crate::runtime) use materialization::SealedWorkspaceMaterialization;
+mod observation;
 mod reader;
+pub(in crate::runtime) use observation::SealedGeneralObservation;
 mod resources;
 mod routed;
 mod seal;
@@ -394,15 +396,9 @@ impl RepositoryPhysicalRoot {
         self.check_origin(scope, active)?;
         let _credit = self.resources.reserve(IO_SCRATCH, 3, 0)?;
         self.validate_backing()?;
-        let io = RootIo::new(&self.file, io_limits(self.mode, &self.reservation))?;
-        let result = super::path_observation::rooted::observe_rooted(
-            &io,
-            &self.anchor,
-            demands,
-            scope,
-            active,
-        )
-        .map_err(PhysicalRootError::Observation)?;
+        let owner = SealedGeneralObservation::new(self, scope, active)?;
+        let result = super::path_observation::rooted::observe_sealed_general(&owner, demands)
+            .map_err(PhysicalRootError::Observation)?;
         self.validate_backing()?;
         self.check_origin(scope, active)?;
         Ok(result)

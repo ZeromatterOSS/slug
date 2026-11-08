@@ -21,7 +21,10 @@ use super::*;
 use crate::runtime::dice::source_service::SourceBufferReservation;
 use crate::runtime::dice::source_service::SourceCounter;
 use crate::runtime::dice::source_service::read_open_regular_file_after_attempt;
+use crate::runtime::repository_physical_root::SealedGeneralObservation;
 use crate::runtime::repository_root_io::RootIo;
+
+mod owned;
 
 const MAX_DEMANDS: usize = 131_072;
 const MAX_PATH_STORAGE: usize = 4 * 1024 * 1024;
@@ -173,6 +176,34 @@ pub(in crate::runtime) fn observe_rooted(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<PathObservationEpoch, RootedObservationError> {
+    observe_batch(root, anchor, demands, scope, active, None)
+}
+
+/// A separate closed entrypoint: generic RootIo callers cannot supply modeled
+/// bodies or suppress acquisition charges. The carrier owns the exact root,
+/// canonical State borrow and original scope/activity binding together.
+pub(in crate::runtime) fn observe_sealed_general(
+    owner: &SealedGeneralObservation<'_>,
+    demands: &[PathObservationDemand],
+) -> Result<PathObservationEpoch, RootedObservationError> {
+    observe_batch(
+        owner.io(),
+        owner.anchor(),
+        demands,
+        owner.scope(),
+        owner.active(),
+        Some(owner),
+    )
+}
+
+fn observe_batch(
+    root: &RootIo<'_>,
+    anchor: &MaterializationPathAnchor,
+    demands: &[PathObservationDemand],
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+    owner: Option<&SealedGeneralObservation<'_>>,
+) -> Result<PathObservationEpoch, RootedObservationError> {
     check(scope, active)?;
     let paths = validate_rooted_demands(anchor, demands)?;
     // SortedMap uses Buck2's OrderedMap/SmallMap entry/hash/index arrays. Eight
@@ -223,17 +254,24 @@ pub(in crate::runtime) fn observe_rooted(
         check(scope, active)?;
         let demand = &demands[index];
         let path = relative(anchor, demand, index)?;
-        // SourceAttempts bounds actual content acquisition, not metadata
-        // revalidation. Charge before lstat as missing/wrong-kind/failed content
-        // captures are attempts too. FileBytes uses the after-attempt kernel.
-        // Metadata still has the full batch/path/live-credit/deadline guards.
-        if matches!(
+        let content = matches!(
             demand.operation(),
             PathObservationOperation::FileBytes | PathObservationOperation::FileDigest
-        ) {
-            scope.charge(SourceCounter::SourceAttempts, 1)?;
-        }
-        let result = observe_one(root, path, demand.operation(), scope, active, &mut credits)?;
+        );
+        // Classify from the actual sealed owner before any path IO. An eligible
+        // verification error never retries as a capture. Every other content
+        // request still charges before lstat, including missing/wrong-kind.
+        let canonical = content
+            .then(|| owner.and_then(|owner| owner.file(path)))
+            .flatten();
+        let result = if let Some((body, mode)) = canonical {
+            owned::verify(root, path, body, mode, demand.operation(), scope, active)?
+        } else {
+            if content {
+                scope.charge(SourceCounter::SourceAttempts, 1)?;
+            }
+            observe_one(root, path, demand.operation(), scope, active, &mut credits)?
+        };
         check(scope, active)?;
         observations.push((demand.clone(), result));
     }
@@ -570,3 +608,6 @@ mod tests;
 
 #[cfg(test)]
 mod resolution_tests;
+
+#[cfg(test)]
+mod owned_tests;

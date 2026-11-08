@@ -3,19 +3,25 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: attribute the unchanged Source-attempt64 exhaustion on original
-`rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
-The [observation-cutoff component](wp1225-observation-cutoffs-acceptance-2026-11-08.json)
-now keeps completed original A cached across unrelated repository publications,
-while full own history, request-bound sources and fresh leases remain tracked.
-Its same-input ABBA diagnostic observes about1.9s less root-compute wall time
-across762 cycles. Both candidate runs reach Source-attempt64 at about25s;
-the controls reach the deadline or the same refusal at about27s. This is bounded
-graph evidence, not completed Rust cquery or whole-command performance/RSS proof.
-Inspect actual source charges and their producer custody before selecting any
-generic reuse change under the [owner contract](wp1225-general-repository-workspace-design.md#repository-observation-cutoffs).
-No caller-specific pruning, clock/cap increase or Need-cacheability change is
-selected. Rust archive progress remains unreached.
+Current delta: diagnose and repair the observed PermissionDenied13 in genuine
+Immutable Source preparation for original `rules-rust-073-toolchain-owner`
+`cquery //pkg:probe` with its nightly setting. Static archive/producer evidence
+points to final MODULE replacement over a mode0555 archive member; confirm the
+exact producer with a causal regression and pinned-source semantics before
+selecting a generic same-root replacement fix. No cap or privilege increase,
+caller pruning, fabricated root or semantic substitute is selected.
+
+The [owned-verification component](wp1225-owned-observation-acceptance-2026-11-08.json)
+now shares canonical General bodies after complete fresh FD verification.
+104 ordinary tests, four real owner guards and four warm compiler commands pass.
+Original Rust General-family acquisition debits fall 51→0 with identical103265
+decoded bytes, passing the predecessor Source64 refusal. Private Source capture
+then decodes25,559,040 additional bytes before PermissionDenied13; total attempts
+are14 with no sticky scope error. Completed51 roots/100records/762 cycles remain
+the same. Exact cleanup passes; Rust completion, General archive callback,
+production activation and completed-command latency/RSS gates remain open.
+The [cutoff component](wp1225-observation-cutoffs-acceptance-2026-11-08.json)
+retains exact used/absent dependencies, full own history and command freshness.
 
 The [retention contract](wp1225-general-repository-workspace-design.md#retention-admission-dimensions)
 now separates root capacity128 from metadata-bounded exact history and enforces

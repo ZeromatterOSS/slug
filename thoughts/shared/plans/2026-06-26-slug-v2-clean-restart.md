@@ -73,9 +73,12 @@ bounds command-wide execution. The
 [observation-cutoff component](./slug-v2-subplans/wp1225-observation-cutoffs-acceptance-2026-11-08.json)
 now preserves exact per-repository dependencies with causal cache/freshness proof.
 Same-input bounded diagnostics observe about1.9s less root-compute wall time;
-Rust reaches the unchanged Source-attempt64 boundary with51 roots/100 records.
-Source-charge attribution precedes the next generic change and Rust archive
-extraction. No completed-command latency or RSS acceptance is implied.
+The [owned-verification component](./slug-v2-subplans/wp1225-owned-observation-acceptance-2026-11-08.json)
+now keeps full actual byte charges while sharing canonical General bodies.
+Rust passes Source-attempt64 into further private Source preparation and reaches
+PermissionDenied13 with14 attempts, still51 roots/100 records. Generic Source
+replacement diagnosis precedes Rust archive extraction. No completed-command
+latency or RSS acceptance is implied.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

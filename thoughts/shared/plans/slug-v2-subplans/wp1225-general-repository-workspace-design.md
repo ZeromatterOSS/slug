@@ -1030,6 +1030,83 @@ No clock, Source, root, byte, process or backing expansion is selected. Analysis
 adjacent broad source projections remain a separate measured follow-up if the
 public cquery still exposes them.
 
+### Owned-file observation verification
+
+The unchanged SourceAttempts64 refusal is attributed to 53 path captures
+(51 General-family increments, two Source), nine successful Workspace
+acquisitions and two increments in the final refused Immutable Source capture.
+The census is incomplete; these totals prove neither duplicate demands nor
+51 eligible regular files. The selected generic change separates verification
+of already-owned complete General file bytes from content acquisition. This is
+an explicit **Slug-native accounting and drift-error-stage revision**, not a
+counter repair or cap increase. Default General activation remains Disabled.
+
+Only `RepositoryPhysicalRoot::observe` may mint a closed borrowed verification
+carrier from its actual sealed owner. It binds the exact full State, original
+scope and anchor; it cannot be constructed from a body supplied by a generic
+caller, a digest certificate, path spelling, repository name or source hash.
+The carrier is temporary native call state, never a DICE value or retained
+cache. The existing RootIo is borrowed from that same owner after backing,
+origin and resource admission. Before any demand-path IO, the existing complete batch,
+namespace/path, duplicate and storage preflight runs, and the carrier context
+must match. Root descriptor/backing attestation retains its prior position. A direct own `State::File` member with its canonical body selects
+verification; links, unknown members and non-file entries select the unchanged
+acquisition route. Source snapshots, Host and legacy observers receive no carrier.
+
+For eligible FileBytes or FileDigest, verify current terminal mode and exact
+length, open nofollow, stream the actual FD and compare every chunk against the
+owned body, check exact EOF and stable FD/name metadata, and revalidate the
+original scope/activity and backing. FileBytes returns the same body Arc only
+after success; FileDigest uses SHA-256 computed from those actual chunks.
+Retain the FileBytes1MiB object ceiling and its sticky DecodedBytes refusal,
+existing digest/RootIo bounds, the fixed scratch/descriptor credits and full
+path/cancellation checks. Do not copy owned `ctx.read`'s separate decoded-byte
+exemption: every actual verification chunk charges DecodedBytes **before** byte
+comparison. SourceAttempts remains64 for actual acquisitions; this new closed
+verification class spends no acquisition attempt. Already-poisoned scopes still
+refuse. Failed verification never falls back to uncharged capture. A modeled
+file that is missing, wrong-kind or differs in mode/length/bytes refuses as
+Unstable/Snapshot instead of publishing a contradictory owned result. Unknown
+and ineligible content attempts retain their pre-lstat debit and prior errors.
+
+Native State credit covers the physical owner. A successful returned pure body
+Arc independently receives the same monotonic DecodedBytes history charge for
+every actual body byte as the prior fresh FileBytes capture; this permits it to
+outlive native State destruction without claiming that refunded native credit
+still covers that alias. Empty files have zero payload charge, with ordinary
+epoch/result metadata admission and no second body allocation. Dropping aliases
+never refunds decoded history. These payload counters do not claim permanent
+Arc-header or live-bank coverage. This preserves an existing component accounting
+class, not a global live-memory or completed Bazel/Slug RSS guarantee. No full body is replaced by a digest, no semantic
+history is removed, and no FD/scope/credit/native setup authority enters DICE.
+
+Implementation scope is Core's physical-root observation seam plus a small
+borrowed carrier leaf, the shared rooted observer and a bounded owned-file
+verification leaf. Tests use the existing rooted FD fixtures and real claimed
+root/registry fixture; no synthetic native-root constructor is added. Prove a
+causal native RED/GREEN for canonical Arc identity and exact attempt/decoded
+counters, actual SHA and repeated verification; kernel negatives cover drift,
+missing/wrong-kind/link/mode, object/decoded/cancellation bounds and atomic batch
+refusal. Generic Source/Host/legacy acquisition64/+1 controls remain. Native
+proof also holds the result after root/state/registry retirement, verifies
+independent native refund and final body destruction without decoded refund.
+Actual association-recheck, foreign-scope and warm compiler tests pass; root owns
+serialized feature/default CLI builds and supervised native selection.
+
+The [owned-verification receipt](wp1225-owned-observation-acceptance-2026-11-08.json)
+records104 ordinary tests, four actual native owner guards and four original
+compiler commands. With the same frozen inputs/helper/deadline, Rust General
+path verification keeps its exact103265 decoded bytes and spends0 acquisitions
+instead of51. Total Paths53→2 and Workspace9 stay exact. The pending Source
+capture then decodes25,559,040 additional bytes and stops with IO PermissionDenied13
+at14 total attempts and no sticky scope error. Completed51 roots/100records and
+762 graph cycles remain unchanged; this advances private preparation within the
+same pending request, not completed roots or a General Archive callback.
+Exact refunds pass. No Rust completion, latency or completed-command RSS claim.
+Next, discriminate the observed Source IO refusal. Static evidence suggests
+final MODULE replacement over an extracted read-only regular member; its causal
+producer and safe generic replacement require proof before implementation.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)
