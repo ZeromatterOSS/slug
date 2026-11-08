@@ -522,6 +522,9 @@ pub struct WorkspaceRuntime {
     workspace: PathBuf,
     source_scope: Option<Arc<source_service::SourceServiceScope>>,
     image_resources: super::input_image::WorkspaceImageResources,
+    // Native streaming work never enters prepared DICE values. One workspace-
+    // shared finite bank survives every in-flight reader/job that retains it.
+    source_readers: Arc<super::native_source_access::NativeReaderResources>,
     scratch_resources: slug_bzlmod_v2::SelectedScratchResources,
     // Retained now so the request-projection packet cannot accidentally create
     // a second process owner at observation time.
@@ -872,7 +875,7 @@ struct NativeDemandSessionOwner {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-enum NativeDemandSessionError {
+pub(in crate::runtime) enum NativeDemandSessionError {
     Busy,
     LeaseTokenExhausted,
     StaleLease,
@@ -1047,6 +1050,8 @@ struct NativeDemandCommand<'a> {
     image_request: Option<input_image_bridge::DeclaredImageRequest>,
     scratch_metadata: Option<selected_tool_source::ScratchMetadataState>,
     repository_results: RepositoryMaterializationResultEpoch,
+    // Immutable facts only. A globally fresh lease precedes graph/prepared reuse.
+    workspace_epoch: slug_bzlmod_v2::RepositoryWorkspaceEpoch,
     execute_transcript: RepositoryExecuteTranscript,
     filesystem_transcript: RepositoryFilesystemTranscript,
     filesystem_progress: super::repository_filesystem_progress::RepositoryFilesystemProgress,
@@ -1236,6 +1241,60 @@ struct NativeCommandCompletionContext<'a, 'runtime> {
 }
 
 impl NativeCommandCompletionContext<'_, '_> {
+    fn native_source_inputs(
+        &self,
+        prepared: Arc<PreparedSourceActionInputs>,
+    ) -> Result<super::native_source_access::NativeSourceActionInputs, NativeDemandSessionError>
+    {
+        let roots = self
+            .command
+            .runtime
+            .repository_materializer
+            .pin_selected_roots(
+                self.command.repository_session,
+                self.selected_repository_requests,
+                self.selected_repository_results,
+                &self.command.runtime.source_readers,
+            )
+            .map_err(|error| {
+                NativeDemandSessionError::Computation(anyhow::anyhow!(
+                    "native source selection: {error:?}"
+                ))
+            })?;
+        super::native_source_access::NativeSourceActionInputs::new(
+            prepared,
+            roots,
+            self.command.runtime.source_scope.clone(),
+            self.command.runtime.source_readers.clone(),
+        )
+    }
+    fn native_action_chain_inputs(
+        &self,
+        prepared: Arc<PreparedActionChainInputs>,
+    ) -> Result<super::native_source_access::NativeActionChainInputs, NativeDemandSessionError>
+    {
+        let roots = self
+            .command
+            .runtime
+            .repository_materializer
+            .pin_selected_roots(
+                self.command.repository_session,
+                self.selected_repository_requests,
+                self.selected_repository_results,
+                &self.command.runtime.source_readers,
+            )
+            .map_err(|error| {
+                NativeDemandSessionError::Computation(anyhow::anyhow!(
+                    "native source selection: {error:?}"
+                ))
+            })?;
+        super::native_source_access::NativeActionChainInputs::new(
+            prepared,
+            roots,
+            self.command.runtime.source_scope.clone(),
+            self.command.runtime.source_readers.clone(),
+        )
+    }
     fn retain_source_generations<'a>(
         &self,
         sources: impl Iterator<Item = &'a crate::runtime::SourceArtifactInput>,
@@ -1248,6 +1307,7 @@ impl NativeCommandCompletionContext<'_, '_> {
                 self.selected_repository_requests,
                 self.selected_repository_results,
                 sources,
+                &self.command.runtime.source_readers,
             )
             .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))
     }
@@ -6265,6 +6325,8 @@ impl WorkspaceRuntime {
         Ok(Self {
             source_scope,
             image_resources,
+            source_readers: super::native_source_access::new_reader_resources()
+                .context("creating native source reader work bank")?,
             scratch_resources,
             workspace,
             process_host,
@@ -6410,6 +6472,29 @@ impl WorkspaceRuntime {
         };
         self.native_demand_sessions
             .attach_repository(lease, repository_session)?;
+        let workspace_lease = self
+            .repository_materializer
+            .workspace_lease(repository_session)
+            .map_err(NativeDemandSessionError::Repository)?;
+        let workspace_epoch = slug_bzlmod_v2::RepositoryWorkspaceEpoch::fresh(
+            self.repository_materializer.workspace().clone(),
+            workspace_lease,
+            slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits::new(
+                128,
+                16 * 1024 * 1024,
+                1024 * 1024 * 1024,
+            )
+            .map_err(|error| {
+                NativeDemandSessionError::Computation(anyhow::anyhow!(
+                    "workspace policy: {error:?}"
+                ))
+            })?,
+        )
+        .map_err(|error| {
+            NativeDemandSessionError::Computation(anyhow::anyhow!(
+                "fresh workspace epoch: {error:?}"
+            ))
+        })?;
         let preflight = match self.repository_materializer.preflight_native(
             repository_session,
             prior.selected.unscoped_paths().iter().cloned(),
@@ -6456,6 +6541,7 @@ impl WorkspaceRuntime {
                 image_request: None,
                 scratch_metadata: None,
                 repository_results: preflight.repository_results().clone(),
+                workspace_epoch,
                 execute_transcript: RepositoryExecuteTranscript::empty(),
                 filesystem_transcript: RepositoryFilesystemTranscript::empty(),
                 filesystem_progress: Default::default(),
@@ -7847,6 +7933,7 @@ impl NativeDemandCommand<'_> {
             self.lease.0,
             self.execute_transcript.dupe(),
         ));
+        data.data.set(self.workspace_epoch.dupe());
         if let Some(capture) = &self.workspace_status {
             super::workspace_status_inputs::install(&mut data, capture);
         }
@@ -7889,6 +7976,12 @@ impl NativeDemandCommand<'_> {
             updater,
             &self.runtime.workspace,
             RepositoryExecuteEpoch::active(self.lease.0, self.execute_transcript.dupe()),
+        )
+        .map_err(NativeDemandSessionError::Injection)?;
+        inject_repository_workspace_epoch(
+            updater,
+            &self.runtime.workspace,
+            self.workspace_epoch.dupe(),
         )
         .map_err(NativeDemandSessionError::Injection)
     }
@@ -8346,6 +8439,12 @@ impl NativeDemandCommand<'_> {
                     &mut updater,
                     &self.runtime.workspace,
                     RepositoryExecuteEpoch::revoked(),
+                )
+                .map_err(NativeDemandSessionError::Restoration)?;
+                inject_repository_workspace_epoch(
+                    &mut updater,
+                    &self.runtime.workspace,
+                    slug_bzlmod_v2::RepositoryWorkspaceEpoch::revoked(),
                 )
                 .map_err(NativeDemandSessionError::Restoration)?;
                 #[allow(unused_mut)]
@@ -9111,6 +9210,12 @@ fn prepare_selected_native_demand_snapshot(
         RepositoryExecuteEpoch::revoked(),
     )
     .map_err(NativeDemandSessionError::Injection)?;
+    inject_repository_workspace_epoch(
+        &mut updater,
+        &command.runtime.workspace,
+        slug_bzlmod_v2::RepositoryWorkspaceEpoch::revoked(),
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
     // Keep the provisional terminal alive until its prepared updater reaches
     // revision finalization or the ordinary commit leaf.
     std::hint::black_box(terminal_authority);
@@ -9145,6 +9250,21 @@ fn inject_repository_filesystem_epoch(
     updater
         .changed_to(vec![(RepositoryFilesystemEpochKey::new(workspace), epoch)])
         .context("injecting repository archive epoch")
+}
+
+fn inject_repository_workspace_epoch(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &Path,
+    epoch: slug_bzlmod_v2::RepositoryWorkspaceEpoch,
+) -> anyhow::Result<()> {
+    let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())
+        .context("normalizing repository workspace epoch")?;
+    updater
+        .changed_to(vec![(
+            slug_bzlmod_v2::RepositoryWorkspaceEpochKey::new(workspace),
+            epoch,
+        )])
+        .context("injecting command-fresh repository workspace epoch")
 }
 
 fn inject_repository_execute_epoch(
@@ -14312,6 +14432,10 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
                 .to_string()
                 .contains("configured action output conflict")
         );
+    }
+
+    mod workspace_epoch_tests {
+        include!("tests/workspace_epoch_tests.rs");
     }
 
     mod build_command_tests {

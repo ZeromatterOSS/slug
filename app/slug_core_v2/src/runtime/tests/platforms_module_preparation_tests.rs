@@ -686,10 +686,15 @@ impl GeneratedPlanDiagnostic<'_> {
                 Effect::Symlink(_) => 2,
                 // This historical bounded diagnostic has no deletion schema.
                 // Refuse its snapshot rather than silently omit new effects.
-                Effect::Delete(_) => return GeneratedPlanSummary {
-                    rows: result.rows, counts: None, paths: None,
-                    content: None, captured: false,
-                },
+                Effect::Delete(_) => {
+                    return GeneratedPlanSummary {
+                        rows: result.rows,
+                        counts: None,
+                        paths: None,
+                        content: None,
+                        captured: false,
+                    };
+                }
             };
             result.counts.as_mut().unwrap()[kind] += 1;
         }
@@ -1338,6 +1343,9 @@ impl Bodies {
     )> {
         for (_, request) in needs.repository_materializations().iter() {
             let logical_root = match &request.kind {
+                RepositoryMaterializationKind::GeneralWorkspace(_) => {
+                    return Some((request, "general_workspace_inactive"));
+                }
                 RepositoryMaterializationKind::Local { logical_root } => logical_root,
                 RepositoryMaterializationKind::Immutable => {
                     if immutable_archive_preparation::matches(self, request) {

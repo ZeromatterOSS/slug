@@ -230,6 +230,21 @@ impl RepositoryWorkspaceProgress {
         self.complete_snapshot(request, result, scope, active)
     }
 
+    pub(super) fn seal_realization(
+        self,
+        realization: &RepositoryWorkspaceRealization,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
+        self.check_scope(scope)?;
+        if self.transcript() != realization.transcript() {
+            return Err(PhysicalRootError::Protocol(
+                slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
+            ));
+        }
+        self.builder.seal(realization, scope, active)
+    }
+
     pub(super) fn seal(
         self,
         consumed_records: usize,
@@ -237,6 +252,22 @@ impl RepositoryWorkspaceProgress {
         active: &dyn Fn() -> bool,
     ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
         self.check_scope(scope)?;
+        // The old complete transcript guard remains armed throughout this
+        // borrowed clone. Prepay only its additional realization/cache storage.
+        let full = self
+            .transcript()
+            .realization_storage_bytes()
+            .map_err(PhysicalRootError::Protocol)?;
+        let existing = self
+            .transcript()
+            .retained_storage_bytes()
+            .map_err(PhysicalRootError::Protocol)?;
+        let _realization_credit = self.builder.resources.reserve(
+            full.checked_sub(existing)
+                .ok_or(PhysicalRootError::Resource)?,
+            0,
+            0,
+        )?;
         let realization = self
             .transcript()
             .realize(consumed_records)

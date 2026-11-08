@@ -27,6 +27,7 @@ mod path_observation;
 mod path_resolution;
 
 pub use input_image::*;
+pub use path_file_digest::AnchoredPathFileDigestObservationKey;
 pub use path_file_digest::FileContentDigest;
 pub use path_file_digest::ObservedPathFileDigest;
 pub use path_file_digest::PathFileDigest;

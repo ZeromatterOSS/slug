@@ -7,6 +7,10 @@
  * of this source tree. You may select the license that applies to you.
  */
 
+use slug_workspace_v2::AnchoredPathResolutionError;
+use slug_workspace_v2::AnchoredResolvedPathObservationKey;
+use slug_workspace_v2::MaterializationPathAnchor;
+
 use super::*;
 
 mod registration_diagnostic;
@@ -330,9 +334,63 @@ async fn resolve_source_path(
     key: &HostRepositorySourceObservationKey,
     namespace: PathObservationNamespace,
     requested_path: NormalizedAbsolutePath,
+    anchor: Option<&MaterializationPathAnchor>,
     repo_relative_path: Arc<PathBuf>,
     mode: HostRepositoryObservationMode,
 ) -> ControlFlow<SourceObservationDriverOutcome, (ResolvedPath, PathObservationEpoch)> {
+    if let Some(anchor) = anchor {
+        let checked = if anchor.namespace() == namespace {
+            AnchoredResolvedPathObservationKey::new(anchor.clone(), requested_path.as_path()).ok()
+        } else {
+            None
+        };
+        let Some(checked) = checked else {
+            return ControlFlow::Break(source_observation_complete(
+                key,
+                Err(HostRepositorySourceObservationErrorKind::Request(
+                    RepositorySourceFileError::InvalidMaterializedPath { repo_relative_path },
+                )),
+                PathObservationEpoch::empty(),
+            ));
+        };
+        return match ctx.compute(&checked).await {
+            Ok(PathOutcome::Need(need)) => {
+                ControlFlow::Break(SourcePreparationOutcome::path_need(need))
+            }
+            Ok(PathOutcome::Complete(Err(error))) => {
+                ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
+            }
+            Ok(PathOutcome::Complete(Ok(value))) => match value.result() {
+                Ok(resolved) => {
+                    ControlFlow::Continue((resolved.clone(), value.observations().dupe()))
+                }
+                Err(error) => {
+                    let projected = match error {
+                        AnchoredPathResolutionError::Resolution(error) => {
+                            project_resolution_error(repo_relative_path, error.clone())
+                        }
+                        AnchoredPathResolutionError::EscapesAnchor { .. } => {
+                            RepositorySourceFileError::InvalidMaterializedPath {
+                                repo_relative_path,
+                            }
+                        }
+                    };
+                    ControlFlow::Break(source_observation_complete(
+                        key,
+                        Err(HostRepositorySourceObservationErrorKind::Request(projected)),
+                        value.observations().dupe(),
+                    ))
+                }
+            },
+            Err(error) => ControlFlow::Break(source_observation_complete(
+                key,
+                Err(HostRepositorySourceObservationErrorKind::RequestCompute(
+                    error.to_string().into(),
+                )),
+                PathObservationEpoch::empty(),
+            )),
+        };
+    }
     match mode {
         HostRepositoryObservationMode::Legacy => match ctx
             .compute(&ResolvedPathKey::new(namespace, requested_path))
@@ -462,6 +520,7 @@ async fn drive_request_source(
         key,
         namespace,
         requested_path,
+        materialization.path_anchor(),
         repo_relative_path.clone(),
         mode,
     )

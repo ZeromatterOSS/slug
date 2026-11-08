@@ -6,7 +6,7 @@ pub(super) fn stage(
     owner: &ConfiguredOutputOwner,
     plan: &PreparedActionPlan<'_>,
     index: usize,
-    inputs: Option<&PreparedActionChainInputs>,
+    inputs: Option<&crate::runtime::native_source_access::NativeActionChainInputs>,
     reserved: &SmallSet<&str>,
     seen_backing: &mut SmallSet<PathBuf>,
 ) -> io::Result<PlannedActionOutputStaging> {

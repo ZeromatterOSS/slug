@@ -250,3 +250,69 @@ fn source_input_constructor_rejects_derived_files_and_trees() {
         );
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct AnchoredProbe;
+impl fmt::Display for AnchoredProbe {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "anchored-source-input-probe")
+    }
+}
+#[async_trait]
+impl Key for AnchoredProbe {
+    type Value = SourceArtifactInputOutcome;
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let anchor = MaterializationPathAnchor::new(
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(74)),
+            path("/workspace"),
+        )
+        .unwrap();
+        let key =
+            slug_workspace_v2::AnchoredResolvedPathObservationKey::new(anchor, "/workspace/input")
+                .unwrap();
+        let PathOutcome::Complete(Ok(resolved)) = ctx.compute(&key).await.unwrap() else {
+            panic!("anchored path must complete")
+        };
+        finish_source_input(
+            ctx,
+            &label(),
+            resolved.result().as_ref().unwrap(),
+            resolved.observations(),
+        )
+        .await
+    }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        SourceArtifactInputObservationKey::equality(x, y)
+    }
+}
+#[tokio::test]
+async fn source_digest_join_retains_anchor_without_unanchored_reresolution() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let namespace = PathObservationNamespace::Materialization(PathObservationInstanceId::new(74));
+    let input = epoch(
+        namespace,
+        1,
+        Some(PathNodeKind::RegularFile),
+        Some(PathOperationResult::Present(content())),
+    );
+    let input = PathObservationEpoch::from_shared(
+        input
+            .observations()
+            .iter()
+            .filter(|(d, _)| {
+                d.path()
+                    .as_path()
+                    .starts_with(std::path::Path::new("/workspace"))
+            })
+            .map(|(d, r)| (d.dupe(), r.dupe())),
+    )
+    .unwrap();
+    let mut tx = transaction(&dice, input.dupe()).await;
+    let value = tx.compute(&AnchoredProbe).await.unwrap();
+    let value = observed(&value);
+    let source = value.result().as_ref().unwrap();
+    assert_eq!(source.namespace(), namespace);
+    assert_eq!(source.anchor().unwrap().root(), &path("/workspace"));
+    assert_eq!(source.anchor().unwrap().namespace(), namespace);
+    assert_eq!(value.observations(), &input);
+}

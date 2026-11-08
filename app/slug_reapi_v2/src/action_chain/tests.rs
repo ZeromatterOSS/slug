@@ -20,8 +20,7 @@ use super::*;
 #[path = "../../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod fixture;
 
-#[path = "../source_execution/cas_fixture.rs"]
-mod cas_fixture;
+use crate::cas_fixture;
 
 pub(super) const DEFS: &str = r#"def _resources(os, count):
     fail('real-chain-resource-must-not-execute')
@@ -129,10 +128,10 @@ impl Workspace {
         }
     }
 
-    fn prepare(&self) -> Arc<PreparedActionChainInputs> {
+    fn prepare(&self) -> slug_core_v2::runtime::NativeActionChainInputs {
         let accepted = self
             .runtime
-            .prepare_action_chain_inputs_with_repository_environment(
+            .prepare_native_action_chain_inputs_with_repository_environment(
                 &[TargetPattern::parse("//:one").unwrap()],
                 self.owner.clone(),
                 2,
@@ -415,11 +414,11 @@ impl ActionChainTransport for CheckedTransport {
 
     async fn start(
         &self,
-        inputs: Arc<PreparedActionChainInputs>,
+        inputs: slug_core_v2::runtime::NativeActionChainInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
         let (wrapped, counter) = inputs.with_resource_set_invocation_counter().unwrap();
-        assert_eq!(wrapped, *inputs);
+        assert_eq!(wrapped.metadata(), inputs.metadata());
         let plan = wrapped.plan().unwrap();
         let mut callbacks = 0;
         for step in plan.actions() {
@@ -451,7 +450,7 @@ impl ActionChainTransport for CheckedTransport {
         counter.store(0, Ordering::SeqCst); // only after both genuine calls finish
         self.resource_counters.lock().unwrap().push(counter);
         self.assert_resource_zero();
-        let result = self.inner.start(Arc::new(wrapped), args_context).await;
+        let result = self.inner.start(wrapped, args_context).await;
         self.assert_resource_zero();
         result
     }
@@ -765,7 +764,7 @@ fn resource_chain_preflight_retains_failing_original_without_invoking_it() {
     let workspace = Workspace::new();
     let original = workspace.prepare();
     let (inputs, counter) = original.with_resource_set_invocation_counter().unwrap();
-    assert_eq!(inputs, *original);
+    assert_eq!(inputs.metadata(), original.metadata());
     let plan = inputs.plan().unwrap();
     let mut resources = 0;
     for action in plan.actions() {

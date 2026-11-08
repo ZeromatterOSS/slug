@@ -55,14 +55,11 @@ impl SourceBacking {
         workspace: &Path,
         digest: FileContentDigest,
         permissions: i32,
-        source: &mut File,
+        source: &mut dyn std::io::Read,
     ) -> io::Result<Self> {
         let target = Self::target_path(workspace, digest, permissions)?;
-        if !source.metadata()?.is_file() {
-            return Err(io::Error::other(
-                "source backing requires a regular observed source",
-            ));
-        }
+        // Native source opening establishes regular-file membership; this
+        // sink accepts only bytes and independently verifies SHA/length/EOF.
         let workspace = File::options()
             .read(true)
             .custom_flags(nix::libc::O_DIRECTORY | nix::libc::O_NOFOLLOW | nix::libc::O_CLOEXEC)

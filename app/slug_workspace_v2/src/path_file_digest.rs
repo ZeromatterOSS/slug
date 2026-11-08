@@ -9,6 +9,11 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 
+use crate::AnchoredPathResolutionError;
+use crate::AnchoredResolvedPathKey;
+use crate::AnchoredResolvedPathObservationKey;
+use crate::MaterializationPathAnchor;
+use crate::MaterializationPathAnchorError;
 use crate::NormalizedAbsolutePath;
 use crate::ObservedPathFrontierError;
 use crate::PathFileBytesError;
@@ -22,6 +27,7 @@ use crate::PathObservationResult;
 use crate::PathOperationResult;
 use crate::PathOutcome;
 use crate::PathResult;
+use crate::ResolvedPath;
 use crate::ResolvedPathObservationKey;
 use crate::ResolvedPathState;
 
@@ -54,6 +60,7 @@ pub enum PathFileDigest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub enum PathFileDigestError {
+    AnchoredResolution(AnchoredPathResolutionError),
     Read(PathFileBytesError),
     Frontier(ObservedPathFrontierError),
     SizeChanged {
@@ -160,95 +167,19 @@ impl Key for PathFileDigestObservationKey {
             PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
             PathOutcome::Complete(Ok(resolved)) => resolved,
         };
-        let mut observations = resolved.observations().dupe();
-        let complete = |result, observations| {
-            PathOutcome::Complete(Ok(ObservedPathFileDigest {
-                result,
-                observations,
-            }))
-        };
-        let read_error = |error| Err(PathFileDigestError::Read(error));
-        let resolved = match resolved.result() {
-            Ok(resolved) => resolved,
-            Err(error) => {
-                return complete(
-                    read_error(PathFileBytesError::from_resolution(
-                        key.logical_path.dupe(),
-                        error.dupe(),
-                    )),
-                    observations,
-                );
-            }
-        };
-        let lstat = match resolved.state() {
-            ResolvedPathState::Missing => {
-                return complete(Ok(PathFileDigest::Missing), observations);
-            }
-            ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::RegularFile => lstat,
-            ResolvedPathState::Present(lstat) => {
-                return complete(
-                    read_error(PathFileBytesError::WrongKind {
-                        logical_path: key.logical_path.dupe(),
-                        expected: PathNodeKind::RegularFile,
-                        actual: lstat.kind(),
-                    }),
-                    observations,
-                );
-            }
-        };
-        let demand = PathObservationDemand::new(
+        finish_resolved_digest(
+            ctx,
             key.namespace,
-            resolved.real_path().dupe(),
-            PathObservationOperation::FileDigest,
-        );
-        let result = match ctx
-            .compute(&PathObservationKey::new(demand.dupe()))
-            .await
-            .expect("digest observation DICE invariant")
-        {
-            PathOutcome::Need(need) => return PathOutcome::Need(need),
-            PathOutcome::Complete(result) => result,
-        };
-        observations = match PathObservationEpoch::from_shared(
-            observations
-                .observations()
-                .iter()
-                .map(|(demand, result)| (demand.dupe(), result.dupe()))
-                .chain(std::iter::once((demand.dupe(), result.dupe()))),
-        ) {
-            Ok(epoch) => epoch,
-            Err(error) => return PathOutcome::Complete(Err(error.into())),
-        };
-        let result = match result.as_ref() {
-            PathObservationResult::FileDigest(PathOperationResult::Present(digest)) => {
-                if u64::try_from(lstat.size()).ok() != Some(digest.size_bytes()) {
-                    Err(PathFileDigestError::SizeChanged {
-                        logical_path: key.logical_path.dupe(),
-                        expected: lstat.size(),
-                        observed: digest.size_bytes(),
-                    })
-                } else {
-                    Ok(PathFileDigest::Present(*digest))
-                }
-            }
-            PathObservationResult::FileDigest(PathOperationResult::Missing) => {
-                read_error(PathFileBytesError::InconsistentState {
-                    logical_path: key.logical_path.dupe(),
-                    operation: demand.operation(),
-                    before: Some(lstat),
-                    after: None,
-                })
-            }
-            PathObservationResult::FileDigest(PathOperationResult::Error(error)) => {
-                read_error(PathFileBytesError::Observation {
-                    logical_path: key.logical_path.dupe(),
-                    operation: demand.operation(),
-                    error: *error,
-                })
-            }
-            _ => unreachable!("FileDigest demand must return FileDigest observation"),
-        };
-        complete(result, observations)
+            &key.logical_path,
+            resolved.result().as_ref().map_err(|error| {
+                PathFileDigestError::Read(PathFileBytesError::from_resolution(
+                    key.logical_path.dupe(),
+                    error.dupe(),
+                ))
+            }),
+            resolved.observations().dupe(),
+        )
+        .await
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x.complete_eq(y)
@@ -258,5 +189,158 @@ impl Key for PathFileDigestObservationKey {
     }
 }
 
+/// Content observation that retains the producer-selected materialization
+/// boundary through resolution. This key contains no native resource.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct AnchoredPathFileDigestObservationKey {
+    anchor: MaterializationPathAnchor,
+    logical_path: NormalizedAbsolutePath,
+}
+impl AnchoredPathFileDigestObservationKey {
+    pub fn new(
+        anchor: MaterializationPathAnchor,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, MaterializationPathAnchorError> {
+        let checked = AnchoredResolvedPathKey::new(anchor, path)?;
+        Ok(Self {
+            anchor: checked.anchor().dupe(),
+            logical_path: checked.logical_path().dupe(),
+        })
+    }
+}
+impl fmt::Display for AnchoredPathFileDigestObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "anchored-file-digest:{:?}:{:?}",
+            self.anchor, self.logical_path
+        )
+    }
+}
+#[async_trait]
+impl Key for AnchoredPathFileDigestObservationKey {
+    type Value = PathResult<ObservedPathFileDigest, ObservedPathFrontierError>;
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let key = AnchoredResolvedPathObservationKey::new(
+            self.anchor.dupe(),
+            self.logical_path.as_path(),
+        )
+        .expect("validated anchored digest key");
+        let resolved = match ctx
+            .compute(&key)
+            .await
+            .expect("anchored resolution DICE invariant")
+        {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(resolved)) => resolved,
+        };
+        finish_resolved_digest(
+            ctx,
+            self.anchor.namespace(),
+            &self.logical_path,
+            resolved
+                .result()
+                .as_ref()
+                .map_err(|error| PathFileDigestError::AnchoredResolution(error.dupe())),
+            resolved.observations().dupe(),
+        )
+        .await
+    }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+async fn finish_resolved_digest(
+    ctx: &mut DiceComputations<'_>,
+    namespace: PathObservationNamespace,
+    logical_path: &NormalizedAbsolutePath,
+    resolved: Result<&ResolvedPath, PathFileDigestError>,
+    mut observations: PathObservationEpoch,
+) -> PathResult<ObservedPathFileDigest, ObservedPathFrontierError> {
+    let complete = |result, observations| {
+        PathOutcome::Complete(Ok(ObservedPathFileDigest {
+            result,
+            observations,
+        }))
+    };
+    let read_error = |error| Err(PathFileDigestError::Read(error));
+    let resolved = match resolved {
+        Ok(resolved) => resolved,
+        Err(error) => return complete(Err(error), observations),
+    };
+    let lstat = match resolved.state() {
+        ResolvedPathState::Missing => {
+            return complete(Ok(PathFileDigest::Missing), observations);
+        }
+        ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::RegularFile => lstat,
+        ResolvedPathState::Present(lstat) => {
+            return complete(
+                read_error(PathFileBytesError::WrongKind {
+                    logical_path: logical_path.dupe(),
+                    expected: PathNodeKind::RegularFile,
+                    actual: lstat.kind(),
+                }),
+                observations,
+            );
+        }
+    };
+    let demand = PathObservationDemand::new(
+        namespace,
+        resolved.real_path().dupe(),
+        PathObservationOperation::FileDigest,
+    );
+    let result = match ctx
+        .compute(&PathObservationKey::new(demand.dupe()))
+        .await
+        .expect("digest observation DICE invariant")
+    {
+        PathOutcome::Need(need) => return PathOutcome::Need(need),
+        PathOutcome::Complete(result) => result,
+    };
+    observations = match PathObservationEpoch::from_shared(
+        observations
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(std::iter::once((demand.dupe(), result.dupe()))),
+    ) {
+        Ok(epoch) => epoch,
+        Err(error) => return PathOutcome::Complete(Err(error.into())),
+    };
+    let result = match result.as_ref() {
+        PathObservationResult::FileDigest(PathOperationResult::Present(digest)) => {
+            if u64::try_from(lstat.size()).ok() != Some(digest.size_bytes()) {
+                Err(PathFileDigestError::SizeChanged {
+                    logical_path: logical_path.dupe(),
+                    expected: lstat.size(),
+                    observed: digest.size_bytes(),
+                })
+            } else {
+                Ok(PathFileDigest::Present(*digest))
+            }
+        }
+        PathObservationResult::FileDigest(PathOperationResult::Missing) => {
+            read_error(PathFileBytesError::InconsistentState {
+                logical_path: logical_path.dupe(),
+                operation: demand.operation(),
+                before: Some(lstat),
+                after: None,
+            })
+        }
+        PathObservationResult::FileDigest(PathOperationResult::Error(error)) => {
+            read_error(PathFileBytesError::Observation {
+                logical_path: logical_path.dupe(),
+                operation: demand.operation(),
+                error: *error,
+            })
+        }
+        _ => unreachable!("FileDigest demand must return FileDigest observation"),
+    };
+    complete(result, observations)
+}
 #[cfg(test)]
 mod tests;

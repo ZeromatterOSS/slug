@@ -2,6 +2,7 @@
 use slug_core_v2::runtime::PlannedActionOutputStaging;
 
 use super::*;
+use crate::cas_fixture;
 
 #[derive(Clone, Copy)]
 enum Mutation {
@@ -14,7 +15,7 @@ struct FaultTransport {
     producers: AtomicUsize,
     consumers: AtomicUsize,
     generated_aliases: AtomicUsize,
-    inputs: std::sync::Mutex<Option<Arc<PreparedActionChainInputs>>>,
+    inputs: std::sync::Mutex<Option<slug_core_v2::runtime::NativeActionChainInputs>>,
 }
 impl ActionChainTransport for FaultTransport {
     type Session = ActionChainReapiSession;
@@ -23,7 +24,7 @@ impl ActionChainTransport for FaultTransport {
     type Error = RemoteExecutionError;
     async fn start(
         &self,
-        inputs: Arc<PreparedActionChainInputs>,
+        inputs: slug_core_v2::runtime::NativeActionChainInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
         *self.inputs.lock().unwrap() = Some(inputs.clone());
@@ -86,14 +87,7 @@ impl ActionChainTransport for FaultTransport {
             }),
             "fixture must retain equal-content certified sources"
         );
-        let root = PathBuf::from(std::env::var("SLUG_V2_NATIVELINK_TEST_ROOT").unwrap());
-        for store in ["fast-content", "slow-content"] {
-            let path = root.join("cas").join(store).join("d").join(format!(
-                "{}-{}",
-                digest.hash(),
-                digest.size_bytes()
-            ));
-            assert!(path.is_file());
+        for path in cas_fixture::completed_blob_paths(digest) {
             match self.mutation {
                 Mutation::Remove => fs::remove_file(path).unwrap(),
                 Mutation::Corrupt => {

@@ -60,6 +60,24 @@ fn materialize(
         .unwrap();
 }
 
+fn source(
+    repo: &CanonicalRepoName,
+    namespace: PathObservationNamespace,
+    requested: &NormalizedAbsolutePath,
+    real: &NormalizedAbsolutePath,
+) -> SourceArtifactInput {
+    SourceArtifactInput::for_native_lease_test(
+        CanonicalLabel::parse(&format!("@@{}//:input", repo.as_str())).unwrap(),
+        namespace,
+        requested.clone(),
+        real.clone(),
+        None,
+        slug_workspace_v2::FileContentDigest::new([0; 32], 0).unwrap(),
+    )
+}
+fn readers() -> Arc<NativeReaderResources> {
+    crate::runtime::native_source_access::new_reader_resources().unwrap()
+}
 impl Fixture {
     fn new() -> Self {
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
@@ -89,12 +107,13 @@ impl Fixture {
         }
     }
 
-    fn source(&self) -> SourceGenerationInput<'_> {
-        SourceGenerationInput {
-            repo: &self.request.id.canonical_repo,
-            namespace: PathObservationNamespace::Materialization(self.instance),
-            requested_path: &self.path,
-        }
+    fn source(&self) -> SourceArtifactInput {
+        source(
+            &self.request.id.canonical_repo,
+            PathObservationNamespace::Materialization(self.instance),
+            &self.path,
+            &self.path,
+        )
     }
 
     fn epoch(&self) -> RepositoryMaterializationResultEpoch {
@@ -103,15 +122,13 @@ impl Fixture {
             .unwrap()
     }
 
-    fn retain(
-        &self,
-        sources: &[SourceGenerationInput<'_>],
-    ) -> Result<NativeSourceGenerations, Arc<str>> {
-        self.materializer.retain_source_generation_inputs(
+    fn retain(&self, sources: &[SourceArtifactInput]) -> Result<NativeSourceGenerations, Arc<str>> {
+        self.materializer.retain_source_generations(
             self.token,
             std::slice::from_ref(&self.request),
             &self.epoch(),
-            sources,
+            sources.iter(),
+            &readers(),
         )
     }
 }
@@ -125,7 +142,7 @@ fn selected_native_leases_deduplicate_and_outlive_acceptance_discard_and_owner()
             .unwrap();
         assert_eq!(lease._roots.len(), 1);
         let clone = lease.clone();
-        assert!(Arc::ptr_eq(&lease._roots, &clone._roots));
+        assert!(lease._roots.same_set(&clone._roots));
         if accept {
             fixture
                 .materializer
@@ -168,10 +185,10 @@ fn source_leases_reject_unselected_forged_stale_and_escaping_provenance() {
     let retain = |token,
                   selected: &[Arc<RepositoryMaterializationRequest>],
                   epoch: &RepositoryMaterializationResultEpoch,
-                  sources: &[SourceGenerationInput<'_>]| {
+                  sources: &[SourceArtifactInput]| {
         fixture
             .materializer
-            .retain_source_generation_inputs(token, selected, epoch, sources)
+            .retain_source_generations(token, selected, epoch, sources.iter(), &readers())
             .unwrap_err()
     };
     assert!(
@@ -181,10 +198,10 @@ fn source_leases_reject_unselected_forged_stale_and_escaping_provenance() {
             &epoch,
             &sources
         )
-        .contains("StaleToken")
+        .contains("session")
     );
     let empty = complete_epoch(&fixture.materializer.workspace, &[]).unwrap();
-    assert!(retain(fixture.token, &[], &empty, &sources).contains("not selected"));
+    assert!(retain(fixture.token, &[], &empty, &sources).contains("selected"));
     assert!(
         retain(
             fixture.token,
@@ -219,49 +236,68 @@ fn source_leases_reject_unselected_forged_stale_and_escaping_provenance() {
         retain(fixture.token, selected, &forged_epoch, &sources).contains("result epoch differs")
     );
     let wrong_repo = CanonicalRepoName::new("other").unwrap();
-    let wrong_source = SourceGenerationInput {
-        repo: &wrong_repo,
-        ..fixture.source()
-    };
+    let wrong_source = source(
+        &wrong_repo,
+        PathObservationNamespace::Materialization(fixture.instance),
+        &fixture.path,
+        &fixture.path,
+    );
     assert!(
         fixture
             .retain(&[wrong_source])
             .unwrap_err()
-            .contains("not selected")
+            .contains("selected")
     );
-    let wrong_instance = SourceGenerationInput {
-        namespace: PathObservationNamespace::Materialization(PathObservationInstanceId::new(
+    let wrong_instance = source(
+        &fixture.request.id.canonical_repo,
+        PathObservationNamespace::Materialization(PathObservationInstanceId::new(
             fixture.instance.value() + 1,
         )),
-        ..fixture.source()
-    };
+        &fixture.path,
+        &fixture.path,
+    );
     assert!(
         fixture
             .retain(&[wrong_instance])
             .unwrap_err()
-            .contains("instance differs")
+            .contains("selected native lease")
     );
     let sibling = NormalizedAbsolutePath::new(PathBuf::from(format!(
         "{}-sibling/input",
         fixture.root.display()
     )))
     .unwrap();
-    let outside = SourceGenerationInput {
-        requested_path: &sibling,
-        ..fixture.source()
-    };
+    let outside = source(
+        &fixture.request.id.canonical_repo,
+        PathObservationNamespace::Materialization(fixture.instance),
+        &sibling,
+        &sibling,
+    );
     assert!(
         fixture
             .retain(&[fixture.source(), outside])
             .unwrap_err()
-            .contains("outside its native generation"),
+            .contains("selected native root"),
         "deduplication must not bypass later path checks"
     );
-    let host = SourceGenerationInput {
-        namespace: PathObservationNamespace::Host,
-        requested_path: &sibling,
-        ..fixture.source()
-    };
+    let forged_host = source(
+        &fixture.request.id.canonical_repo,
+        PathObservationNamespace::Host,
+        &sibling,
+        &sibling,
+    );
+    assert!(
+        fixture
+            .retain(&[forged_host])
+            .unwrap_err()
+            .contains("cannot use Host")
+    );
+    let host = source(
+        &CanonicalRepoName::root(),
+        PathObservationNamespace::Host,
+        &sibling,
+        &sibling,
+    );
     assert!(fixture.retain(&[host]).unwrap()._roots.is_empty());
 }
 
@@ -292,9 +328,15 @@ fn historical_and_virtual_generations_do_not_supply_current_native_authority() {
     assert!(
         fixture
             .materializer
-            .retain_source_generation_inputs(token, selected, &epoch, &[fixture.source()])
+            .retain_source_generations(
+                token,
+                selected,
+                &epoch,
+                [fixture.source()].iter(),
+                &readers()
+            )
             .unwrap_err()
-            .contains("instance differs")
+            .contains("selected native lease")
     );
     fixture.materializer.discard(token).unwrap();
 
@@ -314,7 +356,7 @@ fn historical_and_virtual_generations_do_not_supply_current_native_authority() {
         fixture
             .retain(&[fixture.source()])
             .unwrap_err()
-            .contains("root differs from native owner")
+            .contains("association differs")
     );
     let fixture = Fixture::new();
     let roots = {
@@ -325,7 +367,7 @@ fn historical_and_virtual_generations_do_not_supply_current_native_authority() {
         fixture
             .retain(&[fixture.source()])
             .unwrap_err()
-            .contains("no native generation owner")
+            .contains("lacks native owner")
     );
     drop(roots);
     assert!(!fixture.root.exists());
@@ -339,10 +381,12 @@ fn requested_generation_path_can_retain_an_observed_symlink_to_an_external_targe
     std::fs::write(outside.path(), b"outside").unwrap();
     let link = NormalizedAbsolutePath::new(fixture.root.join("link")).unwrap();
     std::os::unix::fs::symlink(outside.path(), link.as_path()).unwrap();
-    let source = SourceGenerationInput {
-        requested_path: &link,
-        ..fixture.source()
-    };
+    let source = source(
+        &fixture.request.id.canonical_repo,
+        PathObservationNamespace::Materialization(fixture.instance),
+        &link,
+        &NormalizedAbsolutePath::new(outside.path()).unwrap(),
+    );
     let lease = fixture.retain(&[source]).unwrap();
     assert_eq!(lease._roots.len(), 1);
     assert_eq!(std::fs::read(link.as_path()).unwrap(), b"outside");

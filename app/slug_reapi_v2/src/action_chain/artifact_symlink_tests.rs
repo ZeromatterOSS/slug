@@ -296,7 +296,8 @@ fn nativelink_artifact_alias_consumers_restore_without_tool_publication() {
                         for out in group.outputs().outputs() {
                             assert!(out.path().ends_with("_consumer.out"));
                             assert_eq!(
-                                fs::read(group.outputs().root().join(out.path())).unwrap(),
+                                fs::read(group.outputs().root().join(out.root_relative_path()))
+                                    .unwrap(),
                                 bytes.as_bytes().repeat(3)
                             );
                         }

@@ -183,7 +183,10 @@ fn generated_effect_runtime_keeps_workspace_and_bare_archive_guards() {
     else {
         panic!("bare API must refuse archive effects before transport or publication");
     };
-    assert!(message.contains("archive"));
+    assert_eq!(
+        message,
+        "generated repository filesystem effects require live invocation realization"
+    );
     assert!(
         materializer
             .state

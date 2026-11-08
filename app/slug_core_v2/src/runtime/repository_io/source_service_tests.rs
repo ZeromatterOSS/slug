@@ -307,7 +307,6 @@ fn scoped_late_valid_hash_cannot_allocate_instance_or_publish_and_drops_root() {
     ));
     assert!(!path.exists());
     let state = materializer.state.lock().unwrap();
-    assert_eq!(state.next_instance, 1);
     assert!(state.active.as_ref().unwrap().entries.is_empty());
     assert!(state.active.as_ref().unwrap().provisional_roots.is_empty());
     drop(state);

@@ -1,13 +1,12 @@
 //! Closure-owned typed Spawn serialization. This plan cannot authorize Execute.
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::actions::registry::validate_output;
-use slug_core_v2::runtime::PreparedSourceActionInputs;
+use slug_core_v2::runtime::NativeSourceActionInputs;
 
 use crate::ReapiActionIdentity;
 use crate::ReapiCommand;
@@ -24,13 +23,14 @@ impl SourceSpawnReapiPlan {
     /// Serialize the selected producer and its complete source-only input tree.
     /// Before future execution, the request must select an execution representative,
     /// establish completed verified staging and revalidate its full source frontier.
-    pub fn from_prepared(
-        prepared: Arc<PreparedSourceActionInputs>,
+    pub fn from_native(
+        prepared: NativeSourceActionInputs,
         remote_defaults: &BTreeMap<String, String>,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self, String> {
+        prepared.check_active().map_err(|e| e.to_string())?;
         let mut command = spawn_command(prepared.configured_action(), remote_defaults)?;
-        let mut inputs = SourceInputReapiPlan::from_prepared(prepared, args_context)?;
+        let mut inputs = SourceInputReapiPlan::from_native(prepared, args_context)?;
         for output in command
             .output_files
             .iter()

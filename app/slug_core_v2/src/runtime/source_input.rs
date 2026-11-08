@@ -15,7 +15,9 @@ use slug_build_api_v2::AnalysisArtifact;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
+use slug_workspace_v2::AnchoredPathFileDigestObservationKey;
 use slug_workspace_v2::FileContentDigest;
+use slug_workspace_v2::MaterializationPathAnchor;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathFileDigest;
@@ -39,6 +41,7 @@ pub enum SourceArtifactInputError {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct SourceArtifactInput {
     label: CanonicalLabel,
+    anchor: Option<MaterializationPathAnchor>,
     namespace: PathObservationNamespace,
     requested_path: NormalizedAbsolutePath,
     real_path: NormalizedAbsolutePath,
@@ -46,6 +49,29 @@ pub struct SourceArtifactInput {
 }
 
 impl SourceArtifactInput {
+    /// Resource-free fixture metadata only. Native authority still requires the
+    /// materializer's checked selected lease; this does not mint a reader.
+    #[cfg(test)]
+    pub(in crate::runtime) fn for_native_lease_test(
+        label: CanonicalLabel,
+        namespace: PathObservationNamespace,
+        requested_path: NormalizedAbsolutePath,
+        real_path: NormalizedAbsolutePath,
+        anchor: Option<MaterializationPathAnchor>,
+        digest: FileContentDigest,
+    ) -> Self {
+        Self {
+            label,
+            namespace,
+            requested_path,
+            real_path,
+            anchor,
+            digest,
+        }
+    }
+    pub fn anchor(&self) -> Option<&MaterializationPathAnchor> {
+        self.anchor.as_ref()
+    }
     pub fn label(&self) -> &CanonicalLabel {
         &self.label
     }
@@ -165,13 +191,21 @@ async fn finish_source_input(
     resolved: &ResolvedPath,
     prefix: &PathObservationEpoch,
 ) -> SourceArtifactInputOutcome {
-    let observed = match ctx
-        .compute(&PathFileDigestObservationKey::new(
+    let observed = if let Some(anchor) = resolved.anchor() {
+        let key = AnchoredPathFileDigestObservationKey::new(
+            anchor.dupe(),
+            resolved.requested_path().as_path(),
+        )
+        .expect("resolved source retains a validated anchor");
+        ctx.compute(&key).await
+    } else {
+        ctx.compute(&PathFileDigestObservationKey::new(
             resolved.namespace(),
             resolved.requested_path().dupe(),
         ))
         .await
-    {
+    };
+    let observed = match observed {
         Ok(PathOutcome::Need(need)) => {
             return LoadingPreparationOutcome::Need(LoadingPreparationNeeds::path(need));
         }
@@ -199,6 +233,7 @@ async fn finish_source_input(
     let result = match observed.result() {
         Ok(PathFileDigest::Present(digest)) => Ok(SourceArtifactInput {
             label: label.clone(),
+            anchor: resolved.anchor().cloned(),
             namespace: resolved.namespace(),
             requested_path: resolved.requested_path().dupe(),
             real_path: resolved.real_path().dupe(),

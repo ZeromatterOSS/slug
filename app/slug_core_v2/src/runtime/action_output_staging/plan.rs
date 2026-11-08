@@ -89,7 +89,7 @@ impl ConfiguredOutputOwner {
 
     pub(in crate::runtime) fn stage_prepared_outputs(
         &self,
-        inputs: &PreparedActionChainInputs,
+        inputs: &crate::runtime::native_source_access::NativeActionChainInputs,
     ) -> io::Result<Vec<PlannedActionOutputStaging>> {
         let plan = inputs
             .plan()
@@ -100,7 +100,7 @@ impl ConfiguredOutputOwner {
     fn stage_outputs_with_inputs(
         &self,
         plan: &PreparedActionPlan<'_>,
-        inputs: Option<&PreparedActionChainInputs>,
+        inputs: Option<&crate::runtime::native_source_access::NativeActionChainInputs>,
     ) -> io::Result<Vec<PlannedActionOutputStaging>> {
         let mut groups: SmallMap<usize, SmallSet<ActionOutput>> = SmallMap::new();
         match plan {

@@ -1,15 +1,15 @@
 //! Native preflight and physical publication projections of ordinary binary roots.
 use super::*;
-use crate::runtime::PreparedActionChainInputs;
+use crate::runtime::NativeActionChainInputs;
 use crate::runtime::PreparedRunfilesAction;
 
 fn prepare(
     workspace: &Workspace,
     target: &str,
-) -> Result<AcceptedCommand<Arc<PreparedActionChainInputs>>, BuildCommandError> {
+) -> Result<AcceptedCommand<NativeActionChainInputs>, BuildCommandError> {
     workspace
         .runtime
-        .prepare_requested_action_inputs_with_repository_environment(
+        .prepare_native_requested_action_inputs_with_repository_environment(
             &[TargetPattern::parse(target).unwrap()],
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),

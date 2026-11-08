@@ -133,17 +133,13 @@ fn relative<'a>(
     Ok(relative)
 }
 
-/// Caller must authenticate the full current selected root/anchor association,
-/// not merely match display path text. All batch membership/duplicate/buffer
-/// checks precede filesystem IO. Immutable results retain no authority/credits.
-pub(in crate::runtime) fn observe_rooted(
-    root: &RootIo<'_>,
+/// Pure batch authorization and retained-path bounds, shared by the registry
+/// before any mixed Host/materialization IO. Duplicate admission remains with
+/// the caller's prepaid sorted/index batch.
+pub(in crate::runtime) fn validate_rooted_demands(
     anchor: &MaterializationPathAnchor,
     demands: &[PathObservationDemand],
-    scope: &Arc<SourceServiceScope>,
-    active: &dyn Fn() -> bool,
-) -> Result<PathObservationEpoch, RootedObservationError> {
-    check(scope, active)?;
+) -> Result<usize, RootedObservationError> {
     if demands.len() > MAX_DEMANDS || anchor.root().as_path().as_os_str().len() > PATH_LIMIT {
         return Err(RootedObservationError::Bound);
     }
@@ -164,6 +160,21 @@ pub(in crate::runtime) fn observe_rooted(
             return Err(RootedObservationError::Bound);
         }
     }
+    Ok(paths)
+}
+
+/// Caller must authenticate the full current selected root/anchor association,
+/// not merely match display path text. All batch membership/duplicate/buffer
+/// checks precede filesystem IO. Immutable results retain no authority/credits.
+pub(in crate::runtime) fn observe_rooted(
+    root: &RootIo<'_>,
+    anchor: &MaterializationPathAnchor,
+    demands: &[PathObservationDemand],
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<PathObservationEpoch, RootedObservationError> {
+    check(scope, active)?;
+    let paths = validate_rooted_demands(anchor, demands)?;
     // SortedMap uses Buck2's OrderedMap/SmallMap entry/hash/index arrays. Eight
     // times entry+hash+control plus fixed slack bounds construction/growth and
     // transfer alongside the input/result/index/credit vectors. The same

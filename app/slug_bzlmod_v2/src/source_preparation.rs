@@ -7,6 +7,7 @@
  * source tree. You may select the license that applies to you.
  */
 
+pub(crate) mod workspace_identity;
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -64,6 +65,8 @@ use slug_workspace_v2::ResolvedPathObservationKey;
 use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
+pub use workspace_identity::RepositoryWorkspaceStableKey;
+pub use workspace_identity::general_workspace_source_identity;
 
 use crate::BuiltinBazelToolsRouteIdentity;
 use crate::BuiltinBazelToolsSnapshot;
@@ -554,6 +557,7 @@ pub enum RepositoryMaterializationKind {
     Immutable,
     GeneratedFileEffects(GeneratedRepositoryFileEffectPlan),
     GeneratedFilesystemEffects(crate::RepositoryFilesystemRealization),
+    GeneralWorkspace(crate::RepositoryWorkspaceRealization),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -665,7 +669,11 @@ impl RepositoryMaterializationResultEpoch {
                     canonical_repo,
                 });
             }
-            if !result_kind_matches(&entry.request.kind, &entry.result) {
+            if matches!(&entry.request.kind,RepositoryMaterializationKind::GeneralWorkspace(realization)
+                if realization.reservation().workspace()!=&entry.request.id.workspace
+                || realization.reservation().repository()!=&entry.request.id.canonical_repo)
+                || !result_kind_matches(&entry.request.kind, &entry.result)
+            {
                 return Err(
                     RepositoryMaterializationResultEpochError::SuccessKindMismatch {
                         canonical_repo,
@@ -765,6 +773,24 @@ fn result_kind_matches(
     kind: &RepositoryMaterializationKind,
     result: &RepositoryMaterializationResult,
 ) -> bool {
+    if let RepositoryMaterializationKind::GeneralWorkspace(realization) = kind {
+        return match result {
+            RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Immutable {
+                    generation_root,
+                    observation_instance,
+                    source_identity,
+                },
+            ) => {
+                generation_root == realization.reservation().display_root().as_path()
+                    && *observation_instance == realization.reservation().instance()
+                    && source_identity.as_ref()
+                        == general_workspace_source_identity(realization).as_ref()
+            }
+            RepositoryMaterializationResult::Success(_) => false,
+            _ => true,
+        };
+    }
     matches!(
         (kind, result),
         (_, RepositoryMaterializationResult::SpecError(_))
@@ -5044,7 +5070,17 @@ pub enum RepositoryMaterialization {
         source_identity: Arc<str>,
         generation_root: PathBuf,
         observation_instance: PathObservationInstanceId,
+        anchor: Option<slug_workspace_v2::MaterializationPathAnchor>,
     },
+}
+
+impl RepositoryMaterialization {
+    pub fn path_anchor(&self) -> Option<&slug_workspace_v2::MaterializationPathAnchor> {
+        match self {
+            Self::Immutable { anchor, .. } => anchor.as_ref(),
+            Self::Local { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -5718,6 +5754,18 @@ impl Key for RepositoryMaterializationResultKey {
                 source_identity: source_identity.clone(),
                 generation_root: generation_root.clone(),
                 observation_instance: *observation_instance,
+                anchor: match &self.request.kind {
+                    RepositoryMaterializationKind::GeneralWorkspace(realization) => Some(
+                        slug_workspace_v2::MaterializationPathAnchor::new(
+                            PathObservationNamespace::Materialization(
+                                realization.reservation().instance(),
+                            ),
+                            realization.reservation().display_root().clone(),
+                        )
+                        .expect("validated workspace reservation anchor"),
+                    ),
+                    _ => None,
+                },
             }),
             RepositoryMaterializationResult::SpecError(message) => {
                 Err(RepositoryMaterializationError::Spec(message.clone()))
@@ -11007,6 +11055,7 @@ mod tests {
             source_identity: Arc::from("fixed-content"),
             generation_root: PathBuf::from(root),
             observation_instance: PathObservationInstanceId::new(instance),
+            anchor: None,
         }
     }
 

@@ -152,7 +152,7 @@ impl SourceActionTransport for Fake {
 
     async fn stage(
         &self,
-        inputs: Arc<PreparedSourceActionInputs>,
+        inputs: crate::runtime::NativeSourceActionInputs,
         _args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Vec<u8>, Self::Error> {
         let attempt = self.stages.fetch_add(1, Ordering::SeqCst);

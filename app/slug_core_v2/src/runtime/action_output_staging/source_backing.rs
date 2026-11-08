@@ -29,7 +29,7 @@ impl SourceBacking {
         workspace: &Path,
         digest: FileContentDigest,
         permissions: i32,
-        source: &mut File,
+        source: &mut dyn std::io::Read,
     ) -> io::Result<Self> {
         #[cfg(all(target_os = "linux", target_env = "gnu"))]
         {

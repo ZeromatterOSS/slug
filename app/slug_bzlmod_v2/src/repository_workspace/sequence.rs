@@ -610,6 +610,14 @@ impl RepositoryWorkspaceTranscript {
             retention,
         })
     }
+    /// Complete retained realization plus fixed digest construction scratch.
+    /// Native producers reserve this before realization clones or digest output.
+    pub fn realization_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            self.retained_storage_bytes()?,
+            std::mem::size_of::<RepositoryWorkspaceRealization>() + 256,
+        )
+    }
     pub fn realize(
         &self,
         consumed: usize,
@@ -617,8 +625,13 @@ impl RepositoryWorkspaceTranscript {
         if consumed != self.records.len() {
             return Err(RepositoryWorkspaceError::UnusedRecords);
         }
+        let source_identity =
+            crate::source_preparation::workspace_identity::derive_workspace_source_identity(
+                self.current(),
+            );
         Ok(RepositoryWorkspaceRealization {
             transcript: self.clone(),
+            source_identity,
         })
     }
 }
@@ -713,8 +726,22 @@ fn validate_result(
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RepositoryWorkspaceRealization {
     transcript: RepositoryWorkspaceTranscript,
+    source_identity: Arc<str>,
 }
 impl RepositoryWorkspaceRealization {
+    pub fn source_identity(&self) -> &Arc<str> {
+        &self.source_identity
+    }
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            std::mem::size_of::<Self>(),
+            add(
+                self.transcript.retained_storage_bytes()?,
+                array_bytes::<u8>(self.source_identity.len())?,
+            )?,
+        )
+    }
+
     pub fn transcript(&self) -> &RepositoryWorkspaceTranscript {
         &self.transcript
     }

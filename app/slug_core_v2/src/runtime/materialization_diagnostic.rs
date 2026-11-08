@@ -39,6 +39,7 @@ impl<'a> MaterializationDiagnostic<'a> {
                 ("local", Some(logical_root.as_path().as_os_str().as_bytes()))
             }
             RepositoryMaterializationKind::Immutable => ("immutable", None),
+            RepositoryMaterializationKind::GeneralWorkspace(_) => ("general_workspace", None),
             RepositoryMaterializationKind::GeneratedFileEffects(_) => {
                 ("generated_file_effects", None)
             }

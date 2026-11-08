@@ -286,3 +286,109 @@ fn assert_complete_eq<T: PartialEq + std::fmt::Debug>(
         "actual: {actual:?}; expected: {expected:?}"
     );
 }
+
+#[tokio::test]
+async fn anchored_digest_never_demands_host_ancestors_or_relabels_equal_display_instances() {
+    use crate::PathObservationInstanceId;
+    let anchor = |instance| {
+        MaterializationPathAnchor::new(
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(instance)),
+            path("/same"),
+        )
+        .unwrap()
+    };
+    let a = anchor(501);
+    let b = anchor(502);
+    let key_a = AnchoredPathFileDigestObservationKey::new(a.dupe(), "/same/file").unwrap();
+    let key_b = AnchoredPathFileDigestObservationKey::new(b.dupe(), "/same/file").unwrap();
+    assert_ne!(key_a, key_b);
+    assert!(AnchoredPathFileDigestObservationKey::new(a.dupe(), "/same/../outside").is_err());
+    let rows = |anchor: &MaterializationPathAnchor, value: u8| {
+        let demand =
+            |name, operation| PathObservationDemand::new(anchor.namespace(), path(name), operation);
+        vec![
+            (
+                demand("/same", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::Directory,
+                    0,
+                    1,
+                    1,
+                    1,
+                    0o755,
+                ))),
+            ),
+            (
+                demand("/same/file", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::RegularFile,
+                    1,
+                    1,
+                    1,
+                    1,
+                    0o644,
+                ))),
+            ),
+            (
+                demand("/same/file", PathObservationOperation::FileDigest),
+                PathObservationResult::FileDigest(PathOperationResult::Present(digest(value))),
+            ),
+        ]
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    updater
+        .changed_to([(PathObservationEpochKey, PathObservationEpoch::empty())])
+        .unwrap();
+    let mut tx = updater.commit().await;
+    let PathOutcome::Need(need) = tx.compute(&key_a).await.unwrap() else {
+        panic!("empty anchor epoch must need root")
+    };
+    assert_eq!(need.demands()[0].path(), a.root());
+    assert_eq!(need.demands()[0].namespace(), a.namespace());
+    assert!(!AnchoredPathFileDigestObservationKey::validity(
+        &PathOutcome::Need(need)
+    ));
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to([(PathObservationEpochKey, epoch(&rows(&a, 1)))])
+        .unwrap();
+    tx = updater.commit().await;
+    let PathOutcome::Complete(Ok(first)) = tx.compute(&key_a).await.unwrap() else {
+        panic!("A must complete without ancestors")
+    };
+    assert_eq!(first.result(), &Ok(PathFileDigest::Present(digest(1))));
+    assert!(
+        first
+            .observations()
+            .observations()
+            .keys()
+            .all(|d| d.path().as_path().starts_with(a.root().as_path()))
+    );
+    assert!(matches!(
+        tx.compute(&key_b).await.unwrap(),
+        PathOutcome::Need(_)
+    ));
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to([(PathObservationEpochKey, epoch(&rows(&b, 2)))])
+        .unwrap();
+    tx = updater.commit().await;
+    let PathOutcome::Complete(Ok(second)) = tx.compute(&key_b).await.unwrap() else {
+        panic!("B must complete")
+    };
+    assert_eq!(second.result(), &Ok(PathFileDigest::Present(digest(2))));
+    assert!(matches!(
+        tx.compute(&key_a).await.unwrap(),
+        PathOutcome::Need(_)
+    ));
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to([(PathObservationEpochKey, epoch(&rows(&a, 1)))])
+        .unwrap();
+    tx = updater.commit().await;
+    let PathOutcome::Complete(Ok(restored)) = tx.compute(&key_a).await.unwrap() else {
+        panic!("A restore must complete")
+    };
+    assert_eq!(restored.result(), first.result());
+}

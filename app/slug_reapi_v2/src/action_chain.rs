@@ -9,6 +9,7 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::ExpandedSpawnCommandLine;
 use slug_core_v2::runtime::ActionChainTransport;
+use slug_core_v2::runtime::NativeActionChainInputs;
 use slug_core_v2::runtime::PreparedActionChainInputs;
 use slug_core_v2::runtime::PreparedRunfilesAction;
 use slug_reapi_cache_v2::CacheClient;
@@ -57,7 +58,7 @@ impl ActionChainRemoteResult {
 
 /// Opaque: neither old results nor caller-selected endpoints can be substituted.
 pub struct ActionChainReapiSession {
-    inputs: Arc<PreparedActionChainInputs>,
+    inputs: NativeActionChainInputs,
     config: RemoteConfig,
     templates: Vec<Template>,
     results: Vec<ActionChainStepResult>,
@@ -287,50 +288,58 @@ impl ActionChainTransport for ActionChainReapiTransport {
 
     async fn start(
         &self,
-        inputs: Arc<PreparedActionChainInputs>,
+        inputs: NativeActionChainInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
-        let templates =
-            Template::prepare(&inputs, &self.config.default_exec_properties, args_context)?;
-        let endpoint =
-            tonic_endpoint(self.config.executor.as_deref().expect("validated executor"))?;
-        let endpoint = tonic::transport::Endpoint::from_shared(endpoint)
-            .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
-        let remote = templates.iter().any(|template| {
-            !matches!(
-                template,
-                Template::Runfiles(_) | Template::ArtifactSymlink(_)
-            )
-        });
-        let channel = if remote {
-            endpoint
-                .connect()
-                .await
-                .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
-        } else {
-            endpoint.connect_lazy()
-        };
-        let mut cache = CacheClient::new(
-            channel.clone(),
-            self.config.instance_name.clone().unwrap_or_default(),
-            TransferPolicy::default(),
-        )
-        .map_err(cache_error)?;
-        if remote {
-            cache
-                .apply_server_batch_limit()
-                .await
+        let native_scope = inputs.clone();
+        native_scope
+            .run_while_active(async move {
+                inputs.check_active().map_err(|e| protocol(e.to_string()))?;
+                let templates =
+                    Template::prepare(&inputs, &self.config.default_exec_properties, args_context)?;
+                let endpoint =
+                    tonic_endpoint(self.config.executor.as_deref().expect("validated executor"))?;
+                let endpoint = tonic::transport::Endpoint::from_shared(endpoint)
+                    .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
+                let remote = templates.iter().any(|template| {
+                    !matches!(
+                        template,
+                        Template::Runfiles(_) | Template::ArtifactSymlink(_)
+                    )
+                });
+                let channel = if remote {
+                    endpoint
+                        .connect()
+                        .await
+                        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
+                } else {
+                    endpoint.connect_lazy()
+                };
+                let mut cache = CacheClient::new(
+                    channel.clone(),
+                    self.config.instance_name.clone().unwrap_or_default(),
+                    TransferPolicy::default(),
+                )
                 .map_err(cache_error)?;
-        }
-        Ok(ActionChainReapiSession {
-            inputs,
-            config: self.config.clone(),
-            templates,
-            results: Vec::new(),
-            cache,
-            channel,
-            identity: Arc::new(()),
-        })
+                if remote {
+                    cache
+                        .apply_server_batch_limit()
+                        .await
+                        .map_err(cache_error)?;
+                }
+                inputs.check_active().map_err(|e| protocol(e.to_string()))?;
+                Ok(ActionChainReapiSession {
+                    inputs,
+                    config: self.config.clone(),
+                    templates,
+                    results: Vec::new(),
+                    cache,
+                    channel,
+                    identity: Arc::new(()),
+                })
+            })
+            .await
+            .map_err(|e| protocol(e.to_string()))?
     }
 
     async fn stage(
@@ -338,107 +347,150 @@ impl ActionChainTransport for ActionChainReapiTransport {
         session: &mut Self::Session,
         index: usize,
     ) -> Result<Self::Staged, Self::Error> {
-        if index != session.results.len() {
-            return Err(protocol("chain staging is out of order"));
-        }
-        let template = session
-            .templates
-            .get(index)
-            .ok_or_else(|| protocol("unknown chain step"))?;
-        if let Template::Runfiles(result) = template {
-            return Ok(StagedChainAction {
-                session: session.identity.clone(),
-                index,
-                payload: StagedPayload::Local(result.clone()),
-            });
-        }
-        if let Template::ArtifactSymlink(alias) = template {
-            return Ok(StagedChainAction {
-                session: session.identity.clone(),
-                index,
-                payload: StagedPayload::Local(artifact_symlink::stage(alias, session).await?),
-            });
-        }
-        let bound = template.bind(&session.results)?;
-        let identity =
-            ReapiActionIdentity::new(&bound.command, bound.tree.root_digest().clone(), None);
-        let blobs = bound
-            .tree
-            .directory_blobs()
-            .iter()
-            .chain(bound.tree.inline_blobs())
-            .cloned()
-            .chain([
-                ReapiBlob::from_bytes(bound.command.serialized()),
-                ReapiBlob::from_bytes(identity.action_bytes().to_vec()),
-            ])
-            .map(|blob| (blob.digest().clone(), blob))
-            .collect::<BTreeMap<_, _>>();
-        let required = bound
-            .tree
-            .entries()
-            .iter()
-            .map(|entry| entry.digest().clone())
-            .chain(blobs.keys().cloned())
-            .collect();
-        let missing = session
-            .cache
-            .find_missing(&required)
-            .await
-            .map_err(cache_error)?;
-        // Check CAS-only provenance first, even when the digest also has local bytes.
-        for digest in &missing {
-            if bound.generated.contains(digest) {
-                return Err(RemoteExecutionError::MissingBlobData {
-                    digest: digest.clone(),
-                });
-            }
-        }
-        for digest in &missing {
-            if let Some(blob) = blobs.get(digest) {
+        let native_scope = session.inputs.clone();
+        native_scope
+            .run_while_active(async move {
                 session
-                    .cache
-                    .upload_missing(&[blob.clone()])
-                    .await
-                    .map_err(cache_error)?;
-            } else if let Some(bytes) = bound.local.get(digest) {
-                session
-                    .cache
-                    .upload_reader_verified(digest, std::io::Cursor::new(bytes.clone()))
-                    .await
-                    .map_err(cache_error)?;
-            } else if let Some(index) = bound.sources.get(digest) {
-                let file = session
                     .inputs
-                    .open_source(*index)
-                    .map_err(|error| protocol(error.to_string()))?;
-                session
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                if index != session.results.len() {
+                    return Err(protocol("chain staging is out of order"));
+                }
+                let template = session
+                    .templates
+                    .get(index)
+                    .ok_or_else(|| protocol("unknown chain step"))?;
+                if let Template::Runfiles(result) = template {
+                    return Ok(StagedChainAction {
+                        session: session.identity.clone(),
+                        index,
+                        payload: StagedPayload::Local(result.clone()),
+                    });
+                }
+                if let Template::ArtifactSymlink(alias) = template {
+                    return Ok(StagedChainAction {
+                        session: session.identity.clone(),
+                        index,
+                        payload: StagedPayload::Local(
+                            artifact_symlink::stage(alias, session).await?,
+                        ),
+                    });
+                }
+                let bound = template.bind(&session.results)?;
+                let identity = ReapiActionIdentity::new(
+                    &bound.command,
+                    bound.tree.root_digest().clone(),
+                    None,
+                );
+                let blobs = bound
+                    .tree
+                    .directory_blobs()
+                    .iter()
+                    .chain(bound.tree.inline_blobs())
+                    .cloned()
+                    .chain([
+                        ReapiBlob::from_bytes(bound.command.serialized()),
+                        ReapiBlob::from_bytes(identity.action_bytes().to_vec()),
+                    ])
+                    .map(|blob| (blob.digest().clone(), blob))
+                    .collect::<BTreeMap<_, _>>();
+                let required = bound
+                    .tree
+                    .entries()
+                    .iter()
+                    .map(|entry| entry.digest().clone())
+                    .chain(blobs.keys().cloned())
+                    .collect();
+                let missing = session
                     .cache
-                    .upload_reader_verified(digest, tokio::fs::File::from_std(file))
+                    .find_missing(&required)
                     .await
                     .map_err(cache_error)?;
-            } else {
-                return Err(RemoteExecutionError::MissingBlobData {
-                    digest: digest.clone(),
-                });
-            }
-        }
-        for digest in &required {
-            session
-                .cache
-                .read_blob_verified(digest, |_| Ok(()))
-                .await
-                .map_err(cache_error)?;
-        }
-        Ok(StagedChainAction {
-            session: session.identity.clone(),
-            index,
-            payload: StagedPayload::Remote {
-                command: bound.command,
-                identity,
-                uploaded: missing.into_iter().collect(),
-            },
-        })
+                // Check CAS-only provenance first, even when the digest also has local bytes.
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                for digest in &missing {
+                    session
+                        .inputs
+                        .check_active()
+                        .map_err(|e| protocol(e.to_string()))?;
+                    if bound.generated.contains(digest) {
+                        return Err(RemoteExecutionError::MissingBlobData {
+                            digest: digest.clone(),
+                        });
+                    }
+                }
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                for digest in &missing {
+                    session
+                        .inputs
+                        .check_active()
+                        .map_err(|e| protocol(e.to_string()))?;
+                    if let Some(blob) = blobs.get(digest) {
+                        session
+                            .cache
+                            .upload_missing(&[blob.clone()])
+                            .await
+                            .map_err(cache_error)?;
+                    } else if let Some(bytes) = bound.local.get(digest) {
+                        session
+                            .cache
+                            .upload_reader_verified(digest, std::io::Cursor::new(bytes.clone()))
+                            .await
+                            .map_err(cache_error)?;
+                    } else if let Some(index) = bound.sources.get(digest) {
+                        let file = session
+                            .inputs
+                            .open_source(*index)
+                            .map_err(|error| protocol(error.to_string()))?;
+                        session
+                            .cache
+                            .upload_reader_verified(digest, file.into_async())
+                            .await
+                            .map_err(cache_error)?;
+                    } else {
+                        return Err(RemoteExecutionError::MissingBlobData {
+                            digest: digest.clone(),
+                        });
+                    }
+                }
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                for digest in &required {
+                    session
+                        .inputs
+                        .check_active()
+                        .map_err(|e| protocol(e.to_string()))?;
+                    session
+                        .cache
+                        .read_blob_verified(digest, |_| Ok(()))
+                        .await
+                        .map_err(cache_error)?;
+                }
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                Ok(StagedChainAction {
+                    session: session.identity.clone(),
+                    index,
+                    payload: StagedPayload::Remote {
+                        command: bound.command,
+                        identity,
+                        uploaded: missing.into_iter().collect(),
+                    },
+                })
+            })
+            .await
+            .map_err(|e| protocol(e.to_string()))?
     }
 
     async fn execute(
@@ -447,49 +499,73 @@ impl ActionChainTransport for ActionChainReapiTransport {
         index: usize,
         staged: Self::Staged,
     ) -> Result<(), Self::Error> {
-        if index != session.results.len()
-            || index != staged.index
-            || !Arc::ptr_eq(&session.identity, &staged.session)
-        {
-            return Err(protocol(
-                "staged action belongs to another chain attempt or step",
-            ));
-        }
-        let result = match staged.payload {
-            StagedPayload::Local(result) => result,
-            StagedPayload::Remote {
-                command,
-                identity,
-                uploaded,
-            } => ActionChainStepResult::Remote(
-                execute_staged_metadata(
-                    &session.config,
-                    &command,
-                    &identity,
-                    &session.cache,
-                    session.channel.clone(),
-                    uploaded,
-                )
-                .await?,
-            ),
-        };
-        session.results.push(result);
-        Ok(())
+        let native_scope = session.inputs.clone();
+        native_scope
+            .run_while_active(async move {
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                if index != session.results.len()
+                    || index != staged.index
+                    || !Arc::ptr_eq(&session.identity, &staged.session)
+                {
+                    return Err(protocol(
+                        "staged action belongs to another chain attempt or step",
+                    ));
+                }
+                let result = match staged.payload {
+                    StagedPayload::Local(result) => result,
+                    StagedPayload::Remote {
+                        command,
+                        identity,
+                        uploaded,
+                    } => ActionChainStepResult::Remote(
+                        execute_staged_metadata(
+                            &session.config,
+                            &command,
+                            &identity,
+                            &session.cache,
+                            session.channel.clone(),
+                            uploaded,
+                        )
+                        .await?,
+                    ),
+                };
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                session.results.push(result);
+                Ok(())
+            })
+            .await
+            .map_err(|e| protocol(e.to_string()))?
     }
 
     async fn finish(&self, session: Self::Session) -> Result<Self::Output, Self::Error> {
-        if session.results.len() != session.templates.len() || session.results.is_empty() {
-            return Err(protocol("chain did not complete every prerequisite"));
-        }
-        Ok(ActionChainRemoteResult {
-            selected: session
-                .inputs
-                .plan()
-                .map_err(command_error)?
-                .selected_action()
-                .map(|_| session.results.len() - 1),
-            results: session.results,
-        })
+        let native_scope = session.inputs.clone();
+        native_scope
+            .run_while_active(async move {
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                if session.results.len() != session.templates.len() || session.results.is_empty() {
+                    return Err(protocol("chain did not complete every prerequisite"));
+                }
+                Ok(ActionChainRemoteResult {
+                    selected: session
+                        .inputs
+                        .plan()
+                        .map_err(command_error)?
+                        .selected_action()
+                        .map(|_| session.results.len() - 1),
+                    results: session.results,
+                })
+            })
+            .await
+            .map_err(|e| protocol(e.to_string()))?
     }
 }
 

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use slug_core_v2::runtime::PreparedSourceActionInputs;
+use slug_core_v2::runtime::NativeSourceActionInputs;
 use slug_core_v2::runtime::SourceActionTransport;
 use slug_reapi_cache_v2::CacheClient;
 use slug_reapi_cache_v2::TransferPolicy;
@@ -68,96 +68,121 @@ impl SourceActionTransport for SourceReapiTransport {
 
     async fn stage(
         &self,
-        inputs: Arc<PreparedSourceActionInputs>,
+        inputs: NativeSourceActionInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Staged, Self::Error> {
-        let plan = SourceSpawnReapiPlan::from_prepared(
-            inputs,
-            &self.config.default_exec_properties,
-            args_context,
-        )
-        .map_err(RemoteExecutionError::Command)?;
-        let endpoint =
-            tonic_endpoint(self.config.executor.as_deref().expect("validated executor"))?;
-        let channel = tonic::transport::Endpoint::from_shared(endpoint)
-            .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
-            .connect()
-            .await
-            .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
-        let mut cache = CacheClient::new(
-            channel.clone(),
-            self.config.instance_name.clone().unwrap_or_default(),
-            TransferPolicy::default(),
-        )
-        .map_err(cache_error)?;
-        cache
-            .apply_server_batch_limit()
-            .await
-            .map_err(cache_error)?;
-        let mut uploaded = plan
-            .inputs()
-            .upload_missing(&cache)
-            .await
-            .map_err(cache_error)?;
-        let blobs = [
-            ReapiBlob::from_bytes(plan.command().serialized()),
-            ReapiBlob::from_bytes(plan.identity().action_bytes().to_vec()),
-        ];
-        let required = required_digests(plan.inputs().input_tree(), &blobs);
-        // required_digests includes file entries; Directory digests must also be
-        // checked even when FindMissing reported them present.
-        let required = required
-            .into_iter()
-            .chain(
-                plan.inputs()
-                    .input_tree()
-                    .directory_blobs()
-                    .iter()
-                    .map(|blob| blob.digest().clone()),
-            )
-            .collect::<std::collections::BTreeSet<_>>();
-        let missing = cache
-            .find_missing(&blobs.iter().map(|blob| blob.digest().clone()).collect())
-            .await
-            .map_err(cache_error)?;
-        let missing_blobs = blobs
-            .into_iter()
-            .filter(|blob| missing.contains(blob.digest()))
-            .collect::<Vec<_>>();
-        cache
-            .upload_missing(&missing_blobs)
-            .await
-            .map_err(cache_error)?;
-        uploaded.extend(missing);
-        // Presence is not completion (NativeLink may advertise in-flight writes).
-        // Reads verify size and hash with bounded transfer buffers and no retained
-        // input bytes. Any incomplete/corrupt value prevents a staged capability.
-        for digest in required {
-            cache
-                .read_blob_verified(&digest, |_| Ok(()))
-                .await
+        let native_scope = inputs.clone();
+        native_scope
+            .run_while_active(async move {
+                let plan = SourceSpawnReapiPlan::from_native(
+                    inputs,
+                    &self.config.default_exec_properties,
+                    args_context,
+                )
+                .map_err(RemoteExecutionError::Command)?;
+                plan.inputs().check_active().map_err(cache_error)?;
+                let endpoint =
+                    tonic_endpoint(self.config.executor.as_deref().expect("validated executor"))?;
+                let endpoint = tonic::transport::Endpoint::from_shared(endpoint)
+                    .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
+                let channel = plan
+                    .inputs()
+                    .run_while_active(endpoint.connect())
+                    .await
+                    .map_err(cache_error)?
+                    .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
+                plan.inputs().check_active().map_err(cache_error)?;
+                let mut cache = CacheClient::new(
+                    channel.clone(),
+                    self.config.instance_name.clone().unwrap_or_default(),
+                    TransferPolicy::default(),
+                )
                 .map_err(cache_error)?;
-        }
-        Ok(StagedSourceAction {
-            config: self.config.clone(),
-            plan,
-            cache,
-            channel,
-            uploaded,
-        })
+                plan.inputs()
+                    .run_while_active(cache.apply_server_batch_limit())
+                    .await
+                    .map_err(cache_error)?
+                    .map_err(cache_error)?;
+                let mut uploaded = plan
+                    .inputs()
+                    .upload_missing(&cache)
+                    .await
+                    .map_err(cache_error)?;
+                let blobs = [
+                    ReapiBlob::from_bytes(plan.command().serialized()),
+                    ReapiBlob::from_bytes(plan.identity().action_bytes().to_vec()),
+                ];
+                let required = required_digests(plan.inputs().input_tree(), &blobs);
+                // required_digests includes file entries; Directory digests must also be
+                // checked even when FindMissing reported them present.
+                let required = required
+                    .into_iter()
+                    .chain(
+                        plan.inputs()
+                            .input_tree()
+                            .directory_blobs()
+                            .iter()
+                            .map(|blob| blob.digest().clone()),
+                    )
+                    .collect::<std::collections::BTreeSet<_>>();
+                let requested = blobs.iter().map(|blob| blob.digest().clone()).collect();
+                let missing = plan
+                    .inputs()
+                    .run_while_active(cache.find_missing(&requested))
+                    .await
+                    .map_err(cache_error)?
+                    .map_err(cache_error)?;
+                let missing_blobs = blobs
+                    .into_iter()
+                    .filter(|blob| missing.contains(blob.digest()))
+                    .collect::<Vec<_>>();
+                plan.inputs()
+                    .run_while_active(cache.upload_missing(&missing_blobs))
+                    .await
+                    .map_err(cache_error)?
+                    .map_err(cache_error)?;
+                uploaded.extend(missing);
+                // Presence is not completion (NativeLink may advertise in-flight writes).
+                // Reads verify size and hash with bounded transfer buffers and no retained
+                // input bytes. Any incomplete/corrupt value prevents a staged capability.
+                for digest in required {
+                    plan.inputs()
+                        .run_while_active(cache.read_blob_verified(&digest, |_| Ok(())))
+                        .await
+                        .map_err(cache_error)?
+                        .map_err(cache_error)?;
+                }
+                plan.inputs().check_active().map_err(cache_error)?;
+                Ok(StagedSourceAction {
+                    config: self.config.clone(),
+                    plan,
+                    cache,
+                    channel,
+                    uploaded,
+                })
+            })
+            .await
+            .map_err(|e| RemoteExecutionError::Protocol(e.to_string()))?
     }
 
     async fn execute(&self, staged: Self::Staged) -> Result<Self::Output, Self::Error> {
-        execute_staged(
-            &staged.config,
-            staged.plan.command(),
-            staged.plan.identity(),
-            &staged.cache,
-            staged.channel,
-            Vec::new(),
-            staged.uploaded,
-        )
-        .await
+        staged.plan.inputs().check_active().map_err(cache_error)?;
+        let result = staged
+            .plan
+            .inputs()
+            .run_while_active(execute_staged(
+                &staged.config,
+                staged.plan.command(),
+                staged.plan.identity(),
+                &staged.cache,
+                staged.channel,
+                Vec::new(),
+                staged.uploaded,
+            ))
+            .await
+            .map_err(cache_error)??;
+        staged.plan.inputs().check_active().map_err(cache_error)?;
+        Ok(result)
     }
 }
 

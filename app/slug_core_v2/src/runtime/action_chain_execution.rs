@@ -21,7 +21,7 @@ pub trait ActionChainTransport: Sync {
 
     fn start(
         &self,
-        inputs: Arc<PreparedActionChainInputs>,
+        inputs: crate::runtime::native_source_access::NativeActionChainInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> impl std::future::Future<Output = Result<Self::Session, Self::Error>> + Send;
     fn stage(
@@ -57,7 +57,7 @@ trait PublicationPolicy<T: ActionChainTransport>: Clone + Sync {
         &self,
         transport: &T,
         session: &mut T::Session,
-        inputs: &PreparedActionChainInputs,
+        inputs: &crate::runtime::native_source_access::NativeActionChainInputs,
     ) -> impl std::future::Future<
         Output = Result<Option<Vec<PlannedActionOutputStaging>>, NativeDemandSessionError>,
     >;
@@ -70,7 +70,7 @@ impl<T: ActionChainTransport> PublicationPolicy<T> for NoPublication {
         &self,
         _transport: &T,
         _session: &mut T::Session,
-        _inputs: &PreparedActionChainInputs,
+        _inputs: &crate::runtime::native_source_access::NativeActionChainInputs,
     ) -> Result<Option<Vec<PlannedActionOutputStaging>>, NativeDemandSessionError> {
         Ok(None)
     }
@@ -83,7 +83,7 @@ impl<T: ActionChainOutputTransport> PublicationPolicy<T> for PublishOutputs<'_> 
         &self,
         transport: &T,
         session: &mut T::Session,
-        inputs: &PreparedActionChainInputs,
+        inputs: &crate::runtime::native_source_access::NativeActionChainInputs,
     ) -> Result<Option<Vec<PlannedActionOutputStaging>>, NativeDemandSessionError> {
         let mut staging = self
             .0
@@ -167,6 +167,7 @@ impl<T, P: Clone> Clone for ActionChainExecutionRoot<'_, T, P> {
 
 struct ActionChainExecutionTerminal<T> {
     inputs: Arc<PreparedActionChainInputs>,
+    native: Option<crate::runtime::native_source_access::NativeActionChainInputs>,
     output: Option<Arc<T>>,
     pending_outputs: Option<Arc<Mutex<Vec<PlannedActionOutputStaging>>>>,
     published_outputs: Option<Arc<[PublishedPlannedActionOutputs]>>,
@@ -176,6 +177,7 @@ impl<T> Clone for ActionChainExecutionTerminal<T> {
     fn clone(&self) -> Self {
         Self {
             inputs: self.inputs.clone(),
+            native: self.native.clone(),
             output: self.output.clone(),
             pending_outputs: self.pending_outputs.clone(),
             published_outputs: self.published_outputs.clone(),
@@ -237,6 +239,7 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
             .await?
             .map(|inputs| ActionChainExecutionTerminal {
                 inputs,
+                native: None,
                 output: None,
                 pending_outputs: None,
                 published_outputs: None,
@@ -286,27 +289,14 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                     }
                 }
             }
-            let needs_source_generations = terminal
-                .inputs
-                .plan()
-                .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?
-                .actions()
-                .iter()
-                .any(|step| {
-                    step.action().runfiles_support_spec().is_some()
-                        || step.action().symlink_spec().is_some()
-                });
-            let _generations = if needs_source_generations {
-                Some(context.retain_source_generations(terminal.inputs.sources())?)
-            } else {
-                None
-            };
+            let native = context.native_action_chain_inputs(terminal.inputs.clone())?;
+            terminal.native = Some(native.clone());
             let args_context = super::source_execution::RequestArgsContext::new(
                 context.command.runtime.source_scope.as_deref(),
             );
             let mut session = self
                 .transport
-                .start(terminal.inputs.clone(), &args_context)
+                .start(native.clone(), &args_context)
                 .await
                 .map_err(|error| {
                     NativeDemandSessionError::Computation(anyhow::Error::new(error))
@@ -333,7 +323,7 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
             }
             let pending = self
                 .publication
-                .stage_outputs(self.transport, &mut session, &terminal.inputs)
+                .stage_outputs(self.transport, &mut session, &native)
                 .await?;
             let output = self.transport.finish(session).await.map_err(|error| {
                 NativeDemandSessionError::Computation(anyhow::Error::new(error))

@@ -80,6 +80,29 @@ impl RepositoryWorkspaceCommand {
         )?;
         check(scope, active)
     }
+    /// Refuse foreign initialization before creating a helper or backing root.
+    pub(in crate::runtime::repository_physical_root) fn check_initialization(
+        &self,
+        reservation: &RepositoryWorkspaceReservation,
+        claim: &crate::runtime::repository_io::reservations::SourceRootClaim,
+        resources: &Arc<RepositoryRootResources>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), PhysicalRootError> {
+        self.check_scope(scope, active)?;
+        if !Arc::ptr_eq(&self.resources, resources)
+            || !claim.belongs_to(resources)
+            || !claim.matches_reservation(reservation)
+        {
+            return Err(PhysicalRootError::Reservation);
+        }
+        // Initial root mode changes no storage forecast. Actual root metadata
+        // and the same admission are verified again when ownership returns.
+        self.epoch()
+            .reserve_storage_bytes(reservation, 0o755)
+            .map_err(PhysicalRootError::Protocol)?;
+        Ok(())
+    }
     fn root_slot(
         &self,
         reservation: &RepositoryWorkspaceReservation,
@@ -410,6 +433,77 @@ impl RepositoryWorkspaceCommand {
             quota_confirmed: mode == RepositoryWorkspaceMode::Process,
             _credit: credit,
         })
+    }
+    /// A metadata-only success or matching final tree cannot adopt a root.
+    /// Match the entire exact selected history before retiring mutable authority.
+    pub(in crate::runtime) fn seal_for_materialization(
+        mut self,
+        request: Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(Self, super::super::SealedWorkspaceMaterialization), PhysicalRootError> {
+        self.check_scope(scope, active)?;
+        let slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(expected) =
+            &request.kind
+        else {
+            return Err(PhysicalRootError::Reservation);
+        };
+        let reservation = expected.reservation().clone();
+        if &request.id.workspace != reservation.workspace()
+            || &request.id.canonical_repo != reservation.repository()
+        {
+            return Err(PhysicalRootError::Reservation);
+        }
+        let slot = self.root_slot(&reservation)?;
+        self.compare_transcript(slot)?;
+        let progress = self.roots[slot]
+            .progress
+            .as_ref()
+            .ok_or(PhysicalRootError::Reservation)?;
+        if expected.transcript() != progress.transcript() {
+            return Err(PhysicalRootError::Protocol(
+                slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
+            ));
+        }
+        let resources = progress.builder.resources.clone();
+        let retained = request
+            .general_workspace_storage_bytes()
+            .map_err(PhysicalRootError::Protocol)?;
+        let credit = resources.reserve(
+            add(
+                retained,
+                std::mem::size_of::<super::super::SealedWorkspaceMaterialization>(),
+            )?,
+            0,
+            0,
+        )?;
+        // Arm retained history before the consuming seal can fail. Field order
+        // retires the complete request before refunding its native credit.
+        struct CreditedRequest {
+            request: Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+            credit: resources::ResourceCredit,
+        }
+        let retained = CreditedRequest { request, credit };
+        let slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(expected) =
+            &retained.request.kind
+        else {
+            unreachable!()
+        };
+        drop(self.roots[slot].initial.take());
+        drop(self.roots[slot].lease.take());
+        let progress = self.roots[slot]
+            .progress
+            .take()
+            .ok_or(PhysicalRootError::Reservation)?;
+        let root = progress.seal_realization(expected, scope, active)?;
+        Ok((
+            self,
+            super::super::SealedWorkspaceMaterialization::from_command(
+                retained.request,
+                root,
+                retained.credit,
+            ),
+        ))
     }
     pub(in crate::runtime) fn seal_root(
         mut self,

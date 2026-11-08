@@ -165,7 +165,7 @@ struct CheckedTransport {
     consumers: AtomicUsize,
     checked: AtomicUsize,
     producers: AtomicUsize,
-    inputs: std::sync::Mutex<Option<Arc<PreparedActionChainInputs>>>,
+    inputs: std::sync::Mutex<Option<slug_core_v2::runtime::NativeActionChainInputs>>,
 }
 impl CheckedTransport {
     fn new(mutation: Option<Mutation>) -> Self {
@@ -199,7 +199,7 @@ impl ActionChainTransport for CheckedTransport {
     type Error = RemoteExecutionError;
     async fn start(
         &self,
-        inputs: Arc<PreparedActionChainInputs>,
+        inputs: slug_core_v2::runtime::NativeActionChainInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
         *self.inputs.lock().unwrap() = Some(inputs.clone());
@@ -238,9 +238,17 @@ impl ActionChainTransport for CheckedTransport {
                     .iter()
                     .any(|entry| entry.path().ends_with(".runfiles/_repo_mapping"))
             );
-            let authored = generated
-                .path()
-                .starts_with("tools/authored_tool.runfiles/");
+            let authored_generated_path = session
+                .inputs
+                .plan()
+                .unwrap()
+                .actions()
+                .iter()
+                .flat_map(|step| step.action().outputs())
+                .find(|output| output.root_relative_path() == "tools/authored_tool")
+                .map(|output| format!("{}.runfiles/_main/gen_file", output.path()))
+                .expect("declared authored tool output");
+            let authored = generated.path() == authored_generated_path;
             assert_eq!(
                 entries
                     .iter()
@@ -293,18 +301,7 @@ impl ActionChainTransport for CheckedTransport {
             self.producers.fetch_add(1, Ordering::SeqCst);
             if let Some(mutation) = self.mutation {
                 let digest = file.digest();
-                let root = PathBuf::from(std::env::var("SLUG_V2_NATIVELINK_TEST_ROOT").unwrap());
-                for store in ["fast-content", "slow-content"] {
-                    let path = root.join("cas").join(store).join("d").join(format!(
-                        "{}-{}",
-                        digest.hash(),
-                        digest.size_bytes()
-                    ));
-                    assert!(
-                        path.is_file(),
-                        "generated CAS blob missing before mutation: {}",
-                        path.display()
-                    );
+                for path in crate::cas_fixture::completed_blob_paths(digest) {
                     match mutation {
                         Mutation::Remove => fs::remove_file(path).unwrap(),
                         Mutation::Corrupt => {
@@ -367,7 +364,7 @@ fn files_to_run_output_namespace_conflict_rejects_before_connection() {
     let prepare = || {
         let accepted = fixture
             .runtime
-            .prepare_requested_action_inputs_with_repository_environment(
+            .prepare_native_requested_action_inputs_with_repository_environment(
                 &[TargetPattern::parse("//:implicit").unwrap()],
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -532,14 +529,29 @@ fn nativelink_files_to_run_consumers_cache_restore_without_tool_publication() {
             .project(|accepted| {
                 let accepted = accepted.as_ref().unwrap();
                 assert!(accepted.published_outputs().is_empty());
-                fixture_output_digests(accepted.output().unwrap(), b"aaa");
+                fixture_output_digests(accepted.inputs(), accepted.output().unwrap(), b"aaa");
                 execution_only.assert_outputs(accepted.inputs(), false, b"aaa");
                 TerminalOutput::new(0, String::new(), String::new())
             }),
     );
 }
 
-fn fixture_output_digests(output: &ActionChainRemoteResult, bytes: &[u8]) {
+fn fixture_output_digests(
+    inputs: &PreparedActionChainInputs,
+    output: &ActionChainRemoteResult,
+    bytes: &[u8],
+) {
+    let plan = inputs.plan().unwrap();
+    let expected_paths = plan
+        .actions()
+        .iter()
+        .flat_map(|step| step.action().outputs())
+        .filter(|output| {
+            ["implicit.out", "explicit.out", "authored.out"].contains(&output.root_relative_path())
+        })
+        .map(|output| output.path())
+        .collect::<Vec<_>>();
+    assert_eq!(expected_paths.len(), 3);
     let mut count = 0;
     for file in output
         .results()
@@ -547,7 +559,7 @@ fn fixture_output_digests(output: &ActionChainRemoteResult, bytes: &[u8]) {
         .filter_map(ActionChainStepResult::remote)
         .flat_map(|remote| remote.result.output_files())
     {
-        if ["implicit.out", "explicit.out", "authored.out"].contains(&file.path()) {
+        if expected_paths.contains(&file.path()) {
             assert_eq!(file.digest(), &ReapiDigest::of_bytes(&bytes.repeat(4)));
             count += 1;
         }

@@ -297,9 +297,31 @@ revoked/escaped demands refuse; Host resolver unchanged. Internal relative or
 absolute-under-same-display links may resolve within instance; no automatic Host
 conversion. Common Bzlmod source route supplies anchor; Analysis follows it.
 
-Core registry holds exact root Arc plus FULL current selected request/result/
-instance association. Snapshot owners under lock, drop lock before IO, recheck
-scope/session afterward. Lstat/readlink/dir/bytes/digest/image all use checked
+The existing materializer registry holds the exact root Arc plus FULL current
+selected request/result/instance association. Accepted rows replace/prune old
+rows; issued immutable data leases independently retain their old generation.
+Legacy generated symlinks retain only their exact referenced legacy data owners
+transitively in an acyclic owner graph, bound from current namespace/path
+membership before effects. These pins preserve live selected symlink targets;
+they retain neither old requests/history nor unrelated roots. Source readers,
+image pins and observation snapshots carry the same owner graph. Legacy links
+to physical virtual roots explicitly refuse until supported views exist.
+Use checked process-wide non-reusing IDs for materializer sessions, observation
+instances and empty workspace leases, with no global root map. Stable display
+v1 derives from full workspace/selected-owner/repository/ordinal structural
+identity; full-key equality guards candidate collisions in the native selection
+domain. Claims survive through the actual shared backing, including cancelled
+bootstrap, and weak claim control blocks remain credited until pruning.
+Reservation tickets bind the expected RepoSpec independently of spelling.
+Only a closed command seal matching the full current native transcript and epoch
+can adopt the same actual root; generic metadata-only success refuses General.
+Cache source identity once at immutable realization production after admission;
+never hash complete retained bodies under the actor mutex.
+
+Snapshot current owners under lock, compare foreign full requests unlocked,
+prevalidate/prepay the COMPLETE demand batch before any Host/legacy/physical IO,
+then recheck the same relevant request/result/generation/native-owner association
+after IO. Token/scope alone cannot authenticate a replaced entry. Lstat/readlink/dir/bytes/digest/image all use checked
 FD-relative fstatat/readlinkat/openat O_NOFOLLOW component walks; final resolved
 open must not bypass recorded symlink route. Reuse input_image Linux primitives.
 Split credited regular-file capture into FD kernel plus Host adapter; materialized
@@ -331,14 +353,44 @@ Temporary handle/scratch credits do not establish physical FD or kernel-memory
 admission. Sealed/exclusive-quiescent ownership, exact root/anchor association,
 registry validation and final source/transport integration remain separate gates.
 
-PreparedSourceActionInputs/PreparedActionChainInputs stay resource-free. At native
-completion mint NativeSourceActionInputs/NativeActionChainInputs = immutable
-metadata Arc + closed NativeSourceAccess from full current selected source set/
-namespace/digest membership and NativeSourceGenerations. open_source(index)
-returns NativeSourceReader(File+root lease+credit), with rooted no-follow reads
-or unchanged Host policy. SourceActionTransport::stage/ActionChainTransport::start
-receive wrappers; REAPI plans/sessions retain them through upload and verify
-actual bytes/digest. No FD in DICE/global lookup; durable runfiles consume reader.
+PreparedSourceActionInputs/PreparedActionChainInputs stay resource-free and have
+no ambient open/upload method. Explicit physical anchors propagate from Bzlmod
+through ResolvedPath, SourceArtifactInput and anchored digest resolution; namespace
+or path-prefix guessing never substitutes for an anchor. At native completion,
+mint NativeSourceActionInputs/NativeActionChainInputs from immutable metadata and
+closed selected-root leases after FULL current request/result and complete source
+namespace/anchor/digest membership checks. A source in a selected immutable repo
+cannot fall back to Host; local external repositories keep their Host policy.
+Readers retain the sealed root/minimal membership rather than terminal history.
+
+The workspace-shared reader work bank admits 16 MiB retained storage and 128 FDs;
+its unused backing allowance grants no mount/backing authority. Action/CAS reads
+do not debit acquisition SourceAttempts or decoder DecodedBytes and do not inherit
+the 1 MiB FileBytes cap. NativeSourceReader exposes Read/Seek without File/AsFd or
+raw-FD conversion. Consuming into_async moves a pre-armed reader/buffer/credit
+owner into each blocking job, so dropping its adapter or network future cannot
+release resources while IO continues. InputImage uses a fixed physical-root
+bridge retaining the actual root and credited duplicate descriptor, validates
+that descriptor, and bypasses ambient anchor opens. No source receives setup or
+mount authority.
+
+SourceActionTransport::stage/ActionChainTransport::start and REAPI from_native
+plans own wrappers through CAS hits, upload, execute and final source validation.
+Every pending RPC checks the ORIGINAL scope before/after and while pending;
+expiration drops the network future without detaching blocking reader ownership.
+CAS and durable SourceBacking independently verify exact length/SHA/EOF from
+opaque reader bytes. Published runfiles never symlink an inaccessible display
+path. On supported Linux the Host/legacy acquisition policy is preserved.
+Non-Linux native source reading/upload is explicitly Unsupported; portable pure
+metadata/query and zero-source native preparation remain available. This is an
+explicit support boundary for the migrated transports, not cross-platform parity.
+
+Cross-repository PROCESS read views remain a separate activation gate: choose one
+materializer-owned userns mount domain and separately typed read-only view tokens
+minted from actually attached roots before sealing. Validate the complete declared
+selected set before effects, including full spelling identity/current generation;
+refuse overlapping generations and unbridged domains. Do not predict needed
+views from argv/path values. Source-data leases never gain these capabilities.
 
 ## Confinement and implementation split
 
@@ -458,10 +510,19 @@ Registry/cross-repository read views and original activation remain later gates.
 Pinned API/source anchors are retained in the linked source contract. Reviewed protocol,
 anchored resolver and rooted observer candidates can be authored inactive before
 complete syscall proof once root accepts design; no unconfined execution follows.
-Remaining gates: full Archive envelope/inode workload, selected physical-root
-registry and cross-repository read views, A/B same-name distinct-instance source/digest/image/
-REAPI reads, generalSource certificate restore, unrelated originals plus existing
-GCC/Homebrew through SAME route, warm Host freshness, selected event replay,
-independent final diff review and appropriate owner/direct-dependent checks.
+The [native source registry receipt](wp1225-native-source-registry-acceptance-2026-11-08.json)
+records accepted closed adoption, selected leases, actual A/B anchored digest/
+reader/image seams and protected Host/legacy NativeLink transport. Physical
+SourceArtifact metadata in the native fixture still uses a resource-free test
+constructor after actual DICE anchor/digest production; it grants no root or
+transport authority and does not prove original Loading activation.
+Remaining activation gates: full Archive envelope/inode workload; compatible
+read-only process views for the complete declared selected repository set;
+original Loading-to-GeneralWorkspace selection and public physical source/CAS/
+runfiles through that route; generalSource certificate restore; unrelated
+originals plus existing GCC/Homebrew through SAME route; warm Host freshness;
+selected event replay; public Rust integration and equivalent-command memory.
+Independent final review and owner/direct-dependent checks apply to each accepted
+implementation chunk.
 Root alone schedules Cargo/native proof, atomic integration, fresh CLI/cquery
 and equivalent whole-command memory checks; internal probes close none of those.

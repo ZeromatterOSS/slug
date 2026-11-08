@@ -50,10 +50,12 @@ handoff and shared root/token backing credits are integrated in the inactive
 owner. Consuming command/epoch admission and actual same-backing Process quota
 shrink are accepted inactive. The owned general runner now also has actual early
 Rust CLI PID1, installed confinement, all-child completion and failure/drop proof.
-Selected root registry, cross-repository read views and source/transport
-integration remain the implementation frontier. Production activation still
-requires full archive-envelope, original Starlark, public integration and
-matching-command memory gates; see the
+The selected root registry and native source ownership/transport are now
+integrated with actual anchored root/reader/image and protected NativeLink proof.
+Cross-repository process read views and original Loading-to-GeneralWorkspace
+integration remain the frontier, including public physical-source CAS/runfiles
+proof. Production activation still requires full archive-envelope, original
+Starlark, public integration and matching-command memory gates; see the
 [current packet](./slug-v2-subplans/current-packet.md).
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,

@@ -34,7 +34,7 @@ impl ActionChainTransport for Publisher {
     type Error = std::io::Error;
     async fn start(
         &self,
-        inputs: Arc<PreparedActionChainInputs>,
+        inputs: crate::runtime::NativeActionChainInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
         self.inner.start(inputs, args_context).await

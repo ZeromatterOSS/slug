@@ -119,9 +119,8 @@ fn requested_staging_certifies_group_only_sources_and_keeps_selection_identity()
             .unwrap()
             .selected_action()
             .unwrap()
-            .outputs()[0]
-            .path(),
-        "done"
+            .outputs()[0],
+        plan.actions()[1].action().outputs()[0]
     );
     assert_eq!(
         selected

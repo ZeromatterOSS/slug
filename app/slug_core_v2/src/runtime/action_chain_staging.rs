@@ -3,7 +3,6 @@
 use slug_build_api_v2::AnalysisArtifact;
 
 use super::source_staging::checked_build_frontier;
-use super::source_staging::open_observed_source;
 use super::*;
 use crate::runtime::ActionPrerequisitePlan;
 use crate::runtime::ObservedSourceArtifactInput;
@@ -114,9 +113,8 @@ impl PreparedActionChainInputs {
         &self.observations
     }
 
-    /// Open an observed source; transport must verify its bytes against the digest.
-    pub fn open_source(&self, index: usize) -> std::io::Result<std::fs::File> {
-        open_observed_source(&self.sources, index)
+    pub(in crate::runtime) fn observed_sources(&self) -> &[Arc<ObservedSourceArtifactInput>] {
+        &self.sources
     }
 }
 
@@ -326,6 +324,60 @@ impl NativeCommandRoot for ActionChainStagingKey {
     }
 }
 
+#[derive(Clone)]
+struct NativeActionChainStagingKey(ActionChainStagingKey);
+#[derive(Clone)]
+struct NativeActionChainStagingKeyTerminal {
+    prepared: Arc<PreparedActionChainInputs>,
+    native: Option<crate::runtime::native_source_access::NativeActionChainInputs>,
+}
+#[async_trait]
+impl NativeCommandRoot for NativeActionChainStagingKey {
+    type Terminal = NativeActionChainStagingKeyTerminal;
+    fn initializes_request_revision(&self) -> bool {
+        true
+    }
+    fn observations<'a>(&self, t: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
+        self.0.observations(&t.prepared)
+    }
+    fn source_certificate<'a>(&self, t: &'a Self::Terminal) -> Option<&'a SourceCertificate> {
+        self.0.source_certificate(&t.prepared)
+    }
+    fn observed_selection_association(&self) -> ObservedSelectionAssociation {
+        self.0.observed_selection_association()
+    }
+    fn event_reconciliation_policy(&self, t: &Self::Terminal) -> EventReconciliationPolicy {
+        self.0.event_reconciliation_policy(&t.prepared)
+    }
+    fn allows_unavailable_terminal_roots(&self, t: &Self::Terminal) -> bool {
+        self.0.allows_unavailable_terminal_roots(&t.prepared)
+    }
+    fn terminal_demand_association(&self, t: &Self::Terminal) -> TerminalDemandAssociation {
+        self.0.terminal_demand_association(&t.prepared)
+    }
+    async fn compute(
+        &self,
+        tx: &mut dice::DiceTransaction,
+    ) -> Result<PreparationOutcome<Self::Terminal>, NativeDemandSessionError> {
+        Ok(NativeCommandRoot::compute(&self.0, tx)
+            .await?
+            .map(|prepared| NativeActionChainStagingKeyTerminal {
+                prepared,
+                native: None,
+            }))
+    }
+    fn complete<'a>(
+        &'a self,
+        t: &'a mut Self::Terminal,
+        context: NativeCommandCompletionContext<'a, '_>,
+    ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
+        async move {
+            t.native = Some(context.native_action_chain_inputs(t.prepared.clone())?);
+            Ok(())
+        }
+    }
+}
+
 impl WorkspaceRuntime {
     /// Observe the complete source frontier of a selected prerequisite chain.
     /// This metadata alone does not authorize execution or publication.
@@ -383,6 +435,85 @@ impl WorkspaceRuntime {
         self.drive_command(request, ActionChainStagingKey::requested(build))
             .map(|driven| driven.accepted)
             .map_err(BuildCommandError::infrastructure)
+    }
+}
+
+impl WorkspaceRuntime {
+    /// Prepare native source access only through current selected completion.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_native_action_chain_inputs_with_repository_environment(
+        &self,
+        targets: &[TargetPattern],
+        owner: ConfiguredTargetKey,
+        action: usize,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> Result<
+        AcceptedCommand<crate::runtime::native_source_access::NativeActionChainInputs>,
+        BuildCommandError,
+    > {
+        let (build, request) = self.prepare_build_request(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+        )?;
+        self.drive_command(
+            request,
+            NativeActionChainStagingKey(ActionChainStagingKey::new(build, owner, action)),
+        )
+        .map(|driven| {
+            driven.accepted.map_terminal(|terminal| {
+                terminal
+                    .native
+                    .expect("native preparation completed before acceptance")
+            })
+        })
+        .map_err(BuildCommandError::infrastructure)
+    }
+    /// Prepare native source access only through current selected completion.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_native_requested_action_inputs_with_repository_environment(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> Result<
+        AcceptedCommand<crate::runtime::native_source_access::NativeActionChainInputs>,
+        BuildCommandError,
+    > {
+        let (build, request) = self.prepare_build_request(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+        )?;
+        self.drive_command(
+            request,
+            NativeActionChainStagingKey(ActionChainStagingKey::requested(build)),
+        )
+        .map(|driven| {
+            driven.accepted.map_terminal(|terminal| {
+                terminal
+                    .native
+                    .expect("native preparation completed before acceptance")
+            })
+        })
+        .map_err(BuildCommandError::infrastructure)
     }
 }
 

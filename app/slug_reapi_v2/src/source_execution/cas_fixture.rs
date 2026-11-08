@@ -6,7 +6,7 @@ use crate::ReapiDigest;
 
 /// Locate ALL independently verified completed copies before any test mutation.
 /// The fixed namespace is owned by this separately supervised NativeLink run.
-pub(super) fn completed_blob_paths(digest: &ReapiDigest) -> Vec<PathBuf> {
+pub(crate) fn completed_blob_paths(digest: &ReapiDigest) -> Vec<PathBuf> {
     const MAX_ENTRIES_PER_STORE: usize = 1024;
     const MAX_FIXTURE_BODY_BYTES: u64 = 64 * 1024;
     assert!(digest.size_bytes() > 0 && digest.size_bytes() <= MAX_FIXTURE_BODY_BYTES);

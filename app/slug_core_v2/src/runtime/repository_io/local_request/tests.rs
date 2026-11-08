@@ -166,7 +166,6 @@ fn native_local_gateway_absolute_and_root_success_remain_rootless() {
         );
         {
             let state = materializer.state.lock().unwrap();
-            assert_eq!(state.next_instance, 1);
             assert!(state.accepted_roots.is_empty());
             assert!(state.active.as_ref().unwrap().provisional_roots.is_empty());
         }

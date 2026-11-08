@@ -32,6 +32,12 @@ mod mount_lease;
 mod process_owner;
 #[path = "repository_workspace_progress.rs"]
 mod progress;
+pub(in crate::runtime) use progress::command::RepositoryWorkspaceCommand;
+mod image;
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+mod initialize;
+mod materialization;
+pub(in crate::runtime) use materialization::SealedWorkspaceMaterialization;
 mod reader;
 mod resources;
 mod seal;
@@ -180,6 +186,15 @@ pub(in crate::runtime) struct RepositoryPhysicalRoot {
 }
 
 impl RepositoryPhysicalRootBuilder {
+    pub(in crate::runtime) fn bind_source_claim(
+        &mut self,
+        claim: Arc<super::repository_io::reservations::SourceRootClaim>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), PhysicalRootError> {
+        check(scope, active)?;
+        self.backing.bind_claim(&self.reservation, claim)
+    }
     /// Native factory precondition: trusted setup has selected this full
     /// reservation's actual backing and stopped/closed all external writers.
     /// Process-mode handoff represents already admitted native progress; this
@@ -270,6 +285,11 @@ impl RepositoryPhysicalRootBuilder {
     }
 }
 impl RepositoryPhysicalRoot {
+    pub(in crate::runtime) fn source_claim(
+        &self,
+    ) -> Option<Arc<super::repository_io::reservations::SourceRootClaim>> {
+        self.backing.source_claim()
+    }
     pub fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
         &self.reservation
     }

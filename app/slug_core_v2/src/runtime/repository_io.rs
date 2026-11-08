@@ -54,11 +54,17 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 
 mod local_request;
+pub(in crate::runtime) mod physical_roots;
+#[cfg(target_os = "linux")]
+pub(in crate::runtime) mod reservations;
+use physical_roots::LegacyRootOwner;
+use physical_roots::RetainedRootOwner;
 pub(super) mod source_service;
 #[cfg(test)]
 mod source_service_tests;
 use source_service::SourceServiceError;
 use source_service::SourceServiceScope;
+mod image_source;
 mod source_generations;
 pub(super) use source_generations::NativeSourceGenerations;
 
@@ -67,17 +73,13 @@ struct LocalRepositoryIo {
 }
 
 struct RetainedImmutableRoots {
-    next_instance: u64,
     roots: Vec<(PathObservationInstanceId, tempfile::TempDir)>,
 }
 
 impl LocalRepositoryIo {
     fn new() -> Self {
         Self {
-            immutable_roots: Mutex::new(RetainedImmutableRoots {
-                next_instance: 1,
-                roots: Vec::new(),
-            }),
+            immutable_roots: Mutex::new(RetainedImmutableRoots { roots: Vec::new() }),
         }
     }
 
@@ -89,25 +91,12 @@ impl LocalRepositoryIo {
             .immutable_roots
             .lock()
             .expect("immutable repository root mutex poisoned");
-        let instance = allocate_observation_instance(&mut retained.next_instance)?;
+        let instance = super::native_identity::next_repository_instance()
+            .map_err(|_| observation_instance_exhausted())?;
         let path = root.path().to_path_buf();
         retained.roots.push((instance, root));
         Ok((path, instance))
     }
-}
-
-fn allocate_observation_instance(
-    next_instance: &mut u64,
-) -> Result<PathObservationInstanceId, RepositoryTransportError> {
-    let current = *next_instance;
-    if current == 0 {
-        return Err(observation_instance_exhausted());
-    }
-    let successor = current
-        .checked_add(1)
-        .ok_or_else(observation_instance_exhausted)?;
-    *next_instance = successor;
-    Ok(PathObservationInstanceId::new(current))
 }
 
 fn observation_instance_exhausted() -> RepositoryTransportError {
@@ -141,6 +130,7 @@ pub(super) enum RepositorySessionError {
     ValidationIncomplete,
     InvalidRetainedRoot(PathBuf),
     NativeObservation(super::path_observation::PathObservationKernelError),
+    NativeWorkspace(Arc<str>),
     InvalidImageAuthority,
     SourceService(SourceServiceError),
 }
@@ -182,18 +172,37 @@ struct AcceptedRepository {
 }
 
 #[allow(dead_code)]
+#[derive(Clone)]
 struct RetainedRepositoryRoot {
     observation_instance: PathObservationInstanceId,
-    root: Arc<tempfile::TempDir>,
+    request: Arc<RepositoryMaterializationRequest>,
+    source_identity: Arc<str>,
+    generation: RepositoryMaterializationGeneration,
+    root: RetainedRootOwner,
+    #[cfg(target_os = "linux")]
+    guard: Option<Arc<super::repository_physical_root::ResourceCredit>>,
 }
 
 #[allow(dead_code)]
 struct ActiveRepositorySession {
     token: RepositorySessionToken,
+    workspace_lease: u64,
     validation: RepositorySessionValidation,
     reusable: Vec<AcceptedRepository>,
     entries: Vec<RepositoryMaterializationEpochEntry>,
     provisional_roots: Vec<RetainedRepositoryRoot>,
+    #[cfg(target_os = "linux")]
+    general: Option<reservations::GeneralWorkspaceSession>,
+}
+
+// Field order keeps cloned semantic owners alive under the row guards, then
+// retires those guarded rows before their temporary allocation allowance.
+struct AcceptanceSnapshot {
+    entries: Vec<RepositoryMaterializationEpochEntry>,
+    rows: Vec<RetainedRepositoryRoot>,
+    cleanup_root_count: usize,
+    #[cfg(target_os = "linux")]
+    _credit: Option<super::repository_physical_root::ResourceCredit>,
 }
 
 #[allow(dead_code)]
@@ -206,11 +215,13 @@ enum RepositorySessionValidation {
 
 #[allow(dead_code)]
 struct RepositoryMaterializerState {
-    next_token: u64,
-    next_instance: u64,
     active: Option<ActiveRepositorySession>,
     accepted: Vec<AcceptedRepository>,
     accepted_roots: Vec<RetainedRepositoryRoot>,
+    #[cfg(target_os = "linux")]
+    accepted_roots_credit: Option<Arc<super::repository_physical_root::ResourceCredit>>,
+    #[cfg(target_os = "linux")]
+    claim_domain: Option<Arc<reservations::NativeSelectionDomain>>,
 }
 
 #[allow(dead_code)]
@@ -266,11 +277,13 @@ impl RepositoryMaterializer {
             source_scope: None,
             workspace,
             state: Mutex::new(RepositoryMaterializerState {
-                next_token: 1,
-                next_instance: 1,
                 active: None,
                 accepted: Vec::new(),
                 accepted_roots: Vec::new(),
+                #[cfg(target_os = "linux")]
+                claim_domain: None,
+                #[cfg(target_os = "linux")]
+                accepted_roots_credit: None,
             }),
         }
     }
@@ -323,6 +336,17 @@ impl RepositoryMaterializer {
             .clone()
     }
 
+    pub(in crate::runtime) fn workspace_lease(
+        &self,
+        token: RepositorySessionToken,
+    ) -> Result<u64, RepositorySessionError> {
+        let state = self
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        Ok(matching_active(&state, token)?.workspace_lease)
+    }
+
     pub(super) fn begin(&self) -> Result<RepositorySessionToken, RepositorySessionError> {
         let mut state = self
             .state
@@ -331,9 +355,17 @@ impl RepositoryMaterializer {
         if state.active.is_some() {
             return Err(RepositorySessionError::Busy);
         }
-        let token = allocate_session_token(&mut state.next_token)?;
+        let token = RepositorySessionToken(
+            super::native_identity::next_repository_session()
+                .map_err(|_| RepositorySessionError::TokenExhausted)?,
+        );
+        let workspace_lease = super::native_identity::next_workspace_lease()
+            .map_err(|_| RepositorySessionError::TokenExhausted)?;
         state.active = Some(ActiveRepositorySession {
             token,
+            workspace_lease,
+            #[cfg(target_os = "linux")]
+            general: None,
             validation: RepositorySessionValidation::Pending,
             reusable: Vec::new(),
             entries: Vec::new(),
@@ -369,7 +401,7 @@ impl RepositoryMaterializer {
     ) -> Result<
         (
             Vec<AcceptedRepository>,
-            Vec<(PathObservationInstanceId, Arc<tempfile::TempDir>)>,
+            Vec<(PathObservationInstanceId, Arc<LegacyRootOwner>)>,
         ),
         RepositorySessionError,
     > {
@@ -383,11 +415,25 @@ impl RepositoryMaterializer {
             return Err(RepositorySessionError::ValidationAlreadyStarted);
         }
         active.validation = RepositorySessionValidation::InProgress;
-        let accepted = state.accepted.clone();
+        let accepted = state
+            .accepted
+            .iter()
+            .filter(|accepted| {
+                !matches!(
+                    accepted.request.kind,
+                    RepositoryMaterializationKind::GeneralWorkspace(_)
+                )
+            })
+            .cloned()
+            .collect();
         let roots = state
             .accepted_roots
             .iter()
-            .map(|root| (root.observation_instance, root.root.clone()))
+            .filter_map(|root| {
+                root.root
+                    .legacy()
+                    .map(|owner| (root.observation_instance, owner.clone()))
+            })
             .collect::<Vec<_>>();
         Ok((accepted, roots))
     }
@@ -404,6 +450,15 @@ impl RepositoryMaterializer {
             .expect("repository materializer mutex poisoned");
         self.check_source_scope(self.source_scope.as_ref())?;
         let active = matching_active_mut(&mut state, token)?;
+        let reusable = reusable
+            .into_iter()
+            .filter(|accepted| {
+                !matches!(
+                    accepted.request.kind,
+                    RepositoryMaterializationKind::GeneralWorkspace(_)
+                )
+            })
+            .collect::<Vec<_>>();
         for accepted in &reusable {
             upsert_epoch_entry(
                 &mut active.entries,
@@ -457,7 +512,7 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         demands: impl IntoIterator<Item = PathObservationDemand>,
         observe: impl FnOnce(
-            &[(PathObservationInstanceId, Arc<tempfile::TempDir>)],
+            &[(PathObservationInstanceId, Arc<LegacyRootOwner>)],
             Vec<(PathObservationInstanceId, NormalizedAbsolutePath)>,
             Vec<PathObservationDemand>,
         ) -> Result<
@@ -473,7 +528,7 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         demands: impl IntoIterator<Item = PathObservationDemand>,
         observe: impl FnOnce(
-            &[(PathObservationInstanceId, Arc<tempfile::TempDir>)],
+            &[(PathObservationInstanceId, Arc<LegacyRootOwner>)],
             Vec<(PathObservationInstanceId, NormalizedAbsolutePath)>,
             Vec<PathObservationDemand>,
         ) -> Result<
@@ -483,14 +538,38 @@ impl RepositoryMaterializer {
     ) -> Result<RepositoryNativePreflight, RepositorySessionError> {
         let (accepted, root_owners) = self.start_validation(token)?;
         let roots = normalize_retained_roots(&root_owners)?;
-        let mut demands = accepted
+        let demands = accepted
             .iter()
             .flat_map(|accepted| accepted.validation.iter().map(|(demand, _)| demand.clone()))
-            .chain(demands)
-            .collect::<Vec<_>>();
+            .chain(demands);
+        #[cfg(target_os = "linux")]
+        let (mut demands, _native_input_credit) = self.collect_native_demands(token, demands)?;
+        #[cfg(not(target_os = "linux"))]
+        let mut demands = demands.collect::<Vec<_>>();
+        // General results are command-fresh, never reusable. Old immutable
+        // source leases remain usable directly, but are not current preflight.
+        {
+            let state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            demands.retain(|demand| {
+                !state.accepted_roots.iter().any(|row| {
+                    row.root.is_physical()
+                        && demand.namespace()
+                            == PathObservationNamespace::Materialization(row.observation_instance)
+                })
+            });
+        }
         demands.sort_unstable();
         demands.dedup();
+        #[cfg(target_os = "linux")]
+        let mut physical = self.split_physical_demands(token, demands)?;
+        #[cfg(target_os = "linux")]
+        let demands = std::mem::take(&mut physical.legacy);
         let observed = observe(&root_owners, roots, demands).map_err(native_observation_error)?;
+        #[cfg(target_os = "linux")]
+        let observed = physical.observe(self, token, observed)?;
         self.check_source_scope(self.source_scope.as_ref())?;
         let reusable = accepted
             .into_iter()
@@ -532,6 +611,14 @@ impl RepositoryMaterializer {
         materialize: impl FnOnce() -> RepositoryMaterializationAttempt,
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
         self.check_source_scope(scope)?;
+        // General physical success is accepted only through the closed native
+        // seal receipt. This guard also precedes replay and arbitrary closures.
+        if matches!(
+            request.kind,
+            RepositoryMaterializationKind::GeneralWorkspace(_)
+        ) {
+            return Err(RepositorySessionError::KindMismatch);
+        }
         if request.id.workspace != self.workspace {
             return Err(RepositorySessionError::WrongWorkspace);
         }
@@ -567,6 +654,9 @@ impl RepositoryMaterializer {
             }
         }
 
+        // Pin typed legacy symlink sources before effects run. An actor
+        // discard during IO cannot retire their transitive data dependencies.
+        let dependencies = self.legacy_dependencies(token, &request)?;
         let attempt = materialize();
         let prepared = match attempt {
             RepositoryMaterializationAttempt::Immutable { bytes, root } => {
@@ -667,8 +757,8 @@ impl RepositoryMaterializer {
                     drop(root);
                     return Err(error);
                 }
-                let mut candidate = state.next_instance;
-                let observation_instance = match allocate_observation_instance(&mut candidate) {
+                let observation_instance = match super::native_identity::next_repository_instance()
+                {
                     Ok(observation_instance) => observation_instance,
                     Err(_) => {
                         drop(state);
@@ -681,13 +771,20 @@ impl RepositoryMaterializer {
                     drop(root);
                     return Err(error);
                 }
-                state.next_instance = candidate;
                 let generation_root = root.path().to_path_buf();
                 matching_validated_active_mut(&mut state, token)?
                     .provisional_roots
                     .push(RetainedRepositoryRoot {
                         observation_instance,
-                        root: Arc::new(root),
+                        request: request.clone(),
+                        source_identity: source_identity.clone(),
+                        generation,
+                        root: RetainedRootOwner::Legacy(Arc::new(LegacyRootOwner::new(
+                            root,
+                            dependencies,
+                        ))),
+                        #[cfg(target_os = "linux")]
+                        guard: None,
                     });
                 RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable {
@@ -710,8 +807,8 @@ impl RepositoryMaterializer {
                     drop(root);
                     return Err(error);
                 }
-                let mut candidate = state.next_instance;
-                let observation_instance = match allocate_observation_instance(&mut candidate) {
+                let observation_instance = match super::native_identity::next_repository_instance()
+                {
                     Ok(observation_instance) => observation_instance,
                     Err(_) => {
                         drop(state);
@@ -724,13 +821,20 @@ impl RepositoryMaterializer {
                     drop(root);
                     return Err(error);
                 }
-                state.next_instance = candidate;
                 let generation_root = root.path().to_path_buf();
                 matching_validated_active_mut(&mut state, token)?
                     .provisional_roots
                     .push(RetainedRepositoryRoot {
                         observation_instance,
-                        root: Arc::new(root),
+                        request: request.clone(),
+                        source_identity: source_identity.clone(),
+                        generation,
+                        root: RetainedRootOwner::Legacy(Arc::new(LegacyRootOwner::new(
+                            root,
+                            dependencies,
+                        ))),
+                        #[cfg(target_os = "linux")]
+                        guard: None,
                     });
                 RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable {
@@ -916,92 +1020,6 @@ impl RepositoryMaterializer {
         complete_epoch(&self.workspace, &entries)
     }
 
-    // Authority is minted from the exact validated session/request/result and
-    // retained source owner, before the first scoped observation performs IO.
-    pub(super) fn image_source(
-        &self,
-        token: RepositorySessionToken,
-        namespace: PathObservationNamespace,
-        anchor: &NormalizedAbsolutePath,
-        selected: Option<(
-            &Arc<RepositoryMaterializationRequest>,
-            &slug_bzlmod_v2::RepositoryMaterialization,
-        )>,
-    ) -> Result<super::input_image::ScopedImageSource, RepositorySessionError> {
-        self.check_source_scope(self.source_scope.as_ref())?;
-        let pin = {
-            let state = self
-                .state
-                .lock()
-                .expect("repository materializer mutex poisoned");
-            let active = matching_validated_active(&state, token)?;
-            match (namespace, selected) {
-                (PathObservationNamespace::Host, None) if anchor == &self.workspace => None,
-                (
-                    PathObservationNamespace::Materialization(instance),
-                    Some((request, expected)),
-                ) => {
-                    let entry = active
-                        .entries
-                        .iter()
-                        .find(|entry| entry.request == *request)
-                        .ok_or(RepositorySessionError::InvalidImageAuthority)?;
-                    let (
-                        RepositoryMaterializationResult::Success(
-                            RepositoryMaterializationSuccess::Immutable {
-                                source_identity,
-                                generation_root,
-                                observation_instance,
-                            },
-                        ),
-                        slug_bzlmod_v2::RepositoryMaterialization::Immutable {
-                            source_identity: expected_identity,
-                            generation_root: expected_root,
-                            observation_instance: expected_instance,
-                            canonical_repo,
-                            repo_spec,
-                        },
-                    ) = (&entry.result, expected)
-                    else {
-                        return Err(RepositorySessionError::InvalidImageAuthority);
-                    };
-                    if source_identity != expected_identity
-                        || generation_root != expected_root
-                        || observation_instance != expected_instance
-                        || *observation_instance != instance
-                        || canonical_repo != &request.id.canonical_repo
-                        || repo_spec != &request.repo_spec
-                        || anchor.as_path() != generation_root
-                    {
-                        return Err(RepositorySessionError::InvalidImageAuthority);
-                    }
-                    let root = state
-                        .accepted_roots
-                        .iter()
-                        .chain(active.provisional_roots.iter())
-                        .find(|root| {
-                            root.observation_instance == instance
-                                && root.root.path() == generation_root
-                        })
-                        .ok_or(RepositorySessionError::InvalidImageAuthority)?;
-                    Some(root.root.clone())
-                }
-                _ => return Err(RepositorySessionError::InvalidImageAuthority),
-            }
-        };
-        let root = super::input_image::open_image_anchor(anchor)
-            .map_err(|_| RepositorySessionError::InvalidImageAuthority)?;
-        let source =
-            super::input_image::ScopedImageSource::new(namespace, anchor.clone(), root, pin)
-                .map_err(|_| RepositorySessionError::InvalidImageAuthority)?;
-        let state = self
-            .state
-            .lock()
-            .expect("repository materializer mutex poisoned");
-        matching_validated_active(&state, token)?;
-        Ok(source)
-    }
-
     pub(super) fn observe_native(
         &self,
         token: RepositorySessionToken,
@@ -1068,17 +1086,26 @@ impl RepositoryMaterializer {
             let mut roots = state
                 .accepted_roots
                 .iter()
-                .map(|root| (root.observation_instance, root.root.clone()))
+                .filter_map(|root| {
+                    root.root
+                        .legacy()
+                        .map(|owner| (root.observation_instance, owner.clone()))
+                })
                 .collect::<Vec<_>>();
-            roots.extend(
-                active
-                    .provisional_roots
-                    .iter()
-                    .map(|root| (root.observation_instance, root.root.clone())),
-            );
+            roots.extend(active.provisional_roots.iter().filter_map(|root| {
+                root.root
+                    .legacy()
+                    .map(|owner| (root.observation_instance, owner.clone()))
+            }));
             roots
         };
         let roots = normalize_retained_roots(&root_owners)?;
+        #[cfg(target_os = "linux")]
+        let (demands, _native_input_credit) = self.collect_native_demands(token, demands)?;
+        #[cfg(target_os = "linux")]
+        let mut physical = self.split_physical_demands(token, demands)?;
+        #[cfg(target_os = "linux")]
+        let demands = std::mem::take(&mut physical.legacy);
         #[cfg(all(test, target_os = "linux"))]
         let observed = super::path_observation::observe_native_scoped_with_charge_census(
             &root_owners,
@@ -1097,6 +1124,8 @@ impl RepositoryMaterializer {
             self.source_scope.as_ref(),
         )
         .map_err(native_observation_error);
+        #[cfg(target_os = "linux")]
+        let observed = observed.and_then(|legacy| physical.observe(self, token, legacy));
         self.check_source_scope(self.source_scope.as_ref())?;
         let state = self
             .state
@@ -1113,6 +1142,108 @@ impl RepositoryMaterializer {
         validation: Vec<RepositoryValidation>,
     ) -> Result<(), RepositorySessionError> {
         self.check_source_scope(self.source_scope.as_ref())?;
+        let snapshot = {
+            let state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            self.check_source_scope(self.source_scope.as_ref())?;
+            let active = matching_validated_active(&state, token)?;
+            let cleanup_root_count = state
+                .accepted_roots
+                .len()
+                .checked_add(active.provisional_roots.len())
+                .ok_or_else(|| {
+                    RepositorySessionError::NativeWorkspace(
+                        "selection cleanup count overflow".into(),
+                    )
+                })?;
+            #[cfg(target_os = "linux")]
+            let credit = state
+                .claim_domain
+                .as_ref()
+                .map(|domain| {
+                    let count = cleanup_root_count
+                        .checked_add(selected.len())
+                        .and_then(|n| n.checked_add(validation.len()))
+                        .ok_or_else(|| {
+                            RepositorySessionError::NativeWorkspace(
+                                "selection cleanup count overflow".into(),
+                            )
+                        })?;
+                    let dynamic =
+                        cloned_epoch_dynamic_storage(active.entries.iter().filter(|entry| {
+                            selected
+                                .iter()
+                                .any(|request| request.id == entry.request.id)
+                        }))?;
+                    let bytes = count
+                        .checked_mul(
+                            8 * std::mem::size_of::<RetainedRepositoryRoot>()
+                                + 16 * std::mem::size_of::<RepositoryMaterializationEpochEntry>()
+                                + 128,
+                        )
+                        .and_then(|n| n.checked_add(4096))
+                        .and_then(|n| n.checked_add(dynamic))
+                        .ok_or_else(|| {
+                            RepositorySessionError::NativeWorkspace(
+                                "selection cleanup storage overflow".into(),
+                            )
+                        })?;
+                    domain.reserve_observation(bytes)
+                })
+                .transpose()?;
+            // Declare guards before semantic clones so even a local refusal
+            // retires entries before the complete-history row guards.
+            let mut rows = Vec::with_capacity(selected.len());
+            let mut entries = Vec::with_capacity(selected.len());
+            for entry in &active.entries {
+                if !selected
+                    .iter()
+                    .any(|request| request.id == entry.request.id)
+                {
+                    continue;
+                }
+                if let RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Immutable {
+                        observation_instance,
+                        ..
+                    },
+                ) = &entry.result
+                {
+                    let mut matching = state
+                        .accepted_roots
+                        .iter()
+                        .chain(&active.provisional_roots)
+                        .filter(|row| {
+                            row.observation_instance == *observation_instance
+                                && Arc::ptr_eq(&row.request, &entry.request)
+                        });
+                    let row = matching.next().ok_or_else(|| {
+                        RepositorySessionError::NativeWorkspace(
+                            "selected immutable result lacks native owner".into(),
+                        )
+                    })?;
+                    if matching.next().is_some() {
+                        return Err(RepositorySessionError::NativeWorkspace(
+                            "selected immutable result has ambiguous owner".into(),
+                        ));
+                    }
+                    rows.push(row.clone());
+                }
+                entries.push(entry.clone());
+            }
+            AcceptanceSnapshot {
+                entries,
+                rows,
+                cleanup_root_count,
+                #[cfg(target_os = "linux")]
+                _credit: credit,
+            }
+        };
+        // Foreign request and validation equality can walk full immutable
+        // histories. No such traversal runs while the actor mutex is held.
+        let accepted = selected_acceptance(&snapshot.entries, selected, validation)?;
         let released = {
             let mut state = self
                 .state
@@ -1120,7 +1251,24 @@ impl RepositoryMaterializer {
                 .expect("repository materializer mutex poisoned");
             self.check_source_scope(self.source_scope.as_ref())?;
             let active = matching_validated_active(&state, token)?;
-            let accepted = selected_acceptance(active, selected, validation)?;
+            if snapshot.entries.iter().any(|entry| {
+                !active.entries.iter().any(|now| {
+                    Arc::ptr_eq(&now.request, &entry.request) && now.result == entry.result
+                })
+            }) || snapshot
+                .rows
+                .iter()
+                .any(|row| !physical_roots::association_current(&state, active, row))
+                || state
+                    .accepted_roots
+                    .len()
+                    .checked_add(active.provisional_roots.len())
+                    .is_none_or(|count| count > snapshot.cleanup_root_count)
+            {
+                return Err(RepositorySessionError::NativeWorkspace(
+                    "selected association changed during acceptance".into(),
+                ));
+            }
             let selected_instances = accepted
                 .iter()
                 .filter_map(|accepted| match &accepted.success {
@@ -1131,19 +1279,58 @@ impl RepositoryMaterializer {
                     } => Some(*observation_instance),
                 })
                 .collect::<Vec<_>>();
+            #[cfg(target_os = "linux")]
+            let next_credit = state
+                .claim_domain
+                .as_ref()
+                .map(|domain| {
+                    let dynamic = cloned_epoch_dynamic_storage(&snapshot.entries)?;
+                    domain.reserve_observation(
+                        accepted
+                            .len()
+                            .checked_mul(
+                                std::mem::size_of::<RetainedRepositoryRoot>() * 4
+                                    + std::mem::size_of::<AcceptedRepository>() * 4
+                                    + 128,
+                            )
+                            .and_then(|n| n.checked_add(256))
+                            .and_then(|n| n.checked_add(dynamic))
+                            .ok_or_else(|| {
+                                RepositorySessionError::NativeWorkspace(
+                                    "accepted root storage overflow".into(),
+                                )
+                            })?,
+                    )
+                })
+                .transpose()?
+                .map(Arc::new);
+            #[cfg(target_os = "linux")]
+            let old_credit = std::mem::replace(&mut state.accepted_roots_credit, next_credit);
             let mut active = state.active.take().expect("matching active session exists");
             let mut retained = Vec::new();
             let mut released = Vec::new();
-            for root in active.provisional_roots.drain(..) {
-                if selected_instances.contains(&root.observation_instance) {
+            for root in state
+                .accepted_roots
+                .drain(..)
+                .chain(active.provisional_roots.drain(..))
+            {
+                if selected_instances.contains(&root.observation_instance)
+                    && accepted
+                        .iter()
+                        .any(|selected| Arc::ptr_eq(&selected.request, &root.request))
+                {
                     retained.push(root);
                 } else {
                     released.push(root);
                 }
             }
-            state.accepted_roots.extend(retained);
-            state.accepted = accepted;
-            released
+            state.accepted_roots = retained;
+            let previous = std::mem::replace(&mut state.accepted, accepted);
+            #[cfg(not(target_os = "linux"))]
+            let old_credit = ();
+            // Semantic owners retire before guarded rows; scratch and vector
+            // allowances follow both. The tuple is dropped outside the lock.
+            (previous, active, released, old_credit, snapshot)
         };
         drop(released);
         Ok(())
@@ -1159,11 +1346,7 @@ impl RepositoryMaterializer {
                 .lock()
                 .expect("repository materializer mutex poisoned");
             matching_active(&state, token)?;
-            state
-                .active
-                .take()
-                .expect("matching active session exists")
-                .provisional_roots
+            state.active.take().expect("matching active session exists")
         };
         drop(released);
         Ok(())
@@ -1181,21 +1364,7 @@ enum PreparedMaterializationAttempt {
 }
 
 #[allow(dead_code)]
-fn allocate_session_token(
-    next_token: &mut u64,
-) -> Result<RepositorySessionToken, RepositorySessionError> {
-    let current = *next_token;
-    if current == 0 {
-        return Err(RepositorySessionError::TokenExhausted);
-    }
-    let successor = current
-        .checked_add(1)
-        .ok_or(RepositorySessionError::TokenExhausted)?;
-    *next_token = successor;
-    Ok(RepositorySessionToken(current))
-}
 
-#[allow(dead_code)]
 fn matching_active(
     state: &RepositoryMaterializerState,
     token: RepositorySessionToken,
@@ -1268,9 +1437,48 @@ fn complete_epoch(
         .map_err(|_| RepositorySessionError::WrongWorkspace)
 }
 
+// Four occurrences conservatively cover snapshots, accepted-success clones,
+// and the transient sorted/map projections in complete_epoch. Read borrowed
+// capacities before any dynamic path, diagnostic, or canonical-key clone.
+fn cloned_epoch_dynamic_storage<'a>(
+    entries: impl IntoIterator<Item = &'a RepositoryMaterializationEpochEntry>,
+) -> Result<usize, RepositorySessionError> {
+    entries.into_iter().try_fold(0usize, |total, entry| {
+        cloned_materialization_dynamic_storage(&entry.request.id.canonical_repo, &entry.result)?
+            .checked_add(total)
+            .ok_or_else(|| {
+                RepositorySessionError::NativeWorkspace("epoch dynamic storage overflow".into())
+            })
+    })
+}
+
+fn cloned_materialization_dynamic_storage(
+    repository: &CanonicalRepoName,
+    result: &RepositoryMaterializationResult,
+) -> Result<usize, RepositorySessionError> {
+    let result = match result {
+        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            generation_root,
+            ..
+        }) => generation_root.capacity(),
+        RepositoryMaterializationResult::SpecError(message)
+        | RepositoryMaterializationResult::TransportError { message, .. }
+        | RepositoryMaterializationResult::MaterializationError { message, .. } => {
+            message.capacity()
+        }
+        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local) => 0,
+    };
+    result
+        .checked_add(repository.retained_capacity_bytes())
+        .and_then(|n| n.checked_mul(4))
+        .ok_or_else(|| {
+            RepositorySessionError::NativeWorkspace("epoch dynamic storage overflow".into())
+        })
+}
+
 #[allow(dead_code)]
 fn selected_acceptance(
-    active: &ActiveRepositorySession,
+    entries: &[RepositoryMaterializationEpochEntry],
     selected: &[Arc<RepositoryMaterializationRequest>],
     validation: Vec<RepositoryValidation>,
 ) -> Result<Vec<AcceptedRepository>, RepositorySessionError> {
@@ -1302,8 +1510,7 @@ fn selected_acceptance(
     }
     let mut accepted = Vec::new();
     for request in selected {
-        let entry = active
-            .entries
+        let entry = entries
             .iter()
             .find(|entry| entry.request.id == request.id)
             .ok_or_else(|| {
@@ -1386,7 +1593,7 @@ fn valid_validation(
 
 #[allow(dead_code)]
 fn normalize_retained_roots(
-    roots: &[(PathObservationInstanceId, Arc<tempfile::TempDir>)],
+    roots: &[(PathObservationInstanceId, Arc<LegacyRootOwner>)],
 ) -> Result<Vec<(PathObservationInstanceId, NormalizedAbsolutePath)>, RepositorySessionError> {
     roots
         .iter()
@@ -3349,6 +3556,37 @@ mod tests {
             )
             .unwrap();
         let (source_root, source_instance) = immutable_result(&materializer, "source");
+        for (namespace, path) in [
+            (
+                PathObservationNamespace::Materialization(PathObservationInstanceId::new(0)),
+                source_root.join("source.bzl"),
+            ),
+            (
+                PathObservationNamespace::Materialization(source_instance),
+                workspace_root.path().join("foreign.bzl"),
+            ),
+        ] {
+            let invalid = native_request(
+                &workspace,
+                "invalid_dependency",
+                spec(),
+                RepositoryMaterializationKind::GeneratedFileEffects(generated_symlink_plan(
+                    "BUILD.bazel",
+                    &path,
+                    namespace,
+                    b"filegroup(name='linked')\n",
+                )),
+            );
+            assert!(matches!(
+                materializer.materialize_native_with(
+                    token,
+                    invalid,
+                    RepositoryMaterializationGeneration(1),
+                    || panic!("invalid native dependency reached materialization IO"),
+                ),
+                Err(RepositorySessionError::NativeWorkspace(_))
+            ));
+        }
         let link_request = native_request(
             &workspace,
             "linked",
@@ -3367,7 +3605,7 @@ mod tests {
                 RepositoryMaterializationGeneration(1),
             )
             .unwrap();
-        let (linked_root, _) = immutable_result(&materializer, "linked");
+        let (linked_root, linked_instance) = immutable_result(&materializer, "linked");
         let link = linked_root.join("BUILD.bazel");
         assert!(
             std::fs::symlink_metadata(&link)
@@ -3375,10 +3613,36 @@ mod tests {
                 .file_type()
                 .is_symlink()
         );
+        // A third root depends on the second root's already-pinned source.
+        // Selecting only this root must preserve both transitive targets.
+        let chain_request = native_request(
+            &workspace,
+            "chain",
+            spec(),
+            RepositoryMaterializationKind::GeneratedFileEffects(generated_symlink_plan(
+                "BUILD.bazel",
+                &link,
+                PathObservationNamespace::Materialization(linked_instance),
+                b"filegroup(name='linked')\n",
+            )),
+        );
+        materializer
+            .materialize_native(
+                token,
+                chain_request.clone(),
+                RepositoryMaterializationGeneration(1),
+            )
+            .unwrap();
+        let (chain_root, chain_instance) = immutable_result(&materializer, "chain");
+        let chain_link = chain_root.join("BUILD.bazel");
         materializer
             .accept(
                 token,
-                &[source_request.clone(), link_request.clone()],
+                &[
+                    source_request.clone(),
+                    link_request.clone(),
+                    chain_request.clone(),
+                ],
                 Vec::new(),
             )
             .unwrap();
@@ -3388,22 +3652,98 @@ mod tests {
         materializer
             .preflight_native(token, std::iter::empty())
             .unwrap();
-        let next_instance = materializer.state.lock().unwrap().next_instance;
+        let before = immutable_result(&materializer, chain_request.id.canonical_repo.as_str());
         materializer
             .materialize_native(
                 token,
-                link_request.clone(),
+                chain_request.clone(),
                 RepositoryMaterializationGeneration(2),
             )
             .unwrap();
         assert_eq!(
-            materializer.state.lock().unwrap().next_instance,
-            next_instance
+            immutable_result(&materializer, chain_request.id.canonical_repo.as_str()),
+            before
         );
-        materializer
-            .accept(token, std::slice::from_ref(&link_request), Vec::new())
+        #[cfg(target_os = "linux")]
+        let image = {
+            let projected = slug_bzlmod_v2::RepositoryMaterialization::Immutable {
+                canonical_repo: chain_request.id.canonical_repo.clone(),
+                repo_spec: chain_request.repo_spec.clone(),
+                source_identity: match active_result(&materializer, "chain") {
+                    RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Immutable {
+                            source_identity, ..
+                        },
+                    ) => source_identity,
+                    _ => panic!("chain immutable result"),
+                },
+                generation_root: chain_root.clone(),
+                observation_instance: chain_instance,
+                anchor: None,
+            };
+            materializer
+                .image_source(
+                    token,
+                    PathObservationNamespace::Materialization(chain_instance),
+                    &NormalizedAbsolutePath::new(chain_root.clone()).unwrap(),
+                    Some((&chain_request, &projected)),
+                )
+                .unwrap()
+        };
+        let selected_epoch = {
+            let state = materializer.state.lock().unwrap();
+            let active = matching_validated_active(&state, token).unwrap();
+            complete_epoch(
+                &workspace,
+                &active
+                    .entries
+                    .iter()
+                    .filter(|entry| Arc::ptr_eq(&entry.request, &chain_request))
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap()
+        };
+        let bank = crate::runtime::native_source_access::new_reader_resources().unwrap();
+        let selected = materializer
+            .pin_selected_roots(
+                token,
+                std::slice::from_ref(&chain_request),
+                &selected_epoch,
+                &bank,
+            )
             .unwrap();
+        let metadata = crate::runtime::SourceArtifactInput::for_native_lease_test(
+            CanonicalLabel::parse("@@chain//:BUILD.bazel").unwrap(),
+            PathObservationNamespace::Materialization(chain_instance),
+            NormalizedAbsolutePath::new(chain_link.clone()).unwrap(),
+            NormalizedAbsolutePath::new(source_root.join("source.bzl")).unwrap(),
+            None,
+            slug_workspace_v2::FileContentDigest::new([0; 32], 0).unwrap(),
+        );
+        let lease = selected.lease_for(&metadata).unwrap().unwrap();
+        drop(selected);
+        materializer
+            .accept(token, std::slice::from_ref(&chain_request), Vec::new())
+            .unwrap();
+        assert_eq!(materializer.state.lock().unwrap().accepted_roots.len(), 1);
+        let source_history = Arc::downgrade(&source_request);
+        let linked_history = Arc::downgrade(&link_request);
+        drop(source_request);
+        drop(link_request);
+        assert!(
+            source_history.upgrade().is_none(),
+            "source data pin retained full request"
+        );
+        assert!(
+            linked_history.upgrade().is_none(),
+            "dependency data pin retained full request"
+        );
         assert!(source_root.exists(), "accepted source root was released");
+        assert_eq!(
+            std::fs::read(&chain_link).unwrap(),
+            b"filegroup(name='linked')\n"
+        );
         assert_eq!(std::fs::read(&link).unwrap(), b"filegroup(name='linked')\n");
 
         let token = begin_empty(&materializer);
@@ -3454,8 +3794,23 @@ mod tests {
         assert!(!provisional_link_root.exists());
         assert_eq!(std::fs::read(&link).unwrap(), b"filegroup(name='linked')\n");
         drop(materializer);
+        assert_eq!(
+            std::fs::read(&chain_link).unwrap(),
+            b"filegroup(name='linked')\n"
+        );
+        drop(lease);
+        #[cfg(target_os = "linux")]
+        {
+            assert!(source_root.exists(), "image lost transitive legacy pin");
+            assert_eq!(
+                std::fs::read(&chain_link).unwrap(),
+                b"filegroup(name='linked')\n"
+            );
+            drop(image);
+        }
         assert!(!source_root.exists());
         assert!(!linked_root.exists());
+        assert!(!chain_root.exists());
     }
 
     #[test]
@@ -3561,12 +3916,12 @@ mod tests {
         materializer
             .preflight_native(token, std::iter::empty())
             .unwrap();
-        let before_reuse = materializer.state.lock().unwrap().next_instance;
+        let before_reuse = immutable_result(&materializer, a.id.canonical_repo.as_str());
         materializer
             .materialize_native(token, a.clone(), RepositoryMaterializationGeneration(2))
             .unwrap();
         assert_eq!(
-            materializer.state.lock().unwrap().next_instance,
+            immutable_result(&materializer, a.id.canonical_repo.as_str()),
             before_reuse
         );
         materializer.discard(token).unwrap();
@@ -3581,7 +3936,7 @@ mod tests {
             .accept(token, std::slice::from_ref(&b), Vec::new())
             .unwrap();
         assert!(b_root.exists());
-        assert!(a_root.exists());
+        assert!(!a_root.exists(), "unleased replaced generation must retire");
         {
             let state = materializer.state.lock().unwrap();
             assert_eq!(state.accepted.len(), 1);
@@ -3620,7 +3975,7 @@ mod tests {
             .unwrap();
         assert_ne!(restored_instance, b_instance);
         assert!(restored_root.exists());
-        assert!(b_root.exists());
+        assert!(!b_root.exists(), "unleased replaced generation must retire");
         {
             let state = materializer.state.lock().unwrap();
             assert_eq!(state.accepted.len(), 1);
@@ -4299,7 +4654,6 @@ mod tests {
             .unwrap();
         {
             let state = materializer.state.lock().unwrap();
-            assert_eq!(state.next_instance, 1);
             assert!(state.accepted_roots.is_empty());
             assert!(state.active.as_ref().unwrap().provisional_roots.is_empty());
         }
@@ -4403,7 +4757,6 @@ mod tests {
         materializer
             .preflight_native(token, std::iter::empty())
             .unwrap();
-        let next_instance = materializer.state.lock().unwrap().next_instance;
         let new_request = materialization_request(
             &workspace,
             "new",
@@ -4437,27 +4790,16 @@ mod tests {
         );
         assert!(!provisional.unwrap().exists());
         let state = materializer.state.lock().unwrap();
-        assert_eq!(state.next_instance, next_instance);
         assert_eq!(state.accepted.len(), 1);
         assert!(state.active.is_none());
     }
 
     #[test]
     fn retained_session_lease_allocators_cancellation_and_lock_scope_are_exact() {
-        for invalid in [0, u64::MAX] {
-            let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
-            let materializer = RepositoryMaterializer::new(workspace);
-            materializer.state.lock().unwrap().next_token = invalid;
-            let error = materializer.begin().unwrap_err();
-            assert_eq!(error, RepositorySessionError::TokenExhausted);
-            let state = materializer.state.lock().unwrap();
-            assert_eq!(state.next_token, invalid);
-            assert!(state.active.is_none());
-        }
-
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
         let materializer = RepositoryMaterializer::new(workspace.clone());
         let pending = materializer.begin().unwrap();
+        let pending_lease = materializer.workspace_lease(pending).unwrap();
         assert_eq!(
             materializer.epoch(pending).unwrap_err(),
             RepositorySessionError::ValidationIncomplete
@@ -4493,7 +4835,8 @@ mod tests {
         materializer.discard(pending).unwrap();
 
         let token = begin_empty(&materializer);
-        assert_eq!(token, RepositorySessionToken(2));
+        assert!(token.0 > pending.0);
+        assert_ne!(materializer.workspace_lease(token).unwrap(), pending_lease);
         assert_eq!(
             materializer
                 .validate(token, &mut |_, _| unreachable!())
@@ -4504,7 +4847,17 @@ mod tests {
             materializer.begin().unwrap_err(),
             RepositorySessionError::Busy
         );
-        assert_eq!(materializer.state.lock().unwrap().next_token, 3);
+        assert_eq!(
+            materializer
+                .state
+                .lock()
+                .unwrap()
+                .active
+                .as_ref()
+                .unwrap()
+                .token,
+            token
+        );
 
         let stale = RepositorySessionToken(0);
         assert!(matches!(
@@ -4519,7 +4872,17 @@ mod tests {
             materializer.discard(stale),
             Err(RepositorySessionError::StaleToken { .. })
         ));
-        assert_eq!(materializer.state.lock().unwrap().next_token, 3);
+        assert_eq!(
+            materializer
+                .state
+                .lock()
+                .unwrap()
+                .active
+                .as_ref()
+                .unwrap()
+                .token,
+            token
+        );
 
         let request = materialization_request(
             &workspace,
@@ -4548,6 +4911,7 @@ mod tests {
                 },
             )
             .unwrap();
+        let first_instance = immutable_result(&materializer, "repo").1;
         let provisional_path = provisional_path.unwrap();
         assert!(provisional_path.exists());
         let copied_token = token;
@@ -4568,8 +4932,7 @@ mod tests {
             }
         );
         let next = begin_empty(&materializer);
-        assert_eq!(next, RepositorySessionToken(3));
-        assert_eq!(materializer.state.lock().unwrap().next_instance, 2);
+        assert!(next.0 > token.0);
         assert_eq!(
             materializer.discard(token).unwrap_err(),
             RepositorySessionError::StaleToken {
@@ -4594,50 +4957,12 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(
-            immutable_result(&materializer, "repo").1,
-            PathObservationInstanceId::new(2)
-        );
+        assert!(immutable_result(&materializer, "repo").1.value() > first_instance.value());
         materializer.discard(next).unwrap();
 
-        for invalid in [0, u64::MAX] {
-            let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
-            let materializer = RepositoryMaterializer::new(workspace.clone());
-            materializer.state.lock().unwrap().next_instance = invalid;
-            let token = begin_empty(&materializer);
-            let request = materialization_request(
-                &workspace,
-                "repo",
-                "invalid",
-                RepositoryMaterializationKind::Immutable,
-            );
-            let mut root_path = None;
-            let error = materializer
-                .materialize_with(
-                    token,
-                    request,
-                    RepositoryMaterializationGeneration(1),
-                    || {
-                        let root = tempfile::tempdir().unwrap();
-                        root_path = Some(root.path().to_path_buf());
-                        RepositoryMaterializationAttempt::Immutable {
-                            bytes: Vec::new(),
-                            root,
-                        }
-                    },
-                )
-                .unwrap_err();
-            assert_eq!(error, RepositorySessionError::InstanceExhausted);
-            assert!(!root_path.unwrap().exists());
-            let state = materializer.state.lock().unwrap();
-            assert_eq!(state.next_instance, invalid);
-            assert!(state.active.as_ref().unwrap().entries.is_empty());
-            assert!(state.active.as_ref().unwrap().provisional_roots.is_empty());
-            drop(state);
-            materializer.discard(token).unwrap();
-        }
+        // The checked process-global exhaustion boundary is tested against
+        // independent counters in native_identity; live tests never reset it.
     }
-
     #[test]
     fn retained_session_epochs_acceptance_reuse_and_old_roots_are_exact() {
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
@@ -4682,7 +5007,15 @@ mod tests {
                 )
                 .unwrap();
         }
-        let instance_after_immutable = materializer.state.lock().unwrap().next_instance;
+        let roots_after_immutable = materializer
+            .state
+            .lock()
+            .unwrap()
+            .active
+            .as_ref()
+            .unwrap()
+            .provisional_roots
+            .len();
         materializer
             .materialize_with(
                 token,
@@ -4693,7 +5026,10 @@ mod tests {
             .unwrap();
         {
             let state = materializer.state.lock().unwrap();
-            assert_eq!(state.next_instance, instance_after_immutable);
+            assert_eq!(
+                state.active.as_ref().unwrap().provisional_roots.len(),
+                roots_after_immutable
+            );
             let active = state.active.as_ref().unwrap();
             assert_eq!(
                 active
@@ -4834,10 +5170,13 @@ mod tests {
         materializer
             .accept(token, std::slice::from_ref(&changed_request), Vec::new())
             .unwrap();
-        assert!(path_a.exists());
+        assert!(
+            !path_a.exists(),
+            "unselected historical owner must retire without a source lease"
+        );
         assert!(replacement_path.exists());
         let state = materializer.state.lock().unwrap();
-        assert_eq!(state.accepted_roots.len(), 2);
+        assert_eq!(state.accepted_roots.len(), 1);
         assert_eq!(state.accepted.len(), 1);
         assert_eq!(*state.accepted[0].request, *changed_request);
     }
@@ -5520,7 +5859,6 @@ mod tests {
                 )],
             )
             .unwrap();
-        assert_eq!(materializer.state.lock().unwrap().next_instance, 1);
 
         let token = materializer.begin().unwrap();
         materializer.validate_native(token).unwrap();
@@ -5549,7 +5887,6 @@ mod tests {
                 .entries
                 .is_empty()
         );
-        assert_eq!(materializer.state.lock().unwrap().next_instance, 1);
         materializer.discard(token).unwrap();
     }
 
@@ -5791,56 +6128,18 @@ mod tests {
     }
 
     #[test]
-    fn observation_instance_allocator_is_checked_and_preserves_invalid_state() {
-        let mut next_instance = 1;
-        assert_eq!(
-            allocate_observation_instance(&mut next_instance).unwrap(),
-            PathObservationInstanceId::new(1)
-        );
-        assert_eq!(next_instance, 2);
-        assert_eq!(
-            allocate_observation_instance(&mut next_instance).unwrap(),
-            PathObservationInstanceId::new(2)
-        );
-        assert_eq!(next_instance, 3);
-
-        for invalid in [0, u64::MAX] {
-            let mut next_instance = invalid;
-            let error = allocate_observation_instance(&mut next_instance).unwrap_err();
-            assert_eq!(
-                error.message,
-                "repository materialization observation instance is invalid or exhausted"
-            );
-            assert_eq!(next_instance, invalid);
-        }
-    }
-
-    #[test]
-    fn failed_observation_instance_allocation_drops_unretained_root() {
-        for invalid in [0, u64::MAX] {
-            let io = LocalRepositoryIo {
-                immutable_roots: Mutex::new(RetainedImmutableRoots {
-                    next_instance: invalid,
-                    roots: Vec::new(),
-                }),
-            };
-            let root = tempfile::tempdir().unwrap();
-            let path = root.path().to_owned();
-
-            let error = io.retain(root).unwrap_err();
-
-            assert_eq!(
-                error.message,
-                "repository materialization observation instance is invalid or exhausted"
-            );
-            assert!(!path.exists());
-            let retained = io
-                .immutable_roots
-                .lock()
-                .expect("immutable repository root mutex poisoned");
-            assert_eq!(retained.next_instance, invalid);
-            assert!(retained.roots.is_empty());
-        }
+    fn independent_repository_io_owners_never_reuse_native_instances() {
+        let a = LocalRepositoryIo::new();
+        let b = LocalRepositoryIo::new();
+        let (path_a, id_a) = a.retain(tempfile::tempdir().unwrap()).unwrap();
+        let (path_b, id_b) = b.retain(tempfile::tempdir().unwrap()).unwrap();
+        assert!(id_a.value() > 0 && id_b.value() > id_a.value());
+        drop(a);
+        assert!(!path_a.exists());
+        assert!(path_b.exists());
+        let c = LocalRepositoryIo::new();
+        let (_, id_c) = c.retain(tempfile::tempdir().unwrap()).unwrap();
+        assert!(id_c.value() > id_b.value());
     }
 
     #[tokio::test]

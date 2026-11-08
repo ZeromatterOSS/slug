@@ -30,14 +30,17 @@ pub(super) fn workspace() -> Workspace {
     workspace
 }
 
-pub(super) fn prepare(workspace: &Workspace, targets: &[&str]) -> Arc<PreparedActionChainInputs> {
+pub(super) fn prepare(
+    workspace: &Workspace,
+    targets: &[&str],
+) -> slug_core_v2::runtime::NativeActionChainInputs {
     let targets = targets
         .iter()
         .map(|target| TargetPattern::parse(target).unwrap())
         .collect::<Vec<_>>();
     let accepted = workspace
         .runtime
-        .prepare_requested_action_inputs_with_repository_environment(
+        .prepare_native_requested_action_inputs_with_repository_environment(
             &targets,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -66,7 +69,7 @@ fn transport() -> ActionChainReapiTransport {
 }
 
 pub(super) fn disconnected_session(
-    inputs: Arc<PreparedActionChainInputs>,
+    inputs: slug_core_v2::runtime::NativeActionChainInputs,
 ) -> ActionChainReapiSession {
     let transport = transport();
     let channel = tonic::transport::Endpoint::from_static("http://127.0.0.1:1").connect_lazy();

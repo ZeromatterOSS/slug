@@ -137,14 +137,56 @@ impl Drop for LogicalByteReservation {
 
 /// Only the materializer's validated factory may construct a source. The FD
 /// anchors every operation; the pin keeps a selected immutable source alive.
+enum ImageSourcePin {
+    Named(Option<Arc<TempDir>>),
+    Legacy(Arc<super::repository_io::physical_roots::LegacyRootOwner>),
+    #[cfg(target_os = "linux")]
+    Physical {
+        root: Arc<super::repository_physical_root::RepositoryPhysicalRoot>,
+        scope: Arc<super::repository_io::source_service::SourceServiceScope>,
+        // Source File closes before root and then lifetime credit retire.
+        _credit: super::repository_physical_root::ResourceCredit,
+    },
+}
 pub(super) struct ScopedImageSource {
     namespace: PathObservationNamespace,
     anchor: NormalizedAbsolutePath,
     root: File,
-    _pin: Option<Arc<TempDir>>,
+    _pin: ImageSourcePin,
 }
 
 impl ScopedImageSource {
+    #[cfg(target_os = "linux")]
+    pub(super) fn from_physical(
+        file: File,
+        root: Arc<super::repository_physical_root::RepositoryPhysicalRoot>,
+        scope: Arc<super::repository_io::source_service::SourceServiceScope>,
+        credit: super::repository_physical_root::ResourceCredit,
+    ) -> Result<Self, InputImageCaptureError> {
+        let source = Self {
+            namespace: root.anchor().namespace(),
+            anchor: root.anchor().root().clone(),
+            root: file,
+            _pin: ImageSourcePin::Physical {
+                root,
+                scope,
+                _credit: credit,
+            },
+        };
+        source.check_current_anchor(&|| true)?;
+        Ok(source)
+    }
+    pub(super) fn from_legacy(
+        namespace: PathObservationNamespace,
+        anchor: NormalizedAbsolutePath,
+        file: File,
+        owner: Arc<super::repository_io::physical_roots::LegacyRootOwner>,
+    ) -> Result<Self, InputImageCaptureError> {
+        let mut source = Self::new(namespace, anchor, file, None)?;
+        source._pin = ImageSourcePin::Legacy(owner);
+        Ok(source)
+    }
+
     pub(super) fn new(
         namespace: PathObservationNamespace,
         anchor: NormalizedAbsolutePath,
@@ -165,7 +207,7 @@ impl ScopedImageSource {
                 namespace,
                 anchor,
                 root,
-                _pin: pin,
+                _pin: ImageSourcePin::Named(pin),
             })
         }
         #[cfg(not(target_os = "linux"))]
@@ -229,6 +271,14 @@ impl ScopedImageSource {
         }
         #[cfg(target_os = "linux")]
         {
+            if let ImageSourcePin::Physical { root, scope, .. } = &self._pin {
+                if self.namespace != root.anchor().namespace()
+                    || &self.anchor != root.anchor().root()
+                {
+                    return Err(InputImageCaptureError::Unauthorized);
+                }
+                return root.validate_image_directory(&self.root, scope, active);
+            }
             let opened = linux::fd_stat(&self.root)?;
             let named = linux::fd_stat(&open_image_anchor(&self.anchor)?)?;
             if opened.st_dev != named.st_dev || opened.st_ino != named.st_ino {

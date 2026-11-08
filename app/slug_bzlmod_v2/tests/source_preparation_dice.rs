@@ -1358,6 +1358,7 @@ fn semantic_materialization(
 ) -> SourcePreparationOutcome<Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>>
 {
     SourcePreparationOutcome::Complete(Arc::new(Ok(RepositoryMaterialization::Immutable {
+        anchor: None,
         canonical_repo: slug_identity_v2::CanonicalRepoName::new(canonical_repo).unwrap(),
         repo_spec: RepoSpec {
             rule_id: RepoRuleId {

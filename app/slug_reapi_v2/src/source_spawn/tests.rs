@@ -111,11 +111,11 @@ impl Workspace {
         }
     }
 
-    fn prepare(&self) -> Arc<PreparedSourceActionInputs> {
+    fn prepare(&self) -> slug_core_v2::runtime::NativeSourceActionInputs {
         let mut prepared = None;
         drop(
             self.runtime
-                .prepare_source_action_inputs_with_repository_environment(
+                .prepare_native_source_action_inputs_with_repository_environment(
                     &[TargetPattern::parse("//:one").unwrap()],
                     self.owner.clone(),
                     0,
@@ -136,7 +136,7 @@ impl Workspace {
     }
 
     fn plan(&self) -> Result<SourceSpawnReapiPlan, String> {
-        SourceSpawnReapiPlan::from_prepared(
+        SourceSpawnReapiPlan::from_native(
             self.prepare(),
             &defaults(),
             &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
@@ -163,7 +163,7 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
         prepared.configured_action().context().owner(),
         &workspace.owner
     );
-    let plan = SourceSpawnReapiPlan::from_prepared(
+    let plan = SourceSpawnReapiPlan::from_native(
         prepared.clone(),
         &defaults(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
@@ -300,7 +300,7 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
     let mut changed_defaults = defaults();
     changed_defaults.insert("default-only".to_owned(), "changed".to_owned());
     assert_ne!(
-        SourceSpawnReapiPlan::from_prepared(
+        SourceSpawnReapiPlan::from_native(
             prepared,
             &changed_defaults,
             &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
@@ -312,7 +312,7 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
     );
     workspace.write("BUILD.bazel", workspace.build.replace("platform(name='platform')", "platform(name='platform', exec_properties={'platform-only': 'selected', 'overlap': 'platform'})"));
     let selected = workspace.prepare();
-    let selected_plan = SourceSpawnReapiPlan::from_prepared(
+    let selected_plan = SourceSpawnReapiPlan::from_native(
         selected.clone(),
         &defaults(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
@@ -328,7 +328,7 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
     );
     assert_eq!(
         selected_plan.identity(),
-        SourceSpawnReapiPlan::from_prepared(
+        SourceSpawnReapiPlan::from_native(
             selected,
             &changed_defaults,
             &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
@@ -356,7 +356,7 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
         1
     );
     assert!(context.platform_fact().unwrap().exec_properties.is_empty());
-    let filtered_plan = SourceSpawnReapiPlan::from_prepared(
+    let filtered_plan = SourceSpawnReapiPlan::from_native(
         filtered,
         &defaults(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
@@ -591,10 +591,10 @@ fn native_spawn_projection_uses_current_consumer_cancellation_before_digest() {
     workspace.write("defs.bzl", defs);
     let prepared = workspace.prepare();
     let error =
-        SourceSpawnReapiPlan::from_prepared(prepared.clone(), &defaults(), &CancelledArgsConsumer)
+        SourceSpawnReapiPlan::from_native(prepared.clone(), &defaults(), &CancelledArgsConsumer)
             .unwrap_err();
     assert!(error.contains("Args expansion cancelled"), "{error}");
-    let plan = SourceSpawnReapiPlan::from_prepared(
+    let plan = SourceSpawnReapiPlan::from_native(
         prepared,
         &defaults(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,

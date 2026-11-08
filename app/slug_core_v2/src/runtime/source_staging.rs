@@ -85,41 +85,9 @@ impl PreparedSourceActionInputs {
         &self.observations
     }
 
-    /// Open only a source selected by this prepared set. The caller must verify
-    /// transfer bytes against its digest, and must not infer current provenance
-    /// from a successful open. The handle is never retained in DICE.
-    pub fn open_source(&self, index: usize) -> std::io::Result<std::fs::File> {
-        open_observed_source(&self.sources, index)
+    pub(in crate::runtime) fn observed_sources(&self) -> &[Arc<ObservedSourceArtifactInput>] {
+        &self.sources
     }
-}
-
-pub(super) fn open_observed_source(
-    sources: &[Arc<ObservedSourceArtifactInput>],
-    index: usize,
-) -> std::io::Result<std::fs::File> {
-    let source = sources
-        .get(index)
-        .ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "unknown prepared source")
-        })?
-        .result()
-        .as_ref()
-        .unwrap();
-    let mut options = std::fs::File::options();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(nix::libc::O_NONBLOCK);
-    }
-    let file = options.open(source.real_path().as_path())?;
-    if !file.metadata()?.is_file() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "prepared source is no longer a regular file",
-        ));
-    }
-    Ok(file)
 }
 
 pub(super) fn require_execution_representative(
@@ -366,6 +334,55 @@ impl NativeCommandRoot for SourceStagingKey {
     }
 }
 
+#[derive(Clone)]
+struct NativeSourceStagingKey(SourceStagingKey);
+#[derive(Clone)]
+struct NativeSourceStagingKeyTerminal {
+    prepared: Arc<PreparedSourceActionInputs>,
+    native: Option<crate::runtime::native_source_access::NativeSourceActionInputs>,
+}
+#[async_trait]
+impl NativeCommandRoot for NativeSourceStagingKey {
+    type Terminal = NativeSourceStagingKeyTerminal;
+    fn initializes_request_revision(&self) -> bool {
+        true
+    }
+    fn observations<'a>(&self, t: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
+        self.0.observations(&t.prepared)
+    }
+    fn source_certificate<'a>(&self, t: &'a Self::Terminal) -> Option<&'a SourceCertificate> {
+        self.0.source_certificate(&t.prepared)
+    }
+    fn observed_selection_association(&self) -> ObservedSelectionAssociation {
+        self.0.observed_selection_association()
+    }
+    fn event_reconciliation_policy(&self, t: &Self::Terminal) -> EventReconciliationPolicy {
+        self.0.event_reconciliation_policy(&t.prepared)
+    }
+
+    async fn compute(
+        &self,
+        tx: &mut dice::DiceTransaction,
+    ) -> Result<PreparationOutcome<Self::Terminal>, NativeDemandSessionError> {
+        Ok(NativeCommandRoot::compute(&self.0, tx)
+            .await?
+            .map(|prepared| NativeSourceStagingKeyTerminal {
+                prepared,
+                native: None,
+            }))
+    }
+    fn complete<'a>(
+        &'a self,
+        t: &'a mut Self::Terminal,
+        context: NativeCommandCompletionContext<'a, '_>,
+    ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
+        async move {
+            t.native = Some(context.native_source_inputs(t.prepared.clone())?);
+            Ok(())
+        }
+    }
+}
+
 impl WorkspaceRuntime {
     /// Opt-in source/CAS staging only. This does not execute a build.
     #[allow(clippy::too_many_arguments)]
@@ -399,6 +416,52 @@ impl WorkspaceRuntime {
             },
         )
         .map(|driven| driven.accepted)
+        .map_err(BuildCommandError::infrastructure)
+    }
+}
+
+impl WorkspaceRuntime {
+    /// Prepare native source access only through current selected completion.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_native_source_action_inputs_with_repository_environment(
+        &self,
+        targets: &[TargetPattern],
+        owner: ConfiguredTargetKey,
+        action: usize,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> Result<
+        AcceptedCommand<crate::runtime::native_source_access::NativeSourceActionInputs>,
+        BuildCommandError,
+    > {
+        let (build, request) = self.prepare_build_request(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+        )?;
+        self.drive_command(
+            request,
+            NativeSourceStagingKey(SourceStagingKey {
+                build,
+                owner,
+                action,
+            }),
+        )
+        .map(|driven| {
+            driven.accepted.map_terminal(|terminal| {
+                terminal
+                    .native
+                    .expect("native preparation completed before acceptance")
+            })
+        })
         .map_err(BuildCommandError::infrastructure)
     }
 }

@@ -105,6 +105,9 @@ async fn resolve(
                 panic!("operational result missing")
             };
             assert_eq!(&result, observed.result());
+            if let Ok(resolved) = observed.result() {
+                assert_eq!(resolved.anchor(), Some(plain.anchor()));
+            }
             return observed;
         }
     }

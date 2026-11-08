@@ -15,8 +15,7 @@ use super::*;
 #[path = "../../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod fixture;
 
-#[path = "cas_fixture.rs"]
-mod cas_fixture;
+use crate::cas_fixture;
 
 fn source_defs() -> String {
     format!(
@@ -126,10 +125,13 @@ impl Workspace {
     }
     fn prepare(
         &self,
-    ) -> Result<Arc<PreparedSourceActionInputs>, slug_core_v2::runtime::BuildCommandError> {
+    ) -> Result<
+        slug_core_v2::runtime::NativeSourceActionInputs,
+        slug_core_v2::runtime::BuildCommandError,
+    > {
         let accepted = self
             .runtime
-            .prepare_source_action_inputs_with_repository_environment(
+            .prepare_native_source_action_inputs_with_repository_environment(
                 &[TargetPattern::parse(&format!(
                     "//{}:one",
                     self.owner.label().package().package().as_str()
@@ -186,7 +188,7 @@ fn different_original_resource_callbacks_preserve_identical_reapi_command_and_ac
     let first = workspace.prepare().unwrap();
     let original = first.spawn().resource_set().unwrap();
     assert!(original.published_callable().original_slot().is_some());
-    let first_plan = SourceSpawnReapiPlan::from_prepared(
+    let first_plan = SourceSpawnReapiPlan::from_native(
         first.clone(),
         &Default::default(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
@@ -203,7 +205,7 @@ fn different_original_resource_callbacks_preserve_identical_reapi_command_and_ac
     )
     .unwrap();
     let second = workspace.prepare().unwrap();
-    let second_plan = SourceSpawnReapiPlan::from_prepared(
+    let second_plan = SourceSpawnReapiPlan::from_native(
         second.clone(),
         &Default::default(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
@@ -231,7 +233,7 @@ fn source_counter_preserves_original_and_refuses_callback_free_prepared_action()
     let workspace = Workspace::new();
     let original = workspace.prepare().unwrap();
     let (wrapped, counter) = original.with_resource_set_invocation_counter().unwrap();
-    assert_eq!(wrapped, *original);
+    assert_eq!(wrapped.metadata(), original.metadata());
     assert!(
         wrapped
             .spawn()
@@ -265,8 +267,8 @@ fn source_counter_preserves_original_and_refuses_callback_free_prepared_action()
     );
     assert_eq!(counter.load(Ordering::SeqCst), 1);
     counter.store(0, Ordering::SeqCst);
-    let plan = SourceSpawnReapiPlan::from_prepared(
-        Arc::new(wrapped),
+    let plan = SourceSpawnReapiPlan::from_native(
+        wrapped,
         &Default::default(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
     )
@@ -374,11 +376,11 @@ impl SourceActionTransport for CountingSourceTransport {
     type Error = RemoteExecutionError;
     async fn stage(
         &self,
-        inputs: Arc<PreparedSourceActionInputs>,
+        inputs: slug_core_v2::runtime::NativeSourceActionInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Staged, Self::Error> {
         let (wrapped, counter) = inputs.with_resource_set_invocation_counter().unwrap();
-        assert_eq!(wrapped, *inputs);
+        assert_eq!(wrapped.metadata(), inputs.metadata());
         // Positive control on the SAME DTO passed below, completed before reset.
         let error = wrapped
             .spawn()
@@ -401,7 +403,7 @@ impl SourceActionTransport for CountingSourceTransport {
         counter.store(0, Ordering::SeqCst);
         self.counters.lock().unwrap().push(counter);
         self.assert_zero();
-        let result = self.inner.stage(Arc::new(wrapped), args_context).await;
+        let result = self.inner.stage(wrapped, args_context).await;
         self.assert_zero();
         result
     }
@@ -423,12 +425,12 @@ impl SourceActionTransport for PartialAndCorruptCas {
     type Error = RemoteExecutionError;
     async fn stage(
         &self,
-        inputs: Arc<PreparedSourceActionInputs>,
+        inputs: slug_core_v2::runtime::NativeSourceActionInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Staged, Self::Error> {
         use crate::proto::google::bytestream;
         let plan =
-            SourceSpawnReapiPlan::from_prepared(inputs.clone(), &Default::default(), args_context)
+            SourceSpawnReapiPlan::from_native(inputs.clone(), &Default::default(), args_context)
                 .unwrap();
         let digest = plan
             .inputs()
@@ -590,7 +592,7 @@ impl SourceActionTransport for PartialAndCorruptCas {
                             break;
                         }
                         assert_eq!(status.committed_size, partial.len() as i64);
-                        tokio::task::yield_now().await;
+                        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
                     }
                     Err(status) => panic!("partial upload cleanup status refused: {status}"),
                 }
@@ -677,7 +679,7 @@ fn native_directory_declarations_and_command_paths_follow_retained_kinds() {
     let prepared = workspace.prepare().unwrap();
     let owner = prepared.configured_action().context().owner();
     assert_eq!(owner, &workspace.owner);
-    let plan = SourceSpawnReapiPlan::from_prepared(
+    let plan = SourceSpawnReapiPlan::from_native(
         prepared,
         &Default::default(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
@@ -710,7 +712,7 @@ fn native_directory_declarations_and_command_paths_follow_retained_kinds() {
     }
     std::fs::write(workspace.root.join("pkg/defs.bzl"), defs).unwrap();
     assert_eq!(
-        SourceSpawnReapiPlan::from_prepared(
+        SourceSpawnReapiPlan::from_native(
             workspace.prepare().unwrap(),
             &Default::default(),
             &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
@@ -823,14 +825,20 @@ fn nativelink_source_output_tree_cold_cache_restore_and_missing_descendant() {
         };
         let blob = ReapiBlob::from_bytes(tree.encode_to_vec());
         cache.upload_missing(&[blob.clone()]).await.unwrap();
+        let [file] = last.result.output_files() else {
+            panic!("one regular output required for missing-descendant fixture")
+        };
+        let [directory] = last.result.output_directories() else {
+            panic!("one tree output required for missing-descendant fixture")
+        };
         let poisoned = crate::proto::ActionResult {
             output_files: vec![crate::proto::OutputFile {
-                path: "a.out".into(),
-                digest: Some(digest_to_proto(last.result.output_files()[0].digest())),
+                path: file.path().into(),
+                digest: Some(digest_to_proto(file.digest())),
                 ..Default::default()
             }],
             output_directories: vec![crate::proto::OutputDirectory {
-                path: "tree".into(),
+                path: directory.path().into(),
                 tree_digest: Some(digest_to_proto(blob.digest())),
                 ..Default::default()
             }],

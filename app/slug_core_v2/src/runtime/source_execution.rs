@@ -13,7 +13,7 @@ pub trait SourceActionTransport: Sync {
 
     fn stage(
         &self,
-        inputs: Arc<PreparedSourceActionInputs>,
+        inputs: crate::runtime::native_source_access::NativeSourceActionInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> impl std::future::Future<Output = Result<Self::Staged, Self::Error>> + Send;
     fn execute(
@@ -90,6 +90,7 @@ impl<T> Clone for SourceExecutionRoot<'_, T> {
 
 struct SourceExecutionTerminal<T> {
     inputs: Arc<PreparedSourceActionInputs>,
+    native: Option<crate::runtime::native_source_access::NativeSourceActionInputs>,
     output: Option<Arc<T>>,
 }
 
@@ -97,6 +98,7 @@ impl<T> Clone for SourceExecutionTerminal<T> {
     fn clone(&self) -> Self {
         Self {
             inputs: self.inputs.clone(),
+            native: self.native.clone(),
             output: self.output.clone(),
         }
     }
@@ -132,6 +134,7 @@ impl<T: SourceActionTransport> NativeCommandRoot for SourceExecutionRoot<'_, T> 
             .await?
             .map(|inputs| SourceExecutionTerminal {
                 inputs,
+                native: None,
                 output: None,
             }))
     }
@@ -145,9 +148,11 @@ impl<T: SourceActionTransport> NativeCommandRoot for SourceExecutionRoot<'_, T> 
             terminal.inputs.check_execution_representative()?;
             let args_context =
                 RequestArgsContext::new(context.command.runtime.source_scope.as_deref());
+            let native = context.native_source_inputs(terminal.inputs.clone())?;
+            terminal.native = Some(native.clone());
             let staged = self
                 .transport
-                .stage(terminal.inputs.clone(), &args_context)
+                .stage(native, &args_context)
                 .await
                 .map_err(|error| {
                     NativeDemandSessionError::Computation(anyhow::Error::new(error))

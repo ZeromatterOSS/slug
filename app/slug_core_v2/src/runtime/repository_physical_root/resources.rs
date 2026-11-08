@@ -90,7 +90,7 @@ impl RepositoryRootResources {
             peak_backing_bytes: usage.peak_backing,
         }
     }
-    pub(super) fn reserve(
+    pub(in crate::runtime) fn reserve(
         self: &Arc<Self>,
         bytes: usize,
         fds: usize,
@@ -147,7 +147,7 @@ impl Drop for SlotCredit {
 }
 
 #[derive(Debug)]
-pub(super) struct ResourceCredit {
+pub(in crate::runtime) struct ResourceCredit {
     pub(super) bytes: ImageDescriptorReservation,
     slots: SlotCredit,
 }
@@ -163,6 +163,9 @@ pub(super) struct RepositoryRootBacking {
 struct BackingState {
     mode: RepositoryWorkspaceMode,
     binding: Option<(RootIdentity, Arc<RepositoryWorkspaceReservation>)>,
+    // Stable spelling/domain claims follow every builder/root/token pin. They
+    // contain no IO authority and keep collision control alive for old readers.
+    claim: Option<Arc<crate::runtime::repository_io::reservations::SourceRootClaim>>,
     // Binding payload precedes the sole quota/control credit on destruction.
     credit: ResourceCredit,
 }
@@ -177,9 +180,40 @@ impl RepositoryRootBacking {
             state: Mutex::new(BackingState {
                 mode,
                 binding: None,
+                claim: None,
                 credit,
             }),
         }))
+    }
+    pub(super) fn bind_claim(
+        &self,
+        reservation: &RepositoryWorkspaceReservation,
+        claim: Arc<crate::runtime::repository_io::reservations::SourceRootClaim>,
+    ) -> Result<(), PhysicalRootError> {
+        if !claim.matches_reservation(reservation) || !claim.belongs_to(&self.resources) {
+            return Err(PhysicalRootError::Reservation);
+        }
+        let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        if state
+            .binding
+            .as_ref()
+            .is_some_and(|(_, prior)| prior.as_ref() != reservation)
+        {
+            return Err(PhysicalRootError::Reservation);
+        }
+        if let Some(prior) = &state.claim {
+            if !Arc::ptr_eq(prior, &claim) {
+                return Err(PhysicalRootError::Reservation);
+            }
+        } else {
+            state.claim = Some(claim);
+        }
+        Ok(())
+    }
+    pub(super) fn source_claim(
+        &self,
+    ) -> Option<Arc<crate::runtime::repository_io::reservations::SourceRootClaim>> {
+        self.state.lock().ok()?.claim.clone()
     }
     pub(super) fn belongs_to(&self, resources: &Arc<RepositoryRootResources>) -> bool {
         Arc::ptr_eq(&self.resources, resources)

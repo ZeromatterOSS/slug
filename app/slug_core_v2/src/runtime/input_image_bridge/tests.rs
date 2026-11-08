@@ -370,6 +370,7 @@ fn declared_image_factory_rejects_foreign_materialization_and_session_before_io(
             observation_instance,
             canonical_repo,
             repo_spec,
+            ..
         } = &mut changed
         else {
             unreachable!()

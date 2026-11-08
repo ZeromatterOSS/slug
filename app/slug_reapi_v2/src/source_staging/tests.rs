@@ -107,7 +107,7 @@ fn nativelink_closure_sources_merkle_and_verified_upload() {
     }));
     let owner = owner.unwrap();
     let prepare = || {
-        workspace.prepare_source_action_inputs_with_repository_environment(
+        workspace.prepare_native_source_action_inputs_with_repository_environment(
             &targets,
             owner.clone(),
             0,
@@ -124,7 +124,7 @@ fn nativelink_closure_sources_merkle_and_verified_upload() {
         prepared = Some(value.clone());
         TerminalOutput::new(0, String::new(), String::new())
     }));
-    let plan = SourceInputReapiPlan::from_prepared(
+    let plan = SourceInputReapiPlan::from_native(
         prepared.unwrap(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
     )
@@ -246,7 +246,7 @@ fn nativelink_closure_sources_merkle_and_verified_upload() {
         changed = Some(value.clone());
         TerminalOutput::new(0, String::new(), String::new())
     }));
-    let stale = SourceInputReapiPlan::from_prepared(
+    let stale = SourceInputReapiPlan::from_native(
         changed.unwrap(),
         &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
     )
@@ -327,7 +327,13 @@ async fn reject_invalid_cas_writes(cache: &CacheClient, channel: tonic::transpor
     // NativeLink merges the verifier error with backend cancellation errors,
     // which can promote INVALID_ARGUMENT to INTERNAL. Require its specific cause.
     assert_ne!(status.code, tonic::Code::Ok as i32, "{result:?}");
-    assert!(status.message.contains("Hashes do not match"), "{result:?}");
+    let actual = ReapiDigest::of_bytes(b"wrong hash case");
+    assert_ne!(hash_blob.digest(), &actual);
+    assert!(
+        status.message.contains(hash_blob.digest().hash())
+            && status.message.contains(actual.hash()),
+        "{result:?}"
+    );
     require_missing_after_cleanup(cache, hash_blob.digest()).await;
     cache.upload_missing(&[hash_blob.clone()]).await.unwrap();
     require_bytes(cache, hash_blob.digest(), hash_blob.data()).await;

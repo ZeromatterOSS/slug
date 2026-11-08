@@ -133,6 +133,7 @@ pub enum ResolvedPathState {
 /// One complete operational resolution.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct ResolvedPath {
+    anchor: Option<MaterializationPathAnchor>,
     namespace: PathObservationNamespace,
     requested_path: NormalizedAbsolutePath,
     real_path: NormalizedAbsolutePath,
@@ -143,6 +144,10 @@ pub struct ResolvedPath {
 }
 
 impl ResolvedPath {
+    /// Immutable selected boundary, never a native lifetime or IO capability.
+    pub fn anchor(&self) -> Option<&MaterializationPathAnchor> {
+        self.anchor.as_ref()
+    }
     pub const fn namespace(&self) -> PathObservationNamespace {
         self.namespace
     }
@@ -334,6 +339,7 @@ impl ResolverFrame {
         state: ResolvedPathState,
     ) -> ResolvedPath {
         ResolvedPath {
+            anchor: None,
             namespace,
             requested_path: self.original_path.dupe(),
             real_path,
@@ -818,7 +824,10 @@ async fn drive_resolution(
                         let MachineStep::Complete(result) = step else {
                             unreachable!("root-frame completion is terminal")
                         };
-                        return Ok(PathOutcome::Complete(result));
+                        return Ok(PathOutcome::Complete(result.map(|mut resolved| {
+                            resolved.anchor = machine.anchor.dupe();
+                            resolved
+                        })));
                     }
                     next = Some(step);
                 }
@@ -2366,6 +2375,7 @@ mod tests {
             chain: Arc::from([path("/target/child"), path("/target")]),
         };
         let baseline = ResolvedPath {
+            anchor: None,
             namespace: ns,
             requested_path: path("/link"),
             real_path: path("/target"),

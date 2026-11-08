@@ -30,7 +30,7 @@ fn producer(plan: &PreparedActionPlan<'_>, artifact: &AnalysisArtifact) -> io::R
 
 pub(super) fn expand_groups(
     plan: &PreparedActionPlan<'_>,
-    inputs: Option<&PreparedActionChainInputs>,
+    inputs: Option<&crate::runtime::native_source_access::NativeActionChainInputs>,
     groups: &mut SmallMap<usize, SmallSet<ActionOutput>>,
 ) -> io::Result<Vec<CoupledTree>> {
     let mut pending = groups.keys().copied().collect::<Vec<_>>();
@@ -113,7 +113,7 @@ pub(super) fn expand_groups(
 pub(super) fn stage_trees(
     owner: &ConfiguredOutputOwner,
     plan: &PreparedActionPlan<'_>,
-    inputs: Option<&PreparedActionChainInputs>,
+    inputs: Option<&crate::runtime::native_source_access::NativeActionChainInputs>,
     trees: Vec<CoupledTree>,
     reserved: &SmallSet<&str>,
     stages: &mut Vec<PlannedActionOutputStaging>,

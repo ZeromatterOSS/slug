@@ -76,7 +76,10 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
             ),
             map("downloads", self.needs.selected_extension_downloads().len()),
             map("executes", self.needs.repository_executes().len()),
-            map("filesystem", self.needs.repository_filesystem_operations().len()),
+            map(
+                "filesystem",
+                self.needs.repository_filesystem_operations().len(),
+            ),
         ]
     }
     fn operation(demand: &PathObservationDemand) -> Option<&'static str> {
@@ -151,6 +154,7 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
                 ("local", Some(logical_root.as_path().as_os_str().as_bytes()))
             }
             RepositoryMaterializationKind::Immutable => ("immutable", None),
+            RepositoryMaterializationKind::GeneralWorkspace(_) => ("general_workspace", None),
             RepositoryMaterializationKind::GeneratedFileEffects(_) => {
                 ("generated_file_effects", None)
             }

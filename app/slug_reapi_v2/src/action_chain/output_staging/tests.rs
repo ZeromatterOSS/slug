@@ -320,7 +320,7 @@ impl ActionChainTransport for InterruptedDownload {
     type Error = RemoteExecutionError;
     async fn start(
         &self,
-        inputs: Arc<PreparedActionChainInputs>,
+        inputs: slug_core_v2::runtime::NativeActionChainInputs,
         args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
         self.starts.fetch_add(1, Ordering::SeqCst);
@@ -376,19 +376,7 @@ impl ActionChainOutputTransport for InterruptedDownload {
                         .find(|file| file.path() == "nested/value")
                         .unwrap()
                         .digest();
-                    let root =
-                        PathBuf::from(std::env::var("SLUG_V2_NATIVELINK_TEST_ROOT").unwrap());
-                    for store in ["fast-content", "slow-content"] {
-                        let path = root.join("cas").join(store).join("d").join(format!(
-                            "{}-{}",
-                            digest.hash(),
-                            digest.size_bytes()
-                        ));
-                        assert!(
-                            path.is_file(),
-                            "missing verified fixture CAS file {}",
-                            path.display()
-                        );
+                    for path in crate::cas_fixture::completed_blob_paths(digest) {
                         match self.behavior {
                             DuringDownload::Missing => std::fs::remove_file(path).unwrap(),
                             DuringDownload::Corrupt => {

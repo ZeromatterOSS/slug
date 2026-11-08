@@ -833,6 +833,7 @@ mod tests {
         let address = external_address(&route);
         let instance = PathObservationInstanceId::new(41);
         let immutable = |root: &str| RepositoryMaterialization::Immutable {
+            anchor: None,
             canonical_repo: address.repo().clone(),
             repo_spec: repo_spec(),
             source_identity: Arc::from(root),

@@ -261,6 +261,20 @@ pub(in crate::runtime::repository_physical_root) struct BootstrapLaunch {
     _credit: resources::ResourceCredit,
 }
 impl BootstrapLaunch {
+    pub(in crate::runtime::repository_physical_root) fn new_claimed(
+        reservation: Arc<RepositoryWorkspaceReservation>,
+        resources: Arc<RepositoryRootResources>,
+        scope: Arc<SourceServiceScope>,
+        claim: Arc<crate::runtime::repository_io::reservations::SourceRootClaim>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
+        let owner = Self::new(reservation, resources, scope, active)?;
+        // Arm the claim in shared backing BEFORE the worker can create a root.
+        // Caller cancellation cannot retire spelling while bootstrap still owns
+        // descriptors, even if no builder ever reaches the awaiting caller.
+        owner.backing.bind_claim(&owner.reservation, claim)?;
+        Ok(owner)
+    }
     pub(in crate::runtime::repository_physical_root) fn new(
         reservation: Arc<RepositoryWorkspaceReservation>,
         resources: Arc<RepositoryRootResources>,

@@ -43,6 +43,9 @@ pub use executor::materialize_configured_outputs;
 pub use executor::materialize_outputs;
 
 #[cfg(test)]
+#[path = "source_execution/cas_fixture.rs"]
+mod cas_fixture;
+#[cfg(test)]
 #[path = "../tests/root_support/mod.rs"]
 pub(crate) mod test_roots;
 pub use executor::verify_materialized_run_executable;

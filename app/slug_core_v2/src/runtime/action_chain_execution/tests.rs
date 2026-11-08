@@ -230,7 +230,7 @@ impl Fake {
     }
 }
 struct Session {
-    inputs: Arc<PreparedActionChainInputs>,
+    inputs: crate::runtime::NativeActionChainInputs,
     attempt: usize,
     executed: Vec<usize>,
     bytes: Vec<u8>,
@@ -259,7 +259,7 @@ impl ActionChainTransport for Fake {
 
     async fn start(
         &self,
-        inputs: Arc<PreparedActionChainInputs>,
+        inputs: crate::runtime::NativeActionChainInputs,
         _args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Session, Self::Error> {
         let attempt = self.starts.fetch_add(1, Ordering::SeqCst);

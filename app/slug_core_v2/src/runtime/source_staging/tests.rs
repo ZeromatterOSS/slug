@@ -148,10 +148,14 @@ fn native_source_staging_tracks_sources_and_rejects_conflicting_roots() {
     let owner = build_owner(&runtime, "one");
     let selected = key(&runtime, &["//:one"], owner.clone());
     let first = runtime
-        .drive_command(request(&runtime), selected.clone())
+        .drive_command(request(&runtime), NativeSourceStagingKey(selected.clone()))
         .unwrap()
         .accepted;
-    let first = first.terminal_for_test();
+    let first = first
+        .terminal_for_test()
+        .native
+        .as_ref()
+        .expect("native source completion");
     assert_unsupported_shapes(first.spawn());
     assert!(
         first

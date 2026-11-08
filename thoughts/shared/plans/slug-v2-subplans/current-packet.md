@@ -34,10 +34,20 @@ bounded capture, namespace-wide reap and closed completion back into the command
 Native gates cover sequential arbitrary argv, env/cwd/nonzero effects, exact
 replay, Process-token mutation, confined Host/proc/device/socket/FD access,
 resources, detached closed-stdio writers, drop/deadline/overflow and exec failure.
-These remain inactive. Selected physical-root registry, cross-repository read
-views and InputImage/native source transport are the next frontier, followed by
-original Loading/process activation under the complete gates below. Existing
-production routes remain replacement-required. The selected design links owner
+These remain inactive. The [native source registry receipt](wp1225-native-source-registry-acceptance-2026-11-08.json)
+adds closed full-history/spec adoption, globally fresh identities/empty epochs,
+exact selected leases, physical anchored observations/digests, descriptor-backed
+InputImage and owned source readers. Native source/chain transports now carry
+selected leases through CAS and publication; protected Host/legacy behavior,
+transitive legacy symlink data lifetime and real NativeLink corruption/cache/
+runfiles checks pass. Physical probes prove the actual root/anchor/digest/reader/
+image seams; their SourceArtifact metadata helper does not activate original
+Loading. Non-Linux native source reading/upload is explicitly unsupported;
+pure metadata remains portable. Cross-repository process read views and original
+Loading-to-GeneralWorkspace integration are the next frontier, including public
+physical-source CAS/runfiles proof under that selection route and the complete
+activation gates below. Existing production process routes remain
+replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.

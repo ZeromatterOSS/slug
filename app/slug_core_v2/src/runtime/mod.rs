@@ -34,8 +34,14 @@ mod generated_repository_definition;
 mod input_image;
 #[cfg(all(test, target_os = "linux"))]
 mod materialization_diagnostic;
+mod native_identity;
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 mod native_output_file;
+mod native_source_access;
+pub use native_source_access::NativeActionChainInputs;
+pub use native_source_access::NativeAsyncSourceReader;
+pub use native_source_access::NativeSourceActionInputs;
+pub use native_source_access::NativeSourceReader;
 mod path_observation;
 #[cfg(feature = "native-probe-observer")]
 pub mod probe_observer;
