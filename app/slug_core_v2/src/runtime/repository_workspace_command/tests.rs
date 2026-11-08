@@ -27,6 +27,7 @@ fn execute(selected: &RepositoryWorkspaceReservation) -> RepositoryWorkspaceOper
                 PathObservationNamespace::Materialization(selected.instance()),
             )
             .unwrap(),
+            slug_bzlmod_v2::RepositoryWorkspaceReadViewManifest::empty(selected),
         )
         .unwrap(),
     )

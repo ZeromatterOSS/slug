@@ -79,6 +79,7 @@ fn execute(
                 PathObservationNamespace::Materialization(selected.instance()),
             )
             .unwrap(),
+            slug_bzlmod_v2::RepositoryWorkspaceReadViewManifest::empty(selected),
         )
         .unwrap(),
     )

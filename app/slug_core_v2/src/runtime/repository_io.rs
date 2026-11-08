@@ -55,6 +55,12 @@ use slug_workspace_v2::PathOperationResult;
 
 mod local_request;
 pub(in crate::runtime) mod physical_roots;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+pub(in crate::runtime) mod process_views;
 #[cfg(target_os = "linux")]
 pub(in crate::runtime) mod reservations;
 use physical_roots::LegacyRootOwner;
@@ -180,7 +186,7 @@ struct RetainedRepositoryRoot {
     generation: RepositoryMaterializationGeneration,
     root: RetainedRootOwner,
     #[cfg(target_os = "linux")]
-    guard: Option<Arc<super::repository_physical_root::ResourceCredit>>,
+    guard: Option<Arc<super::repository_physical_root::NativeWorkspaceHistoryGuard>>,
 }
 
 #[allow(dead_code)]
@@ -201,8 +207,114 @@ struct AcceptanceSnapshot {
     entries: Vec<RepositoryMaterializationEpochEntry>,
     rows: Vec<RetainedRepositoryRoot>,
     cleanup_root_count: usize,
+    comparison_resources: Option<Arc<super::native_source_access::NativeReaderResources>>,
     #[cfg(target_os = "linux")]
     _credit: Option<super::repository_physical_root::ResourceCredit>,
+}
+
+/// Native read-view states share one scoped state/body memo per admission.
+/// Other request fields keep their complete equality; legacy acquisition and
+/// comparison policy is unchanged.
+struct RepositoryRequestComparison<'a> {
+    #[cfg(target_os = "linux")]
+    native: Option<super::repository_physical_root::ViewComparison<'a>>,
+    #[cfg(target_os = "linux")]
+    resources: Option<Arc<super::native_source_access::NativeReaderResources>>,
+    #[cfg(target_os = "linux")]
+    scope: Option<&'a SourceServiceScope>,
+    _active: &'a dyn Fn() -> bool,
+}
+impl<'a> RepositoryRequestComparison<'a> {
+    fn new(
+        resources: Option<&Arc<super::native_source_access::NativeReaderResources>>,
+        scope: Option<&'a SourceServiceScope>,
+        active: &'a dyn Fn() -> bool,
+    ) -> Result<Self, RepositorySessionError> {
+        #[cfg(not(target_os = "linux"))]
+        let _ = (resources, scope);
+        Ok(Self {
+            #[cfg(target_os = "linux")]
+            native: None,
+            #[cfg(target_os = "linux")]
+            resources: resources.cloned(),
+            #[cfg(target_os = "linux")]
+            scope,
+            _active: active,
+        })
+    }
+    fn equal(
+        &mut self,
+        left: &RepositoryMaterializationRequest,
+        right: &RepositoryMaterializationRequest,
+    ) -> Result<bool, RepositorySessionError> {
+        let left_general = matches!(
+            left.kind,
+            RepositoryMaterializationKind::GeneralWorkspace(_)
+        );
+        let right_general = matches!(
+            right.kind,
+            RepositoryMaterializationKind::GeneralWorkspace(_)
+        );
+        if left_general != right_general {
+            return Ok(false);
+        }
+        if left_general {
+            #[cfg(target_os = "linux")]
+            {
+                if self.native.is_none() {
+                    self.native = self
+                        .resources
+                        .as_ref()
+                        .zip(self.scope)
+                        .map(|(resources, scope)| {
+                            super::repository_physical_root::ViewComparison::new(
+                                resources,
+                                scope,
+                                self._active,
+                            )
+                            .map_err(native_comparison_error)
+                        })
+                        .transpose()?;
+                }
+                if let Some(native) = &mut self.native {
+                    return native
+                        .request_equal(left, right)
+                        .map_err(native_comparison_error);
+                }
+            }
+            return Err(RepositorySessionError::NativeWorkspace(
+                "general request comparison lacks original native scope/resources".into(),
+            ));
+        }
+        Ok(left == right)
+    }
+    fn epoch_equal(
+        &mut self,
+        left: &RepositoryMaterializationResultEpoch,
+        right: &RepositoryMaterializationResultEpoch,
+    ) -> Result<bool, RepositorySessionError> {
+        #[cfg(target_os = "linux")]
+        if let Some(native) = &mut self.native {
+            return native
+                .epoch_equal(left, right)
+                .map_err(native_comparison_error);
+        }
+        // Pinning compares every selected request before the epoch. Without a
+        // memo the canonical epoch therefore contains only legacy kinds; a
+        // foreign General variant differs before state data.
+        Ok(left == right)
+    }
+}
+#[cfg(target_os = "linux")]
+fn native_comparison_error(
+    error: super::repository_physical_root::PhysicalRootError,
+) -> RepositorySessionError {
+    match error {
+        super::repository_physical_root::PhysicalRootError::SourceService(error) => {
+            RepositorySessionError::SourceService(error)
+        }
+        _ => RepositorySessionError::NativeWorkspace("native request comparison refused".into()),
+    }
 }
 
 #[allow(dead_code)]
@@ -996,28 +1108,152 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         selected: &[Arc<RepositoryMaterializationRequest>],
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
-        let state = self
-            .state
-            .lock()
-            .expect("repository materializer mutex poisoned");
-        let active = matching_validated_active(&state, token)?;
-        let mut entries = Vec::with_capacity(selected.len());
-        for request in selected {
-            let entry = active
+        self.check_source_scope(self.source_scope.as_ref())?;
+        let snapshot = {
+            let state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            let active = matching_validated_active(&state, token)?;
+            #[cfg(target_os = "linux")]
+            let comparison_resources = active
                 .entries
                 .iter()
-                .find(|entry| entry.request.id == request.id)
-                .ok_or_else(|| {
-                    RepositorySessionError::UnknownSelection(request.id.canonical_repo.clone())
-                })?;
-            if entry.request != *request {
+                .any(|entry| {
+                    matches!(
+                        entry.request.kind,
+                        RepositoryMaterializationKind::GeneralWorkspace(_)
+                    ) && selected
+                        .iter()
+                        .any(|request| request.id == entry.request.id)
+                })
+                .then(|| {
+                    state
+                        .claim_domain
+                        .as_ref()
+                        .map(|domain| domain.resources().clone())
+                })
+                .flatten();
+            #[cfg(not(target_os = "linux"))]
+            let comparison_resources = None;
+            #[cfg(target_os = "linux")]
+            let credit = comparison_resources
+                .as_ref()
+                .map(|resources| {
+                    let dynamic =
+                        cloned_epoch_dynamic_storage(active.entries.iter().filter(|entry| {
+                            selected
+                                .iter()
+                                .any(|request| request.id == entry.request.id)
+                        }))?;
+                    let bytes = selected
+                        .len()
+                        .checked_mul(
+                            4 * std::mem::size_of::<RetainedRepositoryRoot>()
+                                + 8 * std::mem::size_of::<RepositoryMaterializationEpochEntry>()
+                                + 128,
+                        )
+                        .and_then(|bytes| bytes.checked_add(dynamic))
+                        .and_then(|bytes| bytes.checked_add(4096))
+                        .ok_or_else(|| {
+                            RepositorySessionError::NativeWorkspace(
+                                "selected epoch storage overflow".into(),
+                            )
+                        })?;
+                    resources
+                        .reserve(bytes, 0, 0)
+                        .map_err(native_comparison_error)
+                })
+                .transpose()?;
+            let mut rows = Vec::new();
+            let mut entries = Vec::with_capacity(selected.len());
+            for request in selected {
+                let entry = active
+                    .entries
+                    .iter()
+                    .find(|entry| entry.request.id == request.id)
+                    .ok_or_else(|| {
+                        RepositorySessionError::UnknownSelection(request.id.canonical_repo.clone())
+                    })?;
+                if matches!(
+                    entry.request.kind,
+                    RepositoryMaterializationKind::GeneralWorkspace(_)
+                ) {
+                    let mut matching = state.accepted_roots.iter().chain(&active.provisional_roots)
+                        .filter(|row| Arc::ptr_eq(&row.request, &entry.request) && matches!(&entry.result,
+                            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {source_identity,generation_root,observation_instance})
+                            if source_identity==&row.source_identity && generation_root==row.root.path() && *observation_instance==row.observation_instance));
+                    let row = matching.next().ok_or_else(|| {
+                        RepositorySessionError::NativeWorkspace(
+                            "selected general epoch lacks native history guard".into(),
+                        )
+                    })?;
+                    if matching.next().is_some() {
+                        return Err(RepositorySessionError::NativeWorkspace(
+                            "selected general epoch has ambiguous native owner".into(),
+                        ));
+                    }
+                    #[cfg(target_os = "linux")]
+                    if row.guard.is_none() {
+                        return Err(RepositorySessionError::NativeWorkspace(
+                            "selected general epoch lacks native history guard".into(),
+                        ));
+                    }
+                    if rows.is_empty() {
+                        rows.try_reserve_exact(selected.len()).map_err(|_| {
+                            RepositorySessionError::NativeWorkspace(
+                                "selected epoch guard storage unavailable".into(),
+                            )
+                        })?;
+                    }
+                    rows.push(row.clone());
+                }
+                entries.push(entry.clone());
+            }
+            AcceptanceSnapshot {
+                entries,
+                rows,
+                cleanup_root_count: 0,
+                comparison_resources,
+                #[cfg(target_os = "linux")]
+                _credit: credit,
+            }
+        };
+        let active = || self.session_is_active(token);
+        let mut comparison = RepositoryRequestComparison::new(
+            snapshot.comparison_resources.as_ref(),
+            self.source_scope.as_deref(),
+            &active,
+        )?;
+        for (entry, request) in snapshot.entries.iter().zip(selected) {
+            if !comparison.equal(&entry.request, request)? {
                 return Err(RepositorySessionError::ConflictingRequest(
                     request.id.canonical_repo.clone(),
                 ));
             }
-            entries.push(entry.clone());
         }
-        complete_epoch(&self.workspace, &entries)
+        let epoch = complete_epoch(&self.workspace, &snapshot.entries)?;
+        self.check_source_scope(self.source_scope.as_ref())?;
+        let state = self
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        let current = matching_validated_active(&state, token)?;
+        if snapshot.entries.iter().any(|entry| {
+            !current
+                .entries
+                .iter()
+                .any(|now| Arc::ptr_eq(&now.request, &entry.request) && now.result == entry.result)
+        }) || snapshot
+            .rows
+            .iter()
+            .any(|row| !physical_roots::association_current(&state, current, row))
+        {
+            return Err(RepositorySessionError::NativeWorkspace(
+                "selected epoch association changed during comparison".into(),
+            ));
+        }
+        Ok(epoch)
     }
 
     pub(super) fn observe_native(
@@ -1238,12 +1474,30 @@ impl RepositoryMaterializer {
                 rows,
                 cleanup_root_count,
                 #[cfg(target_os = "linux")]
+                comparison_resources: state
+                    .claim_domain
+                    .as_ref()
+                    .map(|domain| domain.resources().clone()),
+                #[cfg(not(target_os = "linux"))]
+                comparison_resources: None,
+                #[cfg(target_os = "linux")]
                 _credit: credit,
             }
         };
         // Foreign request and validation equality can walk full immutable
         // histories. No such traversal runs while the actor mutex is held.
-        let accepted = selected_acceptance(&snapshot.entries, selected, validation)?;
+        let active = || self.session_is_active(token);
+        let mut comparison = RepositoryRequestComparison::new(
+            snapshot.comparison_resources.as_ref(),
+            self.source_scope.as_deref(),
+            &active,
+        )?;
+        let accepted = selected_acceptance(
+            &snapshot.entries,
+            selected,
+            validation,
+            &mut |left, right| comparison.equal(left, right),
+        )?;
         let released = {
             let mut state = self
                 .state
@@ -1481,11 +1735,15 @@ fn selected_acceptance(
     entries: &[RepositoryMaterializationEpochEntry],
     selected: &[Arc<RepositoryMaterializationRequest>],
     validation: Vec<RepositoryValidation>,
+    equal: &mut impl FnMut(
+        &RepositoryMaterializationRequest,
+        &RepositoryMaterializationRequest,
+    ) -> Result<bool, RepositorySessionError>,
 ) -> Result<Vec<AcceptedRepository>, RepositorySessionError> {
     let mut selected = selected.to_vec();
     selected.sort_by(|left, right| left.id.canonical_repo.cmp(&right.id.canonical_repo));
     if let Some(pair) = selected.windows(2).find(|pair| pair[0].id == pair[1].id) {
-        return Err(if *pair[0] == *pair[1] {
+        return Err(if equal(&pair[0], &pair[1])? {
             RepositorySessionError::DuplicateSelection(pair[0].id.canonical_repo.clone())
         } else {
             RepositorySessionError::ConflictingRequest(pair[0].id.canonical_repo.clone())
@@ -1502,7 +1760,7 @@ fn selected_acceptance(
         .windows(2)
         .find(|pair| pair[0].request.id == pair[1].request.id)
     {
-        return Err(if *pair[0].request == *pair[1].request {
+        return Err(if equal(&pair[0].request, &pair[1].request)? {
             RepositorySessionError::InvalidValidation(pair[0].request.id.canonical_repo.clone())
         } else {
             RepositorySessionError::ConflictingRequest(pair[0].request.id.canonical_repo.clone())
@@ -1516,7 +1774,7 @@ fn selected_acceptance(
             .ok_or_else(|| {
                 RepositorySessionError::UnknownSelection(request.id.canonical_repo.clone())
             })?;
-        if *entry.request != *request {
+        if !equal(&entry.request, &request)? {
             return Err(RepositorySessionError::ConflictingRequest(
                 request.id.canonical_repo.clone(),
             ));
@@ -1530,7 +1788,7 @@ fn selected_acceptance(
             .iter()
             .find(|candidate| candidate.request.id == request.id)
             .map(|candidate| {
-                if *candidate.request != *request {
+                if !equal(&candidate.request, &request)? {
                     Err(RepositorySessionError::ConflictingRequest(
                         request.id.canonical_repo.clone(),
                     ))
@@ -4195,6 +4453,78 @@ mod tests {
         begin_validated(materializer, |_, _| {
             panic!("empty accepted state must not observe")
         })
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn legacy_selected_epoch_ignores_unrelated_exhausted_general_bank() {
+        use std::time::Duration;
+        use std::time::Instant;
+
+        use super::super::dice::source_service::SourceServiceLimits;
+        use super::super::repository_physical_root::RepositoryRootResourceLimits;
+        use super::super::repository_physical_root::RepositoryRootResources;
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let scope = SourceServiceScope::new_for_test(
+            workspace.clone(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            SourceServiceLimits::default(),
+        )
+        .unwrap();
+        let actor = RepositoryMaterializer::new_scoped(workspace.clone(), scope.clone()).unwrap();
+        let token = begin_empty(&actor);
+        let cap = 64 * 1024;
+        let bank =
+            RepositoryRootResources::new(RepositoryRootResourceLimits::new(cap, 8, 1).unwrap())
+                .unwrap();
+        let baseline = bank.snapshot().retained_bytes;
+        actor
+            .begin_general_workspace(
+                token,
+                bank.clone(),
+                slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits::new(
+                    8,
+                    1024 * 1024,
+                    2 * 1024 * 1024 * 1024,
+                )
+                .unwrap(),
+                &scope,
+            )
+            .unwrap();
+        let request = native_request(
+            &workspace,
+            "local",
+            local_spec("/workspace"),
+            RepositoryMaterializationKind::Local {
+                logical_root: workspace.clone(),
+            },
+        );
+        let expected = actor
+            .materialize_with_scope(
+                token,
+                request.clone(),
+                RepositoryMaterializationGeneration(1),
+                Some(&scope),
+                || RepositoryMaterializationAttempt::Local,
+            )
+            .unwrap();
+        let foreign = Arc::new((*request).clone());
+        assert!(!Arc::ptr_eq(&request, &foreign));
+        let pressure = bank
+            .reserve(cap - bank.snapshot().retained_bytes, 0, 0)
+            .unwrap();
+        let before = bank.snapshot();
+        assert_eq!(actor.selected_epoch(token, &[foreign]).unwrap(), expected);
+        assert_eq!(bank.snapshot().retained_bytes, before.retained_bytes);
+        assert_eq!(
+            bank.snapshot().peak_retained_bytes,
+            before.peak_retained_bytes
+        );
+        drop(pressure);
+        drop(actor);
+        assert_eq!(bank.snapshot().retained_bytes, baseline);
     }
 
     fn begin_validated(

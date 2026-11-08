@@ -51,6 +51,20 @@ is introduced. The [physical-root receipt](wp1225-physical-root-acceptance-2026-
 records actual tmpfs fixture proof; virtual quota reservations do not establish
 kernel-memory or completed-command RSS bounds.
 
+Selected process views reuse Arc/Allocative pure Spec/final-State projections and
+native data-only dependency guards. Explicit owned/source-State storage parts
+keep complete standalone bounds while covered native owners share existing
+source data through request/capture/transcript/receipt/row destruction. Reference
+and Spec metadata stay positively counted; sources never enter mutable Process
+body history. Foreign State/body comparisons use phase-local standard HashMap
+with the existing Buck-derived StarlarkHasherBuilder: UnorderedMap lacks the
+required fallible reserve and actual-capacity APIs. Lazy conservative growth
+prepays old/new table peaks; strong pair operands prevent ABA and exact64KiB
+comparisons check original scope/activity. No donor import, dependency, global
+pool/cache, semantic hash shortcut or cap increase is introduced. Derived DICE
+equality is unchanged; component proof does not establish completed-command fit.
+See [selected-view admission evidence](wp1225-selected-view-admission-acceptance-2026-11-08.json).
+
 Owner construction separately certifies full retained facts as original native
 bodies plus the actual-unique owner/shared/arena body union and an explicit
 positive declaration-reference count. Both root parts, every completed prior

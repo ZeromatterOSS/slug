@@ -5,6 +5,7 @@ use super::super::process_owner::ReapedCapture;
 use super::super::progress::command::NativeProcessAdmission;
 use super::super::progress::command::RepositoryWorkspaceCommand;
 use super::super::progress::command::finalize::NativeViewFinalization;
+use super::batch::NativeViewBatch;
 use super::domain::NativeMountDomain;
 use super::quota::ProcessQuotaTransition;
 use super::quota::QuotaFacts;
@@ -16,6 +17,108 @@ use crate::runtime::repository_process_wire::RunMode;
 pub(in crate::runtime::repository_physical_root) enum ExecuteDecision {
     Replay(RepositoryWorkspaceCommand),
     Launch(ExecuteLaunch),
+}
+pub(in crate::runtime::repository_physical_root) enum SelectedExecuteDecision {
+    Replay(RepositoryWorkspaceCommand),
+    Launch(SelectedExecuteLaunch),
+}
+pub(in crate::runtime::repository_physical_root) struct SelectedExecuteLaunch {
+    root: ExecuteLaunch,
+    views: NativeViewBatch,
+}
+impl SelectedExecuteLaunch {
+    pub(in crate::runtime::repository_physical_root) fn new(
+        root: ExecuteLaunch,
+        views: NativeViewBatch,
+    ) -> Result<Self, PhysicalRootError> {
+        if !Arc::ptr_eq(
+            &root
+                .covered_request_owner()
+                .ok_or(PhysicalRootError::Mode)?,
+            views.request_cover(),
+        ) || root.root_identity() != Some(views.executor())
+            || !Arc::ptr_eq(root.scope(), views.scope())
+            || !Arc::ptr_eq(root.resources(), views.resources())
+        {
+            return Err(PhysicalRootError::Reservation);
+        }
+        Ok(Self { root, views })
+    }
+}
+impl ProcessLaunch for SelectedExecuteLaunch {
+    type Output = RepositoryWorkspaceCommand;
+    fn mode(&self) -> RunMode {
+        self.root.mode()
+    }
+    fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
+        self.root.reservation()
+    }
+    fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
+        self.root.request()
+    }
+    fn covered_request_owner(&self) -> Option<Arc<CoveredWorkspaceRequest>> {
+        self.root.covered_request_owner()
+    }
+    fn root_identity(&self) -> Option<RootIdentity> {
+        self.root.root_identity()
+    }
+    fn scope(&self) -> &Arc<SourceServiceScope> {
+        self.root.scope()
+    }
+    fn resources(&self) -> &Arc<RepositoryRootResources> {
+        self.root.resources()
+    }
+    fn namespace(&self) -> Result<Option<BorrowedFd<'_>>, PhysicalRootError> {
+        self.root.namespace()
+    }
+    fn transfer(
+        &mut self,
+        socket: BorrowedFd<'_>,
+        nonce: &[u8; 16],
+    ) -> Result<(), PhysicalRootError> {
+        self.root.transfer(socket, nonce)
+    }
+    fn verify_successor(
+        &mut self,
+        attached: File,
+        token: File,
+        userns: File,
+        words: [u64; 8],
+        quota: Option<[u64; 8]>,
+    ) -> Result<(), PhysicalRootError> {
+        self.root
+            .verify_successor(attached, token, userns, words, quota)
+    }
+    fn bind_attempt(&mut self, nonce: &[u8; 16]) -> Result<(), PhysicalRootError> {
+        self.root.bind_attempt(nonce)?;
+        self.views.bind_attempt(nonce)
+    }
+    fn views(&self) -> &[crate::runtime::repository_process_wire::ViewEntry] {
+        self.views.entries()
+    }
+    fn transfer_view(
+        &mut self,
+        slot: usize,
+        socket: BorrowedFd<'_>,
+        _: &[u8; 16],
+    ) -> Result<(), PhysicalRootError> {
+        self.views.transfer(slot, socket)
+    }
+    fn verify_view_successor(
+        &mut self,
+        slot: usize,
+        attached: File,
+        token: File,
+        words: [u64; 8],
+    ) -> Result<(), PhysicalRootError> {
+        self.views.stage(slot, attached, token, words)
+    }
+    fn finish_reaped(mut self, capture: ReapedCapture) -> Result<Self::Output, PhysicalRootError> {
+        let restored = self.views.complete(&capture)?;
+        let scope = self.root.scope().clone();
+        let command = self.root.finish_reaped(capture)?;
+        command.restore_process_views(restored, &scope, &|| true)
+    }
 }
 pub(in crate::runtime::repository_physical_root) enum ExecuteLaunch {
     First(ProcessQuotaTransition),
@@ -117,10 +220,10 @@ impl ProcessLaunch for ExecuteLaunch {
             Self::Continue { admission, .. } => admission.request(),
         })
     }
-    fn request_owner(&self) -> Option<Arc<RepositoryWorkspaceRequest>> {
+    fn covered_request_owner(&self) -> Option<Arc<CoveredWorkspaceRequest>> {
         Some(match self {
-            Self::First(q) => q.request_owner(),
-            Self::Continue { admission, .. } => admission.request_owner(),
+            Self::First(q) => q.covered_request_owner(),
+            Self::Continue { admission, .. } => admission.request_cover(),
         })
     }
     fn root_identity(&self) -> Option<RootIdentity> {
@@ -348,7 +451,7 @@ impl ProcessLaunch for BootstrapLaunch {
     fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
         None
     }
-    fn request_owner(&self) -> Option<Arc<RepositoryWorkspaceRequest>> {
+    fn covered_request_owner(&self) -> Option<Arc<CoveredWorkspaceRequest>> {
         None
     }
     fn root_identity(&self) -> Option<RootIdentity> {
@@ -471,7 +574,7 @@ impl ProcessLaunch for FinalizeLaunch {
     fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
         None
     }
-    fn request_owner(&self) -> Option<Arc<RepositoryWorkspaceRequest>> {
+    fn covered_request_owner(&self) -> Option<Arc<CoveredWorkspaceRequest>> {
         None
     }
     fn root_identity(&self) -> Option<RootIdentity> {

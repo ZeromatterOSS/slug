@@ -96,7 +96,7 @@ pub(super) fn shrink_attached(
 /// A current parent-side physical verification, not an execution completion.
 /// Constructor is private and all retained guards precede their own credit.
 pub(in crate::runtime::repository_physical_root) struct VerifiedProcessQuota {
-    request: Arc<RepositoryWorkspaceRequest>,
+    request: Arc<CoveredWorkspaceRequest>,
     root: RootIdentity,
     backing: Arc<RepositoryRootBacking>,
     scope: Arc<SourceServiceScope>,
@@ -111,7 +111,7 @@ impl VerifiedProcessQuota {
     ) -> bool {
         std::ptr::eq(backing, self.backing.as_ref())
             && self.root == identity
-            && self.request.reservation() == reservation
+            && self.request.request().reservation() == reservation
     }
     pub(in crate::runtime::repository_physical_root) fn commit(
         &self,
@@ -125,7 +125,7 @@ impl VerifiedProcessQuota {
             Some(scope),
         )?;
         check(scope, active)?;
-        if request != self.request.as_ref()
+        if request != self.request.request()
             || builder.mode != RepositoryWorkspaceMode::Archive
             || builder.identity != self.root
             || !Arc::ptr_eq(&builder.backing, &self.backing)
@@ -200,12 +200,7 @@ impl ProcessQuotaTransition {
         clone
             .credit
             .bytes
-            .try_grow(
-                admission
-                    .request()
-                    .retained_storage_bytes()
-                    .map_err(PhysicalRootError::Protocol)?,
-            )
+            .try_grow(admission.request_cover().owned_bytes())
             .map_err(|_| PhysicalRootError::Resource)?;
         let lease = RepositoryMountLease {
             reservation: admission.request().reservation().clone(),
@@ -214,9 +209,9 @@ impl ProcessQuotaTransition {
             predecessor: admission.request().predecessor().clone(),
             clone,
         };
-        let request = admission.request().clone();
+        let request = admission.request_cover();
         let attempt = lease
-            .begin(admission.builder(), request, admission.scope(), active)
+            .begin_covered(admission.builder(), request, admission.scope(), active)
             .map_err(PhysicalRootError::mount)?;
         Ok(Self {
             attempt: Some(attempt),
@@ -232,8 +227,8 @@ impl ProcessQuotaTransition {
     pub(super) fn scope(&self) -> &Arc<SourceServiceScope> {
         self.admission.scope()
     }
-    pub(super) fn request_owner(&self) -> Arc<RepositoryWorkspaceRequest> {
-        self.admission.request_owner()
+    pub(super) fn covered_request_owner(&self) -> Arc<CoveredWorkspaceRequest> {
+        self.admission.request_cover()
     }
     pub(in crate::runtime::repository_physical_root) fn builder(
         &self,
@@ -314,15 +309,13 @@ impl ProcessQuotaTransition {
         let credit = root.resources.reserve(
             add(
                 std::mem::size_of::<VerifiedProcessQuota>(),
-                self.request()
-                    .retained_storage_bytes()
-                    .map_err(PhysicalRootError::Protocol)?,
+                self.admission.request_cover().owned_bytes(),
             )?,
             0,
             0,
         )?;
         let proof = VerifiedProcessQuota {
-            request: self.admission.request_owner(),
+            request: self.admission.request_cover(),
             root: root.identity,
             backing: root.backing.clone(),
             scope: self.admission.scope().clone(),
@@ -361,7 +354,7 @@ impl ProcessQuotaTransition {
             return Err(PhysicalRootError::Mode);
         }
         let pending = self.pending.take().ok_or(PhysicalRootError::Mode)?;
-        if pending.request != *self.request()
+        if pending.request.request() != self.request()
             || pending.root != self.builder().identity
             || pending.reservation != *self.request().reservation()
         {

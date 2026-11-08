@@ -15,10 +15,12 @@ use slug_workspace_v2::PathObservationInstanceId;
 use crate::HostSelectedExtensionOwner;
 
 mod operation;
+mod read_views;
 mod sequence;
 mod state;
 
 pub use operation::*;
+pub use read_views::*;
 pub use sequence::*;
 pub use state::*;
 

@@ -9,13 +9,13 @@ pub(in crate::runtime) struct SealedWorkspaceMaterialization {
     request: Arc<RepositoryMaterializationRequest>,
     root: Arc<RepositoryPhysicalRoot>,
     // Full request/history guard follows both native and immutable owners.
-    credit: ResourceCredit,
+    credit: Arc<NativeWorkspaceHistoryGuard>,
 }
 impl SealedWorkspaceMaterialization {
     pub(in crate::runtime::repository_physical_root) fn from_command(
         request: Arc<RepositoryMaterializationRequest>,
         root: Arc<RepositoryPhysicalRoot>,
-        credit: ResourceCredit,
+        credit: Arc<NativeWorkspaceHistoryGuard>,
     ) -> Self {
         Self {
             request,
@@ -34,7 +34,7 @@ impl SealedWorkspaceMaterialization {
     ) -> (
         Arc<RepositoryMaterializationRequest>,
         Arc<RepositoryPhysicalRoot>,
-        ResourceCredit,
+        Arc<NativeWorkspaceHistoryGuard>,
     ) {
         (self.request, self.root, self.credit)
     }

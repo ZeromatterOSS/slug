@@ -89,6 +89,7 @@ pub(super) fn realization(
                         PathObservationNamespace::Materialization(reservation.instance()),
                     )
                     .unwrap(),
+                    slug_bzlmod_v2::RepositoryWorkspaceReadViewManifest::empty(&reservation),
                 )
                 .unwrap(),
             ),

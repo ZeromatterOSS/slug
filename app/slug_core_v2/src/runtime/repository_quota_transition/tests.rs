@@ -53,6 +53,7 @@ fn execute(reservation: &RepositoryWorkspaceReservation) -> RepositoryWorkspaceO
                 PathObservationNamespace::Materialization(reservation.instance()),
             )
             .unwrap(),
+            slug_bzlmod_v2::RepositoryWorkspaceReadViewManifest::empty(reservation),
         )
         .unwrap(),
     )

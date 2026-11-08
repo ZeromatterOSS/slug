@@ -181,6 +181,11 @@ impl FinalizedRepositoryView {
     pub(in crate::runtime::repository_physical_root) fn root_identity(&self) -> RootIdentity {
         self.root.identity
     }
+    pub(in crate::runtime::repository_physical_root) fn data_root(
+        &self,
+    ) -> &Arc<RepositoryPhysicalRoot> {
+        &self.root
+    }
     /// The incoming token's mount ID, rather than the original data FD's ID.
     pub(in crate::runtime::repository_physical_root) fn attachment_identity(&self) -> RootIdentity {
         self.mount.clone.detached
@@ -207,22 +212,48 @@ pub(in crate::runtime::repository_physical_root) struct ReadOnlyViewAttempt {
     poisoned: bool,
 }
 #[derive(Debug)]
-struct ViewUseBinding {
-    request: Arc<RepositoryWorkspaceRequest>,
+pub(super) struct ViewUseBinding {
+    request: Arc<CoveredWorkspaceRequest>,
     root: RootIdentity,
     nonce: [u8; 16],
     _credit: resources::ResourceCredit,
 }
+impl ViewUseBinding {
+    pub(super) fn new(
+        request: Arc<CoveredWorkspaceRequest>,
+        root: RootIdentity,
+        nonce: [u8; 16],
+        resources: &Arc<RepositoryRootResources>,
+    ) -> Result<Arc<Self>, MountLeaseError> {
+        let credit = resources.reserve(arc_bytes::<Self>()?, 0, 0)?;
+        Ok(Arc::new(Self {
+            request,
+            root,
+            nonce,
+            _credit: credit,
+        }))
+    }
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn check_capture(
+        &self,
+        capture: &super::super::process_owner::ReapedCapture,
+    ) -> Result<(), MountLeaseError> {
+        capture
+            .binding()
+            .verify_attempt(self.request.request(), self.root, &self.nonce)?;
+        Ok(())
+    }
+}
 #[derive(Debug)]
 pub(in crate::runtime::repository_physical_root) struct ReadOnlyViewInFlight {
-    binding: Option<ViewUseBinding>,
+    binding: Option<Arc<ViewUseBinding>>,
     view: Option<FinalizedRepositoryView>,
     slot: usize,
     poisoned: bool,
 }
 #[derive(Debug)]
 pub(in crate::runtime::repository_physical_root) struct PendingReadOnlyView {
-    binding: ViewUseBinding,
+    binding: Arc<ViewUseBinding>,
     view: Option<FinalizedRepositoryView>,
     poisoned: bool,
 }
@@ -258,9 +289,7 @@ impl ReadOnlyViewAttempt {
     pub(in crate::runtime::repository_physical_root) fn transfer(
         &mut self,
         socket: BorrowedFd<'_>,
-        nonce: &[u8; 16],
-        executor_request: Arc<RepositoryWorkspaceRequest>,
-        executor_root: RootIdentity,
+        binding: Arc<ViewUseBinding>,
         slot: usize,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
@@ -275,29 +304,16 @@ impl ReadOnlyViewAttempt {
         let view = self.view.as_ref().ok_or(MountLeaseError::Consumed)?;
         view.validate(scope, active)?;
         view.domain.check_root(
-            executor_request.reservation(),
+            binding.request.request().reservation(),
             &view.root.resources,
             scope,
             active,
         )?;
-        let retained = executor_request
-            .retained_storage_bytes()
-            .map_err(PhysicalRootError::Protocol)?;
-        let credit = view.root.resources.reserve(
-            add(std::mem::size_of::<ViewUseBinding>(), retained)?,
-            0,
-            0,
-        )?;
-        let binding = ViewUseBinding {
-            request: executor_request,
-            root: executor_root,
-            nonce: *nonce,
-            _credit: credit,
-        };
         let mut frame = Frame::new(
             Kind::ViewIncoming,
-            *nonce,
-            u64::try_from(binding.request.index()).map_err(|_| MountLeaseError::Request)?,
+            binding.nonce,
+            u64::try_from(binding.request.request().index())
+                .map_err(|_| MountLeaseError::Request)?,
         );
         frame.words[0] = u64::try_from(slot).map_err(|_| MountLeaseError::Request)?;
         wire::send(socket, &frame, &[view.mount.clone.token.as_fd()])?;
@@ -386,12 +402,27 @@ impl PendingReadOnlyView {
         &self,
         capture: &super::super::process_owner::ReapedCapture,
     ) -> Result<(), MountLeaseError> {
-        capture.binding().verify_attempt(
-            &self.binding.request,
-            self.binding.root,
-            &self.binding.nonce,
+        self.binding.check_capture(capture)
+    }
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn check_completion(
+        &self,
+        capture: &super::super::process_owner::ReapedCapture,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), MountLeaseError> {
+        if self.poisoned {
+            return Err(MountLeaseError::Consumed);
+        }
+        let view = self.view.as_ref().ok_or(MountLeaseError::Consumed)?;
+        view.domain.check_root(
+            self.binding.request.request().reservation(),
+            &view.root.resources,
+            scope,
+            active,
         )?;
-        Ok(())
+        self.check_capture(capture)?;
+        view.validate(scope, active)
     }
     #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
     pub(in crate::runtime::repository_physical_root) fn check_capture_for_test(
@@ -410,16 +441,9 @@ impl PendingReadOnlyView {
         if self.poisoned {
             return Err(MountLeaseError::Consumed);
         }
+        let checked = self.check_completion(capture, scope, active);
         self.poisoned = true;
-        let view = self.view.as_ref().ok_or(MountLeaseError::Consumed)?;
-        view.domain.check_root(
-            self.binding.request.reservation(),
-            &view.root.resources,
-            scope,
-            active,
-        )?;
-        self.check_capture(capture)?;
-        view.validate(scope, active)?;
+        checked?;
         Ok(self.view.take().expect("verified pending view"))
     }
 }

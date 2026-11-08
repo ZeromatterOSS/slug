@@ -30,6 +30,7 @@ pub(super) struct CapturedWorkspaceSnapshot<'prior> {
 #[derive(Debug)]
 pub(super) struct CreditedWorkspaceTranscript {
     pub(super) transcript: RepositoryWorkspaceTranscript,
+    pub(super) dependencies: Option<Arc<NativeReadViewDependencies>>,
     pub(super) credit: resources::ResourceCredit,
 }
 impl CreditedWorkspaceTranscript {
@@ -51,6 +52,15 @@ impl CapturedWorkspaceSnapshot<'_> {
         request: RepositoryWorkspaceRequest,
         result: RepositoryWorkspaceResult,
     ) -> Result<CreditedWorkspaceTranscript, PhysicalRootError> {
+        self.complete_with_dependencies(transcript, request, result, None)
+    }
+    pub(super) fn complete_with_dependencies(
+        self,
+        transcript: &RepositoryWorkspaceTranscript,
+        request: RepositoryWorkspaceRequest,
+        result: RepositoryWorkspaceResult,
+        dependencies: Option<Arc<NativeReadViewDependencies>>,
+    ) -> Result<CreditedWorkspaceTranscript, PhysicalRootError> {
         if transcript.reservation().as_ref() != self.prior.reservation().as_ref()
             || request.reservation().as_ref() != self.prior.reservation().as_ref()
         {
@@ -63,9 +73,18 @@ impl CapturedWorkspaceSnapshot<'_> {
                 slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
             ));
         }
-        let forecast = transcript
-            .completion_storage_bytes(&request, &result, self.mode, &self.entries)
+        let storage = transcript
+            .completion_storage_partition(&request, &result, self.mode, &self.entries)
             .map_err(PhysicalRootError::Protocol)?;
+        let forecast = match &dependencies {
+            Some(deps) => {
+                if !deps.covers_transcript(transcript) || !deps.covers_request(&request) {
+                    return Err(PhysicalRootError::Reservation);
+                }
+                storage.owned_bytes()
+            }
+            None => storage.total_bytes().map_err(PhysicalRootError::Protocol)?,
+        };
         let permanent = self.resources.reserve(
             add(forecast, std::mem::size_of::<CreditedWorkspaceTranscript>())?,
             0,
@@ -85,6 +104,7 @@ impl CapturedWorkspaceSnapshot<'_> {
             .map_err(PhysicalRootError::Protocol)?;
         Ok(CreditedWorkspaceTranscript {
             transcript,
+            dependencies,
             credit: permanent,
         })
     }

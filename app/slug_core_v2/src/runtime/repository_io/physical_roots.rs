@@ -446,17 +446,31 @@ impl RepositoryMaterializer {
         // Complete foreign semantic comparisons and epoch construction happen
         // outside the actor mutex. Cloned row guards keep their request/history
         // prepaid even if a concurrent discard retires the original row.
+        let active = || self.session_is_active(token);
+        let mut comparison = RepositoryRequestComparison::new(
+            Some(resources),
+            self.source_scope.as_deref(),
+            &active,
+        )
+        .map_err(|_| Arc::<str>::from("selected request comparison refused"))?;
         for (entry, request) in entries.iter().zip(selected) {
             if !matches!(entry.result, RepositoryMaterializationResult::Success(_)) {
                 return Err("selected repository lacks successful materialization".into());
             }
-            if entry.request != *request {
+            if !comparison
+                .equal(&entry.request, request)
+                .map_err(|_| Arc::<str>::from("selected request comparison refused"))?
+            {
                 return Err("selected request differs from current request".into());
             }
         }
-        if complete_epoch(&self.workspace, &entries)
-            .map_err(|_| Arc::<str>::from("selected epoch refused"))?
-            != *results
+        if !comparison
+            .epoch_equal(
+                &complete_epoch(&self.workspace, &entries)
+                    .map_err(|_| Arc::<str>::from("selected epoch refused"))?,
+                results,
+            )
+            .map_err(|_| Arc::<str>::from("selected epoch comparison refused"))?
         {
             return Err("selected result epoch differs from current results".into());
         }
@@ -476,7 +490,7 @@ impl RepositoryMaterializer {
             else {
                 return Err("selected native root lacks immutable success".into());
             };
-            if row.request != entry.request
+            if !Arc::ptr_eq(&row.request, &entry.request)
                 || row.observation_instance != *observation_instance
                 || row.root.path() != generation_root
                 || &row.source_identity != source_identity

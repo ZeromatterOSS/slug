@@ -47,10 +47,13 @@ pub(super) trait ProcessLaunch: Send + 'static {
     fn mode(&self) -> RunMode;
     fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation>;
     fn request(&self) -> Option<&RepositoryWorkspaceRequest>;
-    fn request_owner(&self) -> Option<Arc<RepositoryWorkspaceRequest>>;
+    fn covered_request_owner(&self) -> Option<Arc<CoveredWorkspaceRequest>>;
     fn root_identity(&self) -> Option<RootIdentity>;
     fn scope(&self) -> &Arc<SourceServiceScope>;
     fn resources(&self) -> &Arc<RepositoryRootResources>;
+    fn bind_attempt(&mut self, _nonce: &[u8; 16]) -> Result<(), PhysicalRootError> {
+        Ok(())
+    }
     fn views(&self) -> &[wire::ViewEntry] {
         &[]
     }
@@ -490,12 +493,18 @@ fn drive<L: ProcessLaunch>(
         plan: None,
         credit: Some(credit),
     };
+    let attempt_nonce = nonce()?;
+    driver
+        .launch
+        .as_mut()
+        .unwrap()
+        .bind_attempt(&attempt_nonce)?;
     let owner = driver.launch.as_ref().unwrap();
     let captures = capture::Captures::new(owner.resources())?;
     driver.captures = Some(captures);
     let (mirror, rows) = spawn::HostMirror::collect(owner.resources(), &stop, owner.scope())?;
     driver.mirror = Some(mirror);
-    driver.plan = Some(plan(owner, rows, nonce()?)?);
+    driver.plan = Some(plan(owner, rows, attempt_nonce)?);
     if stop.load(Ordering::Acquire) {
         return Err(PhysicalRootError::Inactive);
     }
@@ -701,7 +710,7 @@ fn drive<L: ProcessLaunch>(
                 code.unwrap(),
                 owner.mode(),
                 driver.plan.as_ref().unwrap().nonce,
-                owner.request_owner(),
+                owner.covered_request_owner(),
                 root,
                 proof,
             );

@@ -649,6 +649,73 @@ impl<'a> RepositoryMaterializationInstanceView<'a> {
 mod materialization_inventory;
 
 impl RepositoryMaterializationResultEpoch {
+    /// Exact immutable comparison for native callers that bound source-state
+    /// work. Active map equality stays unordered; retained inventory equality
+    /// preserves both Option shape and slice order. Derived DICE Eq is unchanged.
+    #[doc(hidden)]
+    pub fn try_eq_with_states<E>(
+        &self,
+        other: &Self,
+        compare: &mut impl FnMut(
+            &Arc<crate::RepositoryWorkspaceState>,
+            &Arc<crate::RepositoryWorkspaceState>,
+        ) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        fn entry_equal<E>(
+            left: &RepositoryMaterializationEpochEntry,
+            right: &RepositoryMaterializationEpochEntry,
+            compare: &mut impl FnMut(
+                &Arc<crate::RepositoryWorkspaceState>,
+                &Arc<crate::RepositoryWorkspaceState>,
+            ) -> Result<bool, E>,
+        ) -> Result<bool, E> {
+            let RepositoryMaterializationEpochEntry { request, result } = left;
+            let RepositoryMaterializationEpochEntry {
+                request: other_request,
+                result: other_result,
+            } = right;
+            if !request.try_eq_with_states(other_request, compare)? {
+                return Ok(false);
+            }
+            Ok(result == other_result)
+        }
+        let Self {
+            workspace,
+            entries,
+            retained_generated,
+        } = self;
+        let Self {
+            workspace: other_workspace,
+            entries: other_entries,
+            retained_generated: other_retained,
+        } = other;
+        if workspace != other_workspace || entries.len() != other_entries.len() {
+            return Ok(false);
+        }
+        for (key, entry) in entries.iter() {
+            let Some(other) = other_entries.get(key) else {
+                return Ok(false);
+            };
+            if !entry_equal(entry, other, compare)? {
+                return Ok(false);
+            }
+        }
+        match (retained_generated, other_retained) {
+            (None, None) => Ok(true),
+            (Some(left), Some(right)) => {
+                if left.len() != right.len() {
+                    return Ok(false);
+                }
+                for (left, right) in left.iter().zip(right.iter()) {
+                    if !entry_equal(left, right, compare)? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
     pub fn new(
         workspace: NormalizedAbsolutePath,
         entries: impl IntoIterator<Item = RepositoryMaterializationEpochEntry>,

@@ -5,6 +5,7 @@ use std::io::Read;
 use super::super::super::readonly::PendingReadOnlyView;
 use super::super::super::readonly::ReadOnlyViewAttempt;
 use super::super::super::readonly::ReadOnlyViewInFlight;
+use super::super::super::readonly::ViewUseBinding;
 use super::*;
 use crate::runtime::repository_process_wire as wire;
 
@@ -25,6 +26,7 @@ struct Probe {
     pending: Option<PendingReadOnlyView>,
     entries: Vec<wire::ViewEntry>,
     stale_capture: Option<ReapedCapture>,
+    binding: Option<Arc<ViewUseBinding>>,
     // Covers heap metadata and conservative cross-process old/incoming/new
     // descriptor overlap, held through actual namespace and monitor death.
     _credit: resources::ResourceCredit,
@@ -49,6 +51,7 @@ impl Probe {
             pending: None,
             entries: Vec::new(),
             stale_capture: None,
+            binding: None,
             _credit: credit,
         };
         result.arm();
@@ -97,10 +100,10 @@ impl ProcessLaunch for Probe {
     fn request(&self) -> Option<&RepositoryWorkspaceRequest> {
         Some(self.executor())
     }
-    fn request_owner(&self) -> Option<Arc<RepositoryWorkspaceRequest>> {
+    fn covered_request_owner(&self) -> Option<Arc<CoveredWorkspaceRequest>> {
         Some(match self.root.as_ref().unwrap() {
-            Root::First(q) => q.request_owner(),
-            Root::Again { admission, .. } => admission.request_owner(),
+            Root::First(q) => q.covered_request_owner(),
+            Root::Again { admission, .. } => admission.request_cover(),
         })
     }
     fn root_identity(&self) -> Option<RootIdentity> {
@@ -120,6 +123,18 @@ impl ProcessLaunch for Probe {
     }
     fn views(&self) -> &[wire::ViewEntry] {
         &self.entries
+    }
+    fn bind_attempt(&mut self, nonce: &[u8; 16]) -> Result<(), PhysicalRootError> {
+        self.binding = Some(
+            ViewUseBinding::new(
+                self.covered_request_owner().unwrap(),
+                self.builder().identity,
+                *nonce,
+                self.resources(),
+            )
+            .map_err(PhysicalRootError::mount)?,
+        );
+        Ok(())
     }
     fn transfer(
         &mut self,
@@ -203,19 +218,18 @@ impl ProcessLaunch for Probe {
         &mut self,
         slot: usize,
         socket: BorrowedFd<'_>,
-        nonce: &[u8; 16],
+        _nonce: &[u8; 16],
     ) -> Result<(), PhysicalRootError> {
         if slot != 0 {
             return Err(PhysicalRootError::Mode);
         }
-        let request = self.request_owner().unwrap();
-        let root = self.builder().identity;
+        let binding = self.binding.as_ref().unwrap().clone();
         let scope = self.scope().clone();
         let next = self
             .attempt
             .as_mut()
             .ok_or(PhysicalRootError::Mode)?
-            .transfer(socket, nonce, request, root, slot, &scope, &|| true)
+            .transfer(socket, binding, slot, &scope, &|| true)
             .map_err(PhysicalRootError::mount)?;
         drop(self.attempt.take());
         self.inflight = Some(next);
@@ -281,6 +295,7 @@ impl ProcessLaunch for Probe {
             pending: None,
         });
         self.view = Some(view);
+        self.binding = None;
         Ok(Observed {
             probe: self,
             capture,

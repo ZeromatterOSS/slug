@@ -15,13 +15,13 @@ impl RepositoryMaterializer {
         self.check_source_scope(self.source_scope.as_ref())?;
         // Only constant-size Arc clones leave this mutex. Row's shared guard
         // continues paying for complete request/history while compared unlocked.
-        let pin = {
+        let (pin, comparison_resources) = {
             let state = self
                 .state
                 .lock()
                 .expect("repository materializer mutex poisoned");
             let active = matching_validated_active(&state, token)?;
-            match (namespace, selected) {
+            let pin = match (namespace, selected) {
                 (PathObservationNamespace::Host, None) if anchor == &self.workspace => None,
                 (PathObservationNamespace::Materialization(instance), Some((request, _))) => {
                     let entry = active
@@ -44,8 +44,22 @@ impl RepositoryMaterializer {
                     Some(row.clone())
                 }
                 _ => return Err(RepositorySessionError::InvalidImageAuthority),
-            }
+            };
+            #[cfg(target_os = "linux")]
+            let resources = state
+                .claim_domain
+                .as_ref()
+                .map(|domain| domain.resources().clone());
+            #[cfg(not(target_os = "linux"))]
+            let resources = None;
+            (pin, resources)
         };
+        let active = || self.session_is_active(token);
+        let mut comparison = RepositoryRequestComparison::new(
+            comparison_resources.as_ref(),
+            self.source_scope.as_deref(),
+            &active,
+        )?;
         if let Some(row) = &pin {
             let (request, expected) =
                 selected.ok_or(RepositorySessionError::InvalidImageAuthority)?;
@@ -60,7 +74,7 @@ impl RepositoryMaterializer {
             else {
                 return Err(RepositorySessionError::InvalidImageAuthority);
             };
-            if row.request != *request
+            if !comparison.equal(&row.request, request)?
                 || canonical_repo != &request.id.canonical_repo
                 || repo_spec != &request.repo_spec
                 || source_identity != &row.source_identity

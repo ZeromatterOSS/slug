@@ -45,6 +45,28 @@ mod seal;
 mod snapshot;
 pub(in crate::runtime) use reader::RepositoryRootReader;
 pub(in crate::runtime) use resources::*;
+#[path = "repository_view_data.rs"]
+mod view_data;
+use view_data::CoveredWorkspaceRequest;
+#[path = "repository_view_comparison.rs"]
+mod view_comparison;
+pub(in crate::runtime) use view_comparison::ViewComparison;
+pub(in crate::runtime) use view_data::NativeReadViewData;
+pub(in crate::runtime) use view_data::NativeReadViewDependencies;
+pub(in crate::runtime) use view_data::NativeWorkspaceHistoryGuard;
+
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+pub(in crate::runtime) async fn run_selected_process(
+    decision: mount_lease::launch::SelectedExecuteDecision,
+    active: &(dyn Fn() -> bool + Sync),
+) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
+    match decision {
+        mount_lease::launch::SelectedExecuteDecision::Replay(command) => Ok(command),
+        mount_lease::launch::SelectedExecuteDecision::Launch(launch) => {
+            process_owner::run(launch, initialize::platform()?, active).await
+        }
+    }
+}
 
 const ARCHIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const PROCESS_BYTES: u64 = 64 * 1024 * 1024;

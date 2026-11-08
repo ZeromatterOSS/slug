@@ -89,8 +89,49 @@ pub struct RepositoryWorkspaceExecute {
     timeout_seconds: i32,
     quiet: bool,
     working_directory: HostRepositoryLabelPathValue,
+    read_views: RepositoryWorkspaceReadViewManifest,
 }
 impl RepositoryWorkspaceExecute {
+    /// Exact structural comparison with caller-bounded source-state equality.
+    /// This read-only hook grants no native authority and changes no derived Eq.
+    #[doc(hidden)]
+    pub fn try_eq_with_states<E>(
+        &self,
+        other: &Self,
+        compare: &mut impl FnMut(
+            &Arc<RepositoryWorkspaceState>,
+            &Arc<RepositoryWorkspaceState>,
+        ) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        let Self {
+            argv,
+            environment,
+            overrides,
+            timeout_seconds,
+            quiet,
+            working_directory,
+            read_views,
+        } = self;
+        let Self {
+            argv: other_argv,
+            environment: other_environment,
+            overrides: other_overrides,
+            timeout_seconds: other_timeout,
+            quiet: other_quiet,
+            working_directory: other_cwd,
+            read_views: other_views,
+        } = other;
+        if argv != other_argv
+            || environment != other_environment
+            || overrides != other_overrides
+            || timeout_seconds != other_timeout
+            || quiet != other_quiet
+            || working_directory != other_cwd
+        {
+            return Ok(false);
+        }
+        read_views.try_eq_with_states(other_views, compare)
+    }
     /// Called after Loading validates Starlark types in pinned argv/timeout/env
     /// order and resolves cwd. Requested600 remains600, independently of the
     /// native30s operational cap. This constructor admits no runtime authority.
@@ -101,6 +142,7 @@ impl RepositoryWorkspaceExecute {
         timeout_seconds: i32,
         quiet: bool,
         working_directory: HostRepositoryLabelPathValue,
+        read_views: RepositoryWorkspaceReadViewManifest,
     ) -> Result<Self, RepositoryWorkspaceError> {
         if argv.is_empty() {
             return Err(RepositoryWorkspaceError::InvalidOperation);
@@ -137,6 +179,7 @@ impl RepositoryWorkspaceExecute {
             timeout_seconds,
             quiet,
             working_directory,
+            read_views,
         })
     }
     pub fn argv(&self) -> &[RepositoryWorkspaceArgument] {
@@ -156,6 +199,19 @@ impl RepositoryWorkspaceExecute {
     }
     pub fn working_directory(&self) -> &HostRepositoryLabelPathValue {
         &self.working_directory
+    }
+    pub fn read_views(&self) -> &RepositoryWorkspaceReadViewManifest {
+        &self.read_views
+    }
+    /// Pure rebuild for native canonicalization. No capability is granted;
+    /// callers must compare the complete old/new projection before acceptance.
+    pub fn with_read_views(
+        mut self,
+        read_views: RepositoryWorkspaceReadViewManifest,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        read_views.owned_metadata_bytes()?;
+        self.read_views = read_views;
+        Ok(self)
     }
     pub fn effective_value(&self, name: &str) -> Option<&str> {
         match self.overrides.get(name) {
@@ -195,11 +251,14 @@ impl RepositoryWorkspaceExecute {
             }
         }
         add(
-            size,
-            self.working_directory
-                .path()
-                .retained_storage_bytes()
-                .ok_or(RepositoryWorkspaceError::RetentionLimit)?,
+            add(
+                size,
+                self.working_directory
+                    .path()
+                    .retained_storage_bytes()
+                    .ok_or(RepositoryWorkspaceError::RetentionLimit)?,
+            )?,
+            self.read_views.owned_metadata_bytes()?,
         )
     }
 }
@@ -290,6 +349,19 @@ impl fmt::Debug for RepositoryWorkspaceOperation {
     }
 }
 impl RepositoryWorkspaceOperation {
+    pub(super) fn try_eq_with_states<E>(
+        &self,
+        other: &Self,
+        compare: &mut impl FnMut(
+            &Arc<RepositoryWorkspaceState>,
+            &Arc<RepositoryWorkspaceState>,
+        ) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        match (self, other) {
+            (Self::Execute(left), Self::Execute(right)) => left.try_eq_with_states(right, compare),
+            _ => Ok(self == other),
+        }
+    }
     pub(super) fn validate(&self) -> Result<(), RepositoryWorkspaceError> {
         match self {
             Self::File { path, mode, .. } | Self::Template { path, mode, .. } => {
@@ -310,6 +382,13 @@ impl RepositoryWorkspaceOperation {
             Self::Archive(_) | Self::Execute(_) => {}
         }
         Ok(())
+    }
+    pub(super) fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        if let Self::Execute(execute) = self {
+            for view in execute.read_views.views() {
+                visit(view)
+            }
+        }
     }
     pub(super) fn bodies(&self, visit: &mut impl FnMut(&Arc<[u8]>)) {
         match self {

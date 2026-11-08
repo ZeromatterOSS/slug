@@ -36,27 +36,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 Packet: WP-7-425-m7a-general-repository-process
 
-Original build-info callbacks are integrated and post-verified in `d202a77e29b4`.
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.
-The fixed three-launch backing diagnostic passes. Inactive rooted IO,
-delete/manifest consumers, immutable workspace protocol and borrowed rooted
-source observations are accepted. Closed physical-root attestation, complete
-sealing and source-lease ownership are also accepted with fixed native evidence.
-Inactive consuming native progress and actual complete credited snapshots now
-cover ordered File/Template/Read/Exists/Delete. An inactive linear rolling-lease
-primitive also has fixed Rust three-launch handoff evidence. Verified archive
-handoff and shared root/token backing credits are integrated in the inactive
-owner. Consuming command/epoch admission and actual same-backing Process quota
-shrink are accepted inactive. The owned general runner now also has actual early
-Rust CLI PID1, installed confinement, all-child completion and failure/drop proof.
-The selected root registry and native source ownership/transport are now
-integrated with actual anchored root/reader/image and protected NativeLink proof.
-Cross-repository process read views and original Loading-to-GeneralWorkspace
-integration remain the frontier, including public physical-source CAS/runfiles
-proof. Production activation still requires full archive-envelope, original
-Starlark, public integration and matching-command memory gates; see the
+Inactive Core now covers rooted mutation/archive IO, complete snapshots/sealing,
+owned confined execution, selected native source IO/transport and full selected
+process-view manifests/admission with ordinary semantic records. Its real CLI,
+registry and protected transport evidence is linked from the
 [current packet](./slug-v2-subplans/current-packet.md).
+Original Loading-to-GeneralWorkspace integration and profile removal are the
+frontier. Full archive-envelope, actual original/public Rust integration,
+original-route physical CAS/runfiles and matching-command memory gates still
+precede production activation.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

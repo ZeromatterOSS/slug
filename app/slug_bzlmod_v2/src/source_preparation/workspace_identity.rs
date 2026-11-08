@@ -135,10 +135,11 @@ fn label(value: &CanonicalLabel) -> Result<usize, RepositoryWorkspaceError> {
             .map_or(0, |v| v.retained_capacity_bytes()),
     )
 }
-struct Walk {
+#[derive(Default)]
+pub(crate) struct WorkspaceSpecStorageWalk {
     nodes: usize,
 }
-impl Walk {
+impl WorkspaceSpecStorageWalk {
     fn step(&mut self, depth: usize) -> Result<(), RepositoryWorkspaceError> {
         self.nodes = self
             .nodes
@@ -202,7 +203,42 @@ fn map_bytes<K, V>(
 }
 
 impl RepositoryMaterializationRequest {
-    pub fn general_workspace_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+    /// Compare complete current selected facts while letting Core bound actual
+    /// state/body work. Non-general kinds retain their ordinary full equality.
+    #[doc(hidden)]
+    pub fn try_eq_with_states<E>(
+        &self,
+        other: &Self,
+        compare: &mut impl FnMut(
+            &Arc<crate::RepositoryWorkspaceState>,
+            &Arc<crate::RepositoryWorkspaceState>,
+        ) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        let Self {
+            id,
+            repo_spec,
+            kind,
+        } = self;
+        let Self {
+            id: other_id,
+            repo_spec: other_spec,
+            kind: other_kind,
+        } = other;
+        if id != other_id || repo_spec != other_spec {
+            return Ok(false);
+        }
+        match (kind, other_kind) {
+            (
+                RepositoryMaterializationKind::GeneralWorkspace(left),
+                RepositoryMaterializationKind::GeneralWorkspace(right),
+            ) => left.try_eq_with_states(right, compare),
+            _ => Ok(kind == other_kind),
+        }
+    }
+
+    pub fn general_workspace_storage_partition(
+        &self,
+    ) -> Result<crate::RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
         let RepositoryMaterializationKind::GeneralWorkspace(realization) = &self.kind else {
             return Err(RepositoryWorkspaceError::InvalidOperation);
         };
@@ -216,16 +252,29 @@ impl RepositoryMaterializationRequest {
         )?;
         n = add(n, self.id.canonical_repo.retained_capacity_bytes())?;
         n = add(n, self.repo_spec.workspace_retained_storage_bytes()?)?;
-        add(n, realization.retained_storage_bytes()?)
+        realization.storage_partition()?.add_owned(n)
+    }
+    pub fn general_workspace_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        self.general_workspace_storage_partition()?.total_bytes()
+    }
+    pub fn visit_read_views(&self, visit: &mut impl FnMut(&crate::RepositoryWorkspaceReadView)) {
+        if let RepositoryMaterializationKind::GeneralWorkspace(realization) = &self.kind {
+            realization.visit_read_views(visit)
+        }
     }
 }
 impl RepoSpec {
     pub fn workspace_retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        self.workspace_retained_storage_bytes_with(&mut WorkspaceSpecStorageWalk::default())
+    }
+    pub(crate) fn workspace_retained_storage_bytes_with(
+        &self,
+        walk: &mut WorkspaceSpecStorageWalk,
+    ) -> Result<usize, RepositoryWorkspaceError> {
         let mut n = arc::<Self>(1)?;
         n = add(n, label(&self.rule_id.bzl_file)?)?;
         n = add(n, self.rule_id.rule_name.capacity())?;
         n = add(n, map_bytes(self.attributes.as_ref())?)?;
-        let mut walk = Walk { nodes: 0 };
         for (name, value) in self.attributes.iter() {
             walk.step(0)?;
             n = add(n, name.capacity())?;

@@ -220,6 +220,17 @@ pub(super) struct GeneralWorkspaceSession {
     root_credit: Option<ResourceCredit>,
     _credit: ResourceCredit,
 }
+impl GeneralWorkspaceSession {
+    pub(super) fn lease(&self) -> u64 {
+        self.lease
+    }
+    pub(super) fn resources(&self) -> &Arc<RepositoryRootResources> {
+        &self.resources
+    }
+    pub(super) fn scope(&self) -> &Arc<SourceServiceScope> {
+        &self.scope
+    }
+}
 pub(in crate::runtime) struct ReservedRepositoryWorkspace {
     token: RepositorySessionToken,
     reservation: Arc<RepositoryWorkspaceReservation>,
@@ -499,7 +510,7 @@ impl RepositoryMaterializer {
             },
             generation,
             root: RetainedRootOwner::Physical(root),
-            guard: Some(Arc::new(credit)),
+            guard: Some(credit),
         });
         active
             .entries

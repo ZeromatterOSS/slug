@@ -4890,7 +4890,9 @@ probe_rule(name = "probe")
 fn rule_definition_resolver_uses_external_source_repository_mapping() {
     let source = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules+//pkg:defs.bzl").unwrap(),
-        workspace_path: "/workspace/rules/pkg/defs.bzl".into(),
+        source: slug_build_api_v2::ModuleSourceOrigin::Workspace(
+            "/workspace/rules/pkg/defs.bzl".into(),
+        ),
         repository_mapping: Arc::from([(
             ApparentRepoName::new("toolchains").unwrap(),
             CanonicalRepoName::new("toolchains+1.0").unwrap(),

@@ -114,26 +114,57 @@ establishes death. At most128 views fit the unchanged2MiB plan; the existing
 setup effects. No sealed-FD clone, Host alias, proc reopen, copying or keeper is
 an alternative source of mount authority.
 
-The physical prerequisite is inactive. Ordinary semantic Execute admits no
-foreign view until a pure selected-view manifest and full native selected-set
-admission are integrated together. A private test owner may drive actual helper
-read/execute/EROFS and successor reuse without publishing a semantic Execute
-result or accepted transcript. The eventual manifest contains full child-visible
-reservation/owner/instance/display/spec/final-state facts, not recursively nested
-upstream transcripts. Native admission independently authenticates full current
-request/result associations and closed seals before matching that projection,
-then rechecks at completion. Loading supplies the current-prefix declaration
-set; later discoveries do not rewrite an earlier Execute. Local/legacy sources
-without a proved post-profile view remain explicitly unsupported. These
-prerequisites close no original Loading, archive envelope, public Rust or
-equivalent-command memory gate.
+The inactive semantic path now requires a pure selected-view manifest on each
+Execute: full Spec plus final State (including reservation/instance/display/
+lease/policy/mode/tree), without recursively retaining source transcripts.
+Canonicalization rejects duplicate/overlapping/self/foreign-command views and
+keeps the128-view bound. Full request equality and exact prefix replay include
+the manifest. Loading must supply the declaration set at each original prefix;
+later discoveries must not rewrite an earlier completed Execute. Its original
+integration remains pending.
 
-[Native process-view evidence](wp1225-native-process-views-acceptance-2026-11-08.json)
-records the inactive implementation and actual CLI proof: shared-domain roots,
-65MiB Archive source consumption with a writable Process executor, repeated RO
-renewal, stale-launch refusal before ACK, Process finalization and cancellation
-with the last source owner. Ordinary Execute still has no foreign views; the
-manifest and complete selected-set admission remain the next coupled boundary.
+Core snapshots the COMPLETE supplied selected request/result set and closed
+native rows under the existing actor mutex, compares full foreign semantics
+outside it, then authenticates every actual source root/controller/domain.
+Every member is admitted before setup effects; argv never predicts visibility.
+The exclusive command checks out all controllers locally. One covered request
+and nonce/root binding is shared by the batch and ordinary runner. All RO
+successors validate before payload ACK and actual reap precedes normal complete
+snapshot/record acceptance and controller restoration. The actor rechecks the
+same-token full associations before exposing the updated command; a refusal
+discards private completion after actual death. No actor lock, evaluator or DICE
+transaction spans child work.
+
+Pure storage forecasts partition owned operation/Spec/reference metadata from
+complete referenced source State allocations; standalone totals remain complete.
+Native owned-only accounting requires canonical data-root coverage. Pointer-only
+coverage can establish allocation lifetime before input credit, never semantic
+authority; uncovered foreign input pays the total before exact comparison and
+canonical rehoming. Mutable body/history visitors exclude source State bodies.
+Data-only dependency guards follow covered requests, captured bindings, credited
+transcripts (including later trusted mutation), terminal receipts and actor rows.
+The command epoch drops before its dependency union. Terminal guards keep only
+referenced source data, while sealed output data roots retain no history,
+controllers or namespace authority. Current-manifest guards and accumulated
+history guards remain separate, so changed declarations do not lose old inputs.
+
+Foreign native association, image, selection, acceptance and seal comparisons
+memoize exact State/body pairs in prepaid phase-local tables. Strong operands
+prevent address reuse; misses compare source bodies in64KiB chunks with original
+scope/activity checks, including on memo hits.131072 pairs per table is an
+explicit operational bound. Other existing non-Execute/result byte fields keep
+ordinary full equality; this is not a universal preemptible equality claim.
+Pure/DICE derived equality is unchanged. Host/legacy acquisition/equality policy
+and legacy-only selection budgets remain unchanged. Local/legacy process views
+without actual post-profile visibility proof are explicitly unsupported.
+
+[Physical view proof](wp1225-native-process-views-acceptance-2026-11-08.json) and
+[selected admission proof](wp1225-selected-view-admission-acceptance-2026-11-08.json)
+cover the real early CLI helper,65MiB Archive source, normal semantic records,
+nonzero writes, exact replay, canonical foreign projections, unused declared
+sources, prelaunch refusals, post-reap association changes and last-owner cleanup.
+These close no original Loading, full archive envelope, public Rust, physical
+CAS/runfiles under that original route or equivalent-command memory gate.
 
 ## Archive envelope and irreversible process transition
 
@@ -204,8 +235,9 @@ snapshot and prepaid transcript completion still follow every successful decode.
 
 Trusted deterministic setup excludes other writers. Snapshot equality alone
 never proves descendant death or absence of write aliases; Execute requires the
-owned runner's exact quiescence capability before capture. Registry association,
-cross-repository read views and production activation remain packet gates.
+owned runner's exact quiescence capability before capture. Registry association and cross-repository read views now have inactive
+implementation/proof below; original integration and production activation
+remain packet gates.
 
 Legacy plain archive behavior remains 512 MiB/call, 1 GiB cumulative DECODED,
 with its existing bounds. Select general-root Archive mode with **tmpfs size=
@@ -438,12 +470,13 @@ Non-Linux native source reading/upload is explicitly Unsupported; portable pure
 metadata/query and zero-source native preparation remain available. This is an
 explicit support boundary for the migrated transports, not cross-platform parity.
 
-Cross-repository PROCESS read views remain a separate activation gate: choose one
-materializer-owned userns mount domain and separately typed read-only view tokens
-minted from actually attached roots before sealing. Validate the complete declared
-selected set before effects, including full spelling identity/current generation;
-refuse overlapping generations and unbridged domains. Do not predict needed
-views from argv/path values. Source-data leases never gain these capabilities.
+Cross-repository PROCESS read views use the inactive manifest/admission contract
+above: one exclusive-command-owned userns mount domain and separately typed read-only
+view tokens minted from actually attached roots before sealing. The complete
+declared selected set validates before effects, including full spelling identity/
+current generation; overlapping generations and unbridged domains refuse.
+Original Loading must supply that complete declaration set before activation.
+Source-data leases never gain these capabilities.
 
 ## Confinement and implementation split
 
@@ -548,7 +581,8 @@ capture binds the full executed request and original physical root. Completion
 then verifies/captures the actual tree, accepts the immutable record and next
 mount token, and republishes the original command epoch. Deterministic mutations
 advance a Process token only through their actual accepted native progress.
-Registry/cross-repository read views and original activation remain later gates.
+Registry/cross-repository read views now have inactive proof above. Original
+Loading integration and production activation remain later gates.
 
 | Owner | Files under app/ (new leaves explicitly named) |
 | --- | --- |
@@ -569,8 +603,8 @@ reader/image seams and protected Host/legacy NativeLink transport. Physical
 SourceArtifact metadata in the native fixture still uses a resource-free test
 constructor after actual DICE anchor/digest production; it grants no root or
 transport authority and does not prove original Loading activation.
-Remaining activation gates: full Archive envelope/inode workload; compatible
-read-only process views for the complete declared selected repository set;
+Remaining activation gates: full Archive envelope/inode workload; original
+Loading declaration-prefix integration with the complete selected-set API;
 original Loading-to-GeneralWorkspace selection and public physical source/CAS/
 runfiles through that route; generalSource certificate restore; unrelated
 originals plus existing GCC/Homebrew through SAME route; warm Host freshness;

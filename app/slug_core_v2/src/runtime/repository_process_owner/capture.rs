@@ -84,7 +84,7 @@ impl Captures {
         code: i32,
         mode: RunMode,
         nonce: [u8; 16],
-        request: Option<Arc<RepositoryWorkspaceRequest>>,
+        request: Option<Arc<CoveredWorkspaceRequest>>,
         root: RootIdentity,
         _proof: super::lifecycle::NamespaceReaped,
     ) -> ReapedCapture {
@@ -152,7 +152,7 @@ impl ReapedCapture {
 /// A full structural request and exact physical generation, coupled to real
 /// namespace quiescence. Neither a numeric index nor a digest can replace it.
 pub(in crate::runtime::repository_physical_root) struct ReapedBinding {
-    request: Option<Arc<RepositoryWorkspaceRequest>>,
+    request: Option<Arc<CoveredWorkspaceRequest>>,
     root: RootIdentity,
     mode: RunMode,
     nonce: [u8; 16],
@@ -175,7 +175,9 @@ impl ReapedBinding {
         request: &RepositoryWorkspaceRequest,
         root: RootIdentity,
     ) -> Result<(), PhysicalRootError> {
-        if !self.mode.has_payload() || self.request.as_deref() != Some(request) || self.root != root
+        if !self.mode.has_payload()
+            || self.request.as_deref().map(|covered| covered.request()) != Some(request)
+            || self.root != root
         {
             return Err(PhysicalRootError::Reservation);
         }

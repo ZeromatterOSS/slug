@@ -43,8 +43,9 @@ transitive legacy symlink data lifetime and real NativeLink corruption/cache/
 runfiles checks pass. Physical probes prove the actual root/anchor/digest/reader/
 image seams; their SourceArtifact metadata helper does not activate original
 Loading. Non-Linux native source reading/upload is explicitly unsupported;
-pure metadata remains portable. Cross-repository process read views and original
-Loading-to-GeneralWorkspace integration are the next frontier, including public
+pure metadata remains portable. Cross-repository manifests and full native
+selected-view admission now join ordinary semantic Execute in the inactive owner.
+Original Loading-to-GeneralWorkspace integration is the next frontier, including public
 physical-source CAS/runfiles proof under that selection route and the complete
 activation gates below. Existing production process routes remain
 replacement-required. The selected design links owner
@@ -114,10 +115,13 @@ byte/inode limits do not prove all kernel metadata RAM or the full archive
 workload envelope.
 
 [Native process-view proof](wp1225-native-process-views-acceptance-2026-11-08.json)
-accepts the inactive shared owning namespace, RO finalization and reap-bound
-renewal primitives. Full child-visible manifests and complete native selected-set
-admission must join ordinary Execute before cross-repository activation. The
-original Loading, full Archive/public Rust and equivalent-memory gates remain.
+and [selected admission proof](wp1225-selected-view-admission-acceptance-2026-11-08.json)
+cover shared owning namespaces, RO finalization/renewal, full child-visible
+manifests and complete native selected-set admission through ordinary Execute.
+Data-only history guards preserve source allocations without setup authority;
+source bodies never become mutable Process history. Original Loading, full
+Archive/public Rust, original-route physical CAS/runfiles and equivalent-memory
+gates remain. No production profile replacement is activated by this evidence.
 
 Inactive protocol, anchored resolver, rooted observation/mutation and native
 reader candidates may proceed. Before untrusted activation, prove actual

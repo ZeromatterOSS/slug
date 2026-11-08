@@ -63,7 +63,11 @@ impl RepositoryWorkspaceProgress {
         drop(scratch);
         Ok(Self {
             builder,
-            transcript: CreditedWorkspaceTranscript { transcript, credit },
+            transcript: CreditedWorkspaceTranscript {
+                transcript,
+                dependencies: None,
+                credit,
+            },
             delete_work: DeleteWork::default(),
             decoded: 0,
             scope: scope.clone(),
@@ -131,9 +135,33 @@ impl RepositoryWorkspaceProgress {
         check(scope, active)?;
         let snapshot =
             snapshot::capture(&self.builder, self.transcript().current(), scope, active)?;
-        let next = snapshot.complete(self.transcript(), request, result)?;
+        let next = snapshot.complete_with_dependencies(
+            self.transcript(),
+            request,
+            result,
+            self.transcript.dependencies.clone(),
+        )?;
         self.transcript = next;
         Ok(self)
+    }
+
+    pub(super) fn complete_snapshot_covered(
+        mut self,
+        request: Arc<CoveredWorkspaceRequest>,
+        result: RepositoryWorkspaceResult,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
+        let dependencies = if let Some(prior) = &self.transcript.dependencies {
+            prior.merge(request.dependencies().owners(), &self.builder.resources)?
+        } else {
+            request.dependencies().clone()
+        };
+        if !dependencies.covers_transcript(self.transcript()) {
+            return Err(PhysicalRootError::Reservation);
+        }
+        self.transcript.dependencies = Some(dependencies);
+        self.complete_snapshot(request.request().clone(), result, scope, active)
     }
 
     /// Incoming operation/argv/source storage is producer-credited already.
@@ -256,12 +284,25 @@ impl RepositoryWorkspaceProgress {
         // borrowed clone. Prepay only its additional realization/cache storage.
         let full = self
             .transcript()
-            .realization_storage_bytes()
+            .realization_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
         let existing = self
             .transcript()
-            .retained_storage_bytes()
+            .storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
+        let (full, existing) = if let Some(deps) = &self.transcript.dependencies {
+            if !deps.covers_transcript(self.transcript()) {
+                return Err(PhysicalRootError::Reservation);
+            }
+            (full.owned_bytes(), existing.owned_bytes())
+        } else {
+            (
+                full.total_bytes().map_err(PhysicalRootError::Protocol)?,
+                existing
+                    .total_bytes()
+                    .map_err(PhysicalRootError::Protocol)?,
+            )
+        };
         let _realization_credit = self.builder.resources.reserve(
             full.checked_sub(existing)
                 .ok_or(PhysicalRootError::Resource)?,

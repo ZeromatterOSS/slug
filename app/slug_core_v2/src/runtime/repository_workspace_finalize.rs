@@ -43,30 +43,54 @@ impl RepositoryWorkspaceCommand {
             .progress
             .as_ref()
             .ok_or(PhysicalRootError::Reservation)?;
-        if expected.transcript() != progress.transcript() {
-            return Err(PhysicalRootError::Protocol(
-                slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
-            ));
-        }
-        self.mount_domain
-            .as_ref()
-            .ok_or(PhysicalRootError::Reservation)?
-            .check_root(reservation, &self.resources, scope, active)
-            .map_err(PhysicalRootError::mount)?;
-        let retained = request
-            .general_workspace_storage_bytes()
+        let storage = request
+            .general_workspace_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
+        let bytes = if self
+            .source_dependencies
+            .covers_transcript_state_allocations(expected.transcript())
+        {
+            storage.owned_bytes()
+        } else {
+            storage.total_bytes().map_err(PhysicalRootError::Protocol)?
+        };
         let credit = self.resources.reserve(
-            add(retained, std::mem::size_of::<NativeViewFinalization>())?,
+            add(bytes, std::mem::size_of::<NativeViewFinalization>())?,
             0,
             0,
         )?;
-        Ok(NativeViewFinalization {
+        let admission = NativeViewFinalization {
             request,
             command: self,
             slot,
             _credit: credit,
-        })
+        };
+        let slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(expected) =
+            &admission.request.kind
+        else {
+            unreachable!()
+        };
+        let progress = admission.command.roots[slot]
+            .progress
+            .as_ref()
+            .ok_or(PhysicalRootError::Reservation)?;
+        if !ViewComparison::new(&admission.command.resources, scope, active)?
+            .transcript_equal(expected.transcript(), progress.transcript())?
+        {
+            return Err(PhysicalRootError::Protocol(
+                slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
+            ));
+        }
+        admission
+            .domain()
+            .check_root(
+                expected.reservation(),
+                &admission.command.resources,
+                scope,
+                active,
+            )
+            .map_err(PhysicalRootError::mount)?;
+        Ok(admission)
     }
 
     /// Inactive physical capability: no Execute record/index is fabricated.

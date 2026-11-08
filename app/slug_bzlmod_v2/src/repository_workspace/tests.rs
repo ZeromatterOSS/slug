@@ -78,6 +78,7 @@ fn execute() -> RepositoryWorkspaceOperation {
                 PathObservationNamespace::Materialization(PathObservationInstanceId::new(11)),
             )
             .unwrap(),
+            RepositoryWorkspaceReadViewManifest::empty(&reservation_with(7, 11, limits())),
         )
         .unwrap(),
     )
@@ -160,6 +161,7 @@ fn all_position_arguments_environment_removal_empty_and_requested_timeout_are_li
         600,
         false,
         path.clone(),
+        RepositoryWorkspaceReadViewManifest::empty(&reservation_with(7, 11, limits())),
     )
     .unwrap();
     assert_eq!(command.effective_value("REMOVE"), None);
@@ -176,7 +178,8 @@ fn all_position_arguments_environment_removal_empty_and_requested_timeout_are_li
             overrides.clone(),
             30,
             false,
-            path.clone()
+            path.clone(),
+            RepositoryWorkspaceReadViewManifest::empty(&reservation_with(7, 11, limits())),
         )
         .unwrap()
     );
@@ -187,13 +190,22 @@ fn all_position_arguments_environment_removal_empty_and_requested_timeout_are_li
             overrides.clone(),
             0,
             false,
-            path.clone()
+            path.clone(),
+            RepositoryWorkspaceReadViewManifest::empty(&reservation_with(7, 11, limits())),
         )
         .is_err()
     );
     assert!(
-        RepositoryWorkspaceExecute::new(Arc::from([]), environment, overrides, 600, false, path)
-            .is_err()
+        RepositoryWorkspaceExecute::new(
+            Arc::from([]),
+            environment,
+            overrides,
+            600,
+            false,
+            path,
+            RepositoryWorkspaceReadViewManifest::empty(&reservation_with(7, 11, limits())),
+        )
+        .is_err()
     );
 }
 
@@ -484,6 +496,7 @@ fn execute_cwd_requires_selected_instance_and_repository_subtree_before_need() {
                     namespace,
                 )
                 .unwrap(),
+                RepositoryWorkspaceReadViewManifest::empty(&reservation_with(7, 11, limits())),
             )
             .unwrap(),
         )
@@ -594,6 +607,7 @@ fn argument_environment_archive_metadata_charge_actual_spare_storage_and_owner_a
                 600,
                 true,
                 cwd.clone(),
+                RepositoryWorkspaceReadViewManifest::empty(&reservation_with(7, 11, limits())),
             )
             .unwrap(),
         )
@@ -808,6 +822,31 @@ fn protocol_debug_redacts_body_argv_environment_and_captured_bytes() {
         Arc::from([]),
     ));
     assert!(!format!("{result:?}").contains("top-secret"));
+    let source_spec = crate::RepoSpec {
+        rule_id: crate::RepoRuleId {
+            bzl_file: CanonicalLabel::parse("@@//:repos.bzl").unwrap(),
+            rule_name: "repository".into(),
+        },
+        attributes: Arc::new(SmallMap::from_iter([(
+            CompactString::new("token"),
+            crate::OverrideAttributeValue::String("top-secret-spec".into()),
+        )])),
+    };
+    let source = RepositoryWorkspaceReadView::new(source_spec, t.current().clone()).unwrap();
+    let selected = t.reservation();
+    let executor = RepositoryWorkspaceReservation::new(
+        selected.workspace().clone(),
+        selected.owner().clone(),
+        CanonicalRepoName::new("debug-executor").unwrap(),
+        4,
+        NormalizedAbsolutePath::new("/logical/debug-executor").unwrap(),
+        PathObservationInstanceId::new(999),
+        selected.lease(),
+        selected.limits(),
+    )
+    .unwrap();
+    let manifest = RepositoryWorkspaceReadViewManifest::new(&executor, vec![source]).unwrap();
+    assert!(!format!("{manifest:?}").contains("top-secret"));
 }
 
 #[test]
@@ -1454,6 +1493,7 @@ fn native_epoch_publication_cannot_bypass_other_process_root_history_admission()
                     PathObservationNamespace::Materialization(reservation.instance()),
                 )
                 .unwrap(),
+                RepositoryWorkspaceReadViewManifest::empty(reservation),
             )
             .unwrap(),
         )
@@ -1502,3 +1542,5 @@ fn native_epoch_publication_cannot_bypass_other_process_root_history_admission()
         Err(RepositoryWorkspaceError::RetentionLimit)
     );
 }
+
+mod read_view_tests;

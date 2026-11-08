@@ -21,6 +21,9 @@ use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceState;
 
 use super::*;
+#[path = "repository_process_view_batch.rs"]
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+pub(super) mod batch;
 
 #[path = "repository_mount_domain.rs"]
 pub(super) mod domain;
@@ -377,14 +380,14 @@ pub(super) struct RepositoryMountLease {
 }
 #[derive(Debug)]
 pub(super) struct RepositoryMountAttempt {
-    request: RepositoryWorkspaceRequest,
+    request: Arc<CoveredWorkspaceRequest>,
     lease: RepositoryMountLease,
 }
 #[derive(Debug)]
 pub(super) struct MountInFlight {
     reservation: Arc<RepositoryWorkspaceReservation>,
     root: RootIdentity,
-    request: RepositoryWorkspaceRequest,
+    request: Arc<CoveredWorkspaceRequest>,
     owner: File,
     namespace: NamespaceIdentity,
     incoming: RootIdentity,
@@ -395,7 +398,7 @@ pub(super) struct MountInFlight {
 pub(super) struct PendingMountLease {
     reservation: Arc<RepositoryWorkspaceReservation>,
     root: RootIdentity,
-    request: RepositoryWorkspaceRequest,
+    request: Arc<CoveredWorkspaceRequest>,
     successor: AttachedMountClone,
 }
 
@@ -540,21 +543,27 @@ impl RepositoryMountLease {
         Ok(())
     }
     pub(super) fn begin(
-        mut self,
+        self,
         root: &RepositoryPhysicalRootBuilder,
         request: RepositoryWorkspaceRequest,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<RepositoryMountAttempt, MountLeaseError> {
-        self.validate_request(root, &request, scope, active)?;
+        let request = CoveredWorkspaceRequest::empty(request, &root.resources)?;
+        self.begin_covered(root, request, scope, active)
+    }
+    pub(super) fn begin_covered(
+        mut self,
+        root: &RepositoryPhysicalRootBuilder,
+        request: Arc<CoveredWorkspaceRequest>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<RepositoryMountAttempt, MountLeaseError> {
+        self.validate_request(root, request.request(), scope, active)?;
         self.clone
             .credit
             .bytes
-            .try_grow(
-                request
-                    .retained_storage_bytes()
-                    .map_err(|_| PhysicalRootError::Resource)?,
-            )
+            .try_grow(request.owned_bytes())
             .map_err(|_| PhysicalRootError::Resource)?;
         Ok(RepositoryMountAttempt {
             lease: self,
@@ -596,7 +605,7 @@ impl RepositoryMountAttempt {
             &self.lease.clone.token,
             &self.lease.clone.owner,
             nonce,
-            self.request.index(),
+            self.request.request().index(),
         )?;
         check(scope, active)?;
         // Keep the consumed token closed, while retaining its prepaid owner and
@@ -655,9 +664,7 @@ impl MountInFlight {
             .bytes
             .try_grow(add(
                 std::mem::size_of::<PendingMountLease>(),
-                self.request
-                    .retained_storage_bytes()
-                    .map_err(|_| PhysicalRootError::Resource)?,
+                self.request.owned_bytes(),
             )?)
             .map_err(|_| PhysicalRootError::Resource)?;
         Ok(PendingMountLease {
@@ -678,9 +685,10 @@ impl PendingMountLease {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Self, MountLeaseError> {
+        let request = CoveredWorkspaceRequest::empty(request, &root.resources)?;
         check(scope, active)?;
         if !Arc::ptr_eq(&successor.resources, &root.resources)
-            || request.reservation() != &root.reservation
+            || request.request().reservation() != &root.reservation
             || successor.attached != root.identity
             || identity(&root.file)? != root.identity
             || !same_backing(successor.detached, root.identity)
@@ -688,7 +696,7 @@ impl PendingMountLease {
             return Err(MountLeaseError::Request);
         }
         if !matches!(
-            request.operation(),
+            request.request().operation(),
             RepositoryWorkspaceOperation::Execute(_)
         ) {
             return Err(MountLeaseError::UnsupportedOperation);
@@ -704,12 +712,7 @@ impl PendingMountLease {
         successor
             .credit
             .bytes
-            .try_grow(add(
-                std::mem::size_of::<Self>(),
-                request
-                    .retained_storage_bytes()
-                    .map_err(|_| PhysicalRootError::Resource)?,
-            )?)
+            .try_grow(add(std::mem::size_of::<Self>(), request.owned_bytes())?)
             .map_err(|_| PhysicalRootError::Resource)?;
         Ok(Self {
             reservation: root.reservation.clone(),
@@ -727,13 +730,14 @@ impl PendingMountLease {
         check(scope, active)?;
         if self.successor.backing.is_none()
             || completion.root != self.root
-            || completion.record.request() != &self.request
+            || completion.record.request() != self.request.request()
             || completion.record.next().reservation() != &self.reservation
         {
             return Err(MountLeaseError::Completion);
         }
         let index = self
             .request
+            .request()
             .index()
             .checked_add(1)
             .ok_or(MountLeaseError::Completion)?;

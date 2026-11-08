@@ -33,6 +33,7 @@ fn execute(reservation: &RepositoryWorkspaceReservation) -> RepositoryWorkspaceO
                 PathObservationNamespace::Materialization(reservation.instance()),
             )
             .unwrap(),
+            slug_bzlmod_v2::RepositoryWorkspaceReadViewManifest::empty(reservation),
         )
         .unwrap(),
     )
@@ -68,6 +69,7 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
         .unwrap();
     let mut current = CreditedWorkspaceTranscript {
         transcript: RepositoryWorkspaceTranscript::new(reservation.clone(), 0o755).unwrap(),
+        dependencies: None,
         credit: initial_credit,
     };
     let mut root: Option<RepositoryPhysicalRootBuilder> = None;
@@ -295,6 +297,7 @@ fn native_pending_accept_credit_shortage_retires_successor_and_payload_owners() 
         .unwrap();
     let initial = CreditedWorkspaceTranscript {
         transcript: RepositoryWorkspaceTranscript::new(reservation.clone(), 0o755).unwrap(),
+        dependencies: None,
         credit: initial_credit,
     };
     let request = initial.transcript().request(execute(&reservation)).unwrap();

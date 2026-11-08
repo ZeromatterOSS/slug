@@ -48,6 +48,38 @@ pub struct RepositoryWorkspaceRequest {
     operation: RepositoryWorkspaceOperation,
 }
 impl RepositoryWorkspaceRequest {
+    /// Exact comparison whose every state edge uses the caller's bounded
+    /// comparator. No digest substitutes for structural equality.
+    #[doc(hidden)]
+    pub fn try_eq_with_states<E>(
+        &self,
+        other: &Self,
+        compare: &mut impl FnMut(
+            &Arc<RepositoryWorkspaceState>,
+            &Arc<RepositoryWorkspaceState>,
+        ) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        let Self {
+            reservation,
+            index,
+            predecessor,
+            operation,
+        } = self;
+        let Self {
+            reservation: other_reservation,
+            index: other_index,
+            predecessor: other_predecessor,
+            operation: other_operation,
+        } = other;
+        if reservation != other_reservation || index != other_index {
+            return Ok(false);
+        }
+        if !compare(predecessor, other_predecessor)? {
+            return Ok(false);
+        }
+        operation.try_eq_with_states(other_operation, compare)
+    }
+
     pub fn reservation(&self) -> &Arc<RepositoryWorkspaceReservation> {
         &self.reservation
     }
@@ -65,7 +97,9 @@ impl RepositoryWorkspaceRequest {
     /// charged fully until protocol completion replaces them; sharing may be
     /// overcounted, never silently omitted.
     #[doc(hidden)]
-    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+    pub fn storage_partition(
+        &self,
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
         let mut bytes = add(
             std::mem::size_of::<Self>(),
             add(
@@ -88,7 +122,31 @@ impl RepositoryWorkspaceRequest {
         if let Some(error) = failure {
             return Err(error);
         }
-        Ok(bytes)
+        RepositoryWorkspaceStoragePartition::new(
+            bytes,
+            read_views::source_storage_bytes(|visit| {
+                self.visit_read_views(&mut |view| visit(view))
+            })?,
+        )
+    }
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        self.storage_partition()?.total_bytes()
+    }
+    pub fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        self.operation.visit_read_views(visit)
+    }
+    /// Rehome an independently validated equal source projection without
+    /// changing argv/env/cwd or copying any source body. Core checks full Eq.
+    pub fn with_read_views(
+        mut self,
+        manifest: RepositoryWorkspaceReadViewManifest,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        manifest.validate_for(&self.reservation)?;
+        let RepositoryWorkspaceOperation::Execute(execute) = self.operation else {
+            return Err(RepositoryWorkspaceError::InvalidOperation);
+        };
+        self.operation = RepositoryWorkspaceOperation::Execute(execute.with_read_views(manifest)?);
+        Ok(self)
     }
 }
 
@@ -99,6 +157,33 @@ pub struct RepositoryWorkspaceRecord {
     next: Arc<RepositoryWorkspaceState>,
 }
 impl RepositoryWorkspaceRecord {
+    /// Exact comparison whose every state edge uses the caller's bounded
+    /// comparator. No digest substitutes for structural equality.
+    #[doc(hidden)]
+    pub(super) fn try_eq_with_states<E>(
+        &self,
+        other: &Self,
+        compare: &mut impl FnMut(
+            &Arc<RepositoryWorkspaceState>,
+            &Arc<RepositoryWorkspaceState>,
+        ) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        let Self {
+            request,
+            result,
+            next,
+        } = self;
+        let Self {
+            request: other_request,
+            result: other_result,
+            next: other_next,
+        } = other;
+        if !request.try_eq_with_states(other_request, compare)? || result != other_result {
+            return Ok(false);
+        }
+        compare(next, other_next)
+    }
+
     pub fn request(&self) -> &RepositoryWorkspaceRequest {
         &self.request
     }
@@ -118,6 +203,46 @@ pub struct RepositoryWorkspaceTranscript {
     retention: RepositoryWorkspaceRetention,
 }
 impl RepositoryWorkspaceTranscript {
+    /// Exact comparison whose every state edge uses the caller's bounded
+    /// comparator. No digest substitutes for structural equality.
+    #[doc(hidden)]
+    pub fn try_eq_with_states<E>(
+        &self,
+        other: &Self,
+        compare: &mut impl FnMut(
+            &Arc<RepositoryWorkspaceState>,
+            &Arc<RepositoryWorkspaceState>,
+        ) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        let Self {
+            reservation,
+            initial,
+            records,
+            retention,
+        } = self;
+        let Self {
+            reservation: other_reservation,
+            initial: other_initial,
+            records: other_records,
+            retention: other_retention,
+        } = other;
+        if reservation != other_reservation
+            || retention != other_retention
+            || records.len() != other_records.len()
+        {
+            return Ok(false);
+        }
+        if !compare(initial, other_initial)? {
+            return Ok(false);
+        }
+        for (record, other) in records.iter().zip(other_records.iter()) {
+            if !record.try_eq_with_states(other, compare)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     pub fn new(
         reservation: Arc<RepositoryWorkspaceReservation>,
         root_mode: u16,
@@ -266,6 +391,7 @@ impl RepositoryWorkspaceTranscript {
             let RepositoryWorkspaceOperation::Execute(execute) = &operation else {
                 unreachable!()
             };
+            execute.read_views().validate_for(&self.reservation)?;
             let cwd = execute.working_directory();
             if cwd.namespace()
                 != slug_workspace_v2::PathObservationNamespace::Materialization(
@@ -438,14 +564,31 @@ impl RepositoryWorkspaceTranscript {
     }
 
     /// Conservative complete native lifetime guard, including the producer's
-    /// retained construction scratch. No allocation or body traversal is needed.
+    /// retained construction scratch. Projected source allocations are reported
+    /// separately; the borrowed walk reads lengths and never copies bodies.
     #[doc(hidden)]
-    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
-        add(
+    pub fn storage_partition(
+        &self,
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
+        let owned = add(
             self.retention.metadata_bytes,
             usize::try_from(self.retention.body_bytes)
                 .map_err(|_| RepositoryWorkspaceError::RetentionLimit)?,
+        )?;
+        RepositoryWorkspaceStoragePartition::new(
+            owned,
+            read_views::source_storage_bytes(|visit| {
+                self.visit_read_views(&mut |view| visit(view))
+            })?,
         )
+    }
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        self.storage_partition()?.total_bytes()
+    }
+    pub fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        for record in self.records.iter() {
+            record.request.visit_read_views(visit)
+        }
     }
 
     /// Bound a complete successor and its construction scratch before native
@@ -454,13 +597,13 @@ impl RepositoryWorkspaceTranscript {
     /// actual canonicalization may reuse storage and retain less. This forecast
     /// does not substitute for completion's semantic or unique-body admission.
     #[doc(hidden)]
-    pub fn completion_storage_bytes(
+    pub fn completion_storage_partition(
         &self,
         request: &RepositoryWorkspaceRequest,
         result: &RepositoryWorkspaceResult,
         mode: RepositoryWorkspaceMode,
         entries: &[RepositoryWorkspaceEntry],
-    ) -> Result<usize, RepositoryWorkspaceError> {
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
         let (retention, _, _) = self.completion_metadata(
             request,
             result,
@@ -496,7 +639,21 @@ impl RepositoryWorkspaceTranscript {
         if let Some(error) = failure {
             return Err(error);
         }
-        Ok(bytes)
+        let sources = read_views::source_storage_bytes(|visit| {
+            self.visit_read_views(&mut |view| visit(view));
+            request.visit_read_views(&mut |view| visit(view));
+        })?;
+        RepositoryWorkspaceStoragePartition::new(bytes, sources)
+    }
+    pub fn completion_storage_bytes(
+        &self,
+        request: &RepositoryWorkspaceRequest,
+        result: &RepositoryWorkspaceResult,
+        mode: RepositoryWorkspaceMode,
+        entries: &[RepositoryWorkspaceEntry],
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        self.completion_storage_partition(request, result, mode, entries)?
+            .total_bytes()
     }
 
     /// Incoming snapshot/argv/source buffers MUST already be credited by their
@@ -612,11 +769,14 @@ impl RepositoryWorkspaceTranscript {
     }
     /// Complete retained realization plus fixed digest construction scratch.
     /// Native producers reserve this before realization clones or digest output.
+    pub fn realization_storage_partition(
+        &self,
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
+        self.storage_partition()?
+            .add_owned(std::mem::size_of::<RepositoryWorkspaceRealization>() + 256)
+    }
     pub fn realization_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
-        add(
-            self.retained_storage_bytes()?,
-            std::mem::size_of::<RepositoryWorkspaceRealization>() + 256,
-        )
+        self.realization_storage_partition()?.total_bytes()
     }
     pub fn realize(
         &self,
@@ -729,17 +889,47 @@ pub struct RepositoryWorkspaceRealization {
     source_identity: Arc<str>,
 }
 impl RepositoryWorkspaceRealization {
+    /// Exact comparison whose every state edge uses the caller's bounded
+    /// comparator. No digest substitutes for structural equality.
+    #[doc(hidden)]
+    pub fn try_eq_with_states<E>(
+        &self,
+        other: &Self,
+        compare: &mut impl FnMut(
+            &Arc<RepositoryWorkspaceState>,
+            &Arc<RepositoryWorkspaceState>,
+        ) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        let Self {
+            transcript,
+            source_identity,
+        } = self;
+        let Self {
+            transcript: other_transcript,
+            source_identity: other_identity,
+        } = other;
+        if source_identity != other_identity {
+            return Ok(false);
+        }
+        transcript.try_eq_with_states(other_transcript, compare)
+    }
+
     pub fn source_identity(&self) -> &Arc<str> {
         &self.source_identity
     }
-    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
-        add(
+    pub fn storage_partition(
+        &self,
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
+        self.transcript.storage_partition()?.add_owned(add(
             std::mem::size_of::<Self>(),
-            add(
-                self.transcript.retained_storage_bytes()?,
-                array_bytes::<u8>(self.source_identity.len())?,
-            )?,
-        )
+            array_bytes::<u8>(self.source_identity.len())?,
+        )?)
+    }
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        self.storage_partition()?.total_bytes()
+    }
+    pub fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        self.transcript.visit_read_views(visit)
     }
 
     pub fn transcript(&self) -> &RepositoryWorkspaceTranscript {
@@ -810,29 +1000,53 @@ impl RepositoryWorkspaceEpoch {
     /// independently checked by every epoch update. The empty Arc header is
     /// included even before any transcript has been reserved.
     #[doc(hidden)]
+    pub fn fresh_storage_partition(
+        workspace: &NormalizedAbsolutePath,
+        lease: u64,
+        limits: RepositoryWorkspaceRetentionLimits,
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
+        RepositoryWorkspaceStoragePartition::new(
+            add(
+                Self::fresh_metadata(workspace, lease, limits)?,
+                array_bytes::<RepositoryWorkspaceTranscript>(0)?,
+            )?,
+            0,
+        )
+    }
     pub fn fresh_storage_bytes(
         workspace: &NormalizedAbsolutePath,
         lease: u64,
         limits: RepositoryWorkspaceRetentionLimits,
     ) -> Result<usize, RepositoryWorkspaceError> {
-        add(
-            Self::fresh_metadata(workspace, lease, limits)?,
-            array_bytes::<RepositoryWorkspaceTranscript>(0)?,
-        )
+        Self::fresh_storage_partition(workspace, lease, limits)?.total_bytes()
     }
-    #[doc(hidden)]
-    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+    pub fn storage_partition(
+        &self,
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
         let Some(active) = &self.active else {
-            return Ok(std::mem::size_of::<Self>());
+            return RepositoryWorkspaceStoragePartition::new(std::mem::size_of::<Self>(), 0);
         };
-        let mut bytes = add(
-            active.overhead,
-            array_bytes::<RepositoryWorkspaceTranscript>(0)?,
+        let mut storage = RepositoryWorkspaceStoragePartition::new(
+            add(
+                active.overhead,
+                array_bytes::<RepositoryWorkspaceTranscript>(0)?,
+            )?,
+            0,
         )?;
         for transcript in active.transcripts.iter() {
-            bytes = add(bytes, transcript.retained_storage_bytes()?)?;
+            storage = storage.add_partition(transcript.storage_partition()?)?
         }
-        Ok(bytes)
+        Ok(storage)
+    }
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        self.storage_partition()?.total_bytes()
+    }
+    pub fn visit_read_views(&self, visit: &mut impl FnMut(&RepositoryWorkspaceReadView)) {
+        if let Some(active) = &self.active {
+            for transcript in active.transcripts.iter() {
+                transcript.visit_read_views(visit)
+            }
+        }
     }
     fn reservation_budget(
         &self,
@@ -856,17 +1070,30 @@ impl RepositoryWorkspaceEpoch {
         Ok(self.remaining_budget(None)?.0)
     }
     #[doc(hidden)]
-    pub fn reserve_storage_bytes(
+    pub fn reserve_storage_partition(
         &self,
         reservation: &RepositoryWorkspaceReservation,
         root_mode: u16,
-    ) -> Result<usize, RepositoryWorkspaceError> {
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
         let budget = self.reservation_budget(reservation)?;
         let (_, retention) =
             RepositoryWorkspaceTranscript::initial_retention(reservation, root_mode, budget)?;
         let (_, total) =
             self.projected_retention(None, retention, RepositoryWorkspaceMode::Archive)?;
-        Self::retention_storage(total)
+        RepositoryWorkspaceStoragePartition::new(
+            Self::retention_storage(total)?,
+            read_views::source_storage_bytes(|visit| {
+                self.visit_read_views(&mut |view| visit(view))
+            })?,
+        )
+    }
+    pub fn reserve_storage_bytes(
+        &self,
+        reservation: &RepositoryWorkspaceReservation,
+        root_mode: u16,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        self.reserve_storage_partition(reservation, root_mode)?
+            .total_bytes()
     }
     fn publish_slot(
         &self,
@@ -905,17 +1132,33 @@ impl RepositoryWorkspaceEpoch {
         self.update(Some(slot), transcript)
     }
     #[doc(hidden)]
-    pub fn publish_storage_bytes(
+    pub fn publish_storage_partition(
         &self,
         transcript: &RepositoryWorkspaceTranscript,
-    ) -> Result<usize, RepositoryWorkspaceError> {
+    ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
         let slot = self.publish_slot(transcript)?;
         let (_, total) = self.projected_retention(
             Some(slot),
             transcript.retention,
             transcript.current().mode(),
         )?;
-        Self::retention_storage(total)
+        let sources = read_views::source_storage_bytes(|visit| {
+            if let Some(active) = &self.active {
+                for (index, item) in active.transcripts.iter().enumerate() {
+                    if index != slot {
+                        item.visit_read_views(&mut |view| visit(view))
+                    }
+                }
+            }
+            transcript.visit_read_views(&mut |view| visit(view));
+        })?;
+        RepositoryWorkspaceStoragePartition::new(Self::retention_storage(total)?, sources)
+    }
+    pub fn publish_storage_bytes(
+        &self,
+        transcript: &RepositoryWorkspaceTranscript,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        self.publish_storage_partition(transcript)?.total_bytes()
     }
     fn retention_storage(
         total: RepositoryWorkspaceRetention,
