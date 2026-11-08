@@ -3,6 +3,13 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
+Current delta: [read-only Source backing quota contraction](wp1225-general-repository-workspace-design.md#read-only-source-backing-quota-contraction).
+The Source-specific closed finalization proof now reduces eligible physical
+backing after complete seal/reap while preserving logical limits and large
+fallback. Its [acceptance receipt](wp1225-source-quota-acceptance-2026-11-08.json)
+records repeated authentic compiler/Homebrew A/B/A on one runtime and the fixed
+bank. The next frontier is the actual authentic Rust toolchain archive path;
+derived Source Path APIs are not assumed to be its first prerequisite.
 Baseline: d202a77e29b4fda077e69bc17ea4874c4635e22a.
 The [selected implementation design](wp1225-general-repository-workspace-design.md)
 owns the concrete protocol, rooted IO, quotas and file split.
@@ -78,9 +85,10 @@ including completed legacy replay and mixed native frontiers before progress IO.
 The inactive original compiler proof includes absent Homebrew then present
 A/B/A environment snapshots and actual wrapper changes/restoration across
 fresh runtimes on one bank, paired with same-DICE General environment/replay
-invalidation. Repeated authentic commands within the shared backing budget
-remain open after the warm attempt refused Resource; the recorded cap is
-unchanged. General production activation remains gated below. The selected design links owner
+invalidation. The separate Source backing-quota proof now closes the recorded
+warm compiler capacity refusal with four actual commands on one runtime and
+the unchanged bank. Full Archive/public Rust and equivalent-memory gates remain;
+General production activation stays gated below. The selected design links owner
 contracts and evidence; component chronology stays in receipts and Git.
 Predecessor [BuildInfo acceptance](wp1224-general-build-info-transform-acceptance-2026-10-18.json)
 is committed and post-verified. Inherited dirty work remains protected.
@@ -130,7 +138,7 @@ Both caller profiles retire atomically under the selected design's retirement
 boundary. Default Disabled Execute then refuses uniformly; later General
 activation remains atomic after its complete gates.
 Relevant owners: Bzlmod repository_execute/filesystem types; Loading repository
-context/path/file-effect leaves; Core repository_process/filesystem_progress/
+context/path/file-effect leaves; Core repository_source_root/process_owner/filesystem_progress/
 repository_io/source-generations and small private backing/confinement leaves.
 Pinned API semantics: [source contract](wp1225-repository-api-source-contract.md).
 Inherited [Stage5](05-bzlmod-and-repository-graph.md),

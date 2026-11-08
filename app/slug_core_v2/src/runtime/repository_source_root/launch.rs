@@ -11,6 +11,10 @@ use super::super::source::SourceRootBuilder;
 use super::*;
 use crate::runtime::repository_process_wire::RunMode;
 
+#[path = "readonly_quota.rs"]
+pub(in crate::runtime::repository_physical_root) mod readonly_quota;
+use readonly_quota::PendingSourceReadOnlyCompaction;
+
 pub(in crate::runtime::repository_physical_root) struct SourceMountSeed {
     clone: AttachedMountClone,
 }
@@ -193,6 +197,8 @@ pub(in crate::runtime::repository_physical_root) struct SourceFinalize {
     state_credit: ResourceCredit,
     incoming: Option<SourceMountSeed>,
     pending: Option<readonly::ReadOnlyMountClone>,
+    compaction: Option<PendingSourceReadOnlyCompaction>,
+    nonce: Option<[u8; 16]>,
     observer: super::super::progress::command::RepositoryWorkspaceRetirementObserver,
     _credit: ResourceCredit,
 }
@@ -219,6 +225,8 @@ impl SourceFinalize {
             state_credit,
             incoming: Some(incoming),
             pending: None,
+            compaction: None,
+            nonce: None,
             observer,
             _credit: credit,
         })
@@ -258,6 +266,12 @@ impl ProcessLaunch for SourceFinalize {
     fn namespace(&self) -> Result<Option<BorrowedFd<'_>>, PhysicalRootError> {
         Ok(Some(self.builder.domain.borrow_namespace()))
     }
+    fn bind_attempt(&mut self, nonce: &[u8; 16]) -> Result<(), PhysicalRootError> {
+        if self.nonce.replace(*nonce).is_some() {
+            return Err(PhysicalRootError::Reservation);
+        }
+        Ok(())
+    }
     fn transfer(
         &mut self,
         socket: BorrowedFd<'_>,
@@ -286,7 +300,7 @@ impl ProcessLaunch for SourceFinalize {
         words: [u64; 8],
         quota: Option<[u64; 8]>,
     ) -> Result<(), PhysicalRootError> {
-        if quota.is_some() || self.pending.is_some() {
+        if self.pending.is_some() || self.compaction.is_some() {
             return Err(PhysicalRootError::Mode);
         }
         let successor = super::launch::received_successor(
@@ -309,10 +323,17 @@ impl ProcessLaunch for SourceFinalize {
                 .clone
                 .detached
             || !same_backing(successor.attached, self.builder.identity)
-            || backing_identity(&attached, RepositoryWorkspaceMode::Archive)? != successor.attached
         {
             return Err(PhysicalRootError::Backing);
         }
+        self.compaction = Some(PendingSourceReadOnlyCompaction::receive(
+            &self.builder,
+            &successor,
+            &attached,
+            quota.ok_or(PhysicalRootError::Mode)?,
+            self.nonce.ok_or(PhysicalRootError::Reservation)?,
+            &self.builder.scope,
+        )?);
         self.pending = Some(
             readonly::ReadOnlyMountClone::from_received_clone(successor)
                 .map_err(PhysicalRootError::mount)?,
@@ -323,15 +344,20 @@ impl ProcessLaunch for SourceFinalize {
         mut self,
         capture: ReapedCapture,
     ) -> Result<FinalizedSource, PhysicalRootError> {
-        capture
-            .binding()
-            .verify_finalize(self.builder.identity, RunMode::FinalizeSourceArchive)?;
+        capture.binding().verify_finalize_attempt(
+            self.builder.identity,
+            RunMode::FinalizeSourceArchive,
+            &self.nonce.ok_or(PhysicalRootError::Reservation)?,
+        )?;
         if capture.return_code() != 0
             || !capture.stdout().is_empty()
             || !capture.stderr().is_empty()
         {
             return Err(PhysicalRootError::Snapshot);
         }
+        let compaction = self.compaction.take().ok_or(PhysicalRootError::Mode)?;
+        compaction.stage_after_reap(&mut self.builder, &capture)?;
+        // No writable setup token survives complete digest-tree sealing.
         drop(self.incoming.take());
         let domain = self.builder.domain.clone();
         let scope = self.builder.scope.clone();
@@ -339,9 +365,13 @@ impl ProcessLaunch for SourceFinalize {
         let receipt =
             self.builder
                 .seal(self.state, PathObservationEpoch::empty(), &scope, &|| true)?;
+        let pending = self.pending.take().ok_or(PhysicalRootError::Mode)?;
+        // Full debit survives reap, original-FD re-attestation, complete tree
+        // verification and the exact matching read-only successor proof.
+        compaction.commit(receipt.root(), &pending, &capture)?;
         let view = readonly::FinalizedRepositoryView::bind_source(
             &receipt,
-            self.pending.take().ok_or(PhysicalRootError::Mode)?,
+            pending,
             domain,
             &scope,
             &|| true,

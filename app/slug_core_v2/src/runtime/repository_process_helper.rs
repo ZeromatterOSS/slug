@@ -230,7 +230,10 @@ fn run_checked(plan: &RunPlan) -> Result<()> {
             &[],
         )?;
     }
-    let compact_quota = if plan.mode == RunMode::FinalizeArchive {
+    let compact_quota = if matches!(
+        plan.mode,
+        RunMode::FinalizeArchive | RunMode::FinalizeSourceArchive
+    ) {
         let (before, after) = readonly_quota::compact_attached(
             attached.as_ref().ok_or_else(|| invalid(6))?,
             Path::new(plan.display.to_str().map_err(|_| invalid(6))?),

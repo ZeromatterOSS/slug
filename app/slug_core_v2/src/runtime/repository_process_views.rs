@@ -135,7 +135,7 @@ impl ViewDataRoot {
     fn frozen_quota(&self) -> Option<FrozenArchiveQuota> {
         match self {
             Self::Workspace(root) => root.frozen_archive_quota,
-            Self::Source(_) => None,
+            Self::Source(root) => root.frozen_archive_quota,
         }
     }
     fn native_quota(&self) -> (u64, u64) {

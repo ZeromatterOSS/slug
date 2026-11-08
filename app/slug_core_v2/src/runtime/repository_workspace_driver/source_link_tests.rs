@@ -104,9 +104,7 @@ fn prepare_protobuf_sources(workspace: &Path, inputs: &Path) {
     std::fs::write(root.join("MODULE.bazel"),"module(name='protobuf',version='33.4')\nbazel_dep(name='bazel_features',version='1.42.1',repo_name='proto_bazel_features')\n").unwrap();
 }
 
-#[test]
-#[ignore = "actual compiled CLI + unchanged authentic cc_autoconf + native compiler; supervised Linux gate required"]
-fn native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probes() {
+fn authentic_cc_autoconf_environment_sequence(warm: bool) {
     let (workspace, policy) = original_workspace("", "empty");
     let inputs = verified_source_fixture(workspace.path());
     prepare_protobuf_sources(workspace.path(), &inputs);
@@ -143,12 +141,12 @@ fn native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probe
         .unwrap()
         .to_string()];
     let mut wrapper_observations = Vec::new();
+    let mut retained_runtime = None;
     // First protect the ordinary branch, then change an undeclared environment
-    // value under Homebrew A/B/A. Use fresh runtimes on one persistent bank,
-    // refunding every native owner between cases: retained prior Source roots
-    // plus this authentic bootstrap exceed the fixed bank on a warm runtime.
-    // Warm environment invalidation is proved separately on one DICE engine.
-    // Every case still samples original compiler calls and actual templates.
+    // value under Homebrew A/B/A. Protect cold per-runtime execution and repeat
+    // the same actual originals on one retained runtime. Both use one persistent
+    // bank and retain its existing caps; no result eviction or scope renewal is
+    // used to make warm bootstrap fit. Only output identities survive cold cases.
     for (case, extra) in [None, Some("x'y%z"), Some("changed'percent%"), Some("x'y%z")]
         .into_iter()
         .enumerate()
@@ -166,12 +164,15 @@ fn native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probe
             RepositoryEnvironmentEntry::new("_", "underscore-must-be-filtered"),
         ]);
         let environment = RepositoryEnvironmentSnapshot::from_canonical(entries).unwrap();
-        let mut runtime =
-            WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
+        let runtime = retained_runtime.get_or_insert_with(|| {
+            let mut runtime =
+                WorkspaceRuntime::new(workspace.path(), crate::runtime::ProcessHostOwner::native())
+                    .unwrap();
+            runtime
+                .enable_general_repository_workspaces_for_test(resources.clone(), limits())
                 .unwrap();
-        runtime
-            .enable_general_repository_workspaces_for_test(resources.clone(), limits())
-            .unwrap();
+            runtime
+        });
         let accepted = runtime
             .cquery_command_with_repository_environment_and_distdirs(
                 "//:use",
@@ -301,11 +302,23 @@ fn native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probe
             }
         }
         drop(accepted);
-        drop(runtime);
         let snapshot = resources.snapshot();
-        assert_eq!(snapshot.native_fds, 0, "case {case}");
-        assert_eq!(snapshot.backing_bytes, 0, "case {case}");
-        assert_eq!(snapshot.retained_bytes, baseline, "case {case}");
+        eprintln!(
+            "SourceQuotaOriginal warm={warm} case={case} backing={} peak_backing={} retained={} peak_retained={} fds={} peak_fds={}",
+            snapshot.backing_bytes,
+            snapshot.peak_backing_bytes,
+            snapshot.retained_bytes,
+            snapshot.peak_retained_bytes,
+            snapshot.native_fds,
+            snapshot.peak_native_fds,
+        );
+        if !warm {
+            drop(retained_runtime.take());
+            let snapshot = resources.snapshot();
+            assert_eq!(snapshot.native_fds, 0, "case {case}");
+            assert_eq!(snapshot.backing_bytes, 0, "case {case}");
+            assert_eq!(snapshot.retained_bytes, baseline, "case {case}");
+        }
     }
     assert_ne!(wrapper_observations[0].1, wrapper_observations[1].1);
     assert_ne!(wrapper_observations[1], wrapper_observations[2]);
@@ -313,8 +326,21 @@ fn native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probe
         wrapper_observations[1], wrapper_observations[3],
         "restored full environment restores wrapper bytes and content identity"
     );
+    drop(retained_runtime);
     let snapshot = resources.snapshot();
     assert_eq!(snapshot.native_fds, 0);
     assert_eq!(snapshot.backing_bytes, 0);
     assert_eq!(snapshot.retained_bytes, baseline);
+}
+
+#[test]
+#[ignore = "actual compiled CLI + unchanged authentic cc_autoconf + native compiler; supervised Linux gate required"]
+fn native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probes() {
+    authentic_cc_autoconf_environment_sequence(false);
+}
+
+#[test]
+#[ignore = "actual compiled CLI + unchanged original compiler/Homebrew A/B/A on one retained runtime and fixed bank"]
+fn native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources() {
+    authentic_cc_autoconf_environment_sequence(true);
 }

@@ -1,4 +1,5 @@
-//! Physical compaction of a General Archive that is being irreversibly sealed.
+//! Physical compaction of an Archive that is being irreversibly sealed.
+//! General and Source owners use distinct closed reservation proofs.
 //! Semantic mode/history are unchanged. The old capacity debit remains armed
 //! through actual reap, complete seal and exact readonly successor acceptance.
 use super::quota::QuotaFacts;
@@ -25,7 +26,7 @@ impl FrozenArchiveQuota {
             Self::CompactArchive => (PROCESS_BYTES, 8192),
         }
     }
-    fn select(facts: QuotaFacts) -> Self {
+    pub(in crate::runtime::repository_physical_root) fn select(facts: QuotaFacts) -> Self {
         if facts.allocated <= PROCESS_BYTES && facts.used_inodes <= 8192 {
             Self::CompactArchive
         } else {

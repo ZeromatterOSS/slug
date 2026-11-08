@@ -10,6 +10,8 @@ use super::*;
 use crate::runtime::dice::source_service::SourceServiceLimits;
 use crate::runtime::repository_io::RepositoryMaterializer;
 
+#[path = "tests/readonly_quota.rs"]
+mod readonly_quota;
 #[path = "tests/source_link_actor.rs"]
 mod source_link_actor;
 #[path = "tests/source_links.rs"]
@@ -457,6 +459,10 @@ fn native_source_roots_keep_large_digest_only_data_and_original_scope_after_cont
         false,
     )
     .unwrap();
+    readonly_quota::assert_frozen_source(
+        &a,
+        crate::runtime::repository_physical_root::mount_lease::readonly_quota::FrozenArchiveQuota::FullArchive,
+    );
     assert!(a.state().file_bytes() > 64 * 1024 * 1024);
     assert!(a.state().tree_storage_bytes().unwrap() < 1024 * 1024);
     assert!(
@@ -516,6 +522,10 @@ fn native_source_roots_keep_large_digest_only_data_and_original_scope_after_cont
         false,
     )
     .unwrap();
+    readonly_quota::assert_frozen_source(
+        &b,
+        crate::runtime::repository_physical_root::mount_lease::readonly_quota::FrozenArchiveQuota::FullArchive,
+    );
     assert_eq!(a_display, *b.reservation().display_root());
     assert_ne!(a_root.reservation().instance(), b.reservation().instance());
     assert!(a_root.open_member("a", &b_scope, &|| true).is_err());

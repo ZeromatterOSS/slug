@@ -50,7 +50,10 @@ impl RunMode {
         )
     }
     pub fn expects_quota(self) -> bool {
-        matches!(self, Self::FirstExecute | Self::FinalizeArchive)
+        matches!(
+            self,
+            Self::FirstExecute | Self::FinalizeArchive | Self::FinalizeSourceArchive
+        )
     }
 }
 impl TryFrom<u8> for RunMode {

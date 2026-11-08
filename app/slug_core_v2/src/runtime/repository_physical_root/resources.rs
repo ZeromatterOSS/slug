@@ -327,6 +327,51 @@ impl RepositoryRootBacking {
 }
 
 impl RepositoryRootBacking {
+    /// Source-only irreversible accounting transition. The proof is minted
+    /// after actual reap, complete Source seal and exact readonly acceptance.
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(super) fn freeze_source_archive(
+        &self,
+        proof: &super::mount_lease::source::readonly_quota::VerifiedSourceReadOnlyCompaction<'_>,
+    ) -> Result<(), PhysicalRootError> {
+        let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        let (identity, reservation) = state
+            .source_binding
+            .as_ref()
+            .ok_or(PhysicalRootError::Backing)?;
+        let claim = state
+            .source_snapshot_claim
+            .as_ref()
+            .ok_or(PhysicalRootError::Reservation)?;
+        if state.mode != RepositoryWorkspaceMode::Archive
+            || state.frozen_archive_quota.is_some()
+            || state.binding.is_some()
+            || state.claim.is_some()
+            || state.credit.slots.backing != ARCHIVE_BYTES
+            || !proof.matches_binding(self, *identity, reservation, claim)
+        {
+            return Err(PhysicalRootError::Backing);
+        }
+        let class = proof.class();
+        let delta = ARCHIVE_BYTES
+            .checked_sub(class.bytes())
+            .ok_or(PhysicalRootError::Resource)?;
+        let mut usage = self
+            .resources
+            .usage
+            .lock()
+            .map_err(|_| PhysicalRootError::Resource)?;
+        if usage.backing < state.credit.slots.backing {
+            return Err(PhysicalRootError::Resource);
+        }
+        usage.backing = usage
+            .backing
+            .checked_sub(delta)
+            .ok_or(PhysicalRootError::Resource)?;
+        state.credit.slots.backing = class.bytes();
+        state.frozen_archive_quota = Some(class);
+        Ok(())
+    }
     pub(super) fn bind_source_claim(
         &self,
         reservation: &slug_bzlmod_v2::RepositorySourceSnapshotReservation,
@@ -336,7 +381,8 @@ impl RepositoryRootBacking {
             return Err(PhysicalRootError::Reservation);
         }
         let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
-        if state.claim.is_some()
+        if state.frozen_archive_quota.is_some()
+            || state.claim.is_some()
             || state.binding.is_some()
             || state
                 .source_binding
@@ -360,7 +406,8 @@ impl RepositoryRootBacking {
         reservation: &Arc<slug_bzlmod_v2::RepositorySourceSnapshotReservation>,
     ) -> Result<(), PhysicalRootError> {
         let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
-        if state.claim.is_some() || state.binding.is_some() {
+        if state.frozen_archive_quota.is_some() || state.claim.is_some() || state.binding.is_some()
+        {
             return Err(PhysicalRootError::Reservation);
         }
         if let Some((old, r)) = &state.source_binding {

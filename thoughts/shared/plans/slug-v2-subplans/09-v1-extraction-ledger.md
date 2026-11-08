@@ -150,7 +150,15 @@ frozen quota class follows the exact concrete data root and read-only successor;
 it freezes before immutable publication. Actual quota lowering, parent
 re-attestation, full seal and real helper reap precede the shared debit change.
 Small eligibility uses charged block/inode units, with large/inode fallback to
-the full Archive quota. Pure State.mode/history and Source quotas stay unchanged.
+the full Archive quota. The accepted General-only component kept pure
+State.mode/history and Source quotas unchanged. The current Source extension
+reuses only its numeric physical facts/classifier and same-root remount leaf;
+a distinct genuine Source reservation/claim/nonce proof precedes its own
+shared backing debit commit. Logical Source limits/identity remain unchanged;
+only consuming read-only physical finalization freezes its measured class.
+The [Source quota receipt](wp1225-source-quota-acceptance-2026-11-08.json) records
+native same-FD/old-debit/fallback/refusal/lifetime proof and repeated original
+compiler commands within one fixed bank, without claiming equivalent RSS fit.
 This introduces no donor, cache, interner, cap increase or whole-workload memory
 claim; physical quota capacity remains covered throughout handoff.
 

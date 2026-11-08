@@ -1,0 +1,737 @@
+{
+  "status": "ACCEPTED_INACTIVE_SOURCE_QUOTA_COMPONENT",
+  "date": "2026-11-08",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "a2028d867e8023787b23b544cece85deb3323d23",
+  "capability_advanced": "Consuming Source-specific physical readonly quota contraction closes the recorded repeated authentic compiler backing refusal under the unchanged bank. Four genuine absent/Homebrew A/B/A commands now pass on one retained runtime; default General remains Disabled.",
+  "compatibility": {
+    "slug_native": "Actual same-tmpfs physical capacity contraction for quiescent sealed Source roots, closed custody and conservative backing-credit lifetime. Eligibility is actual allocated block bytes and charged inode units, never caller identity.",
+    "exact_inherited_slice": "Unchanged verified rules_cc0.2.17 original compiler probes, both Source links and ordinary linked .bzl loading, actual cc/deps wrapper bytes with quote/percent escaping and underscore/dotted env filtering, normal logical Source metadata/SHA/EOF/CAS/runfiles behavior.",
+    "unsupported_unchanged": "Default repository Execute/legacy replay, general production activation, full authentic Rust/archive closure, derived Source Path/reserved-string cases, Legacy LocalTar and external Source-to-Source graph cases. No Bazel physical quota or RSS parity claim."
+  },
+  "contract": {
+    "logical_source": "Existing256MiB total manifest,64MiB/file,8192 entries and current path/link bounds unchanged. Digest metadata retains no file bodies; no General history or Execute record is invented. Semantic Eq/content identity are unchanged.",
+    "physical": "Full2GiB/262144 bootstrap/copy custody. At consuming role6 finalization, actual allocated<=64MiB and charged inodes<=8192 permit CompactArchive64MiB/8192; otherwise freeze FullArchive2GiB/262144.",
+    "proof": "Source-specific pending/verified proof binds genuine Source reservation/claim/backing, original scope/bank, root/devino/mount, role6, exact nonce and RO successor/domain. Full old debit survives actual bound reap, original-FD quota/identity reattestation, complete digest-tree seal and exact RO acceptance. Source-only atomic backing commit precedes publication.",
+    "lifetime": "Sealed Source/RO renewal/observers/member readers carry the frozen class; reads never infer it. Both Full and Compact frozen owners reject mutable bootstrap/bind/claim admission. Data leases contain no namespace/remount control. Precommit failure retains old debit through retirement; postcommit cleanup uses the actual matching frozen debit. Original clocks and A-scope/B-remint refusal remain."
+  },
+  "discriminating_evidence": [
+    "Five new real native Source tests: unchanged originalFD/root identity and actual compact quota; preACK original2GiB+helperTEMP debit; wrong nonce/facts/foreign claim, post-successor refusal/cancel and full-seal drift all refuse without publication or premature refund; retained reader lastDrop refunds; two actual readonly child Executes renew the same view while data outlives controllers.",
+    "Actual inode fallback has7935 logical entries,8695 charged inode units and69632 allocated bytes, isolating inode pressure within Source logical bounds. Real Compact and Full owners reject matches(Archive), same-reservation bind_source and same-claim bind_source_claim without changing facts/debit.",
+    "Protected two33MiB Source files remain full physical Archive with explicit frozenFull/actual2GiB quota, normal reader/child transport and original-scope lifetime. The small A/B captured-source test now expects the actual2x64MiB debit and explicit compact classes, without weakening its identity/provenance/refusal checks.",
+    "Warm actual original proof: one runtime, one persistent bank, four commands absent then HomebrewEXTRA A/B/A, actual compiler records and original Source-backed configuration Loading on every command. Both wrapper bodies/content IDs restoreA; no eviction or scope renewal is introduced. Cold per-runtime proof also passes with complete refunds between all cases. Both sequences refund all FD/backing/retained credits after final runtime drop."
+  ],
+  "fixed_resources": {
+    "retained_bank_bytes": 536870912,
+    "native_fd_bank": 512,
+    "backing_bank_bytes": 8589934592,
+    "process_tree_bytes": 67108864,
+    "executes_per_command": 128,
+    "output_bytes_per_stream": 1048576,
+    "operational_process_seconds": 30,
+    "native_supervision_seconds": 60,
+    "source_logical_bytes": 268435456,
+    "source_file_bytes": 67108864
+  },
+  "warm_measurements": [
+    {
+      "warm": true,
+      "case": 0,
+      "backing_bytes": 335544320,
+      "peak_backing_bytes": 4467986432,
+      "retained_bytes": 2613255,
+      "peak_retained_bytes": 22190607,
+      "native_fds": 5,
+      "peak_native_fds": 265
+    },
+    {
+      "warm": true,
+      "case": 1,
+      "backing_bytes": 335544320,
+      "peak_backing_bytes": 4803530752,
+      "retained_bytes": 2618855,
+      "peak_retained_bytes": 24802622,
+      "native_fds": 5,
+      "peak_native_fds": 270
+    },
+    {
+      "warm": true,
+      "case": 2,
+      "backing_bytes": 335544320,
+      "peak_backing_bytes": 4803530752,
+      "retained_bytes": 2619141,
+      "peak_retained_bytes": 24806694,
+      "native_fds": 5,
+      "peak_native_fds": 270
+    },
+    {
+      "warm": true,
+      "case": 3,
+      "backing_bytes": 335544320,
+      "peak_backing_bytes": 4803530752,
+      "retained_bytes": 2618855,
+      "peak_retained_bytes": 24806980,
+      "native_fds": 5,
+      "peak_native_fds": 270
+    },
+    {
+      "warm": false,
+      "case": 0,
+      "backing_bytes": 335544320,
+      "peak_backing_bytes": 4467986432,
+      "retained_bytes": 2613255,
+      "peak_retained_bytes": 22190607,
+      "native_fds": 5,
+      "peak_native_fds": 265
+    },
+    {
+      "warm": false,
+      "case": 1,
+      "backing_bytes": 335544320,
+      "peak_backing_bytes": 4467986432,
+      "retained_bytes": 2617327,
+      "peak_retained_bytes": 22190607,
+      "native_fds": 5,
+      "peak_native_fds": 265
+    },
+    {
+      "warm": false,
+      "case": 2,
+      "backing_bytes": 335544320,
+      "peak_backing_bytes": 4467986432,
+      "retained_bytes": 2617613,
+      "peak_retained_bytes": 22190607,
+      "native_fds": 5,
+      "peak_native_fds": 265
+    },
+    {
+      "warm": false,
+      "case": 3,
+      "backing_bytes": 335544320,
+      "peak_backing_bytes": 4467986432,
+      "retained_bytes": 2617327,
+      "peak_retained_bytes": 22190607,
+      "native_fds": 5,
+      "peak_native_fds": 265
+    }
+  ],
+  "capacity_interpretation": {
+    "inherited_refusal": "wp1225-profile-retirement-acceptance-2026-11-08.json records101 Resource at bootstrap after7.7508s, observed peak6883905536 backing and2415919104 post-abort backing (2GiB Source+4x64MiB General). Exact rejected root was not inferred from aggregate counters.",
+    "candidate": "Four completed same-runtime commands keep accepted backing335544320 bytes (5x64MiB), observed peak4803530752. This closes that specific backing capacity gap. An eligible Source allowance decreases by1984MiB, with complete physical proof before refund.",
+    "limits": "These are virtual backing/credited retained/FD observations. The old command was incomplete; no completed control/candidate RSS ratio, speedup, kernel/slab bound or whole-workload memory acceptance is established."
+  },
+  "source_authority": {
+    "design": "wp1225-general-repository-workspace-design.md#read-only-source-backing-quota-contraction",
+    "reuse": "Existing same-owning-namespace remount/fstatvfs classifier and generic process owner; General reservation proof is not weakened or reused as Source authority. Existing Arc/Allocative/lastDrop credits, no donor import/cache/interner/dependency/cap increase.",
+    "source_caps": "slug_bzlmod_v2/src/repository_source_snapshot.rs constants are unchanged.",
+    "inherited_originals": "wp1225-profile-retirement-acceptance-2026-11-08.json and wp1225-source-links-acceptance-2026-11-08.json retain the verified release/pinned source/fixture topology. No new upstream corpus or result/provider rewrite.",
+    "next_bootstrap_frontier": "Verified rules_rust0.73 rust/private/repositories.bzl367-508 and repository_utils.bzl922-1008 perform real download_and_extract. Their named toolchain path does not demand derived Source dirname/get_child/readdir; actual archive admission must be probed, not inferred from limits. Crate-vendor derived paths remain a different future original/API family."
+  },
+  "source_sha256": [
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_physical_root/resources.rs",
+      "sha256": "e5fc7f937fb5486a1e6e5f3c26ae0709eae7f1b397a1990fa946030fbfdb4b71"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_process_helper.rs",
+      "sha256": "15c74d2375f03460e996f89bcc0675a2a6d22e079a7731afa7c54cc60ee42259"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_process_views.rs",
+      "sha256": "5be7d540592b2257221d14ed7e5d8833135fc2d5e816594654d1f3abc75315d9"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_process_wire.rs",
+      "sha256": "c01284149fcceccdc45c3dd8abdfaff9aed48fccded4fad848bd19195f16a42b"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_readonly_quota.rs",
+      "sha256": "67ad179abeea3363fa44516c333de7c96234e099c3e4f7e427bf9b1da9b78bc3"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_source_root.rs",
+      "sha256": "a37f104dc03b5de93ba2954331cf39bb79d6da04044b141485b6eb6541146086"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_source_root/launch.rs",
+      "sha256": "36ac1af54813a4d260adbea12b6113138e7f98bc04a15bbf168d61bb86a95fc6"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_source_root/readonly_quota.rs",
+      "sha256": "2cf0f3033502020dc74ae727c4a396b377cc2572ead0887d5d3cc36f19deeb63"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_source_root/tests.rs",
+      "sha256": "ecfb132531721d8a3fec55228dbad71071d6b8438f5dc402b6854c30ac5bd906"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_source_root/tests/readonly_quota.rs",
+      "sha256": "2807ca058bf8cb7054de0897f0938a07949b1961857feb5f402bbc0e629dbbda"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_source_root/tests/transport.rs",
+      "sha256": "dafd0c37fe206ff0bd4bcbec773f11bcd5b32e4616984cf263176a4630700f74"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/repository_workspace_driver/source_link_tests.rs",
+      "sha256": "1f230aed28c02ec829108089e1cdf5cf768c4b006fbdf6ada90e5b271d94eb7d"
+    }
+  ],
+  "validation": {
+    "unique_passing": 439,
+    "ordinary_unique_passing": 374,
+    "native_selected_ignored_passing": 65,
+    "inherited_failures": [
+      "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+      "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+      "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+      "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder",
+      "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error"
+    ],
+    "records": [
+      {
+        "selected": 309,
+        "exit_code": 101,
+        "elapsed_seconds": 18.42889804900915,
+        "executable_sha256": "db6a4a7fee73b6f93b0fbdefea22173d599c372162c07e5c26daad2b90909a90",
+        "failures": [
+          "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+          "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error"
+        ],
+        "known_baseline_failures": [
+          "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+          "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error"
+        ],
+        "record": "source-quota-core-unit.json",
+        "target": "slug_core_v2",
+        "passing": 304,
+        "selection_sha256": "048b8548d12931d6c02cab215a9fadb132020ff9fb9e329e50a37ef241e4ce65",
+        "selection": {
+          "same_recorded_owner_prefixes_as": "wp1225-profile-retirement-acceptance-2026-11-08.json",
+          "exact_selected": 309
+        }
+      },
+      {
+        "target": "slug_reapi_v2",
+        "selected": 53,
+        "passed": 53,
+        "exit_code": 0,
+        "elapsed_seconds": 2.04812780598877,
+        "executable_sha256": "c1ef33daea4b3338f5f40e1a06354618d9ff8c9d4407a074443875f15b6e119a",
+        "record": "source-quota-extra.json",
+        "passing": 53,
+        "selection_sha256": "8d5afa5afe326efbd57aeccd112671a6913bc2c652d208ee419b76f0c71da08a",
+        "selection": [
+          "action_chain::artifact_symlink::tests::alias_chains_preserve_source_mode_and_terminal_byte_authority",
+          "action_chain::artifact_symlink::tests::alias_results_require_exact_producer_and_keep_equal_digest_provenance",
+          "action_chain::artifact_symlink::tests::remote_mode_false_alias_is_executable_and_local_manifest_keeps_bytes",
+          "action_chain::artifact_symlink_tests::source_artifact_alias_execute_permission_changes_without_backend",
+          "action_chain::binding::tests::runfiles_aliases_empty_files_and_trees_keep_distinct_provenance",
+          "action_chain::binding::tests::runfiles_binding_requires_exact_completed_tree_and_target_results",
+          "action_chain::binding::tests::runfiles_preflight_reserves_root_and_logical_tree_namespaces",
+          "action_chain::binding::tests::workspace_status_cannot_bind_as_source_or_generated_input",
+          "action_chain::files_to_run_tests::files_to_run_output_namespace_conflict_rejects_before_connection",
+          "action_chain::local_results_tests::local_manifest_binding_preserves_plan_ordinals_and_remote_cas_provenance",
+          "action_chain::local_results_tests::requested_local_manifest_completes_without_backend_or_remote_result",
+          "action_chain::output_staging::requested_publication_tests::requested_publication_projects_subsets_and_checks_unselected_cooutputs",
+          "action_chain::output_staging::requested_publication_tests::requested_publication_rejects_incomplete_table_invalid_producer_and_subset",
+          "action_chain::output_staging::tests::local_output_reconciliation_checks_full_schema_and_preserves_virtual_kind",
+          "action_chain::output_staging::tests::selected_output_schema_rejects_missing_extra_duplicate_and_wrong_kind",
+          "action_chain::requested_tests::requested_later_policy_failure_precedes_connection",
+          "action_chain::requested_tests::requested_source_only_does_not_connect_real_reapi_transport",
+          "action_chain::requested_tests::requested_templates_bind_shared_producer_and_keep_all_root_results",
+          "action_chain::tests::chain_start_uses_current_consumer_cancellation_before_connection",
+          "action_chain::tests::empty_tree_namespace_rejects_descendants_and_outputs_but_allows_siblings",
+          "action_chain::tests::resource_chain_preflight_retains_failing_original_without_invoking_it",
+          "action_chain::tests::whole_chain_preflight_rejects_downstream_policy_and_empty_tree_param_collision",
+          "executor::tests::configured_materialization_rejects_constant_metadata_before_writes",
+          "executor::tests::file_write_action_key_is_not_the_reapi_action_digest",
+          "executor::tests::file_write_plan_identity_discriminates_and_restores",
+          "executor::tests::file_write_plan_owns_canonical_nul_safe_reapi_objects",
+          "executor::tests::reserved_namespace_and_raw_file_write_fail_closed",
+          "executor::tests::selected_platform_properties_replace_defaults_as_a_whole",
+          "executor::tests::transport_timeout_cannot_salt_file_write_action",
+          "input_tree::tests::build_info_marker_and_constant_outputs_fail_before_digest_projection",
+          "input_tree::tests::existing_entry_constructor_executable_policy_is_preserved",
+          "input_tree::tests::explicit_directories_and_file_modes_have_canonical_wire_encoding",
+          "input_tree::tests::file_directory_ancestor_and_same_digest_mode_conflicts_reject",
+          "input_tree::tests::param_composition_preserves_directories_and_explicit_executable_policy",
+          "output_tree::tests::malformed_tree_rejects_paths_topology_properties_and_integrity",
+          "output_tree::tests::result_shape_requires_exact_output_types_and_sets",
+          "output_tree::tests::tree_resource_limits_are_aggregate_and_checked_before_expansion",
+          "output_tree::tests::verified_tree_preserves_empty_directories_repeated_subtrees_and_modes",
+          "requested_build::tests::bare_remote_options_cannot_silently_drop_policy",
+          "requested_build::tests::evidence_counts_all_prerequisites_but_only_published_producer_subsets",
+          "requested_build::tests::malformed_header_errors_never_retain_or_render_the_value",
+          "requested_build::tests::mixed_runfiles_results_keep_producer_indices_without_inventing_remote_evidence",
+          "requested_build::tests::zero_action_evidence_succeeds_without_materialization_or_daemon_fields",
+          "source_execution::tests::different_original_resource_callbacks_preserve_identical_reapi_command_and_action_bytes",
+          "source_execution::tests::native_directory_declarations_and_command_paths_follow_retained_kinds",
+          "source_execution::tests::source_counter_preserves_original_and_refuses_callback_free_prepared_action",
+          "source_execution::tests::unsupported_source_transport_policy_fails_before_connecting",
+          "source_spawn::tests::linux_shell_source_plan_uses_bazel_argv_without_a_shell_input",
+          "source_spawn::tests::native_spawn_plan_preserves_fields_and_content_identity",
+          "source_spawn::tests::native_spawn_plan_rejects_unmodeled_policy_and_output_collisions",
+          "source_spawn::tests::native_spawn_projection_uses_current_consumer_cancellation_before_digest",
+          "source_spawn::tests::output_projection_rejects_unsupported_kinds_and_malformed_paths",
+          "source_staging::tests::source_merkle_nodes_are_executable_and_paths_are_structural"
+        ]
+      },
+      {
+        "target": "slug_core_v2",
+        "selected": 22,
+        "passed": 22,
+        "exit_code": 0,
+        "elapsed_seconds": 1.2233741029922385,
+        "executable_sha256": "db6a4a7fee73b6f93b0fbdefea22173d599c372162c07e5c26daad2b90909a90",
+        "record": "source-quota-extra.json",
+        "passing": 22,
+        "selection_sha256": "b2e2f3c11a196c9dd01d25c45411a44a9ad36c8b84af3151977b81341b8026ef",
+        "selection": [
+          "runtime::action_output_staging::linux::runfiles::tests::runfiles_seal_checks_exact_contents_and_preflight_rejects_changed_destinations",
+          "runtime::action_output_staging::linux::runfiles::tests::runfiles_topology_rejects_leaf_prefix_manifest_and_workspace_conflicts_before_staging",
+          "runtime::action_output_staging::linux::runfiles::tests::typed_runfiles_tree_replaces_links_and_preserves_targets_modes_and_workspace",
+          "runtime::dice::action_chain_staging::tests::requested_staging_certifies_group_only_sources_and_keeps_selection_identity",
+          "runtime::dice::action_chain_staging::tests::requested_staging_retains_source_only_empty_and_no_target_frontiers",
+          "runtime::dice::requested_artifacts::tests::runfiles_build_tests::native_binary_preflight_observes_hidden_sources_and_couples_manifest_publication",
+          "runtime::dice::requested_artifacts::tests::runfiles_build_tests::native_runfiles_manifest_overlay_preserves_authored_bytes_and_rejects_late_prefix_conflicts",
+          "runtime::dice::requested_artifacts::tests::runfiles_build_tests::native_runfiles_warnings_are_selected_once_and_restore_after_removal",
+          "runtime::dice::requested_artifacts::tests::runfiles_generation_tests::native_materialized_runfiles_generations_survive_restore_and_runtime_shutdown",
+          "runtime::dice::requested_artifacts::tests::runfiles_layout_tests::configured_binary_layout_retains_backing_artifacts_and_held_a_b_a_without_effects",
+          "runtime::dice::requested_artifacts::tests::runfiles_manifest_tests::native_manifest_bytes_and_source_content_restore_without_effects",
+          "runtime::dice::requested_artifacts::tests::runfiles_manifest_tests::native_manifest_external_mapping_and_configuration_paths_are_owned",
+          "runtime::dice::requested_artifacts::tests::runfiles_manifest_tests::native_manifest_observes_overridden_source_constituents",
+          "runtime::dice::requested_artifacts::tests::runfiles_manifest_tests::native_manifest_source_symlink_keeps_requested_path_and_tracks_retargeting",
+          "runtime::repository_physical_root::process_owner::tests::borrowed_plan_forecast_checks_exact_cap_plus_one_and_overflow",
+          "runtime::repository_physical_root::process_owner::tests::capture_exact_and_plus_one_caps_apply_independently_to_each_stream",
+          "runtime::repository_physical_root::process_owner::tests::capture_handles_eintr_eagain_eof_and_bounded_turn_fairness",
+          "runtime::repository_physical_root::process_owner::tests::capture_refuses_before_allocation_when_credit_is_insufficient",
+          "runtime::repository_physical_root::process_owner::tests::monitor_record_parser_rejects_duplicates_escapes_and_unknown_fields",
+          "runtime::repository_physical_root::process_owner::tests::only_actual_normal_wait_status_with_echild_can_complete",
+          "runtime::repository_physical_root::process_owner::tests::private_monitor_status_requires_actual_terminal_record_not_ordinary_exit",
+          "runtime::repository_physical_root::process_owner::tests::unavailable_closefrom_has_no_unguarded_spawn_fallback"
+        ]
+      },
+      {
+        "selected": 5,
+        "exit_code": 0,
+        "elapsed_seconds": 1.2653024549945258,
+        "deadline_seconds": 60,
+        "stream_limit_bytes": 1048576,
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "umask": "0002",
+        "executable_sha256": "db6a4a7fee73b6f93b0fbdefea22173d599c372162c07e5c26daad2b90909a90",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "record": "source-quota-native-components.json",
+        "target": "slug_core_v2",
+        "passing": 5,
+        "selection_sha256": "dd3937b0f40a45126d38b9f179c0dc825e7a4a2eb0a9a9643a80460753bf2ba4",
+        "selection": [
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_compact_source_views_remain_readonly_across_two_executes_and_data_outlives_controllers",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_small_source_contraction_keeps_original_identity_old_debit_until_reap_and_last_reader",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_source_contraction_cannot_borrow_another_reservations_claim",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_source_contraction_keeps_full_quota_when_actual_charged_inodes_cross_compact_allowance",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_source_contraction_refusals_reap_without_publishing_or_refunding_live_backing"
+        ]
+      },
+      {
+        "selected": 56,
+        "exit_code": 0,
+        "elapsed_seconds": 16.731790669000475,
+        "deadline_seconds": 60,
+        "stream_limit_bytes": 1048576,
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "umask": "0002",
+        "executable_sha256": "db6a4a7fee73b6f93b0fbdefea22173d599c372162c07e5c26daad2b90909a90",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "record": "source-quota-native-all.json",
+        "target": "slug_core_v2",
+        "passing": 56,
+        "selection_sha256": "ed6313ca3411e8dd05a470a035ba3d11a0fea482f277c0befaa34d704f316b9a",
+        "selection": [
+          "runtime::dice::repository_workspace_driver::tests::native_frontier_refuses_foreign_predecessor_and_future_index_before_new_root_setup",
+          "runtime::dice::repository_workspace_driver::tests::native_original_cancellation_keeps_session_open_until_bootstrap_or_payload_retires",
+          "runtime::dice::repository_workspace_driver::tests::native_original_starlark_uses_general_needs_normal_records_and_same_root_adoption",
+          "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_builtin_source_is_fresh_across_commands",
+          "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+          "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_local_source_is_recaptured_across_commands",
+          "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_mixed_source_set_is_visible_to_one_process",
+          "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_workspace_source_is_recaptured_across_commands",
+          "runtime::repository_io::process_views::tests::native_selected_execute_rechecks_unused_source_after_actual_record_before_publication",
+          "runtime::repository_io::process_views::tests::native_selected_execute_records_replays_and_retains_data_after_controller_drop",
+          "runtime::repository_io::process_views::tests::native_selected_execute_refuses_omitted_declared_source_before_helper",
+          "runtime::repository_physical_root::initialize::tests::native_claimed_registry_sources_keep_same_display_instances_separate_and_readers_alive",
+          "runtime::repository_physical_root::initialize::tests::native_command_scope_origin_survives_acceptance_without_renewal_by_next_command",
+          "runtime::repository_physical_root::initialize::tests::native_seal_rejects_foreign_spec_after_actual_history_and_releases_root",
+          "runtime::repository_physical_root::mount_lease::launch::tests::native_general_runner_confines_host_proc_devices_sockets_fds_and_process_limits",
+          "runtime::repository_physical_root::mount_lease::launch::tests::native_general_runner_future_drop_and_deadline_keep_worker_ownership_until_namespace_death",
+          "runtime::repository_physical_root::mount_lease::launch::tests::native_general_runner_preserves_same_root_nonzero_env_cwd_replay_and_following_mutations",
+          "runtime::repository_physical_root::mount_lease::launch::tests::native_general_runner_reaps_detached_closed_stdio_writer_and_distinguishes_exec_errors_and_overflow",
+          "runtime::repository_physical_root::mount_lease::launch::tests::readonly_tests::archive_compaction_tests::native_archive_compaction_does_not_promote_deleted_large_history_to_process",
+          "runtime::repository_physical_root::mount_lease::launch::tests::readonly_tests::archive_compaction_tests::native_archive_compaction_refusal_after_successor_reaps_without_publishing_or_early_refund",
+          "runtime::repository_physical_root::mount_lease::launch::tests::readonly_tests::archive_compaction_tests::native_archive_measured_inode_crossing_keeps_full_quota_without_name_cost_assumption",
+          "runtime::repository_physical_root::mount_lease::launch::tests::readonly_tests::archive_compaction_tests::native_compact_archive_view_is_readonly_and_data_outlives_all_controllers",
+          "runtime::repository_physical_root::mount_lease::launch::tests::readonly_tests::archive_compaction_tests::native_small_archive_finalization_contracts_same_original_root_only_after_reap",
+          "runtime::repository_physical_root::mount_lease::launch::tests::readonly_tests::native_process_finalization_preserves_actual_record_and_data_after_setup_authority_drops",
+          "runtime::repository_physical_root::mount_lease::launch::tests::readonly_tests::native_readonly_transfer_cancellation_keeps_sole_source_backing_until_actual_cleanup",
+          "runtime::repository_physical_root::mount_lease::launch::tests::readonly_tests::native_shared_domain_readonly_view_renews_while_same_executor_root_remains_writable",
+          "runtime::repository_physical_root::mount_lease::native_tests::native_pending_accept_credit_shortage_retires_successor_and_payload_owners",
+          "runtime::repository_physical_root::mount_lease::native_tests::native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record",
+          "runtime::repository_physical_root::mount_lease::quota::tests::native_archive_process_shrink_is_shared_and_verified_before_fixed_payload",
+          "runtime::repository_physical_root::mount_lease::quota::tests::native_failure_after_quota_commit_poisoned_after_reap_keeps_guard_until_disposal",
+          "runtime::repository_physical_root::mount_lease::quota::tests::native_physical_precheck_rejects_page_slack_and_actual_inode_charge_crossing",
+          "runtime::repository_physical_root::mount_lease::quota::tests::native_process_quota_rejects_one_more_page_and_measured_inode_exhaustion",
+          "runtime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release",
+          "runtime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits",
+          "runtime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root",
+          "runtime::repository_physical_root::progress::archive_tests::native_archive_progress_refuses_sha_decode_counter_and_scope_failures",
+          "runtime::repository_physical_root::progress::archive_tests::native_archive_progress_uses_same_root_and_replays_without_reacquisition",
+          "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+          "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+          "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+          "runtime::repository_physical_root::progress::tests::native_ordered_progress_samples_replays_and_seals_without_host_path",
+          "runtime::repository_physical_root::progress::tests::native_progress_refusals_retire_the_entire_generation",
+          "runtime::repository_physical_root::source::tests::native_local_snapshot_refuses_identical_byte_replacement_before_source_seal",
+          "runtime::repository_physical_root::source::tests::native_source_roots_keep_large_digest_only_data_and_original_scope_after_controller_retirement",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_compact_source_views_remain_readonly_across_two_executes_and_data_outlives_controllers",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_small_source_contraction_keeps_original_identity_old_debit_until_reap_and_last_reader",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_source_contraction_cannot_borrow_another_reservations_claim",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_source_contraction_keeps_full_quota_when_actual_charged_inodes_cross_compact_allowance",
+          "runtime::repository_physical_root::source::tests::readonly_quota::native_source_contraction_refusals_reap_without_publishing_or_refunding_live_backing",
+          "runtime::repository_physical_root::source::tests::source_link_actor::native_source_link_actor_authenticates_full_epoch_without_granting_undeclared_sources",
+          "runtime::repository_physical_root::source::tests::source_link_actor::native_source_link_execute_rechecks_current_association_before_child_or_root_mutation",
+          "runtime::repository_physical_root::source::tests::source_link_actor::native_source_link_selected_general_view_requires_its_source_independently_in_manifest",
+          "runtime::repository_physical_root::source::tests::source_links::native_source_link_reads_charge_content_only_and_refuse_changed_own_route_before_source_io",
+          "runtime::repository_physical_root::source::tests::source_links::native_source_links_preserve_literal_targets_route_fd_reads_and_keep_only_data_after_retirement",
+          "runtime::repository_physical_root::source::tests::transport::native_captured_source_transport_rejects_foreign_epochs_metadata_and_scopes_and_retains_a",
+          "runtime::repository_physical_root::source::tests::transport::native_local_source_selection_refuses_current_materialization_drift_and_accepts_restoration"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 15.686698244011495,
+        "deadline_seconds": 60,
+        "stream_limit_bytes": 1048576,
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "umask": "0002",
+        "executable_sha256": "db6a4a7fee73b6f93b0fbdefea22173d599c372162c07e5c26daad2b90909a90",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "record": "source-quota-native-authentic-warm.json",
+        "target": "slug_core_v2",
+        "passing": 1,
+        "selection_sha256": "dd1b11fa58716be06628ac8df277f5195e45a1e5d3e60264e39b56878dec5433",
+        "selection": [
+          "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 18.899904217003495,
+        "deadline_seconds": 60,
+        "stream_limit_bytes": 1048576,
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "umask": "0002",
+        "executable_sha256": "db6a4a7fee73b6f93b0fbdefea22173d599c372162c07e5c26daad2b90909a90",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "record": "source-quota-native-authentic-cold.json",
+        "target": "slug_core_v2",
+        "passing": 1,
+        "selection_sha256": "2f13d4017f02ef2fbfadf19f5a0e7f870c7c899ded257d5c9cfbec0ed00ff357",
+        "selection": [
+          "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_source_links_load_bzl_and_execute_original_probes"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 1.6724150779919,
+        "executable_sha256": "c1ef33daea4b3338f5f40e1a06354618d9ff8c9d4407a074443875f15b6e119a",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "backend_config_sha256": "60412ce10087f52f3900fe554483569817efcd5d7e34b315877d04b7ccc46f76",
+        "backend_fresh_per_selector": true,
+        "readiness_deadline_seconds": 20,
+        "test_deadline_seconds": 40,
+        "output_limit_bytes_per_stream": 1048576,
+        "backend_address_space_limit_bytes": 8589934592,
+        "backend_file_size_limit_bytes": 1048576,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "source-quota-original-transport.json",
+        "target": "slug_reapi_v2",
+        "passing": 1,
+        "selection_sha256": "a7724aed9334c4138285907fb37d33fb7f202acd5ad8ff0e7258e46a328e1e2a",
+        "selection": [
+          "action_chain::original_repository_tests::nativelink_original_repository_corrupt_cas_refuses_publication_and_restores"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 2.702656916997512,
+        "executable_sha256": "c1ef33daea4b3338f5f40e1a06354618d9ff8c9d4407a074443875f15b6e119a",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "backend_config_sha256": "9b6a4c310e05718fac9c7cf8dcd780f5606d304707eda12cf67b2b7511102bfa",
+        "backend_fresh_per_selector": true,
+        "readiness_deadline_seconds": 20,
+        "test_deadline_seconds": 40,
+        "output_limit_bytes_per_stream": 1048576,
+        "backend_address_space_limit_bytes": 8589934592,
+        "backend_file_size_limit_bytes": 1048576,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "source-quota-original-transport.json",
+        "target": "slug_reapi_v2",
+        "passing": 1,
+        "selection_sha256": "63f2433b83508fc8fa3a6e2a4286a8d460186b63758df87ff34808bd5d0c6bf2",
+        "selection": [
+          "action_chain::original_repository_tests::nativelink_original_repository_execute_physical_sources_cache_and_runfiles_survive_shutdown"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 3.235572723002406,
+        "executable_sha256": "c1ef33daea4b3338f5f40e1a06354618d9ff8c9d4407a074443875f15b6e119a",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "backend_config_sha256": "9fbd7cfca7abd8bc39d98686cbbcc0b766b96d57c538f73e3cc8fa58aac7a3a9",
+        "backend_fresh_per_selector": true,
+        "readiness_deadline_seconds": 20,
+        "test_deadline_seconds": 40,
+        "output_limit_bytes_per_stream": 1048576,
+        "backend_address_space_limit_bytes": 8589934592,
+        "backend_file_size_limit_bytes": 1048576,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "source-quota-original-transport.json",
+        "target": "slug_reapi_v2",
+        "passing": 1,
+        "selection_sha256": "5e4ddb7d4b4a46ada09997e309298abb83965b0da4236b3bdd68b061e7470e00",
+        "selection": [
+          "action_chain::original_repository_tests::source_link_tests::nativelink_source_linked_general_artifacts_preserve_identity_cache_runfiles_and_retired_data"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 2.812539342994569,
+        "executable_sha256": "c1ef33daea4b3338f5f40e1a06354618d9ff8c9d4407a074443875f15b6e119a",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "backend_config_sha256": "b22098546d39eb12960160f6044a86d34253a32f2a089327ea33390620dfafd2",
+        "backend_fresh_per_selector": true,
+        "readiness_deadline_seconds": 20,
+        "test_deadline_seconds": 40,
+        "output_limit_bytes_per_stream": 1048576,
+        "backend_address_space_limit_bytes": 8589934592,
+        "backend_file_size_limit_bytes": 1048576,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "source-quota-captured-transport.json",
+        "target": "slug_reapi_v2",
+        "passing": 1,
+        "selection_sha256": "2db6028040f87030f1eeb5fddbba9ab90f125d0614587d07aed98100412af8b1",
+        "selection": [
+          "action_chain::source_snapshot_tests::nativelink_captured_bcr_sources_analysis_cas_runfiles_and_fresh_scope"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 3.0995353119942592,
+        "executable_sha256": "c1ef33daea4b3338f5f40e1a06354618d9ff8c9d4407a074443875f15b6e119a",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "backend_config_sha256": "ba2305b81e52b713ffb5516c909d324d9428930cbccbef9662b44c73f2105961",
+        "backend_fresh_per_selector": true,
+        "readiness_deadline_seconds": 20,
+        "test_deadline_seconds": 40,
+        "output_limit_bytes_per_stream": 1048576,
+        "backend_address_space_limit_bytes": 8589934592,
+        "backend_file_size_limit_bytes": 1048576,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "source-quota-captured-transport.json",
+        "target": "slug_reapi_v2",
+        "passing": 1,
+        "selection_sha256": "bf8f0280eff06943cecb9c5e8fc6b380b2bdcad480e89105f72b717aa2dc60c4",
+        "selection": [
+          "action_chain::source_snapshot_tests::nativelink_captured_builtin_sources_analysis_cas_runfiles_and_fresh_scope"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 2.816387853003107,
+        "executable_sha256": "c1ef33daea4b3338f5f40e1a06354618d9ff8c9d4407a074443875f15b6e119a",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "backend_config_sha256": "3111e90f0940529f30bf053157b7a45b5bbc9b052d1f705996bb3675c82dcc1d",
+        "backend_fresh_per_selector": true,
+        "readiness_deadline_seconds": 20,
+        "test_deadline_seconds": 40,
+        "output_limit_bytes_per_stream": 1048576,
+        "backend_address_space_limit_bytes": 8589934592,
+        "backend_file_size_limit_bytes": 1048576,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "source-quota-captured-transport.json",
+        "target": "slug_reapi_v2",
+        "passing": 1,
+        "selection_sha256": "d2c07bcf5d715ef10bee71587db33923f1fb1a82e6cf1f157d95c595512c7bbe",
+        "selection": [
+          "action_chain::source_snapshot_tests::nativelink_captured_local_sources_analysis_cas_runfiles_and_fresh_scope"
+        ]
+      },
+      {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 1.0541706020012498,
+        "executable_sha256": "c1ef33daea4b3338f5f40e1a06354618d9ff8c9d4407a074443875f15b6e119a",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "backend_config_sha256": "1293821f2351c4047c6bf96e734bc60ae73230e354aa8be7af8bb5b8f13b66ce",
+        "backend_fresh_per_selector": true,
+        "readiness_deadline_seconds": 20,
+        "test_deadline_seconds": 40,
+        "output_limit_bytes_per_stream": 1048576,
+        "backend_address_space_limit_bytes": 8589934592,
+        "backend_file_size_limit_bytes": 1048576,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "record": "source-quota-captured-transport.json",
+        "target": "slug_reapi_v2",
+        "passing": 1,
+        "selection_sha256": "cee426ddfd3aae191dff4cac218944ee5129d1668e8622bdf3d971ed88fb7f22",
+        "selection": [
+          "action_chain::source_snapshot_tests::nativelink_captured_workspace_sources_analysis_cas_runfiles_first_command"
+        ]
+      },
+      {
+        "selected": 3,
+        "exit_code": 0,
+        "elapsed_seconds": 1.5512067640083842,
+        "deadline_seconds": 60,
+        "umask": "0002",
+        "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+        "executable_sha256": "71649de8f31dc99c84e0143b1a402fd1a9ab3c20c437bb73c356e543cdfc8a59",
+        "cli_sha256": "27cca8f3301a54af058c403bfee9bc6d1bad816cb37be97585cd2c11eb421448",
+        "record": "source-quota-public-cli.json",
+        "target": "cli",
+        "passing": 3,
+        "selection_sha256": "93a771352c2887055ffe1528edbebc90d248c43b40ffc6a4f080f124f7b9d91b",
+        "selection": [
+          "typed_build_activation_publishes_cold_events_without_warm_daemon_replay",
+          "typed_query_activation_publishes_cold_events_without_warm_daemon_replay",
+          "cquery_label_and_starlark_modes_match_success_and_missing_contracts"
+        ]
+      }
+    ],
+    "builds": [
+      {
+        "record": "source-quota-cli-initial-result.json",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "build",
+          "-p",
+          "slug_cli_v2",
+          "--offline",
+          "--locked",
+          "--target-dir",
+          "/run/media/system/Colossus/dev/slug/target",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 12.834529667001334,
+        "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+      },
+      {
+        "record": "source-quota-cli-tests-result.json",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "-p",
+          "slug_cli_v2",
+          "--test",
+          "cli",
+          "--offline",
+          "--locked",
+          "--target-dir",
+          "/run/media/system/Colossus/dev/slug/target",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 14.45665661500243,
+        "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+      },
+      {
+        "record": "source-quota-owners-corrected-result.json",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "--no-run",
+          "--lib",
+          "-p",
+          "slug_core_v2",
+          "-p",
+          "slug_reapi_v2",
+          "--offline",
+          "--locked",
+          "--target-dir",
+          "/run/media/system/Colossus/dev/slug/target",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 76.84601722699881,
+        "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+      }
+    ],
+    "reused_unaffected_evidence": "Bzlmod/Loading/Workspace/Analysis pure schemas and semantic identity code are untouched; accepted a2028 owner evidence remains applicable. Fresh Core/ReAPI tests, actual native and7 NativeLink transports and default CLI cover all changed implementation owners and direct dependents. Tests are exact-preflighted; native/transport selectors use supervised ignored-list matching.",
+    "structure_checks": "Pinned rustfmt, plan marker consistency, git diff --check, V2 archive status (e218054d4c796655939b968d90208b185decb352) and all final Rust source pins checked before integration."
+  },
+  "corrections": [
+    "Initial test-only compile failed for two references to a missing native_initialize alias; fixed before corrected build/execution. Production CLI already compiled successfully.",
+    "Design review corrected an erroneous logical2GiB phrase to the existing256MiB manifest limit; no code cap was changed.",
+    "Independent review added real Full and Compact frozen-to-mutable refusal assertions; no assertion or resource cap was weakened."
+  ],
+  "fixture_growth": "Two small Source proof/native-test leaves, existing verified authentic fixture/helper and real backend reused. No new archive/corpus/dependency. Inode fixture generates a bounded temporary tree within existing Source limits and measures actual charged units; no name-cost assumption.",
+  "remaining_gates": [
+    "Default General activation and full Archive/resource/lifecycle envelope.",
+    "Actual authentic Rust configured cquery, required action comparison and Rust REAPI, full Slug closure and Stage10/selfhost.",
+    "Repeated Workspace publication and unadmitted Source APIs/graph/archive families.",
+    "Equivalent-command Slug<=1.25xBazel memory and whole-goal fit.",
+    "Five inherited Core diagnostic failures remain; Windows metadata build remains unproved from the existing repository_ignore InputImage arm failure."
+  ],
+  "review": {
+    "design": "Independent ACCEPT after logical/physical limit wording correction.",
+    "production_and_discriminators": "Independent static/correction review accepted Source binding, custody/order and frozen full/compact refusal.",
+    "final": "Independent final ACCEPT: all12 source pins match;439 unique fresh passes support Source quota contraction and the four-command warm compiler backing gap under the unchanged bank. Five inherited failures and activation/full Archive/public Rust/matched-memory gates remain open."
+  },
+  "timing": {
+    "accepted_compile_seconds": 104.13720350900257,
+    "test_record_elapsed_seconds": 93.22858013499354,
+    "scope": "Preparation/compilation separate from runtime observations; no whole-turn/review duration separately instrumented or performance claim."
+  }
+}

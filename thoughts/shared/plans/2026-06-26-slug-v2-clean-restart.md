@@ -62,7 +62,9 @@ linked Analysis/CAS/runfiles under the fixed bank.
 [Atomic profile retirement](./slug-v2-subplans/wp1225-profile-retirement-acceptance-2026-11-08.json)
 removes both GCC/Homebrew adapters and makes default repository Execute
 explicitly unsupported; inactive originals now cover Homebrew environment A/B/A
-wrapper changes/restoration. Full archive-envelope, derived Source Path
+wrapper changes/restoration. [Read-only Source backing contraction](./slug-v2-subplans/wp1225-source-quota-acceptance-2026-11-08.json)
+now closes the warm compiler capacity refusal: four actual commands pass on one
+runtime and the unchanged bank. Full archive-envelope, derived Source Path
 operations, repeated Workspace publication, public Rust and matching-command
 memory gates still precede General production activation.
 

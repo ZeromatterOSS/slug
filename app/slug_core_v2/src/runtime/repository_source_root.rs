@@ -26,6 +26,7 @@ pub(in crate::runtime) struct RepositorySourceRoot {
     pub(super) file: File,
     state: Arc<State>,
     pub(super) identity: RootIdentity,
+    pub(super) frozen_archive_quota: Option<FrozenArchiveQuota>,
     pub(super) resources: Arc<RepositoryRootResources>,
     pub(super) backing: Arc<RepositoryRootBacking>,
     pub(super) origin_scope: Arc<SourceServiceScope>,
@@ -45,6 +46,7 @@ pub(in crate::runtime::repository_physical_root) struct SourceRootBuilder {
     pub(super) file: File,
     pub(super) reservation: Arc<Reservation>,
     pub(super) identity: RootIdentity,
+    pub(super) frozen_archive_quota: Option<FrozenArchiveQuota>,
     pub(super) resources: Arc<RepositoryRootResources>,
     pub(super) backing: Arc<RepositoryRootBacking>,
     pub(super) scope: Arc<SourceServiceScope>,
@@ -110,11 +112,28 @@ impl RepositorySourceRoot {
     ) -> Result<(), PhysicalRootError> {
         super::check_origin(&self.origin_scope, scope, active)
     }
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) fn frozen_archive_quota(
+        &self,
+    ) -> Option<FrozenArchiveQuota> {
+        self.frozen_archive_quota
+    }
     pub(super) fn validate_backing(&self) -> Result<(), PhysicalRootError> {
-        if backing_identity(&self.file, RepositoryWorkspaceMode::Archive)? != self.identity {
+        self.backing.matches_data(
+            &self.resources,
+            RepositoryWorkspaceMode::Archive,
+            self.frozen_archive_quota,
+        )?;
+        if backing_identity_for_quota(&self.file, self.native_quota())? != self.identity {
             return Err(PhysicalRootError::RootIdentity);
         }
         Ok(())
+    }
+    fn native_quota(&self) -> (u64, u64) {
+        self.frozen_archive_quota.map_or_else(
+            || quota(RepositoryWorkspaceMode::Archive),
+            |class| class.quota(),
+        )
     }
     pub(in crate::runtime) fn observe(
         &self,
@@ -194,6 +213,7 @@ impl SourceRootBuilder {
                 inode: 0,
                 mount: 0,
             },
+            frozen_archive_quota: None,
             resources,
             backing: incoming.backing,
             scope,
@@ -204,6 +224,9 @@ impl SourceRootBuilder {
         };
         check(&owner.scope, &|| true)?;
         check_bank(&owner.scope, &owner.resources)?;
+        owner
+            .backing
+            .matches(&owner.resources, RepositoryWorkspaceMode::Archive)?;
         owner.identity = backing_identity(&owner.file, RepositoryWorkspaceMode::Archive)?;
         owner
             .backing
@@ -228,7 +251,11 @@ impl SourceRootBuilder {
         active: &dyn Fn() -> bool,
     ) -> Result<(), PhysicalRootError> {
         super::check_origin(&self.scope, scope, active)?;
-        if backing_identity(&self.file, RepositoryWorkspaceMode::Archive)? != self.identity {
+        let native_quota = self.frozen_archive_quota.map_or_else(
+            || quota(RepositoryWorkspaceMode::Archive),
+            |class| class.quota(),
+        );
+        if backing_identity_for_quota(&self.file, native_quota)? != self.identity {
             return Err(PhysicalRootError::RootIdentity);
         }
         Ok(())
@@ -280,6 +307,7 @@ impl SourceRootBuilder {
             file: self.file,
             state: expected,
             identity: self.identity,
+            frozen_archive_quota: self.frozen_archive_quota,
             resources: self.resources,
             backing: self.backing,
             origin_scope: self.scope,

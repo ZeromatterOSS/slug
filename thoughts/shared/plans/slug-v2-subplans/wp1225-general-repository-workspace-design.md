@@ -418,10 +418,11 @@ The attempted warm authentic sequence refused Resource at bootstrap after
 backing bytes; post-abort live backing was 2,415,919,104 bytes (one 2GiB Source
 plus four 64MiB General roots). Retained prior data plus new bootstrap
 reservations is the supported explanation, but the aggregate counters do not
-identify the exact rejected root. Preserve that refusal and leave repeated
-authentic commands within the shared backing budget open. No quota increase,
-Source contraction or eviction is introduced; neither this proof nor the
-refusal establishes equivalent-command RSS fit. Source authority, complete
+identify the exact rejected root. That receipt preserves the refusal; the
+Source contract below now closes this narrow repeated-compiler capacity gate.
+Profile retirement itself introduced no quota increase, Source contraction or
+eviction. Neither the refusal nor the later backing proof establishes
+equivalent-command RSS fit. Source authority, complete
 environment equality, caps, original clocks and lifecycle remain unchanged. This is retirement plus an inactive
 exact API slice, not production execution or equivalent-memory acceptance.
 Independent design and final review apply. The root owns the small DICE progress
@@ -738,7 +739,9 @@ Add optional physical quota contraction at the consuming read-only finalization
 of every eligible General Archive root. This is a Slug-native lifecycle/resource
 operation. Pure State.mode remains Archive, its exact history and logical
 Archive envelope remain unchanged, and no Execute/index/result is invented.
-Source snapshots retain their existing quota. Process finalization is unchanged.
+That accepted General-only component preserved Source quotas; the Source
+contract below extends physical finalization separately. Process finalization
+is unchanged.
 The eligibility decision uses actual quiescent tmpfs allocated block bytes and
 used inode units: if they fit64MiB and8192 inodes, the trusted owner may lower
 the SAME superblock to that sealed quota class; otherwise it keeps the full2GiB
@@ -783,6 +786,72 @@ foreign facts/owners/scopes, failure/cancel/last-drop behavior and an actual
 read-only child. Reuse the existing Process transition and finalized-view
 fixtures. The final original `cc_autoconf` and linked-artifact gates must then
 pass within the unchanged bank before this prerequisite is accepted.
+
+### Read-only Source backing quota contraction
+
+The [Source quota receipt](wp1225-source-quota-acceptance-2026-11-08.json)
+records actual native contraction/fallback/retirement proof and the restored
+warm original sequence. Four real commands use one runtime and the unchanged
+bank; steady accepted backing is320MiB, with observed peak4,803,530,752 bytes.
+This is backing-capacity evidence, not an RSS comparison or default activation.
+
+The next inactive delta addresses the recorded warm original-command capacity
+refusal in the [profile-retirement receipt](wp1225-profile-retirement-acceptance-2026-11-08.json).
+A retained Source at2GiB plus four sealed General roots at64MiB leaves avoidable
+backing reservation pressure while the next authentic bootstrap runs. This is a
+Slug-native physical-resource operation supporting the same general repository
+capability and eventual authentic Rust cquery. Derived Source Path APIs do not
+resolve this ledger; no caller identity may choose the quota class.
+
+Every Source still bootstraps and copies under the full2GiB/262144 capacity.
+Consuming Source finalization, with no payload writer remaining, may use the
+existing same-superblock compaction leaf: actual allocated block bytes<=64MiB
+and charged inode units<=8192 select the smaller read-only Archive class;
+otherwise retain the full class. Source's existing256MiB logical manifest envelope,
+64MiB/file and all path/entry bounds, complete manifest, semantic Eq/content identity,
+source observations and original clocks stay unchanged. Never fabricate a
+General reservation/history or an Execute result. Default General remains
+Disabled; networking and other unsupported surfaces do not change.
+
+Source owns a distinct pending/verified proof bound to its genuine reservation,
+claim, Source backing association, bank and original scope, root/devino/mount,
+FinalizeSourceArchive role, attempt nonce and exact readonly successor/domain.
+Reuse the physical facts/classifier/remount and generic process lifecycle, not
+General's reservation proof. Role6 requires exactly one ordered quota frame.
+The parent independently re-attests the original root FD and successor; retain
+the old full debit through actual bound helper reap, complete digest-tree seal
+and exact readonly acceptance. Only the Source-specific closed verified proof
+may atomically lower the one shared debit before publication. After commit,
+later controller allocation failure releases the actual frozen owner under the
+matching new debit. Before commit, refusal/cancellation keeps the conservative
+old debit until kill/reap/drop completes. No IO or DICE compute occurs under
+accounting locks.
+
+Carry the closed frozen class through Source builder finalization, sealed data,
+backing, readonly renewal, observation and member readers. Reads never infer or
+mint a class from current usage. Both full and compact frozen owners refuse
+mutable bootstrap/factory/rolling-token admission. Data roots gain no namespace,
+remount or controller authority; A-scope data cannot remint under B's scope.
+No eviction, interner, donor import, new cache or cap increase is introduced.
+Existing Arc/Allocative and last-Drop credits remain the retention owners.
+
+Scope is the Source root/launch/readonly-proof leaves, shared resource backing,
+readonly Source view selection, role/helper protocol and focused Source tests;
+root integrates docs and original/native/CAS proof. Keep the General proof
+unchanged apart from exposing its numeric classifier for the separate Source
+proof. Existing large modules receive only bounded ownership wiring; put the
+new Source proof and its native discriminators in small owner leaves.
+
+Discriminate actual small contraction and original-FD identity, pre-ACK full
+bank debit, large body and measured charged-inode fallback, wrong Source owner/
+nonce/facts, post-successor precommit cancellation, full seal failure, readonly
+child/renewal, retained-reader original scope and exact final refunds. Preserve
+General/Source binding separation, complete SHA/EOF transport and the existing
+large Source/Source-link/CAS/runfiles gates. The actual same-runtime
+absent/Homebrew A/B/A compiler sequence now passes within the unchanged8GiB
+bank, without eviction or scope renewal; cold proof remains protected. This
+closes only that specific capacity gap. Full Archive, public Rust and equivalent-
+command RSS gates remain. Independent design and final review are required.
 
 ### Current captured Source transport (accepted inactive component)
 
