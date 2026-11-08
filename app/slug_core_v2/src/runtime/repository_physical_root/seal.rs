@@ -57,6 +57,7 @@ pub(super) fn seal(
         mode: builder.mode,
         anchor,
         resources: builder.resources,
+        backing: builder.backing,
         credit: builder.credit,
     }))
 }

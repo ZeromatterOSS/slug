@@ -124,6 +124,7 @@ fn verify_before_payload(file: &File, phase: usize) -> io::Result<()> {
 pub(super) struct Receipt {
     pub root: File,
     pub successor: AttachedMountClone,
+    pub backing: Arc<RepositoryRootBacking>,
     pub _receipt: resources::ResourceCredit,
 }
 /// Returns only after the fixed helper and namespace launcher are reaped. The
@@ -137,6 +138,17 @@ pub(super) fn launch(
     scope: &Arc<SourceServiceScope>,
 ) -> io::Result<(Receipt, Option<MountInFlight>)> {
     scope.check().map_err(|e| fail(format!("{e:?}")))?;
+    // The root may be created only after its full backing allowance is paid.
+    // Later launches retain the exact guard rather than reserving quota again.
+    let backing = if let Some(root) = root {
+        root.backing.clone()
+    } else {
+        RepositoryRootBacking::new(resources, RepositoryWorkspaceMode::Process)
+            .map_err(|e| fail(format!("{e:?}")))?
+    };
+    backing
+        .matches(resources, RepositoryWorkspaceMode::Process)
+        .map_err(|e| fail(format!("{e:?}")))?;
     let binary = std::env::current_exe()?;
     {
         let _preflight_credit = resources
@@ -336,6 +348,7 @@ pub(super) fn launch(
                 detached,
                 namespace,
                 resources: resources.clone(),
+                backing: Some(backing.clone()),
                 credit,
             };
             receipt = Some((attached_file, successor));
@@ -354,6 +367,7 @@ pub(super) fn launch(
                     Receipt {
                         root,
                         successor,
+                        backing,
                         _receipt: receive_credit,
                     },
                     inflight,

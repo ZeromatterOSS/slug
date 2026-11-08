@@ -173,6 +173,7 @@ pub(super) struct AttachedMountClone {
     detached: RootIdentity,
     namespace: NamespaceIdentity,
     resources: Arc<RepositoryRootResources>,
+    backing: Option<Arc<RepositoryRootBacking>>,
     credit: resources::ResourceCredit,
 }
 
@@ -221,6 +222,7 @@ pub(super) fn clone_from_attached_root(
         detached,
         namespace,
         resources: resources.clone(),
+        backing: None,
         credit,
     })
 }
@@ -310,6 +312,7 @@ pub(super) struct MountInFlight {
     owner: File,
     namespace: NamespaceIdentity,
     incoming: RootIdentity,
+    backing: Arc<RepositoryRootBacking>,
     _credit: resources::ResourceCredit,
 }
 #[derive(Debug)]
@@ -344,6 +347,11 @@ impl RepositoryMountLease {
             || request.predecessor() != &self.predecessor
             || root.identity != self.root
             || identity(&root.file)? != self.root
+            || !self
+                .clone
+                .backing
+                .as_ref()
+                .is_some_and(|backing| Arc::ptr_eq(backing, &root.backing))
         {
             return Err(MountLeaseError::Request);
         }
@@ -399,6 +407,13 @@ impl RepositoryMountAttempt {
         if root.identity != self.lease.root || root.reservation != self.lease.reservation {
             return Err(MountLeaseError::Request);
         }
+        let backing = self
+            .lease
+            .clone
+            .backing
+            .as_ref()
+            .ok_or(MountLeaseError::Request)?
+            .clone();
         send_incoming(
             socket,
             &root.file,
@@ -417,6 +432,7 @@ impl RepositoryMountAttempt {
             detached,
             namespace,
             resources,
+            backing: _prior_backing,
             credit,
         } = self.lease.clone;
         drop(token);
@@ -426,6 +442,7 @@ impl RepositoryMountAttempt {
             owner,
             namespace,
             incoming: detached,
+            backing,
             _credit: credit,
             reservation: self.lease.reservation,
             root: self.lease.root,
@@ -441,13 +458,22 @@ impl MountInFlight {
         active: &dyn Fn() -> bool,
     ) -> Result<PendingMountLease, MountLeaseError> {
         check(scope, active)?;
-        if successor.namespace != self.namespace
+        if !self.backing.belongs_to(&successor.resources)
+            || successor.namespace != self.namespace
             || successor.attached != self.incoming
             || !same_backing(successor.detached, self.root)
             || successor.detached.mount == successor.attached.mount
         {
             return Err(MountLeaseError::AttachedRoot);
         }
+        if successor
+            .backing
+            .as_ref()
+            .is_some_and(|backing| !Arc::ptr_eq(backing, &self.backing))
+        {
+            return Err(MountLeaseError::AttachedRoot);
+        }
+        successor.backing = Some(self.backing.clone());
         successor
             .credit
             .bytes
@@ -477,7 +503,8 @@ impl PendingMountLease {
         active: &dyn Fn() -> bool,
     ) -> Result<Self, MountLeaseError> {
         check(scope, active)?;
-        if request.reservation() != &root.reservation
+        if !Arc::ptr_eq(&successor.resources, &root.resources)
+            || request.reservation() != &root.reservation
             || successor.attached != root.identity
             || identity(&root.file)? != root.identity
             || !same_backing(successor.detached, root.identity)
@@ -490,6 +517,14 @@ impl PendingMountLease {
         ) {
             return Err(MountLeaseError::UnsupportedOperation);
         }
+        if successor
+            .backing
+            .as_ref()
+            .is_some_and(|backing| !Arc::ptr_eq(backing, &root.backing))
+        {
+            return Err(MountLeaseError::Request);
+        }
+        successor.backing = Some(root.backing.clone());
         successor
             .credit
             .bytes
@@ -514,7 +549,8 @@ impl PendingMountLease {
         active: &dyn Fn() -> bool,
     ) -> Result<RepositoryMountLease, MountLeaseError> {
         check(scope, active)?;
-        if completion.root != self.root
+        if self.successor.backing.is_none()
+            || completion.root != self.root
             || completion.record.request() != &self.request
             || completion.record.next().reservation() != &self.reservation
         {

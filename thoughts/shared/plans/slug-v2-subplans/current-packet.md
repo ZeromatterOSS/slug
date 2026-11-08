@@ -22,8 +22,11 @@ Delete mutations and complete credited tree snapshots; see the
 [mutable-progress receipt](wp1225-mutable-progress-acceptance-2026-11-07.json).
 The [rolling-lease receipt](wp1225-rolling-lease-acceptance-2026-11-07.json)
 adds an inactive linear token primitive and fixed Rust three-launch handoff proof.
-Archive capture, Execute/common rolling-lease integration and quota transition
-remain the native progress frontier, followed by selected physical-root registry
+The [archive-progress receipt](wp1225-archive-progress-acceptance-2026-11-07.json)
+adds verified same-FD archive handoff, pinned source-scope/cumulative decode
+accounting, and shared backing-credit lifetime through root and token owners.
+Execute/common rolling-lease integration and quota transition remain the native
+progress frontier, followed by selected physical-root registry
 and InputImage/native source transport, then
 by original Loading/process activation under the complete gates below. Existing
 production routes remain replacement-required. The selected design links owner

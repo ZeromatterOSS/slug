@@ -11,7 +11,7 @@ use crate::runtime::repository_physical_root::native_tests::reservation;
 use crate::runtime::repository_physical_root::tests::resources;
 use crate::runtime::repository_physical_root::tests::scope;
 
-fn empty_builder(
+pub(super) fn empty_builder(
     reservation: Arc<RepositoryWorkspaceReservation>,
     resources: Arc<RepositoryRootResources>,
     scope: &Arc<SourceServiceScope>,
@@ -45,14 +45,14 @@ fn empty_builder(
     .unwrap()
 }
 
-fn write(path: &str, body: &[u8]) -> RepositoryWorkspaceOperation {
+pub(super) fn write(path: &str, body: &[u8]) -> RepositoryWorkspaceOperation {
     RepositoryWorkspaceOperation::File {
         path: path.into(),
         body: Arc::from(body),
         mode: 0o644,
     }
 }
-fn apply(
+pub(super) fn apply(
     progress: RepositoryWorkspaceProgress,
     operation: RepositoryWorkspaceOperation,
     scope: &Arc<SourceServiceScope>,
@@ -60,7 +60,7 @@ fn apply(
     let request = progress.transcript().request(operation).unwrap();
     progress.apply(request, scope, &|| true).unwrap()
 }
-fn assert_released(resources: &RepositoryRootResources, baseline: usize, fd: i32) {
+pub(super) fn assert_released(resources: &RepositoryRootResources, baseline: usize, fd: i32) {
     assert_eq!(unsafe { libc::fcntl(fd, libc::F_GETFD) }, -1);
     assert_eq!(io::Error::last_os_error().raw_os_error(), Some(libc::EBADF));
     let now = resources.snapshot();

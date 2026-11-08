@@ -209,5 +209,9 @@
     "added_text_lines": 6382,
     "deleted_text_lines": 2,
     "assessment": "One active capability packet; reuse existing bounded native fixture transport and actual snapshot kernels. New native fixture contains only fixed trusted Rust payloads; no copied ruleset or persisted bulk dataset. Ordinary fixtures generate finite ephemeral trees. Distinct admission, rolling and resource-failure discriminators retained."
+  },
+  "followup_correction": {
+    "receipt": "wp1225-archive-progress-acceptance-2026-11-07.json",
+    "qualification": "The original native fixture kept Builder alive until token release. The follow-up closes the independent token lifetime gap with shared backing credit and refreshes native evidence by dropping Builder before the last live token. No production activation occurred."
   }
 }

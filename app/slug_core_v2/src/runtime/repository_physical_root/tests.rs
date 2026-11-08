@@ -150,3 +150,67 @@ fn scope_refusal_precedes_inactive_authority_and_allocations() {
     assert_eq!(owner.snapshot().source_attempts, 0);
     assert_eq!(owner.snapshot().live_buffer_bytes, 0);
 }
+
+#[test]
+fn shared_backing_clones_hold_one_allowance_and_control_until_last_release() {
+    let bank = RepositoryRootResources::new(
+        RepositoryRootResourceLimits::new(1024 * 1024, 4, PROCESS_BYTES).unwrap(),
+    )
+    .unwrap();
+    let baseline = bank.snapshot().retained_bytes;
+    let backing = RepositoryRootBacking::new(&bank, RepositoryWorkspaceMode::Process).unwrap();
+    let retained = bank.snapshot().retained_bytes;
+    assert!(retained > baseline);
+    assert_eq!(bank.snapshot().backing_bytes, PROCESS_BYTES);
+    let clone = backing.clone();
+    assert!(Arc::ptr_eq(&backing, &clone));
+    assert_eq!(bank.snapshot().retained_bytes, retained);
+    assert_eq!(bank.snapshot().backing_bytes, PROCESS_BYTES);
+    assert!(matches!(
+        RepositoryRootBacking::new(&bank, RepositoryWorkspaceMode::Process),
+        Err(PhysicalRootError::Resource)
+    ));
+    drop(backing);
+    assert_eq!(bank.snapshot().backing_bytes, PROCESS_BYTES);
+    drop(clone);
+    assert_eq!(
+        (
+            bank.snapshot().retained_bytes,
+            bank.snapshot().native_fds,
+            bank.snapshot().backing_bytes
+        ),
+        (baseline, 0, 0)
+    );
+}
+
+#[test]
+fn shared_backing_rejects_foreign_bank_and_mode_without_lending_quota() {
+    let selected = resources();
+    let foreign = resources();
+    let selected_base = selected.snapshot().retained_bytes;
+    let foreign_base = foreign.snapshot().retained_bytes;
+    let backing = RepositoryRootBacking::new(&selected, RepositoryWorkspaceMode::Process).unwrap();
+    assert!(
+        backing
+            .matches(&selected, RepositoryWorkspaceMode::Process)
+            .is_ok()
+    );
+    assert!(matches!(
+        backing.matches(&foreign, RepositoryWorkspaceMode::Process),
+        Err(PhysicalRootError::Backing)
+    ));
+    assert!(matches!(
+        backing.matches(&selected, RepositoryWorkspaceMode::Archive),
+        Err(PhysicalRootError::Backing)
+    ));
+    assert_eq!(foreign.snapshot().retained_bytes, foreign_base);
+    assert_eq!(foreign.snapshot().backing_bytes, 0);
+    drop(backing);
+    assert_eq!(
+        (
+            selected.snapshot().retained_bytes,
+            selected.snapshot().backing_bytes
+        ),
+        (selected_base, 0)
+    );
+}

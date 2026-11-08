@@ -87,16 +87,18 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
         let native_fixture::Receipt {
             root: received,
             successor,
+            backing,
             _receipt: receipt_credit,
         } = receipt;
         if phase == 0 {
             original = received.as_raw_fd();
             root = Some(
-                RepositoryPhysicalRootBuilder::from_quiescent_tmpfs(
+                RepositoryPhysicalRootBuilder::from_quiescent_tmpfs_with_backing(
                     received,
                     reservation.clone(),
                     RepositoryWorkspaceMode::Process,
                     resources.clone(),
+                    backing.clone(),
                     &scope,
                     &|| true,
                 )
@@ -110,6 +112,40 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
             drop(received);
         }
         let selected = root.as_ref().unwrap();
+        if phase == 0 {
+            let retained = resources.snapshot().retained_bytes;
+            selected
+                .backing
+                .bind(selected.identity, &reservation)
+                .unwrap();
+            let wrong_mount = RootIdentity {
+                mount: selected.identity.mount.checked_add(1).unwrap(),
+                ..selected.identity
+            };
+            assert!(matches!(
+                selected.backing.bind(wrong_mount, &reservation),
+                Err(PhysicalRootError::Backing)
+            ));
+            let foreign = Arc::new(
+                RepositoryWorkspaceReservation::new(
+                    reservation.workspace().clone(),
+                    reservation.owner().clone(),
+                    reservation.repository().clone(),
+                    reservation.ordinal().checked_add(1).unwrap(),
+                    reservation.display_root().clone(),
+                    reservation.instance(),
+                    reservation.lease(),
+                    reservation.limits(),
+                )
+                .unwrap(),
+            );
+            assert!(matches!(
+                selected.backing.bind(selected.identity, &foreign),
+                Err(PhysicalRootError::Backing)
+            ));
+            assert_eq!(resources.snapshot().retained_bytes, retained);
+            assert_eq!(resources.snapshot().backing_bytes, PROCESS_BYTES);
+        }
         let pending = if let Some(inflight) = inflight {
             inflight.stage(successor, &scope, &|| true).unwrap()
         } else {
@@ -196,6 +232,7 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
         lease = Some(next);
         current = completed;
         drop(receipt_credit);
+        drop(backing);
         assert_eq!(resources.snapshot().native_fds, 3);
         assert_eq!(scope.snapshot().live_buffer_bytes, 0);
         if phase == 0 {
@@ -207,18 +244,23 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
     let request = current.transcript().request(execute(&reservation)).unwrap();
     assert!(matches!(
         lease
-            .take()
+            .as_ref()
             .unwrap()
-            .begin(root.as_ref().unwrap(), request, &scope, &|| true),
+            .validate_request(root.as_ref().unwrap(), &request, &scope, &|| true),
         Err(MountLeaseError::Root(PhysicalRootError::SourceService(
             SourceServiceError::Cancelled
         )))
     ));
-    assert_eq!(resources.snapshot().native_fds, 1);
+    drop(request);
     drop(root);
     assert_eq!(unsafe { libc::fcntl(original, libc::F_GETFD) }, -1);
+    // The live detached token still pins this backing after the original root
+    // descriptor is gone; its shared allowance cannot retire early.
+    assert_eq!(resources.snapshot().native_fds, 2);
+    assert_eq!(resources.snapshot().backing_bytes, PROCESS_BYTES);
     drop(current);
     drop(incoming);
+    drop(lease);
     assert_eq!(
         (
             resources.snapshot().retained_bytes,
@@ -262,13 +304,15 @@ fn native_pending_accept_credit_shortage_retires_successor_and_payload_owners() 
     let native_fixture::Receipt {
         root: input,
         successor,
+        backing,
         _receipt: receipt_credit,
     } = receipt;
-    let builder = RepositoryPhysicalRootBuilder::from_quiescent_tmpfs(
+    let builder = RepositoryPhysicalRootBuilder::from_quiescent_tmpfs_with_backing(
         input,
         reservation,
         RepositoryWorkspaceMode::Process,
         resources.clone(),
+        backing.clone(),
         &scope,
         &|| true,
     )
@@ -284,6 +328,7 @@ fn native_pending_accept_credit_shortage_retires_successor_and_payload_owners() 
         .unwrap();
     let record = completed.transcript().records().last().unwrap();
     drop(receipt_credit);
+    drop(backing);
     // The shared test bank has exactly8MiB. Admission must fail while Pending
     // still owns its request/reservation and their last retained credit guard.
     let pressure = resources

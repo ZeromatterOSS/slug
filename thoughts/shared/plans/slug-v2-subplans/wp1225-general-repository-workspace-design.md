@@ -87,8 +87,13 @@ quiescent setup. It independently checks a directory at the actual tmpfs root
 the exact selected quota pair. A mount-root bit alone does not admit a bind
 of a tmpfs subdirectory. It never opens a display path or retains mount tokens.
 An explicit native resource bank pays syscall scratch, complete retained guards,
-FD slots and declared backing-capacity allowances. Rooted observation also keeps
-its existing source-scope capture credits; no source-bank cap is increased.
+FD slots and declared backing-capacity allowances. One closed shared backing
+credit binds the full reservation and original physical identity; builder,
+sealed root and all bound mount tokens retain it until their last pin closes.
+Arc clones reserve no second quota. Trusted bootstrap prepays backing before
+creation and keeps its receipt guard through attestation/binding. No FD, IO or
+mount capability enters this shared accounting owner. Rooted observation also
+keeps its existing source-scope capture credits; no source-bank cap is increased.
 Retained-byte reservations reuse the existing descriptor-budget utility. Backing
 allowance is a virtual quota reservation, not a kernel/slab or RSS bound.
 
@@ -107,10 +112,11 @@ The inactive consuming native progress owner begins only with an actual empty
 Archive root. It applies File/Template/Read/Exists/Delete through the rooted
 kernels and samples the complete actual tree before accepting each new record.
 Exact completed prefix requests replay without rewinding the current tree. It
-retains one invocation-wide deletion work counter; all errors, cancellation and
-partial mutations consume the entire mutable generation. Archive and Execute
-remain explicitly unsupported in this owner until their native capture/runner
-handoffs are implemented. There is no generic mutation or process-result callback.
+retains invocation-wide deletion and decoded-archive counters; all errors,
+cancellation and partial mutations consume the entire mutable generation.
+Archive uses the closed verified native capture handoff below. Execute remains
+unsupported until the general native runner is integrated. There is no generic
+mutation or process-result callback.
 
 Actual capture records directories, modes, bodies, deletions and admitted literal
 internal links under the selected Archive/Process envelope. A prior same-path
@@ -120,6 +126,25 @@ credited. Bzlmod forecasts successor transcript storage from the same accounting
 used by completion. Native progress keeps old transcript and captured storage
 credited while admitting/constructing the successor; credits accompany both
 success and failure ownership paths. Only immutable transcripts project to DICE.
+
+Archive acquisition reuses the existing checksum-verifying Host/HTTP/distdir
+producer and transfers its private temporary file without a compressed Arc or
+second capture copy. The native handoff verifies bounded actual SHA/EOF and
+single-link regular identity on that same FD before rooted extraction. Existing
+source acquisition policy remains unchanged; it is not newly confined. Workspace
+mutation uses only the held root FD and the existing shared decoder with
+512MiB/call and 1GiB/invocation decoded limits. The original SourceServiceScope
+identity is pinned before every operation, replay and seal; a fresh scope cannot
+reset transport/decode budgets. Exact replay performs no acquisition.
+
+Capture reserves separate FD/control/scratch and128MiB compressed-storage
+allowances. Decode retains its existing source buffer/codec credits plus native
+temporary-FD/path-set admission. Explicit close precedes handoff. If capture
+unlink fails, actual FD/control charges retire but the storage-only allowance
+stays conservatively charged, matching existing fail-closed source ownership;
+there is no orphan retry registry or cleanup-success claim for that path. Trusted
+capture creation excludes outstanding writers until retirement. Complete actual
+snapshot and prepaid transcript completion still follow every successful decode.
 
 Trusted setup still excludes all other writers. Snapshot equality does not prove
 descendant death or absence of write aliases. Registry association, rolling-token

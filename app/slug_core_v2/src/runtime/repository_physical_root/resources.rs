@@ -151,3 +151,74 @@ pub(super) struct ResourceCredit {
     pub(super) bytes: ImageDescriptorReservation,
     slots: SlotCredit,
 }
+
+/// Shared lifetime credit for ONE selected backing. Contains no descriptor,
+/// reader, mutation or namespace authority and never enters DICE.
+#[derive(Debug)]
+pub(super) struct RepositoryRootBacking {
+    resources: Arc<RepositoryRootResources>,
+    state: Mutex<BackingState>,
+}
+#[derive(Debug)]
+struct BackingState {
+    mode: RepositoryWorkspaceMode,
+    binding: Option<(RootIdentity, Arc<RepositoryWorkspaceReservation>)>,
+    // Binding payload precedes the sole quota/control credit on destruction.
+    credit: ResourceCredit,
+}
+impl RepositoryRootBacking {
+    pub(super) fn new(
+        resources: &Arc<RepositoryRootResources>,
+        mode: RepositoryWorkspaceMode,
+    ) -> Result<Arc<Self>, PhysicalRootError> {
+        let credit = resources.reserve(arc_bytes::<Self>()?, 0, quota(mode).0)?;
+        Ok(Arc::new(Self {
+            resources: resources.clone(),
+            state: Mutex::new(BackingState {
+                mode,
+                binding: None,
+                credit,
+            }),
+        }))
+    }
+    pub(super) fn belongs_to(&self, resources: &Arc<RepositoryRootResources>) -> bool {
+        Arc::ptr_eq(&self.resources, resources)
+    }
+    pub(super) fn matches(
+        &self,
+        resources: &Arc<RepositoryRootResources>,
+        mode: RepositoryWorkspaceMode,
+    ) -> Result<(), PhysicalRootError> {
+        let state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        if !Arc::ptr_eq(&self.resources, resources)
+            || state.mode != mode
+            || state.credit.slots.backing != quota(mode).0
+        {
+            return Err(PhysicalRootError::Backing);
+        }
+        Ok(())
+    }
+    pub(super) fn bind(
+        &self,
+        identity: RootIdentity,
+        reservation: &Arc<RepositoryWorkspaceReservation>,
+    ) -> Result<(), PhysicalRootError> {
+        let mut state = self.state.lock().map_err(|_| PhysicalRootError::Resource)?;
+        if let Some((selected, owner)) = &state.binding {
+            if *selected != identity || owner != reservation {
+                return Err(PhysicalRootError::Backing);
+            }
+            return Ok(());
+        }
+        let retained = reservation
+            .retained_storage_bytes()
+            .map_err(|_| PhysicalRootError::Resource)?;
+        state
+            .credit
+            .bytes
+            .try_grow(retained)
+            .map_err(|_| PhysicalRootError::Resource)?;
+        state.binding = Some((identity, reservation.clone()));
+        Ok(())
+    }
+}

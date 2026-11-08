@@ -22,6 +22,8 @@ use super::path_observation::rooted::RootedObservationError;
 use super::repository_root_io::RootIo;
 use super::repository_root_io::RootIoLimits;
 
+#[path = "repository_workspace_archive.rs"]
+mod archive;
 #[path = "repository_mount_lease.rs"]
 mod mount_lease;
 #[path = "repository_workspace_progress.rs"]
@@ -145,6 +147,7 @@ pub(in crate::runtime) struct RepositoryPhysicalRootBuilder {
     identity: RootIdentity,
     mode: RepositoryWorkspaceMode,
     resources: Arc<RepositoryRootResources>,
+    backing: Arc<RepositoryRootBacking>,
     credit: resources::ResourceCredit,
 }
 
@@ -159,6 +162,7 @@ pub(in crate::runtime) struct RepositoryPhysicalRoot {
     mode: RepositoryWorkspaceMode,
     anchor: MaterializationPathAnchor,
     resources: Arc<RepositoryRootResources>,
+    backing: Arc<RepositoryRootBacking>,
     credit: resources::ResourceCredit,
 }
 
@@ -176,6 +180,39 @@ impl RepositoryPhysicalRootBuilder {
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         check(scope, active)?;
+        let backing = RepositoryRootBacking::new(&resources, mode)?;
+        Self::from_quiescent_tmpfs_with_backing(
+            input,
+            reservation,
+            mode,
+            resources,
+            backing,
+            scope,
+            active,
+        )
+    }
+
+    /// The trusted producer already prepaid this exact backing before creating
+    /// it. Incoming file ownership is armed before any further refusal.
+    fn from_quiescent_tmpfs_with_backing(
+        input: File,
+        reservation: Arc<RepositoryWorkspaceReservation>,
+        mode: RepositoryWorkspaceMode,
+        resources: Arc<RepositoryRootResources>,
+        backing: Arc<RepositoryRootBacking>,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
+        struct Incoming {
+            file: File,
+            backing: Arc<RepositoryRootBacking>,
+        }
+        let incoming = Incoming {
+            file: input,
+            backing,
+        };
+        check(scope, active)?;
+        incoming.backing.matches(&resources, mode)?;
         if reservation.instance().value() == 0 || reservation.lease() == 0 {
             return Err(PhysicalRootError::Reservation);
         }
@@ -188,11 +225,11 @@ impl RepositoryPhysicalRootBuilder {
                     .map_err(|_| PhysicalRootError::Resource)?,
             )?,
         )?;
-        let credit = resources.reserve(retained, 1, quota(mode).0)?;
+        let credit = resources.reserve(retained, 1, 0)?;
         // Arm handle-before-credit destruction immediately after admission, so
         // every later refusal closes the root before returning its FD credit.
         let mut owner = Self {
-            file: input,
+            file: incoming.file,
             reservation,
             identity: RootIdentity {
                 device: 0,
@@ -201,10 +238,12 @@ impl RepositoryPhysicalRootBuilder {
             },
             mode,
             resources,
+            backing: incoming.backing,
             credit,
         };
         let _scratch = owner.resources.reserve(IO_SCRATCH, 0, 0)?;
         owner.identity = backing_identity(&owner.file, mode)?;
+        owner.backing.bind(owner.identity, &owner.reservation)?;
         check(scope, active)?;
         Ok(owner)
     }

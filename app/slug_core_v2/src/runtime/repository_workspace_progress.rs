@@ -1,7 +1,8 @@
 //! Closed, consuming deterministic mutation of one inactive general workspace.
 //! Trusted setup must exclude all other writers. There is no process-result
-//! injection seam: Archive capture and Execute remain gated on their native
-//! owners. Every error retires this entire generation, including partial writes.
+//! injection seam: archive capture uses its closed verified native owner;
+//! Execute remains gated on the general native process owner. Every error
+//! retires this entire generation, including partial writes.
 use std::path::Path;
 
 use slug_bzlmod_v2::RepositoryWorkspaceNode;
@@ -19,6 +20,8 @@ pub(super) struct RepositoryWorkspaceProgress {
     builder: RepositoryPhysicalRootBuilder,
     transcript: CreditedWorkspaceTranscript,
     delete_work: DeleteWork,
+    decoded: u64,
+    scope: Arc<SourceServiceScope>,
     // Retire actual descriptors and transcript allocations before control credit.
     _control: resources::ResourceCredit,
 }
@@ -62,12 +65,71 @@ impl RepositoryWorkspaceProgress {
             builder,
             transcript: CreditedWorkspaceTranscript { transcript, credit },
             delete_work: DeleteWork::default(),
+            decoded: 0,
+            scope: scope.clone(),
             _control: control,
         })
     }
 
     pub(super) fn transcript(&self) -> &RepositoryWorkspaceTranscript {
         self.transcript.transcript()
+    }
+
+    fn check_scope(&self, supplied: &Arc<SourceServiceScope>) -> Result<(), PhysicalRootError> {
+        crate::runtime::repository_io::source_service::check_identity(
+            Some(&self.scope),
+            Some(supplied),
+        )
+        .map_err(PhysicalRootError::SourceService)
+    }
+
+    /// Captures and decodes the declared archive before sampling the same actual
+    /// root. Exact prefix replay performs no acquisition or decoded-byte charge.
+    /// Existing explicit Host source acquisition policy remains separate from
+    /// exclusively rooted workspace mutation.
+    pub(super) fn apply_archive(
+        mut self,
+        request: RepositoryWorkspaceRequest,
+        runtime: &tokio::runtime::Runtime,
+        distdirs: &crate::runtime::ArchiveDistdirPolicy,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
+        self.check_scope(scope)?;
+        check(scope, active)?;
+        if self
+            .transcript()
+            .replay(&request)
+            .map_err(PhysicalRootError::Protocol)?
+            .is_some()
+        {
+            return Ok(self);
+        }
+        let capture = archive::VerifiedWorkspaceArchiveCapture::capture(
+            &request,
+            &self.builder.resources,
+            runtime,
+            distdirs,
+            scope,
+            active,
+        )?;
+        let result = capture.extract(&self.builder, &mut self.decoded, scope, active)?;
+        self.complete_snapshot(request, result, scope, active)
+    }
+
+    fn complete_snapshot(
+        mut self,
+        request: RepositoryWorkspaceRequest,
+        result: RepositoryWorkspaceResult,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
+        check(scope, active)?;
+        let snapshot =
+            snapshot::capture(&self.builder, self.transcript().current(), scope, active)?;
+        let next = snapshot.complete(self.transcript(), request, result)?;
+        self.transcript = next;
+        Ok(self)
     }
 
     /// Incoming operation/argv/source storage is producer-credited already.
@@ -79,6 +141,7 @@ impl RepositoryWorkspaceProgress {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
+        self.check_scope(scope)?;
         check(scope, active)?;
         if self
             .transcript()
@@ -160,12 +223,7 @@ impl RepositoryWorkspaceProgress {
                 }
             }
         };
-        check(scope, active)?;
-        let snapshot =
-            snapshot::capture(&self.builder, self.transcript().current(), scope, active)?;
-        let next = snapshot.complete(self.transcript(), request, result)?;
-        self.transcript = next;
-        Ok(self)
+        self.complete_snapshot(request, result, scope, active)
     }
 
     pub(super) fn seal(
@@ -174,6 +232,7 @@ impl RepositoryWorkspaceProgress {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
+        self.check_scope(scope)?;
         let realization = self
             .transcript()
             .realize(consumed_records)
@@ -185,3 +244,7 @@ impl RepositoryWorkspaceProgress {
 #[cfg(test)]
 #[path = "repository_workspace_progress/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "repository_workspace_progress/archive_tests.rs"]
+mod archive_tests;
