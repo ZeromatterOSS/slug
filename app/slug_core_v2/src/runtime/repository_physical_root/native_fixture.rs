@@ -19,21 +19,21 @@ use std::time::Instant;
 
 use slug_bzlmod_v2::RepositoryWorkspaceMode;
 
-const BWRAP: &str = "/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap";
+pub(super) const BWRAP: &str = "/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap";
 const HELPER: &str =
     "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper";
 const MAGIC: &[u8; 8] = b"SLUG425R";
 const FRAME_BYTES: usize = 74;
-const TEXT_BYTES: usize = 4096;
-const STDERR_BYTES: usize = 16 * 1024;
-const DEADLINE: Duration = Duration::from_secs(5);
+pub(super) const TEXT_BYTES: usize = 4096;
+pub(super) const STDERR_BYTES: usize = 16 * 1024;
+pub(super) const DEADLINE: Duration = Duration::from_secs(5);
 pub(super) const BODY: &[u8] = b"wp425 trusted tmpfs\0\xff";
 
 fn failure(message: impl Into<String>) -> io::Error {
     io::Error::other(message.into())
 }
 
-struct Reap(Child);
+pub(super) struct Reap(pub(super) Child);
 impl Drop for Reap {
     fn drop(&mut self) {
         if !matches!(self.0.try_wait(), Ok(Some(_))) {
@@ -48,7 +48,7 @@ impl Drop for Reap {
     }
 }
 
-fn nonblocking(fd: i32) -> io::Result<()> {
+pub(super) fn nonblocking(fd: i32) -> io::Result<()> {
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
     if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
         return Err(io::Error::last_os_error());
@@ -56,7 +56,7 @@ fn nonblocking(fd: i32) -> io::Result<()> {
     Ok(())
 }
 
-fn drain(input: &mut impl Read, output: &mut Vec<u8>, cap: usize) -> io::Result<bool> {
+pub(super) fn drain(input: &mut impl Read, output: &mut Vec<u8>, cap: usize) -> io::Result<bool> {
     let mut bytes = [0; 1024];
     loop {
         match input.read(&mut bytes) {
@@ -74,7 +74,7 @@ fn drain(input: &mut impl Read, output: &mut Vec<u8>, cap: usize) -> io::Result<
     }
 }
 
-fn pause() -> io::Result<()> {
+pub(super) fn pause() -> io::Result<()> {
     if unsafe { libc::poll(std::ptr::null_mut(), 0, 2) } < 0 {
         let error = io::Error::last_os_error();
         if error.kind() != io::ErrorKind::Interrupted {
@@ -85,8 +85,12 @@ fn pause() -> io::Result<()> {
 }
 
 fn preflight(binary: &Path) -> io::Result<()> {
+    preflight_for(binary, HELPER)
+}
+
+pub(super) fn preflight_for(binary: &Path, selector: &str) -> io::Result<()> {
     let child = Command::new(binary)
-        .args(["--list", "--ignored", "--exact", HELPER])
+        .args(["--list", "--ignored", "--exact", selector])
         .env_clear()
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -107,7 +111,7 @@ fn preflight(binary: &Path) -> io::Result<()> {
         if let Some(status) = child.0.try_wait()? {
             if out_end && err_end {
                 let text = std::str::from_utf8(&out).map_err(|error| failure(error.to_string()))?;
-                let expected = format!("{HELPER}: test");
+                let expected = format!("{selector}: test");
                 if !status.success()
                     || !err.is_empty()
                     || text
@@ -252,6 +256,28 @@ fn send(fd: i32, bytes: &[u8]) -> io::Result<()> {
 }
 
 fn receive(socket: i32) -> io::Result<Option<(Vec<u8>, Vec<OwnedFd>)>> {
+    receive_with_control(socket, 128)
+}
+
+/// Bound the number of descriptors the kernel may install before parsing.
+/// CMSG_LEN (not padded CMSG_SPACE) leaves no room for an extra integer FD.
+pub(super) fn receive_bounded(
+    socket: i32,
+    max_fds: usize,
+) -> io::Result<Option<(Vec<u8>, Vec<OwnedFd>)>> {
+    if max_fds > 28 {
+        return Err(failure(
+            "descriptor receipt bound exceeds fixed control storage",
+        ));
+    }
+    let bytes = unsafe { libc::CMSG_LEN((max_fds * std::mem::size_of::<i32>()) as u32) } as usize;
+    receive_with_control(socket, if max_fds == 0 { 0 } else { bytes })
+}
+
+fn receive_with_control(
+    socket: i32,
+    control_bytes: usize,
+) -> io::Result<Option<(Vec<u8>, Vec<OwnedFd>)>> {
     let mut bytes = [0; TEXT_BYTES + 1];
     let mut control = Control([0; 128]);
     let mut iov = libc::iovec {
@@ -262,7 +288,7 @@ fn receive(socket: i32) -> io::Result<Option<(Vec<u8>, Vec<OwnedFd>)>> {
     message.msg_iov = &mut iov;
     message.msg_iovlen = 1;
     message.msg_control = control.0.as_mut_ptr().cast();
-    message.msg_controllen = control.0.len();
+    message.msg_controllen = control_bytes;
     let count = unsafe {
         libc::recvmsg(
             socket,

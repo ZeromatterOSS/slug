@@ -88,11 +88,28 @@ exact root lease and positive credits, compares bytes to the sealed snapshot,
 and checks current rooted/FD identity. Descriptors and owned payloads close before
 their credits can be reused.
 
-This owner has no generic mutation closure. Future native progress must supply
-closed mutation/launch operations and prove all external writers quiescent.
-Snapshot equality alone does not prove descendant death or absence of write
-aliases. Registry association, rolling-token integration, quota transition,
-confinement and production activation remain separate packet gates.
+The inactive consuming native progress owner begins only with an actual empty
+Archive root. It applies File/Template/Read/Exists/Delete through the rooted
+kernels and samples the complete actual tree before accepting each new record.
+Exact completed prefix requests replay without rewinding the current tree. It
+retains one invocation-wide deletion work counter; all errors, cancellation and
+partial mutations consume the entire mutable generation. Archive and Execute
+remain explicitly unsupported in this owner until their native capture/runner
+handoffs are implemented. There is no generic mutation or process-result callback.
+
+Actual capture records directories, modes, bodies, deletions and admitted literal
+internal links under the selected Archive/Process envelope. A prior same-path
+body is reused only after actual byte/EOF/identity comparison. Changed bodies
+receive exact prepaid Arc allocations; bounded rows and transfer arrays stay
+credited. Bzlmod forecasts successor transcript storage from the same accounting
+used by completion. Native progress keeps old transcript and captured storage
+credited while admitting/constructing the successor; credits accompany both
+success and failure ownership paths. Only immutable transcripts project to DICE.
+
+Trusted setup still excludes all other writers. Snapshot equality does not prove
+descendant death or absence of write aliases. Registry association, rolling-token
+integration, quota transition, confinement and production activation remain
+separate packet gates.
 
 Legacy plain archive behavior remains 512 MiB/call, 1 GiB cumulative DECODED,
 with its existing bounds. Select general-root Archive mode with **tmpfs size=

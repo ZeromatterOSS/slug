@@ -61,7 +61,7 @@ pub(super) fn seal(
     }))
 }
 
-fn verify(
+pub(super) fn verify(
     io: &RootIo<'_>,
     state: &RepositoryWorkspaceState,
     scope: &Arc<SourceServiceScope>,

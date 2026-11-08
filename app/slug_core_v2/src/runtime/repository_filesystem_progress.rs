@@ -244,6 +244,6 @@ fn apply_file_suffix(
 }
 
 #[path = "repository_delete.rs"]
-mod deletion;
+pub(super) mod deletion;
 #[path = "repository_filesystem_manifest.rs"]
 mod manifest;

@@ -1259,3 +1259,97 @@ async fn dice_observes_completed_state_fresh_commands_revocation_and_workspace_i
     assert_ne!(initial, completed);
     assert_ne!(next_command, restored);
 }
+
+#[test]
+fn native_storage_forecast_covers_initial_unique_and_reused_completion() {
+    let mut t = transcript();
+    assert_eq!(
+        RepositoryWorkspaceTranscript::initial_storage_bytes(t.reservation(), 0o755).unwrap(),
+        t.retained_storage_bytes().unwrap(),
+    );
+    // Unique bodies and actual byte-equal foreign Arcs use the same producer
+    // forecast; semantic completion still performs its own canonicalization.
+    for body in [b"first".as_slice(), b"different", b"first"] {
+        let request = t
+            .request(RepositoryWorkspaceOperation::File {
+                path: "out".into(),
+                body: Arc::from(body),
+                mode: 0o644,
+            })
+            .unwrap();
+        let entries = vec![root(), file("out", Arc::from(body))];
+        let forecast = t
+            .completion_storage_bytes(
+                &request,
+                &RepositoryWorkspaceResult::Unit,
+                RepositoryWorkspaceMode::Archive,
+                &entries,
+            )
+            .unwrap();
+        let next = t
+            .complete(
+                request,
+                RepositoryWorkspaceResult::Unit,
+                RepositoryWorkspaceMode::Archive,
+                entries,
+            )
+            .unwrap();
+        assert!(forecast >= next.retained_storage_bytes().unwrap());
+        t = next;
+    }
+    assert_eq!(
+        t.retention().body_bytes(),
+        (b"first".len() + b"different".len()) as u64
+    );
+}
+
+#[test]
+fn native_storage_forecast_refuses_foreign_replay_and_invalid_effects() {
+    let t = transcript();
+    let request = t
+        .request(RepositoryWorkspaceOperation::File {
+            path: "out".into(),
+            body: Arc::from(b"required".as_slice()),
+            mode: 0o644,
+        })
+        .unwrap();
+    let bad_entries = vec![root(), file("out", Arc::from(b"different".as_slice()))];
+    assert_eq!(
+        t.completion_storage_bytes(
+            &request,
+            &RepositoryWorkspaceResult::Unit,
+            RepositoryWorkspaceMode::Archive,
+            &bad_entries
+        ),
+        Err(RepositoryWorkspaceError::InvalidResult)
+    );
+    let foreign =
+        RepositoryWorkspaceTranscript::new(reservation_with(8, 12, limits()), 0o755).unwrap();
+    assert_eq!(
+        foreign.completion_storage_bytes(
+            &request,
+            &RepositoryWorkspaceResult::Unit,
+            RepositoryWorkspaceMode::Archive,
+            &bad_entries
+        ),
+        Err(RepositoryWorkspaceError::ForeignReservation)
+    );
+    let entries = vec![root(), file("out", Arc::from(b"required".as_slice()))];
+    let completed = t
+        .complete(
+            request.clone(),
+            RepositoryWorkspaceResult::Unit,
+            RepositoryWorkspaceMode::Archive,
+            entries.clone(),
+        )
+        .unwrap();
+    assert_eq!(
+        completed.completion_storage_bytes(
+            &request,
+            &RepositoryWorkspaceResult::Unit,
+            RepositoryWorkspaceMode::Archive,
+            &entries
+        ),
+        Err(RepositoryWorkspaceError::WrongIndex)
+    );
+}

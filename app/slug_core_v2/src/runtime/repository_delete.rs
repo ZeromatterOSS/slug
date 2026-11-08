@@ -17,7 +17,7 @@ const MAX_DEPTH: usize = 256;
 const FRONTIER_CREDIT: usize = MAX_PATH_BYTES + 64 * 1024;
 
 #[derive(Default)]
-pub(super) struct DeleteWork {
+pub(in crate::runtime) struct DeleteWork {
     entries: usize,
     path_bytes: usize,
 }
@@ -208,7 +208,7 @@ mod rooted;
 
 /// General workspace route; the existing Path consumer remains unchanged.
 #[cfg(target_os = "linux")]
-pub(super) fn delete_at(
+pub(in crate::runtime) fn delete_at(
     root: &crate::runtime::repository_root_io::RootIo<'_>,
     relative: &str,
     work: &mut DeleteWork,

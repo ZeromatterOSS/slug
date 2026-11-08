@@ -17,8 +17,12 @@ read-only source leases with descriptor/retained/backing credits. Its fixed Rust
 native fixtures prove namespace-exit lifetime and rejection boundaries, not
 untrusted execution, full archive exhaustion or whole-command memory fit.
 
-The next integration frontier is native mutable progress/rolling lease transfer,
-selected physical-root registry and InputImage/native source transport, followed
+Inactive native progress now covers actual ordered File/Template/Read/Exists/
+Delete mutations and complete credited tree snapshots; see the
+[mutable-progress receipt](wp1225-mutable-progress-acceptance-2026-11-07.json).
+Archive capture, Execute and rolling lease transfer remain the native progress
+frontier, followed by selected physical-root registry and InputImage/native
+source transport, then
 by original Loading/process activation under the complete gates below. Existing
 production routes remain replacement-required. The selected design links owner
 contracts and evidence; prior component chronology stays in receipts and Git.

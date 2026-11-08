@@ -60,6 +60,36 @@ impl RepositoryWorkspaceRequest {
     pub fn operation(&self) -> &RepositoryWorkspaceOperation {
         &self.operation
     }
+
+    /// Complete conservative native request guard. Equal foreign owners are
+    /// charged fully until protocol completion replaces them; sharing may be
+    /// overcounted, never silently omitted.
+    #[doc(hidden)]
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        let mut bytes = add(
+            std::mem::size_of::<Self>(),
+            add(
+                self.reservation.retained_storage_bytes()?,
+                add(
+                    self.predecessor.retained_storage_bytes()?,
+                    self.operation.metadata()?,
+                )?,
+            )?,
+        )?;
+        let mut failure = None;
+        self.operation.bodies(&mut |body| {
+            if failure.is_none() {
+                match array_bytes::<u8>(body.len()).and_then(|size| add(bytes, size)) {
+                    Ok(next) => bytes = next,
+                    Err(error) => failure = Some(error),
+                }
+            }
+        });
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok(bytes)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -95,11 +125,12 @@ impl RepositoryWorkspaceTranscript {
         let budget = reservation.limits;
         Self::new_with_budget(reservation, root_mode, budget)
     }
-    fn new_with_budget(
-        reservation: Arc<RepositoryWorkspaceReservation>,
+    fn initial_retention(
+        reservation: &RepositoryWorkspaceReservation,
         root_mode: u16,
         budget: RepositoryWorkspaceRetentionLimits,
-    ) -> Result<Self, RepositoryWorkspaceError> {
+    ) -> Result<(RepositoryWorkspaceEntry, RepositoryWorkspaceRetention), RepositoryWorkspaceError>
+    {
         let root = RepositoryWorkspaceEntry::new(
             "".into(),
             root_mode,
@@ -107,7 +138,7 @@ impl RepositoryWorkspaceTranscript {
         )?;
         let entries = [root];
         let metadata = RepositoryWorkspaceState::validate(
-            &reservation,
+            reservation,
             RepositoryWorkspaceMode::Archive,
             &entries,
         )?;
@@ -123,6 +154,30 @@ impl RepositoryWorkspaceTranscript {
             body_bytes: 0,
         };
         retention.check(budget, false)?;
+        Ok((entries.into_iter().next().unwrap(), retention))
+    }
+
+    /// Natural producer bound before creating an empty transcript. Includes
+    /// initial Vec/Arc transfer overlap and the complete reservation guard.
+    #[doc(hidden)]
+    pub fn initial_storage_bytes(
+        reservation: &RepositoryWorkspaceReservation,
+        root_mode: u16,
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        Ok(
+            Self::initial_retention(reservation, root_mode, reservation.limits)?
+                .1
+                .metadata_bytes,
+        )
+    }
+
+    fn new_with_budget(
+        reservation: Arc<RepositoryWorkspaceReservation>,
+        root_mode: u16,
+        budget: RepositoryWorkspaceRetentionLimits,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        let (root, retention) = Self::initial_retention(&reservation, root_mode, budget)?;
+        let entries = [root];
         let initial = Arc::new(RepositoryWorkspaceState::from_admitted(
             reservation.clone(),
             RepositoryWorkspaceMode::Archive,
@@ -305,43 +360,18 @@ impl RepositoryWorkspaceTranscript {
             record.result.bodies(visit);
         }
     }
-    /// Incoming snapshot/argv/source buffers MUST already be credited by their
-    /// producer. This method forecasts its own retained arrays and scratch before
-    /// allocation; failed admission never publishes a partial record. Body reuse
-    /// follows complete byte comparison and releases equal foreign allocations.
-    pub fn complete(
+    fn completion_metadata(
         &self,
-        request: RepositoryWorkspaceRequest,
-        result: RepositoryWorkspaceResult,
+        request: &RepositoryWorkspaceRequest,
+        result: &RepositoryWorkspaceResult,
         mode: RepositoryWorkspaceMode,
-        entries: Vec<RepositoryWorkspaceEntry>,
-    ) -> Result<Self, RepositoryWorkspaceError> {
-        self.complete_with_budget(
-            request,
-            result,
-            mode,
-            entries,
-            self.reservation.limits,
-            REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES,
-        )
-    }
-    fn complete_with_budget(
-        &self,
-        mut request: RepositoryWorkspaceRequest,
-        mut result: RepositoryWorkspaceResult,
-        mode: RepositoryWorkspaceMode,
-        mut entries: Vec<RepositoryWorkspaceEntry>,
+        entries: &[RepositoryWorkspaceEntry],
         budget: RepositoryWorkspaceRetentionLimits,
         process_body_limit: u64,
-    ) -> Result<Self, RepositoryWorkspaceError> {
-        if self.replay(&request)?.is_some() {
+    ) -> Result<(RepositoryWorkspaceRetention, usize, usize), RepositoryWorkspaceError> {
+        if self.replay(request)?.is_some() {
             return Err(RepositoryWorkspaceError::WrongIndex);
         }
-        // Equality authenticates facts, not physical storage ownership. Transfer
-        // the already charged current owners before retaining this request;
-        // equal foreign predecessor bodies/descriptor guards must be released.
-        request.reservation = self.reservation.clone();
-        request.predecessor = self.current().clone();
         let execute = matches!(&request.operation, RepositoryWorkspaceOperation::Execute(_));
         if mode
             != if execute {
@@ -352,8 +382,8 @@ impl RepositoryWorkspaceTranscript {
         {
             return Err(RepositoryWorkspaceError::InvalidMode);
         }
-        let state_metadata = RepositoryWorkspaceState::validate(&self.reservation, mode, &entries)?;
-        validate_result(&request, &result, &entries)?;
+        let state_metadata = RepositoryWorkspaceState::validate(&self.reservation, mode, entries)?;
+        validate_result(request, result, entries)?;
         let mut refs = 0usize;
         self.visit_bodies(&mut |_| {
             refs = refs.saturating_add(1);
@@ -404,6 +434,116 @@ impl RepositoryWorkspaceTranscript {
         if mode == RepositoryWorkspaceMode::Process && retention.body_bytes > process_body_limit {
             return Err(RepositoryWorkspaceError::RetentionLimit);
         }
+        Ok((retention, refs, scratch))
+    }
+
+    /// Conservative complete native lifetime guard, including the producer's
+    /// retained construction scratch. No allocation or body traversal is needed.
+    #[doc(hidden)]
+    pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            self.retention.metadata_bytes,
+            usize::try_from(self.retention.body_bytes)
+                .map_err(|_| RepositoryWorkspaceError::RetentionLimit)?,
+        )
+    }
+
+    /// Bound a complete successor and its construction scratch before native
+    /// admission. The old transcript and incoming buffers need their own live
+    /// guards throughout completion. New body occurrences pay full Arc layout;
+    /// actual canonicalization may reuse storage and retain less. This forecast
+    /// does not substitute for completion's semantic or unique-body admission.
+    #[doc(hidden)]
+    pub fn completion_storage_bytes(
+        &self,
+        request: &RepositoryWorkspaceRequest,
+        result: &RepositoryWorkspaceResult,
+        mode: RepositoryWorkspaceMode,
+        entries: &[RepositoryWorkspaceEntry],
+    ) -> Result<usize, RepositoryWorkspaceError> {
+        let (retention, _, _) = self.completion_metadata(
+            request,
+            result,
+            mode,
+            entries,
+            self.reservation.limits,
+            REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES,
+        )?;
+        let mut bytes = add(
+            retention.metadata_bytes,
+            usize::try_from(retention.body_bytes)
+                .map_err(|_| RepositoryWorkspaceError::RetentionLimit)?,
+        )?;
+        let mut charge = |body: &Arc<[u8]>| {
+            bytes = add(bytes, array_bytes::<u8>(body.len())?)?;
+            Ok(())
+        };
+        // bodies() is intentionally allocation-free; retain the first checked
+        // arithmetic error rather than allocating an auxiliary body set.
+        let mut failure = None;
+        let mut visit = |body: &Arc<[u8]>| {
+            if failure.is_none() {
+                failure = charge(body).err();
+            }
+        };
+        request.operation.bodies(&mut visit);
+        result.bodies(&mut visit);
+        for entry in entries {
+            if let RepositoryWorkspaceNode::File(body) = entry.node() {
+                visit(body);
+            }
+        }
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok(bytes)
+    }
+
+    /// Incoming snapshot/argv/source buffers MUST already be credited by their
+    /// producer. This method forecasts its own retained arrays and scratch before
+    /// allocation; failed admission never publishes a partial record. Body reuse
+    /// follows complete byte comparison and releases equal foreign allocations.
+    pub fn complete(
+        &self,
+        request: RepositoryWorkspaceRequest,
+        result: RepositoryWorkspaceResult,
+        mode: RepositoryWorkspaceMode,
+        entries: Vec<RepositoryWorkspaceEntry>,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        self.complete_with_budget(
+            request,
+            result,
+            mode,
+            entries,
+            self.reservation.limits,
+            REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES,
+        )
+    }
+    fn complete_with_budget(
+        &self,
+        mut request: RepositoryWorkspaceRequest,
+        mut result: RepositoryWorkspaceResult,
+        mode: RepositoryWorkspaceMode,
+        mut entries: Vec<RepositoryWorkspaceEntry>,
+        budget: RepositoryWorkspaceRetentionLimits,
+        process_body_limit: u64,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        if self.replay(&request)?.is_some() {
+            return Err(RepositoryWorkspaceError::WrongIndex);
+        }
+        // Equality authenticates facts, not physical storage ownership. Transfer
+        // the already charged current owners before retaining this request;
+        // equal foreign predecessor bodies/descriptor guards must be released.
+        request.reservation = self.reservation.clone();
+        request.predecessor = self.current().clone();
+        let (mut retention, refs, scratch) = self.completion_metadata(
+            &request,
+            &result,
+            mode,
+            &entries,
+            budget,
+            process_body_limit,
+        )?;
         let mut pool: SmallMap<Arc<[u8]>, ()> = SmallMap::with_capacity(refs);
         let mut seen: SmallSet<(usize, usize)> = SmallSet::with_capacity(refs);
         self.visit_bodies(&mut |body| {

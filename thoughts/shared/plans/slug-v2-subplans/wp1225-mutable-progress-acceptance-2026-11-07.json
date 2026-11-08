@@ -1,0 +1,295 @@
+{
+  "status": "INACTIVE_MUTABLE_PROGRESS_ACCEPTED",
+  "date": "2026-11-07",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "79aba42f865918a4f6d82091a1d3947fcf4e8798",
+  "source_view": "Eleven pinned Rust files and Core manifest over clean integration baseline; new mount-lease candidate remains unwired and excluded. Inherited dirty checkout preserved.",
+  "source_sha256": {
+    "app/slug_bzlmod_v2/src/repository_workspace/sequence.rs": "8fe10d243b96393ec6f24795b2b3ca267ee028e9c2bd9cf622db95bbbca42443",
+    "app/slug_bzlmod_v2/src/repository_workspace/tests.rs": "8d6058416df7810477374c24679e9f71ce094adbf0e1dd07bac2a35c9349c290",
+    "app/slug_core_v2/src/runtime/repository_physical_root.rs": "4cfbde81bd0df48f98ec7264830ee0abac7477cfd1bceb140a51d5adbc632292",
+    "app/slug_core_v2/src/runtime/repository_physical_root/seal.rs": "3236b3e73ccf7fab29a1b4f9457657e07a52ca0ff5370b01e60a1f569df6a4af",
+    "app/slug_core_v2/src/runtime/repository_filesystem_progress.rs": "a111f68cf3108a955395e8d62b176f98d54b7502418ef072b8b5f16050987003",
+    "app/slug_core_v2/src/runtime/repository_workspace_progress.rs": "a9d183d29398520f92857ed271a9eb74935c1723cae684dbf6ba399a648f9324",
+    "app/slug_core_v2/src/runtime/repository_workspace_progress/tests.rs": "7e4d99f9aed17d7a9ec1ef4cb4d9b54317ecc4bd3faf1dde3b7e2ea4be5c1f43",
+    "app/slug_core_v2/src/runtime/repository_workspace_snapshot.rs": "b3bfbead7662a1140949f6bc0bb080dfa92d96058c53863defaf6fbd91aac32d",
+    "app/slug_core_v2/src/runtime/repository_workspace_snapshot/tests.rs": "17bfd039135a6b0b3f9ab8dc6271a881afd2cb5ebb9c996fab2cab12edf6e0bd",
+    "app/slug_core_v2/src/runtime/repository_physical_root/native_fixture.rs": "c721d96b32f240dc0c678f77e080b0f18ab16d0b1c966f285f6e37eaacde1f5d",
+    "app/slug_core_v2/src/runtime/repository_delete.rs": "58ae139e6025048a3597c6e326d87aac5368f42c64a0ae81ee440d4aa559b6dd",
+    "app/slug_core_v2/Cargo.toml": "1550e7b56ea61d5d7c6f842d4c1911764bc767124f8d5a5150401ed49b21ab4f"
+  },
+  "compatibility": {
+    "Slug-native": [
+      "Actual bounded complete snapshots, finite native storage/FD admission and consume-on-error ownership",
+      "Inactive deterministic same-root progress with immutable transcript replay"
+    ],
+    "protected_existing": [
+      "Bazel-source-derived deterministic operation/result validation and body canonicalization",
+      "Physical root/sealed source ownership and existing rooted deletion kernels",
+      "Parent mkdir umask semantics and Exists through missing/non-directory ancestors"
+    ],
+    "unsupported_or_inactive": [
+      "Archive capture and Execute integration in native progress",
+      "Rolling lease integration, selected root registry and InputImage/native source transport",
+      "Child/writer quiescence proof, full archive/process quota transition and exhaustion",
+      "Untrusted confinement, original Starlark activation, public bootstrap and equivalent-command memory fit"
+    ]
+  },
+  "design_review": "Independent design ACCEPT for consuming deterministic progress, actual snapshot and concrete precredited transcript completion. Linear mount design reviewed separately; its code not part of this acceptance.",
+  "behavior": [
+    "Progress consumes actual empty Archive builder only; imported nonempty roots cannot fabricate initial history",
+    "File/Template/Read/Exists/Delete use existing rooted IO/deletion; complete actual tree sampled after every new operation; existing completed prefix replays leave current tree unchanged",
+    "Every refusal/cancellation/partial mutation consumes entire generation; one shared invocation DeleteWork counter is retained",
+    "Snapshot includes root, all directories/modes/bodies/deletions/literal internal links; selected Archive/Process name/body/entry/depth/path caps remain distinct",
+    "Prior same-path fileArc reused only after actual complete byte/EOF/identity equality; changed files stream into exact prepaid Arc<MaybeUninit> and initialize only after full verification; no 1MiB FileBytes cap imposed",
+    "Bounded rows/path/link storage and old/new array peaks remain credited; enumeration closes before body IO to retain three-temporary-FD envelope",
+    "Bzlmod shares natural initial/completion accounting with allocation-free forecasts and full Request retained bound; old transcript, capture and successor guards overlap through concrete completion; no uncredited entries/callback result escapes",
+    "Consuming seal verifies final actual root and retains final state only; native ownership never enters DICE",
+    "Parent directory creation requests0777 filtered by ambient umask, and Exists treats ENOENT/ENOTDIR as absence; nofollow refusal policy retained",
+    "Existing trusted native fixture bounded process/transport helpers shared without duplicating its harness; old selectors and128bytecontrol route preserved"
+  ],
+  "compile_gates": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 66.43625681000049,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.1279737759996351,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "-p",
+        "slug_reapi_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 13.663492618999953,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "preflight_and_test_runs": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-6ed4b973def1affc",
+        "--exact",
+        "module_version::repository_workspace_storage_tests::complete_version_storage_includes_both_shared_identifier_arrays",
+        "repository_workspace::tests::all_position_arguments_environment_removal_empty_and_requested_timeout_are_literal",
+        "repository_workspace::tests::archive_deeper_than_256_preserves_lane_while_delete_and_process_keep_own_limits",
+        "repository_workspace::tests::argument_environment_archive_metadata_charge_actual_spare_storage_and_owner_arrays",
+        "repository_workspace::tests::dice_observes_completed_state_fresh_commands_revocation_and_workspace_isolation",
+        "repository_workspace::tests::equal_argv_new_index_is_a_new_sample_not_replay",
+        "repository_workspace::tests::equal_foreign_bodies_are_compared_then_replaced_without_double_retention",
+        "repository_workspace::tests::equal_foreign_predecessor_and_reservation_are_released_before_retention",
+        "repository_workspace::tests::execute_count_exact_limit_replays_prior_indices_and_refuses_new_plus_one",
+        "repository_workspace::tests::execute_cwd_requires_selected_instance_and_repository_subtree_before_need",
+        "repository_workspace::tests::fresh_empty_revoked_epochs_reject_stale_reservations_and_global_state_overflow",
+        "repository_workspace::tests::incorrect_read_write_delete_results_and_reverse_mode_are_not_certificates",
+        "repository_workspace::tests::native_storage_forecast_covers_initial_unique_and_reused_completion",
+        "repository_workspace::tests::native_storage_forecast_refuses_foreign_replay_and_invalid_effects",
+        "repository_workspace::tests::nonzero_exit_keeps_writes_deletions_modes_and_later_read",
+        "repository_workspace::tests::normal_exit_and_each_output_stream_have_independent_exact_plus_one_limits",
+        "repository_workspace::tests::owner_layout_rounds_byte_tails_and_refuses_impossible_array_layouts",
+        "repository_workspace::tests::process_body_exact_limit_and_new_version_plus_one_count_complete_history",
+        "repository_workspace::tests::process_entry_and_depth_exact_plus_one_do_not_lower_archive_admission",
+        "repository_workspace::tests::process_names_and_absolute_path_have_exact_plus_one_limits",
+        "repository_workspace::tests::protocol_debug_redacts_body_argv_environment_and_captured_bytes",
+        "repository_workspace::tests::replay_requires_full_operation_index_predecessor_and_generation",
+        "repository_workspace::tests::reservation_rejects_zero_and_retains_full_generation_policy_identity",
+        "repository_workspace::tests::state_rejects_missing_parent_duplicate_special_modes_and_escaping_link",
+        "repository_workspace::tests::state_versions_metadata_and_retained_bodies_have_exact_plus_one_policies",
+        "repository_workspace::tests::template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equal",
+        "selected_repo_spec::selected_extension_demand::repository_workspace_storage_tests::complete_owner_storage_covers_foreign_spare_strings_and_version_guards",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 27,
+      "elapsed_seconds": 0.19078847899982065,
+      "executable_sha256": "5eecd8848fba713d9331a984ffcec67622e2b812efd279298f10a2578308073a",
+      "preflight_exit_code": 0
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--exact",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_depth_exact_plus_one_and_missing_ancestor_are_bounded",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_frontier_credits_release_on_success_refusal_and_cancellation",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_rejects_hardlinks_special_nodes_and_invalid_demands_before_mutation",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_unlinks_internal_and_escaping_literal_links_without_traversal",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_uses_original_descriptor_with_absent_and_foreign_display",
+        "runtime::repository_filesystem_progress::deletion::rooted::tests::rooted_delete_work_exact_plus_one_accumulates_across_the_complete_tree",
+        "runtime::repository_filesystem_progress::deletion::tests::delete_walk_returns_actual_presence_and_refuses_non_directory_or_symlink_ancestors",
+        "runtime::repository_filesystem_progress::deletion::tests::delete_work_limits_accumulate_without_refund_and_cancellation_stops_io",
+        "runtime::repository_filesystem_progress::deletion::tests::scoped_delete_frontier_credit_releases_on_success_error_and_cancellation",
+        "runtime::repository_physical_root::seal::verification_tests::complete_tree_verification_rejects_extra_root_and_nested_children",
+        "runtime::repository_physical_root::seal::verification_tests::complete_tree_verification_rejects_mode_and_equivalent_literal_link_changes",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_cancellation_and_mutation_during_old_body_comparison_release_all_storage",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_completion_rejects_foreign_owner_and_failed_protocol_without_orphaning_credit",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_limits_include_root_all_paths_literal_targets_and_total_bodies",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_process_entry_depth_and_absolute_path_limits_do_not_lower_archive_lane",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_rejects_special_hardlinked_and_escaping_literal_nodes_without_following",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_retained_descriptor_ignores_absent_and_foreign_display_tree",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_samples_actual_changes_deletions_modes_links_and_reuses_only_observed_equal_body",
+        "runtime::repository_physical_root::snapshot::tests::snapshot_streams_beyond_source_filebytes_cap_and_admits_size_before_allocating",
+        "runtime::repository_physical_root::tests::ordinary_host_directories_and_regular_files_cannot_become_physical_roots",
+        "runtime::repository_physical_root::tests::resource_policy_and_bank_control_require_positive_exact_credits",
+        "runtime::repository_physical_root::tests::resource_reservation_checks_all_domains_atomically_and_releases_on_last_owner",
+        "runtime::repository_physical_root::tests::scope_refusal_precedes_inactive_authority_and_allocations",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 23,
+      "elapsed_seconds": 0.48929129200041643,
+      "executable_sha256": "b1aef8eb93c282aa2d814285ecd8495016f18826da4efe6264865691a2a64adb",
+      "preflight_exit_code": 0
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+        "--ignored",
+        "--exact",
+        "runtime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release",
+        "runtime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits",
+        "runtime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root",
+        "runtime::repository_physical_root::progress::tests::native_ordered_progress_samples_replays_and_seals_without_host_path",
+        "runtime::repository_physical_root::progress::tests::native_progress_refusals_retire_the_entire_generation",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "selected": 5,
+      "elapsed_seconds": 0.31414232200040715,
+      "executable_sha256": "b1aef8eb93c282aa2d814285ecd8495016f18826da4efe6264865691a2a64adb",
+      "preflight_exit_code": 0
+    }
+  ],
+  "native_evidence": {
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-a08c2cb3c5a73ec8",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release",
+      "runtime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits",
+      "runtime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root",
+      "runtime::repository_physical_root::progress::tests::native_ordered_progress_samples_replays_and_seals_without_host_path",
+      "runtime::repository_physical_root::progress::tests::native_progress_refusals_retire_the_entire_generation",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "preflight_listing": "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper: test\nruntime::repository_physical_root::native_tests::native_archive_and_process_roots_seal_same_backing_and_readers_own_last_release: test\nruntime::repository_physical_root::native_tests::native_reader_cancellation_is_nonretryable_and_last_drop_releases_all_credits: test\nruntime::repository_physical_root::native_tests::native_seal_rejects_foreign_reservation_mode_and_body_without_retaining_root: test\nruntime::repository_physical_root::progress::tests::native_ordered_progress_samples_replays_and_seals_without_host_path: test\nruntime::repository_physical_root::progress::tests::native_progress_refusals_retire_the_entire_generation: test\n\n6 tests, 0 benchmarks\n",
+    "socket_capability": "AF_UNIX SOCK_SEQPACKET confirmed before invocation",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+    "umask": "0002",
+    "qualification": "Fixed trusted tmpfs fixtures and deterministic progress only; no archive/execute activation, confinement or whole-command memory claim."
+  },
+  "kernel": "7.2.7-ogc1.1.fc44.x86_64",
+  "test_scope": {
+    "protected_bzlmod": 27,
+    "core_ordinary": 23,
+    "snapshot_ordinary": 8,
+    "physical_root_ordinary": 6,
+    "deletion_ordinary": 9,
+    "explicit_ignored_native_parents": 5,
+    "new_native_progress_parents": 2,
+    "protected_native_physical_root_parents": 3,
+    "internal_helper_selected_only_by_parents": 1,
+    "passed_parent_tests": 55,
+    "failed": 0
+  },
+  "compile_json_sha256": {
+    "mutable-owners-visibility-failure.jsonl": "1575d3f4afe38344fb7c359e367de2d435d9cb5ff4a1a441e0ad58eb3799da63",
+    "mutable-owners.jsonl": "50e33cf5ba37a24433c736e407a4e6ae8f430426c8cb6e0b7d9e0b5610be95a8",
+    "mutable-dependents.jsonl": "561fe02ad721435361b124698de64c5eb528e98e906cfb29df07a588f4eb85a1",
+    "mutable-dependents-import-failure.jsonl": "1e4c48e1ee6ef49c29e16a5746e9d2f66c12b5914597f60e72498981ccfdcb40",
+    "mutable-owners-before-manifest.jsonl": "af20d2954d9d51968a9b8015a194143ba524dd7ad34383966db3af336fe3f51a"
+  },
+  "raw_test_output_sha256": {
+    "slug_bzlmod_v2-ordinary": {
+      "stdout": "fa326ba03903c31cf289d516aab8edb25fb7313a1590d8e9352041faaba888a7",
+      "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "slug_core_v2-ordinary": {
+      "stdout": "3d272944e340622eaa25908ac6aebccd820a0bd1f2b625b6fed0018096f40521",
+      "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "slug_core_v2-native": {
+      "stdout": "377aaf31eb88205267610fc89f88017ff6415e7486cff772693b53d137fd8855",
+      "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "corrections": [
+    "Reuse existing deletion module with runtime visibility; no duplicate kernel/counter",
+    "ENOTDIR Exists absence and mkdir0777 ambient umask regression; native subprocess0002 discriminates",
+    "Core selector preflight count corrected23 before execution; no zero/incomplete selection accepted",
+    "Move existing pinned compact_str dependency from dev to production; protected test variant reused exact Cargo inputs, and current production CLI/REAPI check passes"
+  ],
+  "final_review": "Independent final source, corrections, source pins, exact artifact/preflight,55tests/native and CLI/REAPI evidence review ACCEPT.",
+  "static_gates": [
+    "Pinned rustfmt",
+    "git diff --check",
+    "scripts/v2_archive_status.sh",
+    "python3 scripts/v2_plan_status.py",
+    "Changed plan links resolve"
+  ],
+  "residual": "Inactive component only. Trusted setup must exclude every external writer; actual snapshot equality does not prove child/descendant death. No archive capture, process launch, mount lease, registry, source transport or original Starlark activation occurs. No whole-command memory-fit claim.",
+  "fixture_growth_checkpoint": {
+    "baseline": "d202a77e29b4fda077e69bc17ea4874c4635e22a",
+    "changed_fixture_or_test_files": 12,
+    "paths": [
+      "app/slug_bzlmod_v2/src/repository_workspace/tests.rs",
+      "app/slug_core_v2/src/runtime/path_observation/rooted/tests.rs",
+      "app/slug_core_v2/src/runtime/repository_delete/rooted/tests.rs",
+      "app/slug_core_v2/src/runtime/repository_filesystem_manifest/rooted/tests.rs",
+      "app/slug_core_v2/src/runtime/repository_physical_root/native_fixture.rs",
+      "app/slug_core_v2/src/runtime/repository_physical_root/native_tests.rs",
+      "app/slug_core_v2/src/runtime/repository_physical_root/tests.rs",
+      "app/slug_core_v2/src/runtime/repository_physical_root/verification_tests.rs",
+      "app/slug_core_v2/src/runtime/repository_root_io/tests.rs",
+      "app/slug_core_v2/src/runtime/repository_workspace_progress/tests.rs",
+      "app/slug_core_v2/src/runtime/repository_workspace_snapshot/tests.rs",
+      "app/slug_core_v2/src/runtime/tests/repository_generated_archive_tests.rs"
+    ],
+    "assessment": "One active WP425 packet; ephemeral actual trees are built in Rust tests. Existing trusted native fixture and rooted deletion kernels reused; no copied ruleset fixture or new persisted bulk dataset. Current acceptance adds two test modules; separate unwired mount candidate excluded."
+  }
+}

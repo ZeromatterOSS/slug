@@ -22,9 +22,13 @@ use super::path_observation::rooted::RootedObservationError;
 use super::repository_root_io::RootIo;
 use super::repository_root_io::RootIoLimits;
 
+#[path = "repository_workspace_progress.rs"]
+mod progress;
 mod reader;
 mod resources;
 mod seal;
+#[path = "repository_workspace_snapshot.rs"]
+mod snapshot;
 pub(in crate::runtime) use reader::RepositoryRootReader;
 pub(in crate::runtime) use resources::*;
 
@@ -51,6 +55,9 @@ pub(in crate::runtime) enum PhysicalRootError {
     Backing,
     RootIdentity,
     Snapshot,
+    UnsupportedOperation,
+    Mutation(super::repository_io::ArchiveMaterializationError),
+    Protocol(slug_bzlmod_v2::RepositoryWorkspaceError),
     Resource,
     SourceService(SourceServiceError),
     Inactive,
