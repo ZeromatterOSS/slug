@@ -2935,31 +2935,24 @@ fn union_host_observations(
     left: &PathObservationEpoch,
     right: &PathObservationEpoch,
 ) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
-    if right.observations().is_empty() || std::ptr::eq(left.observations(), right.observations()) {
-        return Ok(left.dupe());
-    }
-    if left.observations().is_empty() {
-        return Ok(right.dupe());
-    }
-    if right.observations().iter().all(|(demand, result)| {
-        left.get(demand).is_some_and(|original| {
-            Arc::ptr_eq(original, result) || original.as_ref() == result.as_ref()
-        })
-    }) {
-        return Ok(left.dupe());
-    }
-    PathObservationEpoch::from_shared(
-        left.observations()
-            .iter()
-            .map(|(demand, result)| (demand.dupe(), result.dupe()))
-            .chain(
-                right
-                    .observations()
-                    .iter()
-                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
-            ),
-    )
-    .map_err(ObservedPathFrontierError::from)
+    let result = left
+        .try_union(right)
+        .map_err(ObservedPathFrontierError::from);
+    #[cfg(feature = "native-probe-observer")]
+    crate::observation_union_probe::record(
+        crate::observation_union_probe::Helper::HostBzl,
+        left.observations().len(),
+        right.observations().len(),
+        result
+            .as_ref()
+            .ok()
+            .map(|epoch| crate::observation_union_probe::Returned {
+                rows: epoch.observations().len(),
+                reused_left: std::ptr::eq(epoch.observations(), left.observations()),
+                reused_right: std::ptr::eq(epoch.observations(), right.observations()),
+            }),
+    );
+    result
 }
 
 async fn complete_observed_host_bzl_cycle(

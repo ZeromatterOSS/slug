@@ -9,6 +9,8 @@ use std::time::Instant;
 
 use serde_json::Value;
 use serde_json::json;
+use slug_loading_v2::observation_union_probe;
+use slug_loading_v2::observation_union_probe::Snapshot as UnionSnapshot;
 
 use crate::runtime::WorkspaceRuntime;
 use crate::runtime::probe_observer::ProbeGuard;
@@ -24,9 +26,11 @@ const MAGIC: u64 = u64::from_le_bytes(*b"SLGOBS01");
 
 pub(super) struct InstalledProfile {
     guard: ProbeGuard,
+    union_before: UnionSnapshot,
 }
 impl InstalledProfile {
     pub(super) fn attach(runtime: &mut WorkspaceRuntime) -> io::Result<Self> {
+        let union_before = observation_union_probe::snapshot();
         let raw = unsafe {
             libc::memfd_create(
                 c"slug-rust-phase-profile".as_ptr(),
@@ -50,7 +54,10 @@ impl InstalledProfile {
         }
         let guard = ProbeGuard::install_from_fd(fd)?;
         runtime.attach_probe_observer(guard.observer());
-        Ok(Self { guard })
+        Ok(Self {
+            guard,
+            union_before,
+        })
     }
     /// Called only after the outcome and runtime have dropped and native owners
     /// have refunded. Disable first, then sample the still-owned atomic mapping.
@@ -61,8 +68,55 @@ impl InstalledProfile {
         let counts = observer.family_counts_for_test();
         let mut profile = decode(&words);
         profile["dice_family_counts"] = family_counts(counts);
+        profile["observation_union_helpers"] =
+            union_counts(self.union_before, observation_union_probe::snapshot());
         profile
     }
+}
+
+fn union_counts(before: UnionSnapshot, after: UnionSnapshot) -> Value {
+    let rows = observation_union_probe::HELPER_LABELS.iter().enumerate().map(|(index,label)| {
+        let mut saturated_mask = 0u64;
+        let mut reversed_mask = 0u64;
+        let delta: [Option<u64>; 10] = std::array::from_fn(|metric| {
+            let bit = 1 << metric;
+            let initial = before.counts[index][metric];
+            let final_count = after.counts[index][metric];
+            if initial == u64::MAX || final_count == u64::MAX {
+                saturated_mask |= bit;
+            }
+            let difference = final_count.checked_sub(initial);
+            if difference.is_none() {
+                reversed_mask |= bit;
+            }
+            if (before.overflow_masks[index] | after.overflow_masks[index] | saturated_mask) & bit != 0 {
+                None
+            } else {
+                difference
+            }
+        });
+        let overflow = before.overflow_masks[index] | after.overflow_masks[index];
+        json!({
+            "helper":label,"before_counts":before.counts[index],
+            "after_counts":after.counts[index],"checked_delta":delta,
+            "before_overflow_mask":before.overflow_masks[index],
+            "after_overflow_mask":after.overflow_masks[index],
+            "saturated_mask":saturated_mask,"reversed_mask":reversed_mask,
+            "preexisting_overflow":before.overflow_masks[index]!=0,
+            "unknown_overflow_bits":overflow&!0x3ff,
+            "all_counter_deltas_arithmetically_exact":overflow==0&&saturated_mask==0&&reversed_mask==0,
+        })
+    }).collect::<Vec<_>>();
+    json!({
+        "metric_columns":observation_union_probe::METRIC_LABELS,"helpers":rows,
+        "returned_helper_observations":true,"classes_overlap":true,
+        "successful_no_new_keys_uses_union_cardinality":true,
+        "process_wide":true,"request_isolated":false,"atomic_snapshot":false,
+        "per_cell_before_after":true,"reset_performed":false,
+        "arithmetic_deltas_are_not_request_totals":true,
+        "measures_allocation_count":false,"measures_time":false,
+        "retains_keys_paths_or_epochs":false,
+    })
 }
 
 fn family_counts(snapshot: Snapshot) -> Value {
@@ -279,6 +333,16 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
     words[1] = 2;
     let mut profile = decode(&words);
     profile["dice_family_counts"] = counts;
+    profile["observation_union_helpers"] = union_counts(
+        UnionSnapshot {
+            counts: [[10_000_000_000_000_000_000; 10]; 3],
+            overflow_masks: [0; 3],
+        },
+        UnionSnapshot {
+            counts: [[u64::MAX - 1; 10]; 3],
+            overflow_masks: [0; 3],
+        },
+    );
     let timing = ProgressTiming {
         buckets: [Bucket {
             count: u64::MAX,
@@ -292,5 +356,88 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
         ..Default::default()
     };
     let combined = json!({"phase_profile":profile,"progress_wall":timing.summary()});
-    assert!(combined.to_string().len() < REPORT_BYTES);
+    // Long before/after cells and long exact deltas, with margin for the
+    // mutually exclusive overflow form (which uses null deltas).
+    assert!(combined.to_string().len() + 1024 < REPORT_BYTES);
+    let mut masked_profile = combined["phase_profile"].clone();
+    masked_profile["observation_union_helpers"] = union_counts(
+        UnionSnapshot {
+            counts: [[u64::MAX; 10]; 3],
+            overflow_masks: [u64::MAX; 3],
+        },
+        UnionSnapshot {
+            counts: [[u64::MAX; 10]; 3],
+            overflow_masks: [u64::MAX; 3],
+        },
+    );
+    let masked = json!({"phase_profile":masked_profile,"progress_wall":timing.summary()});
+    assert!(masked.to_string().len() + 1024 < REPORT_BYTES);
+}
+
+#[test]
+fn union_helper_deltas_qualify_max_overflow_and_reversal_without_raw_inputs() {
+    let mut before = UnionSnapshot {
+        counts: [[0; 10]; 3],
+        overflow_masks: [0; 3],
+    };
+    let mut after = before;
+    before.counts[0][0] = 10;
+    after.counts[0][0] = 15;
+    before.counts[0][1] = 12;
+    after.counts[0][1] = 11;
+    before.counts[0][2] = u64::MAX;
+    after.counts[0][2] = u64::MAX;
+    before.overflow_masks[1] = 1;
+    after.counts[1][0] = 2;
+    after.overflow_masks[2] = 2;
+    after.counts[2][1] = 3;
+    let report = union_counts(before, after);
+    assert_eq!(report["helpers"][0]["checked_delta"][0], 5);
+    assert!(report["helpers"][0]["checked_delta"][1].is_null());
+    assert!(report["helpers"][0]["checked_delta"][2].is_null());
+    assert_eq!(report["helpers"][0]["reversed_mask"], 2);
+    assert_eq!(report["helpers"][0]["saturated_mask"], 4);
+    assert_eq!(report["helpers"][1]["before_overflow_mask"], 1);
+    assert_eq!(report["helpers"][1]["preexisting_overflow"], true);
+    assert!(report["helpers"][1]["checked_delta"][0].is_null());
+    assert_eq!(report["helpers"][2]["after_overflow_mask"], 2);
+    assert!(report["helpers"][2]["checked_delta"][1].is_null());
+    for index in 0..3 {
+        assert_eq!(
+            report["helpers"][index]["all_counter_deltas_arithmetically_exact"],
+            false
+        );
+        assert_eq!(
+            report["helpers"][index]["helper"],
+            observation_union_probe::HELPER_LABELS[index]
+        );
+    }
+    assert_eq!(report["classes_overlap"], true);
+    assert_eq!(report["request_isolated"], false);
+    assert_eq!(report["atomic_snapshot"], false);
+    let clean = union_counts(
+        UnionSnapshot {
+            counts: [[0; 10]; 3],
+            overflow_masks: [0; 3],
+        },
+        UnionSnapshot {
+            counts: [[1; 10]; 3],
+            overflow_masks: [0; 3],
+        },
+    );
+    assert_eq!(
+        clean["helpers"][0]["all_counter_deltas_arithmetically_exact"],
+        true
+    );
+    assert_eq!(
+        clean["helpers"][0]["checked_delta"],
+        serde_json::to_value([1u64; 10]).unwrap()
+    );
+    for payload in [
+        "arbitrary-key-payload",
+        "/private/source",
+        "secret-like-argv",
+    ] {
+        assert!(!report.to_string().contains(payload));
+    }
 }

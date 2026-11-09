@@ -31,6 +31,8 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use starlark_map::sorted_map::SortedMap;
 
+mod union;
+
 /// A structural path computation result.
 ///
 /// `Need` is transient scheduling state. It deliberately has no Rust equality:

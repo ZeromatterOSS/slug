@@ -3,8 +3,18 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: attribute remaining module/dependency work in original
+Current delta: discriminate prerequisite serialization in original
 `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
+The [validated observation union](wp1225-observation-union-acceptance-2026-11-08.json)
+now preserves full facts, left key/result custody and existing constructor
+validation across three measured Loading helpers. Actual original ownership is
+RED→GREEN;216 ordinary tests, four native guards and four original warm compiler
+commands pass. Both bounded candidates reuse612 route/effect maps that controls
+reconstruct, but every ABBA run last records51 roots/103 records before
+WorkDeadline.
+No deeper frontier, command-latency or RSS acceptance is established. Investigate
+bounded prerequisite discovery with ordered barriers/errors and independent
+resource bounds; no batching, clock/cap increase or caller pruning is selected.
 The [materialization-result cutoff](wp1225-materialization-cutoff-acceptance-2026-11-08.json)
 now tracks only the full-request-bound actual current entry. Actual-key
 completed-A/unrelated-B is RED→GREEN;74 owner and16 observer tests, four native

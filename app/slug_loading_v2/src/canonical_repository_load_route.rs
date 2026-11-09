@@ -230,14 +230,24 @@ fn merge_load_route_observations(
     route: &PathObservationEpoch,
     effect: &PathObservationEpoch,
 ) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
-    PathObservationEpoch::from_shared(
-        route
-            .observations()
-            .iter()
-            .chain(effect.observations().iter())
-            .map(|(demand, result)| (demand.dupe(), result.dupe())),
-    )
-    .map_err(ObservedPathFrontierError::from)
+    let result = route
+        .try_union(effect)
+        .map_err(ObservedPathFrontierError::from);
+    #[cfg(feature = "native-probe-observer")]
+    crate::observation_union_probe::record(
+        crate::observation_union_probe::Helper::CanonicalLoadRoute,
+        route.observations().len(),
+        effect.observations().len(),
+        result
+            .as_ref()
+            .ok()
+            .map(|epoch| crate::observation_union_probe::Returned {
+                rows: epoch.observations().len(),
+                reused_left: std::ptr::eq(epoch.observations(), route.observations()),
+                reused_right: std::ptr::eq(epoch.observations(), effect.observations()),
+            }),
+    );
+    result
 }
 
 async fn compute_route_predecessor(

@@ -83,9 +83,13 @@ now preserves completed results across unrelated publications, with actual-key
 RED/GREEN and native admission proof. Bounded family counts leave the Analysis
 CapturedSourceSnapshotKey unreached in observed prefixes; its cutoff remains
 deferred. Alternating same-input probes reduce result recomputes but
-retain variable prefixes and the unchanged work deadline. Remaining module/
-dependency attribution precedes Rust archive extraction; completion, command
-latency and RSS acceptance remain unproved.
+retain variable prefixes and the unchanged work deadline. The
+[validated observation union](./slug-v2-subplans/wp1225-observation-union-acceptance-2026-11-08.json)
+now reuses no-op maps and full left key/result owners with original RED/GREEN
+and native proof. Bounded candidates reuse612 measured maps, but retain the same
+recorded epoch and work deadline. Prerequisite serialization is the next
+candidate to discriminate; Rust archive extraction, completion, command latency
+and RSS acceptance remain unproved.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

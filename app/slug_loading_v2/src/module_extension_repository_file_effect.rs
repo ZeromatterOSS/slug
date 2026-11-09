@@ -380,18 +380,24 @@ fn merge_observations(
     left: &PathObservationEpoch,
     right: &PathObservationEpoch,
 ) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
-    PathObservationEpoch::from_shared(
-        left.observations()
-            .iter()
-            .map(|(demand, result)| (demand.dupe(), result.dupe()))
-            .chain(
-                right
-                    .observations()
-                    .iter()
-                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
-            ),
-    )
-    .map_err(ObservedPathFrontierError::from)
+    let result = left
+        .try_union(right)
+        .map_err(ObservedPathFrontierError::from);
+    #[cfg(feature = "native-probe-observer")]
+    crate::observation_union_probe::record(
+        crate::observation_union_probe::Helper::SelectedEffect,
+        left.observations().len(),
+        right.observations().len(),
+        result
+            .as_ref()
+            .ok()
+            .map(|epoch| crate::observation_union_probe::Returned {
+                rows: epoch.observations().len(),
+                reused_left: std::ptr::eq(epoch.observations(), left.observations()),
+                reused_right: std::ptr::eq(epoch.observations(), right.observations()),
+            }),
+    );
+    result
 }
 
 enum RepositoryDefinitionLabel {

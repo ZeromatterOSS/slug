@@ -1287,6 +1287,79 @@ would additionally need an explicit resource decision because Core initializes
 new reservations before later operations; more simultaneous Archive backings
 must not bypass the existing bank or choose caller-specific pruning.
 
+### Bounded observation-union attribution
+
+Before selecting another graph change, distinguish the already accepted private
+Loading no-op union from adjacent helpers that reconstruct their certificates.
+The existing Core native-probe-observer feature may enable a separate Loading
+diagnostic feature. A fixed three-owner scalar table observes existing Bzl
+union, canonical route union and selected-effect union returns. Record only
+calls, input/output row totals, successful no-new-key cases, left/right map
+sharing, empty inputs and errors, with checked saturation and overflow masks.
+Read lengths and pointer equality in constant time after the unchanged helper;
+add no equality scan, retained input, clock, graph edge, listener or userdata.
+
+This explicit measurement exception uses feature-only process-wide counters,
+separate from the Observer-owned family table. There is no reset or enable
+state. The ignored profile takes initial and post-retirement scalar snapshots;
+their per-cell differences are neither atomic nor request-isolated. Preserve
+initial/final overflow, preexisting saturation and reversed-delta qualifications.
+Returned-helper counts and overlapping classes prove observed reconstruction
+opportunities, not allocated bytes, self-time, drain or command completion.
+Keep the existing 16 KiB diagnostic reservation and 512 KiB total ceiling.
+
+Use actual original selected-effect certificate/map ownership RED and observed
+rebuilding work before choosing pure union migrations. Preserve complete facts,
+stable left demand/result owners, first sorted conflicts and current freshness.
+Raw constructors, Need validity, default Disabled policy and all resource caps
+remain unchanged. Keep diagnostics with the selected semantic proof, with
+independent review and root-serialized Cargo/native execution.
+
+### Validated observation union
+
+The original-rule ownership RED preserves full facts and individual result Arcs
+but detects a reconstructed certificate map. Bounded attribution observes 45
+canonical route and 411 selected-effect unions returning no new keys without
+map reuse. The existing private Bzl union already reuses contained inputs, but
+also performs actual-growth unions. These are reconstruction opportunities,
+not an attribution of RootCompute time or completed-command memory fit.
+
+Provide `PathObservationEpoch::try_union` over two already validated immutable
+epochs. Keep raw `new`/`from_shared` validation and error precedence unchanged.
+Shared-map or empty-right unions retain the left map; empty-left may retain the
+right map. Scan sorted right entries against the full left facts, using pointer
+identity only as a shortcut for the same immutable result. Return the first
+sorted conflicting demand. If no key is new, retain the left map after checking
+all overlaps. Equal foreign results do not replace left canonical owners.
+
+For growth, use checked unique-row capacity and a two-way sorted merge through
+the existing OrderedMap/SortedMap utilities. Every duplicate selects the whole
+left demand/result pair, including independently charged Image key and result
+owners. Retain shared payloads without copying bodies; add no temporary full
+sort vector, interner, global cache, retained field or donor dependency. Pure
+union does not establish source freshness or grant native authority.
+
+Migrate only the three measured Loading helpers, keeping their mode gates,
+error wrappers and diagnostic counters. Other wrappers and raw append/capture
+paths remain outside this selection. Workspace tests compare exact results and
+errors against the existing constructor, protect two-bank key/result custody
+and last-Drop refunds, and reuse per-demand change/revoke/restore controls.
+Actual original-rule RED/GREEN, existing Bzl ownership controls, direct-dependent
+compilation and protected native/original probes join root-serialized validation.
+All configured clocks, caps, Need validity and default Disabled policy remain.
+
+The [union receipt](wp1225-observation-union-acceptance-2026-11-08.json) records
+216 ordinary tests, actual original ownership RED/GREEN, native admission and
+four original warm compiler commands. In both bounded candidate prefixes,
+46 route and 566 effect no-new-key returns retain the left map; both controls
+reconstruct them. Every ABBA run retains the same recorded 51 roots/103 records
+and reaches WorkDeadline. This closes the local representation/ownership gap,
+without demonstrating deeper Rust progress, command latency or RSS fit. Further
+work must discriminate prerequisite serialization rather than infer time from
+map counts. Bounded path-only lookahead is only a source candidate: ordered
+barriers/errors and independent demand/path/producer resource bounds need review
+before any batching is selected.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

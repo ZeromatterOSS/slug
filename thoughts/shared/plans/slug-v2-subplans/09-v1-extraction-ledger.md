@@ -64,6 +64,19 @@ observer layout and total report ceiling remain unchanged. This is dependency
 cutoff and bounded attribution evidence, not completed-command memory fit; see
 the [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json).
 
+Validated observation unions lift the accepted private Loading no-op policy
+into the Workspace epoch owner. Full left demand/result representatives retain
+Arc/Dupe and charged Image custody; exact overlap comparison precedes allocation.
+Growth uses existing Buck2-derived OrderedMap/SortedMap in sorted order, avoiding
+a temporary full sort vector without a donor import or new container. The raw
+constructors, semantic facts, per-demand freshness and native admission stay
+unchanged. Only three measured Loading helpers migrate. A separate feature-only
+264-byte process scalar collector qualifies observed helper returns; it is no
+semantic cache or request-isolated allocation/time meter. The
+[union receipt](wp1225-observation-union-acceptance-2026-11-08.json) owns causal
+map-identity, full equality/key/result custody and bounded original-command proof;
+completed-command latency/RSS remain independent gates.
+
 Owned-file observation verification borrows a closed carrier from the actual
 sealed native owner and reuses RootIo's nofollow stream, byte comparison and
 actual SHA-256. Only complete direct File bodies may select this class; Source
