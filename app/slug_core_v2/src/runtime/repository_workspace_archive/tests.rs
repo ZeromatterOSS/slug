@@ -65,7 +65,7 @@ fn request(path: &Path, expected: [u8; 32]) -> RepositoryWorkspaceRequest {
         .request(RepositoryWorkspaceOperation::Archive(
             GeneratedRepositoryArchiveEffect::new(
                 Arc::from([url::Url::from_file_path(path).unwrap().to_string().into()]),
-                expected,
+                Some(expected),
                 "prefix".into(),
                 GeneratedRepositoryArchiveFormat::TarGz,
                 "actual-archive-capture".into(),
@@ -264,7 +264,7 @@ fn archive_capture_verifier_rejects_truncation_growth_wrong_bytes_and_hardlinks(
             verify_capture(
                 &file,
                 &frame,
-                Sha256::digest(b"original").into(),
+                Some(Sha256::digest(b"original").into()),
                 &scope(),
                 &|| true
             )
@@ -279,7 +279,7 @@ fn archive_capture_verifier_rejects_truncation_growth_wrong_bytes_and_hardlinks(
         verify_capture(
             &file,
             &frame,
-            Sha256::digest(b"original").into(),
+            Some(Sha256::digest(b"original").into()),
             &scope(),
             &|| true
         )
@@ -290,7 +290,7 @@ fn archive_capture_verifier_rejects_truncation_growth_wrong_bytes_and_hardlinks(
         verify_capture(
             &directory,
             &directory.metadata().unwrap(),
-            [0; 32],
+            Some([0; 32]),
             &scope(),
             &|| true
         )
@@ -309,7 +309,7 @@ fn archive_capture_verifier_accepts_exact_bytes_above_filebytes_cap_and_refuses_
     let frame = file.metadata().unwrap();
     let expected = Sha256::digest(&bytes).into();
     assert_eq!(
-        verify_capture(&file, &frame, expected, &scope(), &|| true).unwrap(),
+        verify_capture(&file, &frame, Some(expected), &scope(), &|| true).unwrap(),
         expected
     );
     File::options()
@@ -324,7 +324,7 @@ fn archive_capture_verifier_accepts_exact_bytes_above_filebytes_cap_and_refuses_
         calls.set(calls.get() + 1);
         true
     };
-    assert!(verify_capture(&file, &large, [0; 32], &scope(), &active).is_err());
+    assert!(verify_capture(&file, &large, Some([0; 32]), &scope(), &active).is_err());
     assert_eq!(calls.get(), 1);
 }
 
@@ -459,7 +459,16 @@ fn archive_capture_cancellation_at_acquisition_verification_and_decode_retires_o
         }
         true
     };
-    assert!(verify_capture(&file, &frame, Sha256::digest(&bytes).into(), &live, &active).is_err());
+    assert!(
+        verify_capture(
+            &file,
+            &frame,
+            Some(Sha256::digest(&bytes).into()),
+            &live,
+            &active
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -501,3 +510,6 @@ fn archive_capture_failed_unlink_releases_descriptors_and_control_but_keeps_stor
     // path obstruction, but the conservatively forgotten allowance stays paid.
     fs::remove_dir(temp).unwrap();
 }
+
+#[path = "tests/optional_checksum_tests.rs"]
+mod optional_checksum_tests;

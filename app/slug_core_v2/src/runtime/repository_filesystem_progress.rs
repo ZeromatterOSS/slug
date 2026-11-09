@@ -48,6 +48,16 @@ impl RepositoryFilesystemProgress {
     ) -> Result<RepositoryFilesystemResult, ArchiveMaterializationError> {
         check(active, scope)?;
         let id = request.id();
+        if matches!(request.operation(), RepositoryFilesystemOperation::Archive(archive)
+            if archive.expected_sha256().is_none())
+        {
+            // Reject before creating or mutating any legacy prefix; retire an
+            // existing failed generation exactly like other operation failures.
+            drop(self.take(id));
+            return Err(spec(
+                "checksum omission requires a command-fresh General workspace",
+            ));
+        }
         let mut prefix = match self.take(id) {
             Some(prefix) => prefix,
             None if id.call_index() == 0 => Prefix {
@@ -82,6 +92,9 @@ impl RepositoryFilesystemProgress {
         )?;
         let result = match request.operation() {
             RepositoryFilesystemOperation::Archive(archive) => {
+                let expected = archive.expected_sha256().ok_or_else(|| {
+                    spec("checksum omission requires a command-fresh General workspace")
+                })?;
                 let urls = archive
                     .urls()
                     .iter()
@@ -90,7 +103,7 @@ impl RepositoryFilesystemProgress {
                 let capture =
                 super::repository_archive_http::capture_selected_generated_archive_with_distdirs(
                         &urls,
-                        archive.sha256(),
+                        expected,
                         runtime,
                         active,
                         scope,
@@ -111,12 +124,12 @@ impl RepositoryFilesystemProgress {
                         request.generated_repository(),
                         request.id().owner().unique_name(),
                         request.id().ordinal(),
-                        hex::encode(archive.sha256()),
+                        hex::encode(expected),
                         error.message,
                     ))
                 })?;
                 capture.close().map_err(io_error)?;
-                RepositoryFilesystemResult::Archive(archive.sha256())
+                RepositoryFilesystemResult::Archive(expected)
             }
             RepositoryFilesystemOperation::Delete(path) => {
                 let removed = deletion::delete(

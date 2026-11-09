@@ -3,25 +3,34 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: bounded operational configuration hashing is implemented for
-Analysis and command-registration keys. The
-[configuration-key receipt](wp1225-configuration-key-hash-acceptance-2026-11-09.json)
-records fresh-key RED/GREEN: 64 Analysis keys fall from 3,861,824 to 2,560 hash
-bytes; each of four Loading key forms falls from 3,865,664 to 3,648 bytes.
-Full structural equality, Legacy streams and global canonical/strong/artifact
-identity remain authoritative. All 414 ordinary checks, five native guards and
-four warm compiler commands pass. No retained storage, constructor work or cap
-changes. Independent final review accepts this bounded component.
+Current delta: General command-fresh archive acquisition now accepts omission of
+both expected-checksum forms. Expected SHA is optional intent; actual compressed
+SHA remains mandatory in closed native results/history and original Starlark
+sha256/SRI. The [optional-checksum receipt](wp1225-optional-archive-checksum-acceptance-2026-11-09.json)
+records omission-refusal RED→GREEN, actual original same-URL A/B/A commands and exact
+replay after source unlink. Supplied-checksum Hash streams, natural Source and
+legacy pinned behavior remain protected. No distdir/cache/offline expected-hash
+lookup is used for omission. All caps remain fixed; temporary provenance is removed. All385 ordinary checks,
+nine native guards and four warm compiler commands pass on the final source.
 
-ABBA cycles929/970/970/930 retain exact cleanup and truncated128-event traces.
-Controls stop at WorkDeadline with last55 roots/139 and140 records; both
-candidates reach `analysis_message_opaque` with last56 roots/143 records.
-This is distinct from the unreproduced earlier Registration category; no cause
-or API repair is established. Next resolve this now-reproducible Analysis
-boundary through its semantic owner and bounded typed evidence. Private-text
-parsing, standalone diagnostic integration and ruleset adapters remain excluded.
-Successful Rust cquery, archive/action closure, equivalent completed-command
-latency/RSS and production activation remain open.
+Original Rust now passes the checksum boundary and acquires83,872,880 compressed
+bytes, decoding389,042,688, before a native Resource refusal. The frozen scalar
+capture identifies successor admission:388,958,838 requested bytes while395,655,166
+are already credited under536,870,912. Cleanup is exact. The
+[selected contract](wp1225-general-repository-workspace-design.md#optional-expected-checksum-for-general-archive-acquisition)
+keeps this capability separate from the next ownership decision: conserve actual
+native coverage across snapshot/transcript/epoch/history without dropping full
+semantic history, undercounting construction or raising limits. Modeled credit
+is not RSS; full archive fit, successful Rust cquery, action/REAPI/Slug closure,
+completed-command latency/RSS and General production activation remain open.
+
+The [configuration-key component](wp1225-configuration-key-hash-acceptance-2026-11-09.json)
+remains accepted with414 ordinary checks, five native guards and four warm
+originals. Its ABBA candidate Analysis Message was diagnosed as the legitimately
+omitted expected checksum, through a frozen borrowed typed leaf. Historical
+Registration-category failures remain unreproduced; do not infer their cause
+from the distinct archive failure. No private-text parsing or caller adapter is
+selected.
 
 The accepted shared-path ordering component remains unchanged. The
 [shared-path receipt](wp1225-shared-path-order-acceptance-2026-11-09.json)

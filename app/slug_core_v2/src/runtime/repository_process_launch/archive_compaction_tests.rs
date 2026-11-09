@@ -404,7 +404,7 @@ fn native_archive_measured_inode_crossing_keeps_full_quota_without_name_cost_ass
                 .unwrap()
                 .to_string()
                 .into()]),
-            sha2::Sha256::digest(&bytes).into(),
+            Some(sha2::Sha256::digest(&bytes).into()),
             "".into(),
             slug_bzlmod_v2::GeneratedRepositoryArchiveFormat::TarGz,
             "".into(),

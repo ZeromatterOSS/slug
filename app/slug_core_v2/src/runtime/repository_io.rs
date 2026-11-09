@@ -2270,7 +2270,12 @@ fn generated_repository_file_effect_source_association(
                         digest.update((url.len() as u64).to_be_bytes());
                         digest.update(url.as_bytes());
                     }
-                    digest.update(archive.sha256());
+                    // Legacy plans reject omission before they can reach this identity writer.
+                    digest.update(
+                        archive
+                            .expected_sha256()
+                            .expect("validated pinned legacy plan"),
+                    );
                     digest.update((archive.strip_prefix().len() as u64).to_be_bytes());
                     digest.update(archive.strip_prefix().as_bytes());
                     for bytes in [
@@ -2495,6 +2500,12 @@ fn materialize_generated_repository_archive_effects(
     source_service::check(scope).map_err(ArchiveMaterializationError::materialization)?;
     if (scope.is_none() && !plan.has_filesystem_operations())
         || plan.has_symlinks()
+        || plan.ordered_effects().any(|effect| {
+            matches!(
+                effect, GeneratedRepositoryOrderedEffectRef::Archive(archive)
+                    if archive.expected_sha256().is_none()
+            )
+        })
         || !generated_repository_file_effect_paths_are_valid(plan)
     {
         return Err(ArchiveMaterializationError::spec(
@@ -2522,6 +2533,11 @@ fn materialize_generated_repository_archive_effects(
                         GeneratedRepositoryArchiveOutput::RepositoryRoot,
                     ) => {}
                 }
+                let expected = archive.expected_sha256().ok_or_else(|| {
+                    ArchiveMaterializationError::spec(
+                        "checksum omission requires a command-fresh General workspace",
+                    )
+                })?;
                 let urls = archive
                     .urls()
                     .iter()
@@ -2529,7 +2545,7 @@ fn materialize_generated_repository_archive_effects(
                     .collect::<Vec<_>>();
                 let capture = super::repository_archive_http::capture_selected_generated_archive_with_distdirs(
                     &urls,
-                    archive.sha256(),
+                    expected,
                     runtime,
                     active,
                     scope,

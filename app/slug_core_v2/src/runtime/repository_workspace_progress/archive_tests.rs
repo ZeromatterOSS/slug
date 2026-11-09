@@ -54,7 +54,7 @@ fn input(
     let operation = RepositoryWorkspaceOperation::Archive(
         GeneratedRepositoryArchiveEffect::new(
             Arc::from([url.into()]),
-            sha2::Sha256::digest(&bytes).into(),
+            Some(sha2::Sha256::digest(&bytes).into()),
             "prefix".into(),
             GeneratedRepositoryArchiveFormat::TarGz,
             "".into(),
@@ -202,7 +202,7 @@ fn native_archive_progress_refuses_sha_decode_counter_and_scope_failures() {
             RepositoryWorkspaceOperation::Archive(
                 GeneratedRepositoryArchiveEffect::new(
                     actual.urls().into(),
-                    [0; 32],
+                    Some([0; 32]),
                     actual.strip_prefix().into(),
                     actual.format(),
                     "".into(),
@@ -351,3 +351,6 @@ fn native_archive_progress_refuses_sha_decode_counter_and_scope_failures() {
         (baseline, 0, 0)
     );
 }
+
+#[path = "archive_tests/optional_checksum_tests.rs"]
+mod optional_checksum_tests;

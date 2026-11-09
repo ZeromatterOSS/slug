@@ -94,7 +94,10 @@ ext = module_extension(implementation=impl)
             .values()
             .next()
             .unwrap();
-        assert_eq!(request.archive().unwrap().sha256(), [0xa1; 32]);
+        assert_eq!(
+            request.archive().unwrap().expected_sha256(),
+            Some([0xa1; 32])
+        );
         assert_eq!(
             request.archive().unwrap().strip_prefix(),
             "arbitrary/prefix"
@@ -141,7 +144,9 @@ async fn general_archive_calls_suspend_then_replay_exact_order_and_terminal_refe
         transcript = transcript
             .append(RepositoryFilesystemRecord::new(
                 request.clone(),
-                RepositoryFilesystemResult::Archive(request.archive().unwrap().sha256()),
+                RepositoryFilesystemResult::Archive(
+                    request.archive().unwrap().expected_sha256().unwrap(),
+                ),
             ))
             .unwrap();
     }
@@ -202,7 +207,9 @@ async fn changed_prefix_revoked_epoch_and_swallowed_generated_observation_fail_c
     let transcript = RepositoryFilesystemTranscript::empty()
         .append(RepositoryFilesystemRecord::new(
             request.clone(),
-            RepositoryFilesystemResult::Archive(request.archive().unwrap().sha256()),
+            RepositoryFilesystemResult::Archive(
+                request.archive().unwrap().expected_sha256().unwrap(),
+            ),
         ))
         .unwrap();
     for (source, epoch) in [

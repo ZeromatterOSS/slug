@@ -43,7 +43,7 @@ pub(super) fn replay_operation(
         (
             RepositoryFilesystemOperation::Archive(effect),
             RepositoryFilesystemResult::Archive(sha),
-        ) => effect.sha256() == *sha,
+        ) => effect.expected_sha256() == Some(*sha),
         (RepositoryFilesystemOperation::Delete(_), RepositoryFilesystemResult::Delete(_)) => true,
         _ => false,
     };

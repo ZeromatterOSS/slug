@@ -1000,3 +1000,6 @@ mod legacy_execute_retirement_tests;
 
 #[path = "rust_toolchain_tests.rs"]
 mod rust_toolchain_tests;
+
+#[path = "optional_archive_tests.rs"]
+mod optional_archive_tests;

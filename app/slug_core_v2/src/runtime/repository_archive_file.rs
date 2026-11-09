@@ -130,8 +130,64 @@ pub(super) fn capture_path(
 #[cfg(target_os = "linux")]
 pub(super) fn capture_path_typed(
     path: &Path,
-    mut capture: tempfile::NamedTempFile,
+    capture: tempfile::NamedTempFile,
     integrity: [u8; 32],
+    limit: u64,
+    subject: &str,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<tempfile::NamedTempFile, FileCaptureError> {
+    capture_path_with_expected(
+        path,
+        capture,
+        Some(integrity),
+        limit,
+        subject,
+        active,
+        scope,
+    )
+}
+
+/// Only the command-fresh General archive owner selects omitted expectation.
+/// This does not make any natural Source or distdir consumer checksum-optional.
+#[cfg(target_os = "linux")]
+pub(super) fn capture_file_without_expected_checksum(
+    original: &str,
+    capture: tempfile::NamedTempFile,
+    limit: u64,
+    subject: &str,
+    active: &dyn Fn() -> bool,
+    scope: &Arc<SourceServiceScope>,
+) -> Result<tempfile::NamedTempFile, String> {
+    capture_path_with_expected(
+        &file_path(original)?,
+        capture,
+        None,
+        limit,
+        subject,
+        active,
+        Some(scope),
+    )
+    .map_err(FileCaptureError::into_message)
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(super) fn capture_file_without_expected_checksum(
+    _original: &str,
+    _capture: tempfile::NamedTempFile,
+    _limit: u64,
+    _subject: &str,
+    _active: &dyn Fn() -> bool,
+    _scope: &Arc<SourceServiceScope>,
+) -> Result<tempfile::NamedTempFile, String> {
+    Err("command-fresh file archive capture is supported only on Linux".into())
+}
+
+#[cfg(target_os = "linux")]
+fn capture_path_with_expected(
+    path: &Path,
+    mut capture: tempfile::NamedTempFile,
+    expected: Option<[u8; 32]>,
     limit: u64,
     subject: &str,
     active: &dyn Fn() -> bool,
@@ -235,10 +291,30 @@ pub(super) fn capture_path_typed(
         hasher.update(&buffer[..count]);
     }
     check_active()?;
-    if hasher.finalize().as_slice() != integrity {
+    let actual: [u8; 32] = hasher.finalize().into();
+    if expected.is_some_and(|digest| digest != actual) {
         return Err(FileCaptureError::Miss(format!(
             "BCR {subject} SHA-256 SRI mismatch"
         )));
+    }
+    if expected.is_none() {
+        let after = input.metadata().map_err(|error| {
+            FileCaptureError::Fatal(format!("stat acquired archive source: {error}"))
+        })?;
+        if total != readable.len()
+            || readable.dev() != after.dev()
+            || readable.ino() != after.ino()
+            || readable.mode() != after.mode()
+            || readable.len() != after.len()
+            || readable.mtime() != after.mtime()
+            || readable.mtime_nsec() != after.mtime_nsec()
+            || readable.ctime() != after.ctime()
+            || readable.ctime_nsec() != after.ctime_nsec()
+        {
+            return Err(FileCaptureError::Fatal(
+                "archive source changed during fresh capture".into(),
+            ));
+        }
     }
     capture
         .flush()

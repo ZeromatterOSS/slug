@@ -305,6 +305,12 @@ impl RepositoryFilesystemTranscript {
                 ));
             }
         }
+        if matches!(request.operation(), RepositoryFilesystemOperation::Archive(archive) if archive.expected_sha256().is_none())
+        {
+            return Err(RepositoryFilesystemTranscriptError::InvalidOperation(
+                id.clone(),
+            ));
+        }
         request
             .prefix()
             .with_operation(request.operation())
@@ -314,7 +320,7 @@ impl RepositoryFilesystemTranscript {
                 RepositoryFilesystemOperation::Archive(archive),
                 RepositoryFilesystemResult::Archive(digest),
             ) => {
-                if *digest != archive.sha256() {
+                if archive.expected_sha256() != Some(*digest) {
                     return Err(RepositoryFilesystemTranscriptError::ChecksumMismatch(
                         id.clone(),
                     ));
@@ -560,7 +566,7 @@ mod tests {
             prefix
                 .push_archive(
                     Arc::from(archive.urls()),
-                    archive.sha256(),
+                    archive.expected_sha256().expect("pinned archive fixture"),
                     archive.strip_prefix().into(),
                 )
                 .unwrap();
@@ -659,7 +665,7 @@ mod tests {
         reversed
             .push_archive(
                 Arc::from([effect.urls()[1].clone(), effect.urls()[0].clone()]),
-                effect.sha256(),
+                effect.expected_sha256().expect("pinned archive fixture"),
                 effect.strip_prefix().into(),
             )
             .unwrap();
@@ -902,7 +908,7 @@ mod tests {
         suffix
             .push_archive(
                 Arc::from(effect.urls()),
-                effect.sha256(),
+                effect.expected_sha256().expect("pinned archive fixture"),
                 effect.strip_prefix().into(),
             )
             .unwrap();

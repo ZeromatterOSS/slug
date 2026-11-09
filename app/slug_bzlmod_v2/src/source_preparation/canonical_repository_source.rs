@@ -652,7 +652,7 @@ mod tests {
     ) -> RepositoryFilesystemRealization {
         let archive = crate::GeneratedRepositoryArchiveEffect::new(
             Arc::from(["https://arbitrary.test/content.tar.xz".into()]),
-            [7; 32],
+            Some([7; 32]),
             "".into(),
             crate::GeneratedRepositoryArchiveFormat::TarXz,
             "".into(),

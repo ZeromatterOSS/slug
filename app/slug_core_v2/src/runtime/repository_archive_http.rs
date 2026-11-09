@@ -406,6 +406,36 @@ pub(super) fn capture_selected_generated_archive_with_distdirs(
     )
 }
 
+/// Only a command-fresh workspace may omit the expected digest. Pinned callers
+/// retain their existing distdir and transport path; omission always reacquires.
+pub(super) fn capture_workspace_generated_archive(
+    urls: &[String],
+    expected: Option<[u8; 32]>,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+    scope: &Arc<SourceServiceScope>,
+    distdirs: &super::ArchiveDistdirPolicy,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    match expected {
+        Some(sha256) => capture_selected_generated_archive_with_distdirs(
+            urls,
+            sha256,
+            runtime,
+            active,
+            Some(scope),
+            distdirs,
+        ),
+        None => scoped::capture_urls_without_expected_checksum(
+            urls,
+            CAPTURE_LIMIT,
+            "generated archive",
+            runtime,
+            active,
+            scope,
+        ),
+    }
+}
+
 fn capture_selected_bcr_with(
     plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,

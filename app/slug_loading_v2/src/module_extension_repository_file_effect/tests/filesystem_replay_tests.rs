@@ -138,7 +138,7 @@ async fn archive_delete_archive_share_ordered_prefix_without_generated_read_auth
         assert_eq!(request.prefix().filesystem_operation_count(), index);
         let result = match request.operation() {
             RepositoryFilesystemOperation::Archive(effect) => {
-                RepositoryFilesystemResult::Archive(effect.sha256())
+                RepositoryFilesystemResult::Archive(effect.expected_sha256().unwrap())
             }
             RepositoryFilesystemOperation::Delete(path) => {
                 assert_eq!(index, 1);
@@ -346,7 +346,7 @@ async fn disabled_execute_refuses_in_all_filesystem_orders_without_process_need(
             RepositoryRuleInvocationError::FilesystemNeed(request) => {
                 let result = match request.operation() {
                     RepositoryFilesystemOperation::Archive(effect) => {
-                        RepositoryFilesystemResult::Archive(effect.sha256())
+                        RepositoryFilesystemResult::Archive(effect.expected_sha256().unwrap())
                     }
                     RepositoryFilesystemOperation::Delete(_) => {
                         RepositoryFilesystemResult::Delete(false)

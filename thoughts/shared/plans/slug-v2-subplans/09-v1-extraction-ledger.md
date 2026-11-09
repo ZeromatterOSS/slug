@@ -2,6 +2,25 @@
 
 ## WP425 rooted repository consumers
 
+General archive intents distinguish an optional expected checksum from the
+mandatory actual digest returned by the existing closed capture owner. Full
+structural identity retains absence and every original field; pinned ordinary
+Hash streams keep the original field writers, while None has a distinct domain.
+The existing size-of/Allocative forecasts count the actual Option layout (padding
+may absorb its tag; no fixed size delta is assumed). Source/native ownership,
+positive backing/FD/control credits and last-owner retirement stay unchanged.
+Fresh unpinned acquisition bypasses checksum-keyed hints and uses the existing
+bounded streaming kernels; one address-classification credit retires before the
+normal address phase. No new cache, interner, compressed Arc, donor code or
+expected-hash authority appears. Legacy/natural Source paths remain pinned.
+The [selected contract](wp1225-general-repository-workspace-design.md#optional-expected-checksum-for-general-archive-acquisition)
+and [component receipt](wp1225-optional-archive-checksum-acceptance-2026-11-09.json)
+record actual FD/digest/history and fresh-command/replay proof, not an RSS claim.
+Frozen failure-local scalars next identify overlapping capture and successor
+credits at refused native successor admission. Any future credit custody change must retain
+all old semantic states/bodies and separately admit actual construction overlap;
+this component changes no transfer, ownership or retained-byte credit rule.
+
 Operational configuration-key hashing reuses an already-owned immutable
 32-byte projection at two lookup boundaries. This applies the Buck2-derived
 `starlark_map::Hashed` distinction between routing and full identity without

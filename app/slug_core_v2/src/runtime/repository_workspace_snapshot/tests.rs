@@ -36,7 +36,7 @@ fn archive() -> RepositoryWorkspaceOperation {
     RepositoryWorkspaceOperation::Archive(
         GeneratedRepositoryArchiveEffect::new(
             Arc::from(["https://example.invalid/snapshot-fixture.tar.gz".into()]),
-            [0; 32],
+            Some([0; 32]),
             "".into(),
             GeneratedRepositoryArchiveFormat::TarGz,
             "snapshot-fixture".into(),

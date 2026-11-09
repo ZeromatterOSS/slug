@@ -931,7 +931,9 @@ fn validate_result(
         (
             RepositoryWorkspaceOperation::Archive(archive),
             RepositoryWorkspaceResult::Archive(digest),
-        ) if archive.sha256() == *digest => {}
+        ) if archive
+            .expected_sha256()
+            .is_none_or(|expected| expected == *digest) => {}
         (RepositoryWorkspaceOperation::Read(path), RepositoryWorkspaceResult::Read(body)) => {
             if next != previous
                 || request

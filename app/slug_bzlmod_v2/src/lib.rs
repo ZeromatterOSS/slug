@@ -113,6 +113,10 @@ pub use generated_repository_file_effect::GeneratedRepositoryOrderedEffectRef;
 #[doc(hidden)]
 pub use generated_repository_file_effect::GeneratedRepositorySymlinkEffect;
 #[doc(hidden)]
+pub use generated_repository_file_effect::generated_repository_archive_is_ignored_http_url;
+#[doc(hidden)]
+pub use generated_repository_file_effect::generated_repository_archive_parse_optional_sha256;
+#[doc(hidden)]
 pub use generated_repository_file_effect::generated_repository_archive_parse_sha256;
 #[doc(hidden)]
 pub use generated_repository_file_effect::generated_repository_archive_sha256_hex;

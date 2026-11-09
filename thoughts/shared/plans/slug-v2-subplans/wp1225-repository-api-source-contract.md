@@ -56,3 +56,21 @@ No accepted next state before actual child/descendant quiescence and bounded com
 Source provenance is recorded in the [backing receipt](wp1225-repository-root-backing-2026-11-07.json).
 Platform experiments do not establish Starlark API compatibility or public
 bootstrap and workload-memory acceptance.
+
+## General archive checksum omission
+
+Pinned `StarlarkBaseExternalContext.java494–562,900–1038,1041–1177` accepts empty
+sha256/integrity, computes actual compressed-file SHA256, and returns success,
+sha256 and SRI integrity. Both nonempty options conflict; malformed declarations
+remain errors. `getUrls443–480` removes plain HTTP when no checksum is given.
+`DownloadManager.java240–315` gates destination/cache/distdir lookup on a provided
+checksum;359–367 may publish a newly acquired file under its actual digest.
+Canonical ID restricts checksum-keyed hits, never identifies bytes by itself.
+
+Use the original tests `starlark_repository_test.sh::test_starlark_repository_context_downloads_return_struct`
+and `bazel_repository_cache_test.sh::test_write_cache_without_hash` as pinned
+regressions. Existing Slug declared-checksum parsing is correct but intentionally
+refuses omission. The [selected design](wp1225-general-repository-workspace-design.md#optional-expected-checksum-for-general-archive-acquisition)
+adds it only under command-fresh General ownership, with actual digest/FD/history
+proof and strict legacy/natural Source integrity retained. Existing format/output/
+auth/headers/allow_fail/rename/strip-components boundaries remain deferred.

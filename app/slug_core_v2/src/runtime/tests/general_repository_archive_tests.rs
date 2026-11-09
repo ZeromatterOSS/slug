@@ -583,7 +583,7 @@ fn actual_filesystem_progress_drops_physical_roots_on_stale_abort_suffix_and_des
                 let archive = last.archive().unwrap();
                 let changed_archive = slug_bzlmod_v2::GeneratedRepositoryArchiveEffect::new(
                     Arc::from(archive.urls()),
-                    archive.sha256(),
+                    archive.expected_sha256(),
                     archive.strip_prefix().into(),
                     archive.format(),
                     "changed after verification".into(),

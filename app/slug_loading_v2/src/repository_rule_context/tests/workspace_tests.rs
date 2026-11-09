@@ -13,6 +13,9 @@ use slug_bzlmod_v2::source_preparation::RepositoryWorkspaceStableKey;
 
 use super::*;
 
+#[path = "workspace_tests/archive_tests.rs"]
+mod archive_tests;
+
 pub(super) async fn binding(
     lease: u64,
 ) -> (

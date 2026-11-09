@@ -981,7 +981,10 @@ fn record_label_materialization(
     receipt.number("tool_source_kind", 2)?;
     for effect in plan.ordered_effects() {
         if let slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef::Archive(archive) = effect {
-            receipt.hex("tool_archive_sha256", &archive.sha256())?;
+            let expected = archive
+                .expected_sha256()
+                .ok_or("pinned tool archive expectation proof refusal")?;
+            receipt.hex("tool_archive_sha256", &expected)?;
         }
     }
     Ok(())

@@ -148,9 +148,70 @@ pub(super) fn capture_urls(
     ))
 }
 
+/// Fresh General acquisition never consults expected-hash offline/cache inputs.
+pub(super) fn capture_urls_without_expected_checksum(
+    urls: &[String],
+    limit: u64,
+    subject: &'static str,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+    scope: &Arc<SourceServiceScope>,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    let mut last = None;
+    for url in urls {
+        scope
+            .check()
+            .map_err(|e| ArchiveMaterializationError::transport(e.to_string()))?;
+        check_address(scope, url).map_err(ArchiveMaterializationError::transport)?;
+        // Reuse the exact pure URL grammar under the existing address scratch
+        // allowance, retired before capture_one's disjoint address phase.
+        let ignored = {
+            let _address_credit = scope
+                .reserve_buffer_at(64 * 1024, SourceBufferSite::ArchiveAddress)
+                .map_err(|e| ArchiveMaterializationError::transport(e.to_string()))?;
+            slug_bzlmod_v2::generated_repository_archive_is_ignored_http_url(url)
+        };
+        if ignored {
+            continue;
+        }
+        match capture_one_with_expected(url, None, limit, subject, runtime, active, scope) {
+            Ok(capture) => return Ok(capture),
+            Err(error) => {
+                scope
+                    .check()
+                    .map_err(|e| ArchiveMaterializationError::transport(e.to_string()))?;
+                last = Some(error);
+            }
+        }
+    }
+    Err(ArchiveMaterializationError::transport(last.unwrap_or_else(
+        || "no checksum-eligible archive URL".into(),
+    )))
+}
+
 pub(super) fn capture_one(
     original: &str,
     integrity: [u8; 32],
+    limit: u64,
+    subject: &str,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+    scope: &Arc<SourceServiceScope>,
+) -> Result<tempfile::NamedTempFile, String> {
+    capture_one_with_expected(
+        original,
+        Some(integrity),
+        limit,
+        subject,
+        runtime,
+        active,
+        scope,
+    )
+}
+
+fn capture_one_with_expected(
+    original: &str,
+    expected: Option<[u8; 32]>,
     limit: u64,
     subject: &str,
     runtime: &tokio::runtime::Runtime,
@@ -182,29 +243,36 @@ pub(super) fn capture_one(
         .map_err(|e| e.to_string())?;
         let capture =
             tempfile::NamedTempFile::new().map_err(|_| "creating source capture failed")?;
-        let capture = super::super::repository_archive_file::capture_file(
-            original,
-            capture,
-            integrity,
-            limit,
-            subject,
-            active,
-            Some(scope),
-        )?;
+        let capture = match expected {
+            Some(integrity) => super::super::repository_archive_file::capture_file(
+                original,
+                capture,
+                integrity,
+                limit,
+                subject,
+                active,
+                Some(scope),
+            )?,
+            None => super::super::repository_archive_file::capture_file_without_expected_checksum(
+                original, capture, limit, subject, active, scope,
+            )?,
+        };
         live()?;
         return Ok(capture);
     }
     let mut url = url::Url::parse(original).map_err(|_| "invalid source URL")?;
     validate_https(&url)?;
     #[cfg(all(test, target_os = "linux"))]
-    if let Some(path) = scope.offline_archive_path_for_test(original, &integrity) {
+    if let Some(path) =
+        expected.and_then(|integrity| scope.offline_archive_path_for_test(original, &integrity))
+    {
         charge_archive(scope, SourceChargeDomain::ArchiveFile).map_err(|e| e.to_string())?;
         let capture =
             tempfile::NamedTempFile::new().map_err(|_| "creating source capture failed")?;
         let capture = super::super::repository_archive_file::capture_path(
             path.as_path(),
             capture,
-            integrity,
+            expected.expect("only declared hashes select offline capture"),
             limit,
             subject,
             active,
@@ -317,7 +385,8 @@ pub(super) fn capture_one(
             capture
                 .flush()
                 .map_err(|_| "flushing source capture failed")?;
-            if hasher.finalize().as_slice() != integrity {
+            let actual: [u8; 32] = hasher.finalize().into();
+            if expected.is_some_and(|integrity| actual != integrity) {
                 return Err(format!("BCR {subject} SHA-256 SRI mismatch"));
             }
             live()

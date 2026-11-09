@@ -637,7 +637,7 @@ fn archive_deeper_than_256_preserves_lane_while_delete_and_process_keep_own_limi
         Arc::from([CompactString::from(
             "https://example.invalid/archive.tar.gz",
         )]),
-        [0; 32],
+        Some([0; 32]),
         "".into(),
         crate::GeneratedRepositoryArchiveFormat::TarGz,
         "".into(),
@@ -738,7 +738,7 @@ fn argument_environment_archive_metadata_charge_actual_spare_storage_and_owner_a
     let archive = RepositoryWorkspaceOperation::Archive(
         crate::GeneratedRepositoryArchiveEffect::new(
             Arc::from([url]),
-            [0; 32],
+            Some([0; 32]),
             "".into(),
             crate::GeneratedRepositoryArchiveFormat::TarGz,
             id,
@@ -1662,3 +1662,5 @@ mod read_view_tests;
 mod retention_admission_tests;
 
 mod source_link_tests;
+
+mod optional_checksum_tests;

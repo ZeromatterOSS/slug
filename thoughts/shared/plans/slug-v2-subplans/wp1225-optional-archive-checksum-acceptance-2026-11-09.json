@@ -1,0 +1,541 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "76f03436f1afb2c5100fd8eb5314efe1283ca095",
+  "recorded_utc": "2026-11-09T12:25:38.342751+00:00",
+  "outcome": "Command-fresh General download_and_extract accepts omitted expected checksums, captures actual bytes through the existing closed producer, and returns mandatory actual compressed SHA/SRI with full exact replay/history.",
+  "classification": {
+    "exact": "Pinned Bazel9.2 omitted-option and actual sha256/integrity return slice; supplied checksum validation and pinned Hash field streams preserved.",
+    "slug_native": "Command-fresh acquisition, confined file/HTTPS transport and bounded native/source admission; no cross-command cache lookup for omission.",
+    "unsupported_deferred": "Full Rust archive fit/cquery/action/REAPI/Slug closure, native credit-custody optimization, completed-command latency/RSS and General production activation; unadmitted auth/headers/allow_fail/rename/strip-components/output/format surfaces."
+  },
+  "source_pins": [
+    {
+      "file": "app/slug_bzlmod_v2/src/generated_repository_file_effect.rs",
+      "sha256": "ec69a36284deffac3ef54e9ef25eb154ba9759bbc3cd33d04b82bd37b8df2932"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/generated_repository_file_effect/optional_checksum_tests.rs",
+      "sha256": "a854b88357e523fc3a4606c18e7e122df037a8a2ff72eb0bcb338c48048bbdab"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/lib.rs",
+      "sha256": "2b3fc137be5f4890e495330822af83024219ed5ef9f319a021fd474e0bb92780"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_filesystem.rs",
+      "sha256": "4410dfa2789adc7601243cd661b3b61f11d25babefb588a23309d6e821ed6fd3"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/sequence.rs",
+      "sha256": "2163ad691d75af441d8c0cc5a827fc150f11a11151ef6a63e05f5b2b671ab8a7"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/tests.rs",
+      "sha256": "198fbc46cdb4ad24f36d0d9d03ca9c59283dc705cad2df44976c0411964d4152"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/tests/optional_checksum_tests.rs",
+      "sha256": "89e8c6e2d7e43ea543298e84e07d6800645b96d3fdf81ed697ab61d5161157e6"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs",
+      "sha256": "d46e4617f8f6c12f0cca0ef8fea91d30fd714f0d2c0f12ec6ba0d1559c9040e5"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/source_preparation/repository_archive_needs_tests.rs",
+      "sha256": "6c857b06cc2496fa5ec856bd08cfa6d8e74ba85785107152e8d19a2019328e73"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_archive_file.rs",
+      "sha256": "43e2b0230d15cdc95e85f52e2dfe38e4941062723617527a0ad86a5787f8784f"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_archive_http.rs",
+      "sha256": "d3445f8ba3b4d9d38546cf0fcf2404d9cbad5915b0ccd9835ce43406de657064"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs",
+      "sha256": "8cddd4ef2861d524d64a8fcc45005b356bf440630b42d89da776df89eaf952e0"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_filesystem_progress.rs",
+      "sha256": "da4e5ff0df814cbfc6b2c02d5e821279406bb722422220cc15df85b662f200b2"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_io.rs",
+      "sha256": "0a38a9900c2677a50d7dacbaa2d0fe9ede77d45a6f6fda067a257f9db2c151e3"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_physical_root/native_tests.rs",
+      "sha256": "c23fc0f09af66a39a560d351613b79ae1376769a87b3eb049b66ae907f7303e0"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_physical_root/routed.rs",
+      "sha256": "ef625fa639f9e206ad43cb46cf8531835631b03bd2b90722cdda5fee37190271"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_process_launch/archive_compaction_tests.rs",
+      "sha256": "fbfa8775acc4419a612f2644ab3198f3549237a6a4c069d797a62fcd6d748255"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_archive.rs",
+      "sha256": "323d35909eb5dc922c29cf7869b1346213c9e8dca175ded930e27ae32e4f1a9a"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_archive/tests.rs",
+      "sha256": "1936c8eaaff0b04e865b1a9238964651185721dec23fbff9c0a089b59978a320"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_archive/tests/optional_checksum_tests.rs",
+      "sha256": "5620ad7a4d22c6ce34b92ec9b6a9ff3d273f11cb0f434805be80aac12fb50e7e"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/optional_archive_tests.rs",
+      "sha256": "cb29441e6d7224e7656ea1951bf98403b172397894a6907fd6a015987882dced"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests.rs",
+      "sha256": "eed6c392c494c2cf4205455db10b353187d5b2865bc6abd0c99e42a62f8d5029"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/tests.rs",
+      "sha256": "639ce0f94c8f2b629578ee5caf225673533822705b5100af3660de484677e337"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_progress/archive_tests.rs",
+      "sha256": "7a9a4e74bb0e30649116d3e4631ee6023b53d34188997a01b406379c2cff98c9"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_progress/archive_tests/optional_checksum_tests.rs",
+      "sha256": "e33f57e86f272ff706dca73e3a952b6cccbd97e5cecab82b72ea03fa8eb34160"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_snapshot/tests.rs",
+      "sha256": "9840d8a3710ac56fb4116a7f96a86abc624442315d659721402e5e23ea671d78"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs",
+      "sha256": "5632aab6929fe6791112d5c323e42ee4f28b81e90bff70812950470f046f663a"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/tests/general_repository_archive_tests.rs",
+      "sha256": "31f2f9c0a27c6050da6d67ecfb94882d60a7dc5dafc729a46f7ed9dae21ed58a"
+    },
+    {
+      "file": "app/slug_loading_v2/src/module_extension_repository_file_effect/tests/archive_replay_tests.rs",
+      "sha256": "ce6b6869f80698903c8cde9c8ce7d0d84882eeaea04ff4d823681b98cb42e5d6"
+    },
+    {
+      "file": "app/slug_loading_v2/src/module_extension_repository_file_effect/tests/filesystem_replay_tests.rs",
+      "sha256": "4ff3865ae8ee51ed8fffeaa0611aaa825fa7f598ebc0e2c2e816f4172b9598f3"
+    },
+    {
+      "file": "app/slug_loading_v2/src/repository_rule_context/archive.rs",
+      "sha256": "0e9ed750418ffb23523c0da8d3deae442ffcf46bed0cb8da7857e9f7753cd65c"
+    },
+    {
+      "file": "app/slug_loading_v2/src/repository_rule_context/filesystem.rs",
+      "sha256": "f7c287e404025eb4d3934d320ac38e58d3cdb453f89de0947210de5956080aa5"
+    },
+    {
+      "file": "app/slug_loading_v2/src/repository_rule_context/tests/workspace_tests.rs",
+      "sha256": "ba512cd3d2583d1de668f9fae4481d1d6ac2074c141414b827db9b582dbfe52a"
+    },
+    {
+      "file": "app/slug_loading_v2/src/repository_rule_context/tests/workspace_tests/archive_tests.rs",
+      "sha256": "e2f938ff61ee108752bfaf68022bd8459f1bce32ade7241298ac6c025bde90d9"
+    },
+    {
+      "file": "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md",
+      "sha256": "28e896a33a9f740ca674a87cac27270abe42c889fc47c5b1ebe2dd3acd5ab3a9"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md",
+      "sha256": "1349298aa668d2b788cb795c8d799642910c52d3a1d5ba0fbaa5b3cfca9ddc26"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/current-packet.md",
+      "sha256": "c5f50826e8df90d24431186119adb0bdf38001ebf52099cc9b42a72ba19761fa"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-general-repository-workspace-design.md",
+      "sha256": "d0d8d31a94df0c1f01978c7cbb525ff72c8dca618e8f8eee2a56626935315270"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-repository-api-source-contract.md",
+      "sha256": "cee2647048735cd9c6be5ac03d5ffbb2c44616924084c511642d6e5d5f58f805"
+    }
+  ],
+  "pinned_bazel": {
+    "revision": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "files": [
+      {
+        "file": "/run/media/system/Colossus/dev/bazel-9.2.0/src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java",
+        "sha256": "69c1ed32510486148b5b84cb37000ddcabc6278df5cd9f5494a61cf4a2981d03"
+      },
+      {
+        "file": "/run/media/system/Colossus/dev/bazel-9.2.0/src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/DownloadManager.java",
+        "sha256": "b596549ab960002609c5240e7dd2908abf343ca8e6ee11b2fe1872bf7f669d2d"
+      },
+      {
+        "file": "/run/media/system/Colossus/dev/bazel-9.2.0/src/test/shell/bazel/starlark_repository_test.sh",
+        "sha256": "5d7f65a7f1dedc9509399a1d3dc41e152b376911649f5d539758ba14168e62a5"
+      },
+      {
+        "file": "/run/media/system/Colossus/dev/bazel-9.2.0/src/test/shell/bazel/bazel_repository_cache_test.sh",
+        "sha256": "917ef9abb78c164120c3129ab17ce6a73d691b5b2de1dba72fe23d6811869f74"
+      }
+    ],
+    "anchors": {
+      "StarlarkBaseExternalContext.java": "getUrls443\u2013480 filters HTTP without expectation; validateChecksum494\u2013519 allows both blank; calculateChecksum523\u2013535 computes actual compressed SHA; calculateDownloadResult542\u2013562 returns SHA/SRI; downloadAndExtract1041\u20131177.",
+      "DownloadManager.java": "240\u2013315 requires expected checksum for destination/cache/distdir lookup;359+ may write fresh download under actual digest. URL/canonical_id alone never identifies content.",
+      "regressions": [
+        "starlark_repository_test.sh::test_starlark_repository_context_downloads_return_struct1159\u20131232",
+        "bazel_repository_cache_test.sh::test_write_cache_without_hash258+"
+      ]
+    }
+  },
+  "contract": {
+    "expectation_vs_actual": "Immutable intent retains Option<[u8;32]>; None is distinct from Some(zero). Complete Archive results/history always retain actual [u8;32]. Full structural identities and exact body equality remain authoritative.",
+    "pinned_streams": "Some uses the original per-field Hash writers, including array framing; None uses an explicit separate domain. StableKey spelling and final-state content SHA algorithms are unchanged.",
+    "boundary": "General owner permits None; strict checksum parser is byte-exact and a new optional wrapper admits only both blank. Legacy plans/transcripts/Loading/materializers and natural Source/BCR/overlay/patch producers retain strict expected-hash guards.",
+    "freshness": "None bypasses checksum-keyed distdir/cache/offline expected-hash bridge. Full original URL intent remains; valid plain HTTP intent is ignored and an eligible file/HTTPS source is required. Shared URL classification selects format from first eligible source. No expected digest is invented from staging or caller identity.",
+    "closed_capture": "Always streaming actual SHA, exact EOF and stable single-link FD/frame, full request/root/bank/scope binding, cancellation and close-before-credit checks. Some additionally compares its supplied expected hash. No public digest/FD constructor creates authority.",
+    "memory": "Actual Option layout is counted by existing size-of/Allocative forecasts, without assuming a fixed delta. Existing bounded file/HTTPS kernels are shared; temporary address-classification credit retires before the normal address phase. No new cache/pool/body owner or credit exemption.",
+    "retention": "Complete semantic history, observations, source custody, noncacheable Needs, positive native admission and last-owner refunds are unchanged."
+  },
+  "proof": {
+    "omission_refusal_red_green": {
+      "red": {
+        "file": "/tmp/slug-wp425-validation/optional-archive-loading-red.json",
+        "sha256": "ac97d3f87dcebd2dfd6d5039e87c2710f38e20b49cb88c65efbe59b35a63879e"
+      },
+      "preserved_red": {
+        "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+        "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/optional-archive-loading-red-baef86154f0cc4a9",
+        "executable_sha256": "baef86154f0cc4a9b9b116266be7db8261ffd7b287b9b813dde95226b77305a5"
+      },
+      "meaning": "Real authored repository Starlark originally refuses checksum omission before ArchiveNeed; after optional dispatch it suspends at Archive, replays observed actual digest/state, then writes independently computed SHA/SRI. This pure-protocol result fixture is separate from native capture proof.",
+      "strict_parser": "Existing required parser still refuses both blank, byte-exact; supplied malformed/conflicting values remain errors."
+    },
+    "native_original_a_b_a": "The exact ignored native_original_optional_archive_is_fresh_across_a_b_a selector performs three normal commands through authored Starlark on one runtime/bank, same URL and unchanged MODULE/ext, independently checks actual compressed SHA/SRI/extracted/read/output bytes, fresh leases/instances and restored content identity. No native effect/result/root is injected.",
+    "native_replay": "The exact native_optional_archive_replay_retains_actual_digest_without_reacquisition selector unlinks source before exact replay and checks unchanged Source/transfer/write/decode counters, complete record/state and actual digest, followed by exact refunds.",
+    "negative_controls": "Some mismatch, full FD SHA/EOF/frame drift/hardlinks, None cancellation/refunds, distdir/offline expected-hash bypass, plain-HTTP eligibility, strict legacy/natural Source behavior and changed actual-result history identity are covered by the selected ordinary/native tests."
+  },
+  "validation": {
+    "ordinary": {
+      "passed": true,
+      "selected": 385,
+      "records": [
+        {
+          "label": "optional-archive-final-bzlmod-tests",
+          "selected": 87,
+          "elapsed_seconds": 0.4309088939917274
+        },
+        {
+          "label": "optional-archive-final-loading-tests",
+          "selected": 54,
+          "elapsed_seconds": 0.1945456659886986
+        },
+        {
+          "label": "optional-archive-final-analysis-tests",
+          "selected": 197,
+          "elapsed_seconds": 0.2889341520203743
+        },
+        {
+          "label": "optional-archive-final-core-tests",
+          "selected": 47,
+          "elapsed_seconds": 0.4906897670007311
+        }
+      ]
+    },
+    "owner_build": {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "-p",
+        "slug_loading_v2",
+        "-p",
+        "slug_analysis_v2",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "slug_core_v2/native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 92.28309328798787,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    "cli_build": {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 39.93424426601268,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    "core_sha256": "d895679e0b0186ba0f35d94b1c2cf423fa2d0889c926ac162094cd4d802c8bfd",
+    "cli_sha256": "732e1d0ef4acdacb1bf3e3cafdefa151e01335ffa73d89e30d376a6b1a362599",
+    "native_guards": {
+      "selected": 9,
+      "exit_code": 0,
+      "elapsed_seconds": 1.305696714000078,
+      "scope": "2 new optional archive proofs,2 existing pinned archive guards,5 protected lifecycle/source/ownership guards"
+    },
+    "warm_originals": {
+      "selected_test": 1,
+      "actual_commands": 4,
+      "exit_code": 0,
+      "elapsed_seconds": 11.859180382016348
+    },
+    "frozen_inputs": {
+      "input_config": "/tmp/slug-wp425-rust-inputs-fourth-flat-dirfd-aee4a6bf85d3/inventory.json",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "preparation": "/tmp/slug-wp425-validation/rust-frontier-preparation-fourth-flat-dirfd.json",
+      "preparation_sha256": "b2372b3168174c472b7499203b21c48d509d17aa0d9f32bb4721b5f7c55deac0"
+    },
+    "final_source_freeze": {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-capture-validation.json",
+      "sha256": "5223d8ef51298e403d3a9f9c838a2e78905c49da926b02a9c387ab54a74a4ed0"
+    }
+  },
+  "original_workload": {
+    "actual_command_success": false,
+    "harness_exit_code": 0,
+    "elapsed_seconds": 24.569564157980494,
+    "result": {
+      "error": {
+        "detail": "resource",
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 835,
+    "acquisition": "Checksumless TarXz operation acquired83,872,880 compressed bytes and decoded389,042,688 before Resource refusal; no archive completion is claimed. Earlier checksum refusal970 vs Resource835 are different frontiers, not a speed comparison.",
+    "peak_retained_bytes": 395751330,
+    "peak_native_fds": 422,
+    "peak_backing_bytes": 8187281408,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "limits": "Unchanged512MiB retained/FD512/backing8GiB; Source64, Execute128, root128, Meta16MiB, Process64MiB, streams1MiB, work27+cleanup3; Archive compressed128MiB, decoded512MiB/call+1GiB/invocation,2GiB/262144-inode tmpfs and131072 entries/4MiB names.",
+    "qualification": "These are modeled counters and incomplete prefixes, not whole-command RSS or the required <=1.25xBazel comparison. Default General policy remains Disabled."
+  },
+  "causal_investigation": {
+    "checksum": "A frozen borrowed typed Inventory capture identifies plan_archive_checksum_missing before unchanged string formatting; no private message parsing.",
+    "next_resource": {
+      "source_freeze_verified": true,
+      "harness_exit_code": 0,
+      "result": {
+        "error": {
+          "detail": {
+            "kind": "resource",
+            "snapshot_reservation": {
+              "capture_credit_bytes": 388968290,
+              "observed_retained_bytes": 395655166,
+              "phase": "snapshot_successor_reserve",
+              "requested_bytes": 388958838,
+              "retained_limit_bytes": 536870912
+            }
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      "computes": 835,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "peak_retained_bytes": 395751330
+    },
+    "meaning": "The actual failed phase is snapshot_successor_reserve. The requested successor credit overlaps still-live capture/producer credits. This establishes the reached reservation, not erroneous accounting, safe fungible coverage or fit through later publication.",
+    "temporary_probes": "Analysis origin/Inventory fields, Loading borrowed getter, resource diagnostic variants/helpers/tests and feature forwarding are absent from integrated source. Source/artifact snapshots and exact removal record remain local, pinned below. No diagnostic-only component lands.",
+    "next": "Review native credit custody across capture/transcript/epoch publication/requests/history, actual unchanged-body allocations and construction overlap; preserve all semantic histories and limits. No transfer/accounting redesign is selected here."
+  },
+  "recoveries": [
+    {
+      "kind": "routine compiler invocation corrections",
+      "detail": "Two new test module paths required explicit path attributes; private pinned tool proof getter now explicitly requires Some. Diagnostic-only exhaustive observation refusal reporter maps its temporary variant to original resource category."
+    },
+    {
+      "kind": "new pure test fixture correction",
+      "detail": "Archive successor fixture initially omitted required predecessor root entry and correctly failed MissingRoot. Retain all predecessor entries before appending extracted file; no production assertion weakened.",
+      "raw": {
+        "file": "/tmp/slug-wp425-validation/optional-archive-loading-tests.json",
+        "sha256": "b066757c6ea0db71958bacdc4f393e2256e9bf0a521732ff84d7624a6e8b46db"
+      }
+    }
+  ],
+  "fixture_growth": {
+    "copied_upstream_fixture_files": 0,
+    "new_test_leaves": 6,
+    "provenance": "Reuse original repository/workspace/native test constructors with tiny deterministic authored compressed data; no ruleset corpus or semantic adapter."
+  },
+  "raw_receipts": [
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-loading-red.json",
+      "sha256": "ac97d3f87dcebd2dfd6d5039e87c2710f38e20b49cb88c65efbe59b35a63879e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-loading-red-build-result.json",
+      "sha256": "699af945b0f7ba14eb6061ae52043eaeb0dbb33b526f73fbc35daf4aef19ab53"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-loading-red-preservation.json",
+      "sha256": "de647fd652586a68a477064f796a4295a9afd6ad883846ee7be50c3367636d25"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-owner-build-fixed-result.json",
+      "sha256": "9143cc5892a1083b4459c83b8a6fe02c55b295662da59883b7866ccd2b45b80f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-loading-green-tests.json",
+      "sha256": "d086c14bf129ba818f2df35fe61d7ad0e026820e2a1a17d8a13efc750f63c322"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-initial-native.json",
+      "sha256": "a73bc4c339171236a4dd7ac4d06ad74aec52b31722ea3f6f8d15e63c78d60c07"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-initial-capture-validation.json",
+      "sha256": "5cc9280272c1d2dce736b050974744c8e1801f7de8ef64b52a9b0f9ba71a502f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/inventory-terminal-leaf-rust-first.json",
+      "sha256": "c475fbfa091d99380afe1b22f8a608ddb5f9f1ed00fdebe29b7f20b6c9c46af1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/inventory-terminal-leaf-capture-validation.json",
+      "sha256": "5c29fe871e7451b28bd9a83cf48a95ace5f72646617d52f79b2a72f3b245153d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-reservation-diagnostic-build-result.json",
+      "sha256": "e88969598fa21428872fb71bdccfe8d1e55c93b82cb0881bacd740e7b26065d6"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-reservation-diagnostic-build-fixed-result.json",
+      "sha256": "7223d84f062b35b8a98b4b17bbf6539f0b322183966d010e216f25b7278f583c"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-reservation-diagnostic-tests.json",
+      "sha256": "d75b4cc01fb3162cdd3093130638f19a3bb69a4c6d585465e009f76dc35facad"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-reservation-diagnostic-cli-build-result.json",
+      "sha256": "00a644305348a0acce1a8e6d060c8ed1b8c39a2ae2ccb6e06b11b1850bab99f0"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-reservation-diagnostic-native-freeze.json",
+      "sha256": "6f1abf6b0eaa5f0029101a8f1dabc11976f487251516738749cc9a56b44d7260"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-reservation-diagnostic-candidate-preservation.json",
+      "sha256": "af817b590626fdffe5e8e050c7774cada83719e6eba8772dc5c2e3fa3dba8b0a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-reservation-diagnostic-rust.json",
+      "sha256": "06b3b62fd73a29350dc4a3231173d43ae82f93ee9536ad5ca7705781956289c2"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-reservation-diagnostic-capture-validation.json",
+      "sha256": "d3f8dc06357c98059e373b3de4bf96de7afd7ee064ab43cefc8b924b078367aa"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-probe-removal.json",
+      "sha256": "41d548e6d5ae419efe8668938e1d3a986add9d89bb7f1025424c0ba8edbb786a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-owner-build-result.json",
+      "sha256": "6b95dd79a3fdf7856c9fb67404a39dc67a64cc77448eea56f0af8a8ba5a95e77"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-cli-build-result.json",
+      "sha256": "ac84a2122d96f3f18262f890a00cc177766cd979ec25058e84596d7bb3e2a4d1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-ordinary.json",
+      "sha256": "fff1498178c1e86dc3606b234cd20854386ddef01def19100a4414bf69cde469"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-bzlmod-tests.json",
+      "sha256": "a63d09dd195daef022c52a2f5b1dd0686128d721e3a286890ac279168753b72d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-loading-tests.json",
+      "sha256": "5cee4f0267122d8754fccf10d45ea65810556fa0f54f07e4e4b9a6a458e33b07"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-analysis-tests.json",
+      "sha256": "d37a1b50ec1fb5da10e71a7368a68b70620ee6e0e6aa2a82febc3e5b6c28edf5"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-core-tests.json",
+      "sha256": "9130c361cf91b68e8c980c082cdaffd79cb28a1103125f94ed84130158938589"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-native-freeze.json",
+      "sha256": "d515cbc7cb615a98687f7e23271de5e6cfe026d7dbc4390464990ff7d33a11f7"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-candidate-preservation.json",
+      "sha256": "a3a3493df0f4bac5cb0f4234d34378ec463f116e80d366809c76e4a70a424f61"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-native-guards.json",
+      "sha256": "029d62c5f79b06994ac248fab3c1fcae86bc42c2b8234d80afca3cba4bd82dc0"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-authentic-warm.json",
+      "sha256": "c09426f2caaf075173f90df6bde6576349c8b1ddefadbdd949f5988c57561f68"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-rust.json",
+      "sha256": "dc2717ae06e8f048b30ea1c10a073114478b56ba480ebd99fb9578e056b77cd7"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-capture-validation.json",
+      "sha256": "5223d8ef51298e403d3a9f9c838a2e78905c49da926b02a9c387ab54a74a4ed0"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/optional-archive-format.json",
+      "sha256": "681dfe970687de01801e207cd93978c88dcbc3e7ee39e22343e4e5be6197e0c2"
+    }
+  ],
+  "final_review": {
+    "verdict": "ACCEPT",
+    "record": {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-review.json",
+      "sha256": "48e3b9cb440d72ae65c044813f6eacd34f8bf7732509d81c04fadd083df023e0"
+    }
+  },
+  "final_validation": {
+    "status": "PASS",
+    "record": {
+      "file": "/tmp/slug-wp425-validation/optional-archive-final-validation.json",
+      "sha256": "5d4fdbcba0e5fb5208d41b528f24e16e812297b26406293702c68992d3a16fdc"
+    }
+  }
+}

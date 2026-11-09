@@ -140,8 +140,15 @@ now bounds fresh-key operational hashing while preserving full structural and
 canonical/strong identity;414 ordinary checks, five native guards and four warm
 originals pass. ABBA929/970/970/930 records two candidate opaque Analysis Message
 errors, distinct from the prior Registration category, with exact cleanup.
-Next resolve that reproducible Analysis boundary through its semantic owner.
-These results prove no successful Rust cquery, command latency/RSS or activation.
+The [optional-checksum component](./slug-v2-subplans/wp1225-optional-archive-checksum-acceptance-2026-11-09.json)
+now resolves that boundary through the general archive API: expected checksum
+omission remains separate from mandatory actual compressed SHA/SRI and full
+history. Generic native same-URL A/B/A and source-unlinked exact replay prove the
+capability; natural Source and legacy behavior remain pinned. Original Rust next
+reaches snapshot successor Resource admission under unchanged limits, with exact
+cleanup. Review native producer/transcript/epoch/history credit custody next;
+modeled reservation overlap is not RSS. Full archive fit, successful Rust cquery,
+command latency/RSS and General activation remain open.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

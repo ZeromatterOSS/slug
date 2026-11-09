@@ -214,9 +214,10 @@ used by completion. Native progress keeps old transcript and captured storage
 credited while admitting/constructing the successor; credits accompany both
 success and failure ownership paths. Only immutable transcripts project to DICE.
 
-Archive acquisition reuses the existing checksum-verifying Host/HTTP/distdir
+Pinned Archive acquisition reuses the existing checksum-verifying Host/HTTP/distdir
 producer and transfers its private temporary file without a compressed Arc or
-second capture copy. The native handoff verifies bounded actual SHA/EOF and
+second capture copy. The selected optional-expectation General slice below uses
+a distinct fresh acquisition path while preserving actual same-FD verification. The native handoff verifies bounded actual SHA/EOF and
 single-link regular identity on that same FD before rooted extraction. Existing
 source acquisition policy remains unchanged; it is not newly confined. Workspace
 mutation uses only the held root FD and the existing shared decoder with
@@ -1790,6 +1791,82 @@ records both causal RED/GREEN owners, full identity/collision and direct-depende
 proof. All414 ordinary checks, five native guards and four warm originals pass.
 Both bounded candidate captures reach a reproducible opaque Analysis Message
 error at970 cycles; neither is a successful Rust cquery or proof of its cause.
+
+### Optional expected checksum for General archive acquisition
+
+Frozen actual Rust captures identify `plan_archive_checksum_missing` at970 cycles.
+The borrowed Inventory classifier reaches that exact Plan variant before Analysis
+formats it; Loading forwards both checksum strings unchanged, and that variant
+is produced only when both are empty. This is an intentional checksum-pinned
+capability boundary, not lost keyword arguments. Pinned Bazel9.2 revision
+`8220c6198837d5c13d53fea211cf3282aa12408a` accepts omission and computes the actual
+compressed-file SHA256 (BaseExternalContext494–562,1041–1177). DownloadManager240–315
+uses provided-checksum cache/distdir lookup only when an expectation exists.
+
+Select omission for the command-fresh General workspace archive owner. Expected
+SHA becomes `Option<[u8;32]>` in the immutable intent; actual SHA remains mandatory
+in the completed Archive result/history and Starlark sha256/SRI fields. None is
+neither zero SHA nor a caller-derived known digest. Full equality includes this
+absence and every original field. Preserve the original Some Hash field stream;
+None receives an explicit new routing domain. StableKey spelling and final tree
+SHA algorithms remain unchanged. Existing size-of/Allocative metadata forecasts
+include positive Option layout bytes; introduce no cache, pool or new owner.
+
+A supplied checksum still must match. None must bypass checksum-based distdir,
+cache and expected-hash test-source lookup and perform a fresh ordinary file/HTTPS
+acquisition. Plain HTTP must never be fetched for this absence slice; validate the
+pinned Bazel filtering/error behavior within the existing transport capability.
+Do not infer remote content from a distdir basename, source inventory, URL, caller
+or canonical_id. Natural SelectedBCR/Source/overlay/patch producers remain strict.
+Legacy generated plans/transcripts/materialization also remain checksum-pinned;
+Loading refuses omission outside a command-fresh workspace instead of weakening
+those old owners. This declared boundary is independent of repository identity.
+
+The closed Core capture owner binds the full request, exact root/resources and
+original scope. Always compute actual SHA, exact EOF and stable single-link FD/
+frame before extraction; expected Some adds its comparison. Keep no outstanding
+writer or public digest/file constructor. Extraction checks that same capture
+and reports its actual digest only after complete physical success and closure.
+Fresh commands recapture even at the same URL; within-command exact replay uses
+the already accepted digest/tree without reacquisition. Full state/history,
+predecessor, body, custody, source observations and Need invalidity stay intact.
+
+Keep128MiB compressed capture,512MiB/call and1GiB/invocation decoded, every Source
+attempt/byte/buffer counter and all root/metadata/FD/backing/work/cleanup caps.
+No auth/headers/allow_fail/rename/strip-components/output-directory or new archive
+format is admitted. Missing optional expectation never becomes native authority.
+This admits the exact result-byte/omitted-option slice; command-fresh recapture
+and existing platform/resource refusals remain Slug-native, other slices deferred.
+
+Before acceptance, real generic Starlark with omission must be RED→GREEN on an
+existing tiny archive, match independently computed actual compressed SHA/SRI and
+extracted bytes, and agree with a pinned Bazel oracle/source regression. General
+native tests must prove pinned mismatch, unpinned actual hash/EOF/frame, drift,
+cancellation/refunds, same-URL A/B/A fresh commands and exact replay without read.
+Pure tests distinguish None from Some(zero), preserve every Some Hash byte, keep
+legacy rejection and full actual-result/history identity, and count Option layout.
+Validate named Bzlmod/Loading/Core/CLI dependents and protected originals. Remove
+unneeded temporary Analysis provenance before integration; diagnostic-only push,
+caller adapters, invented expected digests and cap increases remain excluded.
+Replan only if a closed actual-data producer/freshness owner cannot be preserved.
+Keep the already-large Core repository_io module to narrow strict guards and
+Some getter migrations; new optional dispatch stays in the workspace capture
+leaf. Existing linear file/HTTPS stream kernels remain cohesive across transfer,
+counters and cleanup, with thin strict wrappers sharing the same checks. Tests
+use separate leaves; no unrelated source/transport extraction is selected.
+
+The [component receipt](wp1225-optional-archive-checksum-acceptance-2026-11-09.json) preserves the original omission-refusal RED,
+actual generic native A/B/A result and source-unlinked exact replay evidence.
+Temporary Analysis/Loading/resource provenance is removed before integration.
+A frozen failure-local capture identifies the next original Rust boundary:
+`snapshot_successor_reserve` requests388,958,838 bytes while observed retained
+credit is395,655,166, including388,968,290 capture bytes, under536,870,912.
+All native cleanup refunds exactly. The existing successor forecast overlaps
+already-live producer credits; this is modeled admission evidence, not an RSS
+measurement or a proof that all later publication stages fit. Next review native
+credit custody across snapshot, transcript, epoch publication and history owners;
+preserve full history, construction overlap and fixed limits. No ownership or
+credit-transfer change is accepted by this optional-checksum component.
 
 ### Current captured Source transport (accepted inactive component)
 

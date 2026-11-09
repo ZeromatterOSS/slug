@@ -706,7 +706,7 @@ mod tests {
         let operation = Op::Archive(
             GeneratedRepositoryArchiveEffect::new(
                 Arc::from(["https://example.invalid/model.tar.gz".into()]),
-                [0; 32],
+                Some([0; 32]),
                 "".into(),
                 GeneratedRepositoryArchiveFormat::TarGz,
                 "modeled".into(),

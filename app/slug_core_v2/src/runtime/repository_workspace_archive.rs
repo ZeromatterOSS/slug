@@ -16,7 +16,7 @@ use slug_bzlmod_v2::RepositoryWorkspaceResult;
 
 use super::*;
 use crate::runtime::ArchiveDistdirPolicy;
-use crate::runtime::repository_archive_http::capture_selected_generated_archive_with_distdirs;
+use crate::runtime::repository_archive_http::capture_workspace_generated_archive;
 
 const CAPTURE_BYTES: u64 = 128 * 1024 * 1024;
 const CHUNK_BYTES: usize = 64 * 1024;
@@ -30,7 +30,7 @@ const CAPTURE_SCRATCH: usize = CHUNK_BYTES + 2 * 4096 + 4 * std::mem::size_of::<
 // no new map/hasher or archive policy is introduced by this adapter.
 const DECODE_CONTROL: usize = 4 * 1024 * (256 + std::mem::size_of::<String>() + 32) + 4096;
 
-/// A capability minted only by the actual checksum-verifying producer below.
+/// A capability minted only by the actual full-FD verifying producer below.
 /// No path/File/writer/unchecked digest constructor escapes this leaf. The
 /// capture closes before its FD/backing/control credits can retire.
 pub(super) struct VerifiedWorkspaceArchiveCapture<'request> {
@@ -117,12 +117,12 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
             owned.push_str(url);
             urls.push(owned);
         }
-        let captured = capture_selected_generated_archive_with_distdirs(
+        let captured = capture_workspace_generated_archive(
             &urls,
-            archive.sha256(),
+            archive.expected_sha256(),
             runtime,
             active,
-            Some(scope),
+            scope,
             distdirs,
         );
         // Retire copied URL storage before the later owner's failure cleanup
@@ -152,7 +152,7 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
         }
         let file = owner.capture.as_ref().unwrap().as_file();
         let frame = file.metadata()?;
-        let sha256 = verify_capture(file, &frame, archive.sha256(), scope, active)?;
+        let sha256 = verify_capture(file, &frame, archive.expected_sha256(), scope, active)?;
         owner.frame = Some(frame);
         owner.sha256 = sha256;
         check(scope, active)?;
@@ -281,7 +281,7 @@ fn invalid(message: &'static str) -> PhysicalRootError {
 fn verify_capture(
     file: &File,
     frame: &Metadata,
-    expected: [u8; 32],
+    expected: Option<[u8; 32]>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<[u8; 32], PhysicalRootError> {
@@ -325,7 +325,7 @@ fn verify_capture(
         return Err(PhysicalRootError::Snapshot);
     }
     let actual: [u8; 32] = hash.finalize().into();
-    if actual != expected {
+    if expected.is_some_and(|expected| actual != expected) {
         return Err(invalid("generated archive capture SHA-256 mismatch"));
     }
     check(scope, active)?;

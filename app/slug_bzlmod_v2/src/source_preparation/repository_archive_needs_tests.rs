@@ -8,7 +8,7 @@ fn request(index: usize, digest: u8) -> RepositoryFilesystemRequest {
     let owner = Arc::new(crate::HostSelectedExtensionOwner::testing("independent+"));
     let archive = GeneratedRepositoryArchiveEffect::new(
         Arc::from(["https://example.test/independent.crate".into()]),
-        [digest; 32],
+        Some([digest; 32]),
         "".into(),
         GeneratedRepositoryArchiveFormat::TarGz,
         "ordinary id".into(),

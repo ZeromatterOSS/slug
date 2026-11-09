@@ -71,7 +71,7 @@ pub(super) fn realization(
             RepositoryWorkspaceOperation::Archive(
                 GeneratedRepositoryArchiveEffect::new(
                     Arc::from(["https://example.invalid/fixture.tar.gz".into()]),
-                    [0; 32],
+                    Some([0; 32]),
                     "".into(),
                     GeneratedRepositoryArchiveFormat::TarGz,
                     "physical-root-fixture".into(),

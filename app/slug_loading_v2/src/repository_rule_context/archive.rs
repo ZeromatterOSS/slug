@@ -2,7 +2,8 @@
 
 use slug_bzlmod_v2::GeneratedRepositoryArchiveEffect;
 use slug_bzlmod_v2::GeneratedRepositoryArchiveFormat;
-use slug_bzlmod_v2::generated_repository_archive_parse_sha256;
+use slug_bzlmod_v2::generated_repository_archive_is_ignored_http_url;
+use slug_bzlmod_v2::generated_repository_archive_parse_optional_sha256;
 
 use super::*;
 
@@ -47,7 +48,7 @@ pub(super) fn parse_archive_effect<'v>(
     } else {
         strip_prefix
     };
-    let digest = generated_repository_archive_parse_sha256(sha256, integrity)
+    let digest = generated_repository_archive_parse_optional_sha256(sha256, integrity)
         .map_err(RepositoryRuleInvocationError::Plan)?;
     let mut urls = Vec::new();
     if let Some(url) = url.unpack_str() {
@@ -67,8 +68,11 @@ pub(super) fn parse_archive_effect<'v>(
             ));
         }
     }
+    // Preserve the full mirror intent, but infer the format from the same
+    // eligible URL class as acquisition. Ignored HTTP never authorizes IO.
     let first = urls
-        .first()
+        .iter()
+        .find(|url| digest.is_some() || !generated_repository_archive_is_ignored_http_url(url))
         .ok_or(RepositoryRuleInvocationError::ArchiveArgument)?;
     let format = match archive_type {
         "tar.xz" | "txz" => GeneratedRepositoryArchiveFormat::TarXz,
@@ -104,6 +108,11 @@ pub(super) fn replay_archive<'v>(
     effect: GeneratedRepositoryArchiveEffect,
     heap: Heap<'v>,
 ) -> anyhow::Result<Value<'v>> {
+    if effect.expected_sha256().is_none() && state.workspace.is_none() {
+        return Err(state.fail(RepositoryRuleInvocationError::Plan(
+            GeneratedRepositoryFileEffectPlanError::MissingArchiveChecksum,
+        )));
+    }
     let result = if state.workspace.is_some() {
         match workspace::replay(
             state,
@@ -178,7 +187,7 @@ mod tests {
         assert_eq!(effect.urls().len(), 2);
         assert_eq!(effect.strip_prefix(), "arbitrary/subtree");
         assert_eq!(effect.format(), GeneratedRepositoryArchiveFormat::TarXz);
-        assert_eq!(effect.sha256(), [0xa1; 32]);
+        assert_eq!(effect.expected_sha256(), Some([0xa1; 32]));
         let crate_url = heap.alloc("https://independent.test/tinyjson.crate?download=1");
         assert_eq!(
             parse(crate_url, heap, "tar.gz", "", "").unwrap().format(),
@@ -197,6 +206,76 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn optional_archive_arguments_keep_intent_and_infer_first_eligible_format() {
+        let module = Module::new();
+        let heap = module.heap();
+        let parse_optional = |url, sha, integrity| {
+            parse_archive_effect(
+                url,
+                "",
+                sha,
+                "",
+                "",
+                "",
+                false,
+                "independent partition",
+                None,
+                None,
+                integrity,
+                None,
+                0,
+                heap,
+            )
+        };
+        let ignored = "HTTP://ignored.test/not-the-format.zip";
+        let eligible = "https://eligible.test/archive.tar.gz?download=1";
+        let urls = heap.alloc(AllocTuple([ignored, eligible]));
+        let effect = parse_optional(urls, "", "").unwrap();
+        assert_eq!(effect.expected_sha256(), None);
+        assert_eq!(effect.format(), GeneratedRepositoryArchiveFormat::TarGz);
+        assert_eq!(
+            effect.urls().iter().map(|u| u.as_str()).collect::<Vec<_>>(),
+            [ignored, eligible]
+        );
+        assert_eq!(effect.canonical_id(), "independent partition");
+        assert!(parse_optional(heap.alloc(ignored), "", "").is_err());
+        assert!(
+            parse_optional(
+                heap.alloc("http://user:pass@ignored.test/archive.tar.gz"),
+                "",
+                ""
+            )
+            .is_err()
+        );
+        let pinned = "a1".repeat(32);
+        assert!(
+            parse_optional(urls, &pinned, "").is_err(),
+            "Some preserves existing HTTP refusal"
+        );
+        let direct = parse_optional(heap.alloc(eligible), &pinned, "").unwrap();
+        assert_eq!(direct.expected_sha256(), Some([0xa1; 32]));
+        let sri = slug_bzlmod_v2::generated_repository_archive_sha256_sri([0xa1; 32]);
+        assert_eq!(
+            parse_optional(heap.alloc(eligible), "", &sri)
+                .unwrap()
+                .expected_sha256(),
+            Some([0xa1; 32])
+        );
+        assert!(matches!(
+            parse_optional(heap.alloc(eligible), &pinned, &sri),
+            Err(RepositoryRuleInvocationError::Plan(
+                GeneratedRepositoryFileEffectPlanError::ConflictingArchiveChecksum
+            ))
+        ));
+        assert!(matches!(
+            parse_optional(heap.alloc(eligible), "invalid", ""),
+            Err(RepositoryRuleInvocationError::Plan(
+                GeneratedRepositoryFileEffectPlanError::InvalidArchiveChecksum
+            ))
+        ));
     }
 
     #[test]

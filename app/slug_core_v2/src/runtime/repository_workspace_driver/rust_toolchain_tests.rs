@@ -327,7 +327,7 @@ fn operation(request: &RepositoryWorkspaceRequest) -> Value {
             "archive",
             Some(json!({
                 "format": format!("{:?}", effect.format()),
-                "sha256": hex::encode(effect.sha256()),
+                "expected_sha256": effect.expected_sha256().map(hex::encode),
                 "url_count": effect.urls().len(),
                 "strip_prefix": text(effect.strip_prefix()),
             })),

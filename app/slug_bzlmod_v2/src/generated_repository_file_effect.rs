@@ -8,6 +8,8 @@
  */
 
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -90,13 +92,14 @@ pub enum GeneratedRepositoryArchiveOutput {
     RepositoryRoot,
 }
 
-/// A general checksum-pinned archive intent. No archive bytes or physical
-/// capture path are retained in the repository observation.
+/// An archive intent with an optional expected checksum. Omission is admitted
+/// only by command-fresh General workspaces; legacy plans remain pinned.
+/// No archive bytes or physical capture path enter the observation.
 #[doc(hidden)]
-#[derive(Clone, PartialEq, Eq, Hash, Allocative)]
+#[derive(Clone, PartialEq, Eq, Allocative)]
 pub struct GeneratedRepositoryArchiveEffect {
     urls: Arc<[CompactString]>,
-    sha256: [u8; 32],
+    expected_sha256: Option<[u8; 32]>,
     strip_prefix: CompactString,
     format: GeneratedRepositoryArchiveFormat,
     output: GeneratedRepositoryArchiveOutput,
@@ -106,20 +109,51 @@ pub struct GeneratedRepositoryArchiveEffect {
 
 impl fmt::Debug for GeneratedRepositoryArchiveEffect {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("GeneratedRepositoryArchiveEffect")
-            .field("url_count", &self.urls.len())
-            .field("sha256", &self.sha256_hex())
+        let mut debug = formatter.debug_struct("GeneratedRepositoryArchiveEffect");
+        debug.field("url_count", &self.urls.len());
+        match self.expected_sha256 {
+            Some(digest) => debug.field("sha256", &generated_repository_archive_sha256_hex(digest)),
+            None => debug.field("sha256", &"<unspecified>"),
+        };
+        debug
             .field("format", &self.format)
             .field("output", &self.output)
             .finish_non_exhaustive()
     }
 }
 
+impl Hash for GeneratedRepositoryArchiveEffect {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let Self {
+            urls,
+            expected_sha256,
+            strip_prefix,
+            format,
+            output,
+            canonical_id,
+            declared_integrity,
+        } = self;
+        // Every Some field writer and its order are the original derived Hash
+        // stream. Absence has its own domain, never a zero-digest sentinel.
+        if expected_sha256.is_none() {
+            state.write(b"slug-generated-archive-unpinned-v1\0");
+        }
+        urls.hash(state);
+        if let Some(digest) = expected_sha256 {
+            digest.hash(state);
+        }
+        strip_prefix.hash(state);
+        format.hash(state);
+        output.hash(state);
+        canonical_id.hash(state);
+        declared_integrity.hash(state);
+    }
+}
+
 impl GeneratedRepositoryArchiveEffect {
     pub fn new(
         urls: Arc<[CompactString]>,
-        sha256: [u8; 32],
+        expected_sha256: Option<[u8; 32]>,
         strip_prefix: CompactString,
         format: GeneratedRepositoryArchiveFormat,
         canonical_id: CompactString,
@@ -131,7 +165,10 @@ impl GeneratedRepositoryArchiveEffect {
         if urls.len() > MAX_ARCHIVE_URLS {
             return Err(GeneratedRepositoryFileEffectPlanError::TooManyArchiveUrls);
         }
-        if urls.iter().any(|url| !valid_archive_url(url)) {
+        if urls.iter().any(|url| {
+            !valid_archive_url(url) && !(expected_sha256.is_none() && valid_ignored_http_url(url))
+        }) || (expected_sha256.is_none() && !urls.iter().any(|url| valid_archive_url(url)))
+        {
             return Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveUrl);
         }
         if !strip_prefix.is_empty()
@@ -142,13 +179,16 @@ impl GeneratedRepositoryArchiveEffect {
             return Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveStripPrefix);
         }
         if !declared_integrity.is_empty()
-            && generated_repository_archive_parse_sha256("", &declared_integrity)? != sha256
+            && Some(generated_repository_archive_parse_sha256(
+                "",
+                &declared_integrity,
+            )?) != expected_sha256
         {
             return Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveChecksum);
         }
         Ok(Self {
             urls,
-            sha256,
+            expected_sha256,
             strip_prefix,
             format,
             output: GeneratedRepositoryArchiveOutput::RepositoryRoot,
@@ -169,16 +209,18 @@ impl GeneratedRepositoryArchiveEffect {
         &self.urls
     }
 
-    pub fn sha256(&self) -> [u8; 32] {
-        self.sha256
+    pub fn expected_sha256(&self) -> Option<[u8; 32]> {
+        self.expected_sha256
     }
 
-    pub fn sha256_hex(&self) -> String {
-        generated_repository_archive_sha256_hex(self.sha256)
+    pub fn expected_sha256_hex(&self) -> Option<String> {
+        self.expected_sha256
+            .map(generated_repository_archive_sha256_hex)
     }
 
-    pub fn sha256_sri(&self) -> String {
-        generated_repository_archive_sha256_sri(self.sha256)
+    pub fn expected_sha256_sri(&self) -> Option<String> {
+        self.expected_sha256
+            .map(generated_repository_archive_sha256_sri)
     }
 
     pub fn strip_prefix(&self) -> &str {
@@ -194,8 +236,8 @@ impl GeneratedRepositoryArchiveEffect {
     }
 }
 
-/// Result fields for a checksum-pinned archive, without requiring
-/// Loading to own a separate hex or base64 dependency.
+/// SHA256 result fields for an actual archive, without requiring Loading
+/// to own a separate hex or base64 dependency.
 #[doc(hidden)]
 pub fn generated_repository_archive_sha256_hex(sha256: [u8; 32]) -> String {
     hex::encode(sha256)
@@ -249,6 +291,20 @@ pub fn generated_repository_archive_parse_sha256(
     let mut digest = [0; 32];
     digest.copy_from_slice(&decoded[..32]);
     Ok(digest)
+}
+
+/// Parse an optional General-workspace expectation without relaxing any
+/// supplied checksum syntax or the strict parser used by pinned producers.
+#[doc(hidden)]
+pub fn generated_repository_archive_parse_optional_sha256(
+    sha256: &str,
+    integrity: &str,
+) -> Result<Option<[u8; 32]>, GeneratedRepositoryFileEffectPlanError> {
+    if sha256.is_empty() && integrity.is_empty() {
+        Ok(None)
+    } else {
+        generated_repository_archive_parse_sha256(sha256, integrity).map(Some)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -518,7 +574,7 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
     ) -> Result<(), GeneratedRepositoryFileEffectPlanError> {
         self.push_archive_effect(GeneratedRepositoryArchiveEffect::new(
             urls,
-            sha256,
+            Some(sha256),
             strip_prefix,
             GeneratedRepositoryArchiveFormat::TarXz,
             CompactString::new(""),
@@ -530,6 +586,9 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
         &mut self,
         archive: GeneratedRepositoryArchiveEffect,
     ) -> Result<(), GeneratedRepositoryFileEffectPlanError> {
+        if archive.expected_sha256().is_none() {
+            return Err(GeneratedRepositoryFileEffectPlanError::MissingArchiveChecksum);
+        }
         if self
             .order
             .iter()
@@ -591,6 +650,29 @@ fn valid_archive_url(url: &str) -> bool {
         "file" => parsed.host_str().is_none_or(|host| host.is_empty()) && parsed.query().is_none(),
         _ => false,
     }
+}
+
+// Unpinned requests retain syntactically valid HTTP mirrors as intent, but
+// only existing HTTPS/file URLs are eligible for acquisition. No transport
+// permission is minted by admitting this ignored spelling.
+fn valid_ignored_http_url(url: &str) -> bool {
+    if url.is_empty() || url.len() > MAX_ARCHIVE_URL_BYTES {
+        return false;
+    }
+    let Ok(parsed) = Url::parse(url) else {
+        return false;
+    };
+    parsed.scheme() == "http"
+        && parsed.host_str().is_some()
+        && parsed.username().is_empty()
+        && parsed.password().is_none()
+        && parsed.fragment().is_none()
+}
+
+/// Classifies an ignored HTTP mirror using the archive intent's URL grammar.
+#[doc(hidden)]
+pub fn generated_repository_archive_is_ignored_http_url(url: &str) -> bool {
+    valid_ignored_http_url(url)
 }
 
 pub(crate) fn valid_delete_path(path: &str) -> bool {
@@ -1032,7 +1114,10 @@ mod tests {
         let Some(GeneratedRepositoryOrderedEffectRef::Archive(archive)) = ordered.next() else {
             panic!("second effect should be an archive");
         };
-        assert_eq!(archive.sha256(), [7; 32]);
+        assert_eq!(
+            archive.expected_sha256().expect("pinned archive fixture"),
+            [7; 32]
+        );
         assert_eq!(archive.strip_prefix(), "rustc/rustc");
         assert_eq!(archive.format(), GeneratedRepositoryArchiveFormat::TarXz);
         assert_eq!(
@@ -1044,11 +1129,15 @@ mod tests {
             urls(&["https://static.rust-lang.org/dist/rustc.tar.xz"]).as_ref()
         );
         assert_eq!(
-            archive.sha256_hex(),
+            archive
+                .expected_sha256_hex()
+                .expect("pinned archive fixture"),
             generated_repository_archive_sha256_hex([7; 32])
         );
         assert_eq!(
-            archive.sha256_sri(),
+            archive
+                .expected_sha256_sri()
+                .expect("pinned archive fixture"),
             generated_repository_archive_sha256_sri([7; 32])
         );
         let Some(GeneratedRepositoryOrderedEffectRef::File(last)) = ordered.next() else {
@@ -1138,7 +1227,7 @@ mod tests {
         let make = |format, canonical_id: &str, integrity: &str| {
             super::GeneratedRepositoryArchiveEffect::new(
                 urls(&["https://example.org/source.crate?download=1"]),
-                [7; 32],
+                Some([7; 32]),
                 "".into(),
                 format,
                 canonical_id.into(),
@@ -1209,7 +1298,7 @@ mod tests {
         assert!(
             super::GeneratedRepositoryArchiveEffect::new(
                 urls(&["file:///tmp/source.tar.gz"]),
-                [1; 32],
+                Some([1; 32]),
                 "".into(),
                 GeneratedRepositoryArchiveFormat::TarGz,
                 "".into(),
@@ -1400,3 +1489,6 @@ mod tests {
         assert!(!debug.contains("internal/dist"));
     }
 }
+
+#[cfg(test)]
+mod optional_checksum_tests;
