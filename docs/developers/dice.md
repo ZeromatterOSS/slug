@@ -12,9 +12,12 @@ every agent's context.
 - Represent semantic inputs as DICE keys or tracked DICE dependencies. Do not
   make a value "DICE-owned" by computing it outside DICE and injecting it after
   startup.
-- Key equality and hashing must include every input that can change the result:
-  command policy, environment policy, file identity/digest, repo mapping,
+- Key equality must include every input that can change the result: command
+  policy, environment policy, file identity/digest, repo mapping,
   toolchain/platform policy, lockfile policy, and any relevant mode flags.
+  Operational key hashes may reuse deterministic projections of those inputs;
+  equal keys must hash equally, and collisions must still compare full keys.
+  Such bucket hashes are not canonical, persisted or content identities.
 - Prefer explicit invalidation edges over process-global mutable state,
   singleton caches, marker-file trust, or best-effort digests.
 - A warm cache hit is correct only when the key or tracked dependency graph

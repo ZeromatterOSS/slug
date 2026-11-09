@@ -3,8 +3,27 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: avoid repeated full ordering of the same immutable path owner in
-original `rules-rust-073-toolchain-owner` `cquery //pkg:probe`. The
+Current delta: bounded operational configuration hashing is implemented for
+Analysis and command-registration keys. The
+[configuration-key receipt](wp1225-configuration-key-hash-acceptance-2026-11-09.json)
+records fresh-key RED/GREEN: 64 Analysis keys fall from 3,861,824 to 2,560 hash
+bytes; each of four Loading key forms falls from 3,865,664 to 3,648 bytes.
+Full structural equality, Legacy streams and global canonical/strong/artifact
+identity remain authoritative. All 414 ordinary checks, five native guards and
+four warm compiler commands pass. No retained storage, constructor work or cap
+changes. Independent final review accepts this bounded component.
+
+ABBA cycles929/970/970/930 retain exact cleanup and truncated128-event traces.
+Controls stop at WorkDeadline with last55 roots/139 and140 records; both
+candidates reach `analysis_message_opaque` with last56 roots/143 records.
+This is distinct from the unreproduced earlier Registration category; no cause
+or API repair is established. Next resolve this now-reproducible Analysis
+boundary through its semantic owner and bounded typed evidence. Private-text
+parsing, standalone diagnostic integration and ruleset adapters remain excluded.
+Successful Rust cquery, archive/action closure, equivalent completed-command
+latency/RSS and production activation remain open.
+
+The accepted shared-path ordering component remains unchanged. The
 [shared-path receipt](wp1225-shared-path-order-acceptance-2026-11-09.json)
 records actual PathObservationKey returned-Need RED64→GREEN0 full comparisons,
 with exact std fallback for independent owners. All 230 ordinary checks, five

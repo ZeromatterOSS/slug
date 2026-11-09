@@ -18,14 +18,18 @@ use crate::eval::compiler::def::FrozenDef;
 use crate::values::Value;
 use crate::values::ValueLike;
 
-/// Host-certified immutable identity. Equality/hash must include the complete
+/// Host-certified immutable identity. Equality must compare the complete
 /// evaluation domain and its tracked input validity, never only a digest.
+/// Operational hashes may reuse deterministic projections of these inputs;
+/// collisions never authorize equality or publication. This is not a canonical,
+/// persisted or content hash contract.
 pub trait FunctionSymbolOwner: Any + Debug + Send + Sync + Allocative {
     /// Borrow the host's concrete immutable owner for typed publication.
     fn as_any(&self) -> &dyn Any;
     /// Compare complete structural owner and tracked-input identities.
     fn equals(&self, other: &dyn FunctionSymbolOwner) -> bool;
-    /// Hash the same fields used by `equals` without allocating.
+    /// Route the `equals` identity into a bucket without allocating.
+    /// Equal owners must hash equally; full `equals` resolves collisions.
     fn hash_owner(&self, state: &mut dyn Hasher);
 }
 

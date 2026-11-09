@@ -134,7 +134,13 @@ with full std fallback, Hash/SHA/layout and native authority preserved. All230
 ordinary checks, five native guards and four warm originals pass; independent
 final review accepts the component. ABBA921/927/927/924 remains WorkDeadline with differing recorded
 prefixes and exact cleanup. Diagnostic tools stay bounded; the original error
-cause/API repair remains deferred. Next select the remaining measured owner.
+cause/API repair remains deferred. The
+[configuration-key component](./slug-v2-subplans/wp1225-configuration-key-hash-acceptance-2026-11-09.json)
+now bounds fresh-key operational hashing while preserving full structural and
+canonical/strong identity;414 ordinary checks, five native guards and four warm
+originals pass. ABBA929/970/970/930 records two candidate opaque Analysis Message
+errors, distinct from the prior Registration category, with exact cleanup.
+Next resolve that reproducible Analysis boundary through its semantic owner.
 These results prove no successful Rust cquery, command latency/RSS or activation.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,

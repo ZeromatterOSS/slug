@@ -92,6 +92,9 @@ use crate::registration_expansion::package_postorder;
 #[path = "registration_expansion_tests/path_prerequisite_tests.rs"]
 mod path_prerequisite_tests;
 
+#[path = "registration_expansion_tests/command_hash_tests.rs"]
+mod command_hash_tests;
+
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
 }

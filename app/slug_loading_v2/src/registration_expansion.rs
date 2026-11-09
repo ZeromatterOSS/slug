@@ -6,12 +6,14 @@
  * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
  * of this source tree. You may select, at your option, one of the above-listed
  * licenses.
- */
+*/
 
 //! Loading-owned expansion of selected MODULE registration patterns.
 
 use std::cmp::Ordering;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -300,11 +302,27 @@ impl fmt::Display for ModuleRegistrationExpansionObservationKey {
 }
 
 /// Loading-owned expansion of typed command registration configuration.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct CommandRegistrationExpansionKey {
     workspace: NormalizedAbsolutePath,
     configuration: SlugConfiguration,
     family: ModuleRegistrationFamily,
+}
+
+impl Hash for CommandRegistrationExpansionKey {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let Self {
+            workspace,
+            configuration,
+            family,
+        } = self;
+        workspace.hash(state);
+        // Operational bucket input only. Full configuration equality resolves
+        // collisions; canonical and strong identity writers remain separate.
+        state.write(configuration.projection().as_bytes());
+        family.hash(state);
+    }
 }
 
 impl CommandRegistrationExpansionKey {

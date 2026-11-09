@@ -1,0 +1,517 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "81ad419a7b71eabf74d1ce4bc18cbee448bf30ca",
+  "recorded_utc": "2026-11-09T10:29:05.912302+00:00",
+  "outcome": "Fresh Analysis and command-registration key hashes reuse the existing immutable configuration projection as operational bucket input while retaining full structural equality and exact canonical/strong/artifact identity.",
+  "classification": {
+    "slug_native": "Owner-local operational Hash work reduction; no new Bazel API or checksum/identity parity claim.",
+    "exact_preserved": "Complete typed Eq/Ord, original Legacy writer and discriminant, all key fields/constructors/Debug/Clone/Allocative/layout, global configuration Hash/StrongHash/canonical/projection encoders, artifact/FileWrite identity and native authority.",
+    "unsupported_deferred": "Successful Rust cquery, new opaque Analysis Message cause/API repair, Rust archive/action closure, completed-command latency/RSS and General production activation."
+  },
+  "source_pins": [
+    {
+      "file": "app/slug_analysis_v2/src/key.rs",
+      "sha256": "4b976269a85df37fd2e091513754c950352021659d99641ab07faeb71138b1a3"
+    },
+    {
+      "file": "app/slug_analysis_v2/src/key/configuration_hash_tests.rs",
+      "sha256": "7533c7fe22fba65848dc60021f403d961e75d9788203b905b0465845f54799bc"
+    },
+    {
+      "file": "app/slug_analysis_v2/src/starlark_rule/function_owner/configuration_hash_tests.rs",
+      "sha256": "4f47136ab105fb98dd3d0640516286296c491aa6708de281010053c8466e2cf1"
+    },
+    {
+      "file": "app/slug_analysis_v2/src/starlark_rule/function_owner/tests.rs",
+      "sha256": "91af6243d0def13915cbbc00ec0633920ca08e837933d833cdd97b7992be139c"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_expansion.rs",
+      "sha256": "1ecbef36cec587ecfec3ddfdd2127d17066e0b904113dfc3f20daf48c835da1c"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_expansion_tests.rs",
+      "sha256": "e0ca072b35c54daf2f2385b0072f6c4d41deb0ced9f9042a531365c7e0452736"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_expansion_tests/command_hash_tests.rs",
+      "sha256": "ccc5934140dce3760fb8180fb18db9a7f095d886054e7a5474532118492a810f"
+    },
+    {
+      "file": "docs/developers/dice.md",
+      "sha256": "a5a97aa4b64129a7eaabe1d58fdf5eeaef6c2da0712b273cd2a09fb2a077605c"
+    },
+    {
+      "file": "starlark-rust/starlark/src/eval/function_symbol.rs",
+      "sha256": "374e1d8d039993b391a9efbc8c3038c03ef4059ffeee8a6a3138a0b1b8be4100"
+    },
+    {
+      "file": "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md",
+      "sha256": "86e13776cede666a512a29d749d65b5497bca3210c469d8b4fa81dbd8a1fa521"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md",
+      "sha256": "d0a1ba34f504e4380e6cd3183a14897dff5ff8becf2caf5c73c94474caff65b3"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/current-packet.md",
+      "sha256": "5c0c78aa978aac6465e66e8145e34fb62a3fdd31507d035afe770b0b56430df1"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-general-repository-workspace-design.md",
+      "sha256": "9d042e2bbdd0105d07d727659aa44600162509693fff8789f4dea3cade07aeec"
+    }
+  ],
+  "unchanged_reference_pins": [
+    {
+      "file": "app/slug_configuration_v2/src/native/configuration.rs",
+      "sha256": "a2a505217ddf76d3122d98306aa08a16fc592dfde4f88caebe2f176ae55a7e33"
+    },
+    {
+      "file": "app/slug_configuration_v2/src/command.rs",
+      "sha256": "7ca0f938bef32191fd81a0ef6205c5e7f9df2cbcbde6850252b4884358a6df90"
+    },
+    {
+      "file": "app/slug_analysis_v2/src/analysis_value.rs",
+      "sha256": "fd1a5fa1c4a3abbaf3bd3bcb9e12176f8d9626390a22cdafc4495133b53ab532"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/file_write_identity.rs",
+      "sha256": "3ee3b221eb6bb8b6c53ecab978f4c19310e3595a74a524b06dd1aafe62665f03"
+    },
+    {
+      "file": "app/slug_analysis_v2/src/starlark_rule/function_owner.rs",
+      "sha256": "93feaf56e259698a290f5b52f3c233c24957dbbebd162f53505f30e0b9341827"
+    },
+    {
+      "file": "app/slug_analysis_v2/src/dice.rs",
+      "sha256": "564cc028f0969cc9ece1088968bbe07153f298b6d7614e98ee5eade533942c67"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests.rs",
+      "sha256": "4822323a645eae4c444e6cb6144d8ceecc09054f1258739d73bbf16459203f55"
+    }
+  ],
+  "upstream_source_pins": [
+    {
+      "file": "/run/media/system/Colossus/dev/buck2/starlark-rust/starlark_map/src/hashed.rs",
+      "sha256": "1539d4ebd8eb297b63f2678273acacdf2511d33f9b4d1367532930876e511fe9"
+    },
+    {
+      "file": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/mem/mod.rs",
+      "sha256": "55cdc5bb22d41d7d3c15406dfbfebcbe06bf2a10a6b4ffe76dadac6c24b569a0"
+    }
+  ],
+  "source_basis": {
+    "profile": "Fresh IP-only post-path profile at baseline81ad419a7 pins Core1ce/CLId606/input9331 and directly samples global SlugConfiguration::hash13.18% self. Shared String/SipHasher symbols are not assigned to configuration, nor is all globalConfigHash work assigned to these wrappers.",
+    "natural_owners": "Analysis ConfiguredTargetKey and other DICE keys retain ConfigurationKey; analysis/dice source is actually app/slug_analysis_v2/src/dice.rs:3209\u20133240, which constructs command registration natural keys from immutable configuration. StableKey hashes flow through FunctionEvaluationOwner/NativeFunctionOwner to StarlarkHasher, with separate complete equality.",
+    "strong_domains": "Analysis artifact_owner uses complete_identity_bytes; Core FileWrite identity writes canonical configuration bytes. Neither wrapper implements StrongHash. Global SlugConfiguration Hash/StrongHash and finish_configuration remain byte-exact.",
+    "donor": "Concept/test only: Buck2 Hashed separates operational Hash from full Eq and StrongHash. No donor code imported; reuse the pre-existing projection instead of adding a cached scalar or wrapping/recomputing at each fresh constructor."
+  },
+  "design": {
+    "approval": "Independent design/source/ordinary and final evidence review ACCEPT.",
+    "threshold_before_measurement": "For64 fresh keys from one real immutable341-option configuration, configuration-slot hashing must be exactly32 bytes per call including fresh construction; preserve full structural and persisted identities. This fixed byte-work threshold is separate from wall-time/RSS.",
+    "implementation": "Analysis Slug arm hashes original mem::discriminant plus raw projection32; Legacy delegates original identity.hash. Loading hashes original workspace, raw projection32, original family. Both manual impls exhaustively destructure original key fields.",
+    "ownership_memory": "Zero new retained field/allocation/cache/interner/constructor hashing/owner. Existing Arc/Allocative layouts, positive accounting and last-owner lifetimes are unchanged; no stack/RSS or whole-command memory claim.",
+    "scope": "Operational buckets only. Full Eq resolves collisions, including configured/function-owner identities; no digest-only equality, publication permission or canonical/content/persisted hash authority. Starlark/DICE docs clarify this distinction."
+  },
+  "causal_red_green": {
+    "analysis": {
+      "raw_red": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-red.json",
+        "sha256": "7e4e6d7b5725623167b0c2bf2e6bb7f3398402a1e966024cd5f27b8bfdf46ce6"
+      },
+      "red_exit_code": 101,
+      "fresh_constructions": 64,
+      "writes_before_and_after": 128,
+      "bytes_before": 3861824,
+      "bytes_after": 2560,
+      "green_receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-tests.json",
+        "sha256": "23869bcce9932c135376f847d58a60070a5c5993fd59d2533a1024e2a9a96120"
+      },
+      "meaning": "New test expects original discriminant8 plus projection32 per fresh key. RED fails exact work assertion; GREEN passes all197 Analysis tests. Independent derived stream test verifies compiler-specific discriminant and exact Legacy bytes."
+    },
+    "loading": {
+      "raw_red": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-loading-red.json",
+        "sha256": "639177493751870f6875308e06d9898e7fe60799f668881710b9e70423204442"
+      },
+      "red_exit_code": 101,
+      "fresh_constructions_per_form": 64,
+      "forms": 4,
+      "writes_before_and_after_per_form": 256,
+      "bytes_before_per_form": 3865664,
+      "bytes_after_per_form": 3648,
+      "canonical_config_bytes": 60376,
+      "config_slot_bytes_after": 32,
+      "red_metric_rows": [
+        "COMMAND_CONFIG_HASH_WORK key=slug_loading_v2::registration_expansion::CommandRegistrationExpansionKey family=toolchains constructions=64 actual_writes=256 actual_bytes=3865664 expected_writes=256 expected_bytes=3648 canonical_config_bytes=60376 expected_config_bytes=32",
+        "COMMAND_CONFIG_HASH_WORK key=slug_loading_v2::registration_expansion::CommandRegistrationExpansionObservationKey family=toolchains constructions=64 actual_writes=256 actual_bytes=3865664 expected_writes=256 expected_bytes=3648 canonical_config_bytes=60376 expected_config_bytes=32",
+        "COMMAND_CONFIG_HASH_WORK key=slug_loading_v2::registration_expansion::CommandRegistrationExpansionKey family=execution-platforms constructions=64 actual_writes=256 actual_bytes=3865664 expected_writes=256 expected_bytes=3648 canonical_config_bytes=60376 expected_config_bytes=32",
+        "COMMAND_CONFIG_HASH_WORK key=slug_loading_v2::registration_expansion::CommandRegistrationExpansionObservationKey family=execution-platforms constructions=64 actual_writes=256 actual_bytes=3865664 expected_writes=256 expected_bytes=3648 canonical_config_bytes=60376 expected_config_bytes=32"
+      ],
+      "green_receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-loading-tests.json",
+        "sha256": "0b20f78e9365537d666d6f7bf871ca04194d16fd929fcf8bead0b73a6430b522"
+      },
+      "meaning": "Real base/observed A/B/A for both families, exact labels, restored Arc and Reused assertions precede all4 work measurements. Constant-hasher maps preserve workspace/family/config/unrelated-option and independent-equal identities. Counting proves byte work; source diff establishes exact projection payload."
+    }
+  },
+  "ordinary_tests": [
+    {
+      "suite": "configuration-tests",
+      "selected": 109,
+      "passed": 109,
+      "exit_code": 0,
+      "elapsed_seconds": 0.1603110940050101,
+      "executable_sha256": "b0d98d3f188a9622307a70c606aa2f0f2f9ac740f029a62fb90a9b849409e1df",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-configuration-tests.json",
+        "sha256": "1e697f40497997be059749825658157d31fc14c80c94d04e867f95bba0139628"
+      }
+    },
+    {
+      "suite": "analysis-tests",
+      "selected": 197,
+      "passed": 197,
+      "exit_code": 0,
+      "elapsed_seconds": 0.29368262899515685,
+      "executable_sha256": "855acc6643835e5110c3e2e61ae945428f4cb043311e516b91f59bb2412f0b5b",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-tests.json",
+        "sha256": "23869bcce9932c135376f847d58a60070a5c5993fd59d2533a1024e2a9a96120"
+      }
+    },
+    {
+      "suite": "loading-tests",
+      "selected": 90,
+      "passed": 90,
+      "exit_code": 0,
+      "elapsed_seconds": 0.5106740649935091,
+      "executable_sha256": "47f3b6b72b8d1b69efbbd206d6d3243b4c8ec62364c0b088bfabfd9caa7e6d58",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-loading-tests.json",
+        "sha256": "0b20f78e9365537d666d6f7bf871ca04194d16fd929fcf8bead0b73a6430b522"
+      }
+    },
+    {
+      "suite": "core-tests",
+      "selected": 18,
+      "passed": 18,
+      "exit_code": 0,
+      "elapsed_seconds": 0.008582573995226994,
+      "executable_sha256": "fbf12bf701d1b650cd37847e426db79e828e95f9e6b63214ed81e4f9e9a4599a",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-core-tests.json",
+        "sha256": "437a0475fe6b01683f84c11ead1f40b71e50a84f8d0552103754b8cddd68216b"
+      }
+    }
+  ],
+  "protected_native": {
+    "guards": {
+      "selected": 5,
+      "passed": 5,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-native-guards.json",
+        "sha256": "f6743ecd39995eb15783735cc2f580fa1ca1aa5716a65009ff83496b43a1a257"
+      }
+    },
+    "authentic_warm": {
+      "selected_ignored_tests": 1,
+      "actual_commands": 4,
+      "passed_commands": 4,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-authentic-warm.json",
+        "sha256": "6d79f1de212b49ec056fa47a9aef2ce4a70ddfde6961a75594d97c408433b486"
+      }
+    },
+    "supervision": "Existing60s/8GiB address-space/1MiB-stream supervisors where applicable; native production512MiB/FD512/backing8GiB and Source64/Execute128/roots128/Meta16MiB/Process64MiB/work27+cleanup3 remain unchanged. Compilation precedes native captures."
+  },
+  "original_comparison": {
+    "order": "A/B/B/A",
+    "same_input_cli_source_freeze": {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-native-validation.json",
+      "sha256": "ea59e1b9dc473229c508e8072d6ceb24934033c327fe92a6a808bb1e7fda9d02"
+    },
+    "captures": [
+      {
+        "side": "a1",
+        "core_sha256": "1ce13386df4cda555d7e06807d86046a42a5161e938a18f836201e44c82fa3f3",
+        "result": {
+          "error": {
+            "detail": {
+              "code": "WorkDeadline",
+              "kind": "source_service"
+            },
+            "kind": "repository_workspace"
+          },
+          "status": "driver_refusal"
+        },
+        "computes": 929,
+        "truncated": true,
+        "events_retained": 128,
+        "last_recorded_epoch": {
+          "roots": 55,
+          "record_count": 139
+        },
+        "peak_retained_bytes": 28323621,
+        "peak_backing_bytes": 8082427904,
+        "cleanup": {
+          "backing_bytes": 0,
+          "baseline": 168,
+          "native_fds": 0,
+          "retained_bytes": 168
+        }
+      },
+      {
+        "side": "b1",
+        "core_sha256": "fbf12bf701d1b650cd37847e426db79e828e95f9e6b63214ed81e4f9e9a4599a",
+        "result": {
+          "attempts": 970,
+          "kind": "analysis",
+          "reason": "reason_format_limit",
+          "status": "accepted_terminal_error",
+          "terminal_leaf": "analysis_message_opaque"
+        },
+        "computes": 970,
+        "truncated": true,
+        "events_retained": 128,
+        "last_recorded_epoch": {
+          "roots": 56,
+          "record_count": 143
+        },
+        "peak_retained_bytes": 28323621,
+        "peak_backing_bytes": 8149536768,
+        "cleanup": {
+          "backing_bytes": 0,
+          "baseline": 168,
+          "native_fds": 0,
+          "retained_bytes": 168
+        }
+      },
+      {
+        "side": "b2",
+        "core_sha256": "fbf12bf701d1b650cd37847e426db79e828e95f9e6b63214ed81e4f9e9a4599a",
+        "result": {
+          "attempts": 970,
+          "kind": "analysis",
+          "reason": "reason_format_limit",
+          "status": "accepted_terminal_error",
+          "terminal_leaf": "analysis_message_opaque"
+        },
+        "computes": 970,
+        "truncated": true,
+        "events_retained": 128,
+        "last_recorded_epoch": {
+          "roots": 56,
+          "record_count": 143
+        },
+        "peak_retained_bytes": 28323621,
+        "peak_backing_bytes": 8149536768,
+        "cleanup": {
+          "backing_bytes": 0,
+          "baseline": 168,
+          "native_fds": 0,
+          "retained_bytes": 168
+        }
+      },
+      {
+        "side": "a2",
+        "core_sha256": "1ce13386df4cda555d7e06807d86046a42a5161e938a18f836201e44c82fa3f3",
+        "result": {
+          "error": {
+            "code": "WorkDeadline",
+            "kind": "source_service"
+          },
+          "status": "driver_refusal"
+        },
+        "computes": 930,
+        "truncated": true,
+        "events_retained": 128,
+        "last_recorded_epoch": {
+          "roots": 55,
+          "record_count": 140
+        },
+        "peak_retained_bytes": 28323621,
+        "peak_backing_bytes": 8082427904,
+        "cleanup": {
+          "backing_bytes": 0,
+          "baseline": 168,
+          "native_fds": 0,
+          "retained_bytes": 168
+        }
+      }
+    ],
+    "qualification": "Harness exit0 is not command success. Bounded prefixes differ, traces truncate and candidates end in opaque Analysis Message errors; successful Rust cquery, error cause, command latency/RSS and activation remain unproved.",
+    "memory": "Peak retained/backing values are modeled native counters, not RSS. A/B prefixes and terminal categories differ; all traces truncate128. No successful command or equivalent-command1.25xBazel memory proof."
+  },
+  "recoveries": [
+    {
+      "kind": "test-only compiler error",
+      "receipt": {
+        "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-red-build-result.json",
+        "sha256": "febe9b7d7909bedfe6adce5930ef47dfae393f00ea521a069358316c5d213711"
+      },
+      "correction": "PublicationShape has no PartialEq; compare all five public scalar fields as a tuple. No assertion or production contract weakened. Corrected RED build succeeds before production Hash edits."
+    }
+  ],
+  "fixture_growth": {
+    "new_fixture_files": 0,
+    "new_test_leaves": 3,
+    "provenance": "Reuse real341-option configuration, tracked DICE registration helpers and existing original/native manifests; no new copied upstream fixture."
+  },
+  "raw_receipts": [
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-loading-red-build-result.json",
+      "sha256": "05e9c5248638d465df3703d58211b3b81fb07e6225413ae768b48f4cec1f3cac"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-loading-red.json",
+      "sha256": "639177493751870f6875308e06d9898e7fe60799f668881710b9e70423204442"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-loading-red-preservation.json",
+      "sha256": "9675c4381329070887f84bee0b8e78037ccf487846812d442d6ea11a5671f3a0"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-red-build-result.json",
+      "sha256": "febe9b7d7909bedfe6adce5930ef47dfae393f00ea521a069358316c5d213711"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-red-build-fixed-result.json",
+      "sha256": "95edff883126dde9641df6d05459d1752ced0bba76fb9923ddc09c1fa2a2c788"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-red.json",
+      "sha256": "7e4e6d7b5725623167b0c2bf2e6bb7f3398402a1e966024cd5f27b8bfdf46ce6"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-red-preservation.json",
+      "sha256": "5a2a59a50e337a23822db36d18150636ee14a19456dadc5ce5990cf6c85ada08"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-red-source-freeze.json",
+      "sha256": "56086ec014897822a4f1657f59afeadb39e75a69652f1bceb5de605a96218b22"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-red-source-freeze-fixed.json",
+      "sha256": "04fbbe1e0358483f57b73585ae054100ad28ec99f1e1071385a0198a5ce6bded"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-owner-build-result.json",
+      "sha256": "76ea7b86df16fd65af1fe081b069a7cfb04e5163876ae92b4719d79d5211933b"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-cli-build-result.json",
+      "sha256": "2b36448d5bb618acd6fd93e7843f7d5a3933e3aa36c744aee7b9f0b3f1dd0eba"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-ordinary-sequence.json",
+      "sha256": "96cffee715b1fa2926930a246a5b26ab1e27484cb4975fd99d85880e30b3060f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-format.json",
+      "sha256": "7dd905a8324d39cc491522084974080de59959de27f4780ccbbcc93ea2c01516"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-reference-baseline.json",
+      "sha256": "7735ebbbc5f16f54ee7ac4ecb7d419cc9c29a8a77968bfceff967424d215a9de"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-source-preservation.json",
+      "sha256": "0d7f8b7a6c6313867085434d7df46c40151c1ecf10bef2101c5e7d3c5ec1557a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-candidate-preservation.json",
+      "sha256": "5013125cb9c3282b5b2446f8ea2b64a0bafab8ddbd7db537ef355a64fa2ad629"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-native-freeze.json",
+      "sha256": "e6df12862207fc58f1a0edc8fa38d1559ed277a7e8fb95327cd8a6d37953af29"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-native-sequence.json",
+      "sha256": "5cb01a41ba7201c826620ea88a4d339a6b3a41459372cd2011e8e4e79dee4f27"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-native-validation.json",
+      "sha256": "ea59e1b9dc473229c508e8072d6ceb24934033c327fe92a6a808bb1e7fda9d02"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-native-guards.json",
+      "sha256": "f6743ecd39995eb15783735cc2f580fa1ca1aa5716a65009ff83496b43a1a257"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-authentic-warm.json",
+      "sha256": "6d79f1de212b49ec056fa47a9aef2ce4a70ddfde6961a75594d97c408433b486"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/shared-path-post-cpu-freeze.json",
+      "sha256": "125bffadece1348507ffdc6c8ec817bedd6e04b760d4fda63038f8d2fc5fdf66"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/shared-path-post-cpu-profile.json",
+      "sha256": "748d275a641376c4d781c2632f52d92415dc648cc3f340b0fcdb0d157a212d0c"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/shared-path-post-cpu-symbols.json",
+      "sha256": "210dd0888a7b1a77401a5f304805641ccc934efb369504990718deed49f1e51f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/shared-path-order-candidate-preservation.json",
+      "sha256": "fe01e9c8bde5168a3df34f614294a13041fbd1b07a8c00372808f26e21fb7eeb"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-rust-a1.json",
+      "sha256": "534eadf9bf34abb8bcef3b75c4dfdd0781b64e9c7fd1695e3a338302cb8e4547"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-rust-b1.json",
+      "sha256": "af9889f90f0d88de5083c8e03e9ac3420a2e5c0b3b7d44ebbd2e12a3fc64f11b"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-rust-b2.json",
+      "sha256": "39d64e98ffa3ab3a297ab2ed945a7f88eaaa31c4e8516cf73bebed97b7297ccc"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-rust-a2.json",
+      "sha256": "6519786164368e909d30d87289373a5ef84b5e197d853544c873e1ca3e0ba74f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-loading-red-build.jsonl",
+      "sha256": "afecbf72ff7c07bdf478b3b7c4587befd3f1c4edbc48e1a5324fcbd54d0b7c91"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-red-build.jsonl",
+      "sha256": "d26ff968e760c51366256c059a1e1b119bb47273013ec58226601b8707a0ce94"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-analysis-red-build-fixed.jsonl",
+      "sha256": "bec1c59fd997becb501cb4ad5649925a2fc4988c9eda2ae7b4f149dc74ed04f8"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-owner-build.jsonl",
+      "sha256": "220eaa94dfa9f1842e1d50465cbb441e207c4f163a9d438a88e12e359bcb971a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-cli-build.jsonl",
+      "sha256": "9d1249f66bdcd07db2ec98fd0de4b3772aa8b71600d4f6b1eebb2c92250d2b0e"
+    }
+  ],
+  "final_validation": {
+    "status": "PASS",
+    "record": {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-final-validation.json",
+      "sha256": "1d58adff33422297680465258d021005cedec60ef512c9817632643805dba59b"
+    }
+  },
+  "next": "Resolve the reproducible Analysis Message semantic boundary with bounded typed evidence and its actual API owner. Do not parse private text, invent caller/source adapters or integrate standalone diagnostics.",
+  "final_review": {
+    "verdict": "ACCEPT",
+    "record": {
+      "file": "/tmp/slug-wp425-validation/configuration-key-hash-final-review.json",
+      "sha256": "f87a1efd76a24614dcb0b6ae9ff4dda1ca50173e807256bffcce365807b7bff2"
+    }
+  }
+}

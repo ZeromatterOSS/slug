@@ -1740,6 +1740,57 @@ The [component receipt](wp1225-shared-path-order-acceptance-2026-11-09.json)
 records the accepted work boundary, preservation audits and native evidence;
 it does not close the unreproduced Registration cause or whole-command gates.
 
+### Operational configuration-key hashing
+
+The fresh post-path IP-only profile directly samples `SlugConfiguration::hash`
+at 13.18% self time. This is evidence of repeated full canonical-byte hashing,
+not attribution of shared String/SipHasher samples or a command-speed claim.
+Select the actual Analysis `ConfigurationKey` and Loading
+`CommandRegistrationExpansionKey` lookup boundaries reached by configured
+analysis and command-registration preparation. This is Slug-native operational
+routing; all admitted semantic behavior and unsupported boundaries stay fixed.
+
+Reuse the existing immutable 32-byte configuration projection as bucket input.
+Analysis preserves the identity discriminant and delegates the Legacy arm to its
+original complete writer; Loading preserves workspace/configuration/family order
+and changes only the configuration slot. Full derived structural equality,
+ordering, Debug, Clone/Allocative, constructors, layout and ownership stay intact.
+Projection collisions only increase bucket contention. They cannot establish
+configuration, function-owner or artifact equality. Global `SlugConfiguration`
+Hash/StrongHash, canonical encoding, projection production, complete configured
+identity and artifact/FileWrite writers remain byte-exact. Starlark owner hashing
+is also operational bucket routing; its independent complete structural equality
+and input-validity owner remain authoritative.
+
+Buck2-derived `starlark_map::Hashed` supplies the concept of separating repeated
+routing work from full equality/StrongHash. No donor code, extra cached scalar,
+allocation, interner, constructor hash or owner is introduced: `finish_configuration`
+already computes this projection once from all canonical fields. Existing positive
+layout/accounting and last-owner lifetimes therefore remain unchanged. Keep tests
+in separate owner-local modules; the large Loading module gets only a short Hash
+implementation and test wiring, with no unrelated extraction.
+
+Before acceptance, repeated fresh natural-key construction and hashing from the
+same immutable configuration must reduce configuration-slot bytes from the full
+canonical stream to exactly 32 per call for both families and observation keys.
+The primary threshold is this exact fixed byte-work reduction, including fresh
+constructors; no wall-time threshold is claimed. Verify Legacy exact writer,
+forced bucket collisions with full equality, configuration mutations, workspace,
+family, transition/platform distinctions, complete identity/artifact preservation
+and actual registration A/B/A reuse. Global configuration tests and named direct
+Analysis/Core/CLI dependents, protected native guards and warm originals must
+pass. Balanced same-input bounded original captures qualify reached prefixes and
+cleanup only. Full Rust cquery, archive/action closure, activation and equivalent
+completed-command RSS/latency remain open. Replan only if an operational Hash
+consumer actually requires a persisted/strong byte stream or full equality cannot
+remain authoritative; routine test/compiler fixes stay within this boundary.
+
+The [component receipt](wp1225-configuration-key-hash-acceptance-2026-11-09.json)
+records both causal RED/GREEN owners, full identity/collision and direct-dependent
+proof. All414 ordinary checks, five native guards and four warm originals pass.
+Both bounded candidate captures reach a reproducible opaque Analysis Message
+error at970 cycles; neither is a successful Rust cquery or proof of its cause.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

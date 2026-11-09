@@ -9,6 +9,8 @@
  */
 
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -50,15 +52,16 @@ impl fmt::Display for ConfigurationChecksum {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Allocative)]
 pub struct ConfigurationKey {
     identity: ConfigurationIdentity,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 enum ConfigurationIdentity {
-    /// Production identity: the complete typed structure participates in Eq
-    /// and Hash. The projection is derived spelling only.
+    /// Complete typed production identity remains authoritative for Eq/Ord.
+    /// The outer key may reuse its projection for operational Hash buckets;
+    /// no bucket or display projection substitutes for this full identity.
     Slug(SlugConfiguration),
     /// Bounded compatibility for existing unit fixtures. Production command
     /// roots must never construct this variant.
@@ -67,6 +70,20 @@ enum ConfigurationIdentity {
         checksum: ConfigurationChecksum,
         starlark_options: StarlarkOptions,
     },
+}
+
+impl Hash for ConfigurationKey {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let Self { identity } = self;
+        match identity {
+            ConfigurationIdentity::Slug(configuration) => {
+                std::mem::discriminant(identity).hash(state);
+                state.write(configuration.projection().as_bytes());
+            }
+            ConfigurationIdentity::Legacy { .. } => identity.hash(state),
+        }
+    }
 }
 
 impl ConfigurationKey {
@@ -393,3 +410,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod configuration_hash_tests;

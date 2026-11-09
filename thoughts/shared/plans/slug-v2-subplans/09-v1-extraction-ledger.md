@@ -2,6 +2,17 @@
 
 ## WP425 rooted repository consumers
 
+Operational configuration-key hashing reuses an already-owned immutable
+32-byte projection at two lookup boundaries. This applies the Buck2-derived
+`starlark_map::Hashed` distinction between routing and full identity without
+adding a wrapper, scalar, allocation, constructor hash or donor code. Full typed
+Eq/Ord and global canonical/StrongHash writers remain authoritative. Existing
+Arc/Allocative storage and positive accounting, publication and last-owner
+lifetimes stay unchanged. Forced bucket collisions must retain complete keys;
+fixed fresh-key byte-work evidence is separate from command latency/RSS.
+The [configuration-key receipt](wp1225-configuration-key-hash-acceptance-2026-11-09.json)
+records complete identity/collision controls, unchanged layout and native proof.
+
 Shared immutable path ordering reuses the existing Arc<PathBuf> owner and
 constant-time pointer comparison as a sufficient equality witness for one path
 slot. The exact old PathBuf ordering remains the fallback; no donor import,

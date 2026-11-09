@@ -416,3 +416,6 @@ fn runfiles_owner_storage_preflight_precedes_payload_and_mapping_bytes_share_bud
     assert_eq!(fresh.runfiles_stores.len(), 1);
     assert!(fresh.native.charged_bytes() >= "mapping-owner".len() * 1024);
 }
+
+#[path = "configuration_hash_tests.rs"]
+mod configuration_hash_tests;
