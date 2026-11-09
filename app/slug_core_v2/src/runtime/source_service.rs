@@ -79,6 +79,12 @@ pub(in crate::runtime) use scope::SourceServiceCounters;
 pub(in crate::runtime) use scope::SourceServiceError;
 pub(in crate::runtime) use scope::SourceServiceLimits;
 pub(in crate::runtime) use scope::SourceServiceScope;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+pub(in crate::runtime) use scope::SourceXzDecoder;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) use source_charge_census::SourceChargeDomain;
 #[cfg(all(test, target_os = "linux"))]

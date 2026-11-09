@@ -3,26 +3,31 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [native canonical body allocation coverage](wp1225-general-repository-workspace-design.md#native-canonical-body-allocation-coverage)
-now shares actual immutable body leases across capture, completion, epoch,
-request and final-data/history owners, with separately prepaid metadata and
-construction. The [component receipt](wp1225-body-coverage-acceptance-2026-11-09.json)
-records an actual original48MiB archive RED→GREEN under a64MiB bank, full
-publication/following operations/seal, true changed-body overlap refusal and
-history release while a final reader survives. All460 ordinary checks, twelve
-native guards and four warm originals pass. Complete semantic histories, full
-identity/forecasts, Source custody and all limits remain unchanged.
+Current delta: [bounded actual XZ allocations](wp1225-general-repository-workspace-design.md#bounded-actual-xz-decoder-allocations)
+now prepay each codec allocation, header and control against the same native bank,
+while retaining the full136MiB Source allowance and codec ceiling. The
+[component receipt](wp1225-xz-allocation-acceptance-2026-11-09.json) records genuine
+small-dictionary RED→GREEN beside a retained body, true larger-dictionary refusal,
+partial-init/cancel/EOF/checksum/refill cleanup and unchanged generic reservations.
+All33 focused and216 qualified broader checks, twelve native guards and four warm
+original commands pass. The initial221-test run retains five Source diagnostic
+failures reproduced with identical assertions on both preserved baseline builds;
+their local scratch-tool preparation does not reach XZ. No assertion was changed.
 
-The original Rust run now completes the prior389MB archive: epoch55roots/110records
-at836 attempts, compared with109records and Resource835 before this component.
-The next TarXz archive transfers4,589,980 compressed bytes then stops with Source
-`Allocation` before decoding. Cleanup remains exact; native peak396,202,045.
-Source review identifies the blanket136MiB decoder reservation against the same
-bank as the next owner; its prior high-water is not a new successful allocation.
-Review bounded actual decoder-allocation custody next, preserving that per-decoder
-ceiling, local Source counters and the512MiB native bank. No decoder change is
-accepted here. Full archive fit, Rust/action/REAPI/Slug closure, completed-command
-latency/RSS<=1.25xBazel and production activation remain open.
+The same-input original Rust run advances from110 to112 records in55 roots:
+clippy and cargo archives now complete. At838 attempts the next rustfmt archive
+decodes7,398,400 bytes before the unchanged WorkDeadline. Native peak484,668,126,
+422 FDs and exact cleanup remain within the fixed bank. The completed archive
+success bucket is480,520,192 decoded bytes; the remaining partial archive is not
+accepted. Full archive fit, Rust/action/REAPI/Slug closure, completed-command
+latency/RSS<=1.25xBazel and production activation remain open. Next inspect the
+remaining archive/deadline work under the existing resource and observation bounds.
+
+The [body-coverage prerequisite](wp1225-body-coverage-acceptance-2026-11-09.json)
+continues to carry canonical native allocations across capture, completion,
+epoch/request and final-data/history owners, with complete semantic histories,
+full identities and separately prepaid metadata/construction. Its prior389MB
+archive success and true changed-body/history-release guards remain protected.
 
 Accepted prerequisite: General command-fresh archive acquisition now accepts omission of
 both expected-checksum forms. Expected SHA is optional intent; actual compressed

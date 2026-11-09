@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "component": "Bounded actual XZ decoder allocations",
+  "date": "2026-11-09",
+  "baseline": "9d67a356b5cb0061c03be0395ea4fe0d49eb046e",
+  "compatibility": "Slug-native physical admission; existing codec/API semantics remain protected",
+  "status": "accepted",
+  "reviews": {
+    "design": "ACCEPT, including Linux/x86_64/64-bit platform correction",
+    "source": "ACCEPT, including interrupted-refill correction",
+    "partial_initialization_validation": "ACCEPT; real second initializer allocation refusal after one success",
+    "final": "ACCEPT"
+  },
+  "contract": "wp1225-general-repository-workspace-design.md#bounded-actual-xz-decoder-allocations",
+  "implementation": {
+    "owner": "Private SourceXzDecoder with stable allocator context, disjoint raw stream and inline 8192-byte reader buffer",
+    "dependency": "Explicit existing locked lzma-sys0.1.20 edge; no version change, C shim or xz2 layout transmute",
+    "allowance": "Full logical Source136MiB retained independently from actual native allocation credits; generic reserve_decoder unchanged",
+    "allocation": "Checked multiplication/Layout/isize/live-payload bound; exact header/alignment/layout native credit before fallible allocation; deallocation before credit retirement",
+    "ffi": "No Source lock/watch/user callback across C, no unwind; callback failure published after C; end before allocator/control/allowance retirement, including failed init",
+    "stream": "CONCATENATED, RUN until compressed EOF then FINISH; full checksum/footer/padding/trailing input validation, pointer clearing and retry/EOF/no-progress handling",
+    "scope": "Same existing command bank only; unbound/unscoped local ceiling; other platforms keep xz2 plus full reservation",
+    "unchanged": [
+      "Source136MiB decoder limit/counters",
+      "native512MiB/FD512/backing8GiB",
+      "Source/process/decode/archive/terminal limits",
+      "27+3 work/cleanup clocks",
+      "full semantic histories and canonical identities",
+      "General production Disabled",
+      "DICE ownership/keys/locks",
+      "gzip and source acquisition policy"
+    ]
+  },
+  "evidence": {
+    "causal_red_green": {
+      "test": "runtime::repository_generated_archive::xz_accounting_tests::genuine_small_xz_dictionary_fits_shared_native_bank_with_retained_body",
+      "baseline_exit_code": 101,
+      "baseline_cause": "Source Allocation before decoder construction",
+      "candidate_exit_code": 0,
+      "fixture": "Genuine1MiB dictionary XZ plus actual prepaid4MiB body in same16MiB native bank; full tar extraction/content/mode/counts/refunds"
+    },
+    "negative": "Genuine16MiB dictionary succeeds unbound, refuses shared16MiB bank beside4MiB body with sticky Allocation; Source1024-byte allowance instead refuses DecoderLimit before counters",
+    "focused": {
+      "selected": 33,
+      "passed": 33,
+      "elapsed_seconds": 0.1412669199926313
+    },
+    "broader": {
+      "selected": 221,
+      "passed": 216,
+      "baseline_failures": [
+        "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+        "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+        "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+        "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder",
+        "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error"
+      ],
+      "baseline_reproduction": "Same five exact assertions on both preserved default and native-probe-observer baseline artifacts; local scratch-tool diagnostics do not reach XZ; no assertion changed",
+      "qualified_rerun_selected": 216,
+      "qualified_rerun_passed": 216,
+      "elapsed_seconds": 3.7386627289815806
+    },
+    "native_guards": {
+      "selected": 12,
+      "passed": 12,
+      "elapsed_seconds": 1.968213840998942
+    },
+    "warm_originals": {
+      "selected_tests": 1,
+      "actual_commands": 4,
+      "passed_commands": 4,
+      "elapsed_seconds": 11.717773028998636
+    },
+    "default_cli_compile": "passed",
+    "source_formatting": "9 changed Rust files passed pinned rustfmt --check"
+  },
+  "original_rust": {
+    "same_input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+    "same_preparation_sha256": "b2372b3168174c472b7499203b21c48d509d17aa0d9f32bb4721b5f7c55deac0",
+    "core_sha256": "d50c981e3bb800a34a12b0ba54dbe6c4033ffdb698dec3230bdc3091460c4f11",
+    "cli_sha256": "bd1ed4612001dd1c300355a1b1ed7407f375190f90c8852eaf8f0f12e85b4a88",
+    "capture_freeze_files": 15,
+    "baseline_records": 110,
+    "candidate_records": 112,
+    "roots": 55,
+    "attempts": 838,
+    "newly_completed_archives": [
+      "clippy index1",
+      "cargo index2"
+    ],
+    "next_operation": "rustfmt TarXz index3; partial decode7,398,400 then unchanged WorkDeadline",
+    "completed_workspace_decoded_bytes": 480520192,
+    "result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "scope": {
+      "decoded_bytes": 488040334,
+      "first_error": "WorkDeadline",
+      "live_buffer_bytes": 0,
+      "live_decoder_bytes": 0,
+      "peak_buffer_bytes": 852795,
+      "peak_decoder_bytes": 142606336,
+      "registry_attempts": 0,
+      "registry_bytes": 0,
+      "source_attempts": 21,
+      "transferred_bytes": 125231033,
+      "written_bytes": 612481864
+    },
+    "resource_peaks": {
+      "peak_backing_bytes": 8187281408,
+      "peak_native_fds": 422,
+      "peak_retained_bytes": 484668126
+    },
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "Harness exit0 validates capture/cleanup, not command success. Prefix advance is not whole-command latency/RSS proof."
+  },
+  "donor": {
+    "revision": "0795445f3ab60f4e49070bdd0b94425c5610f73a",
+    "disposition": "Zabel concept/test only: stable callback state, checked allocation header, init/end and concatenated EOF. No donor code/runtime/bridge, fixed alignment, cap or collapsed status mapping imported. Existing V2 native bank utility reused."
+  },
+  "timing": {
+    "recorded_compile_seconds": 309.03815940898494,
+    "review_time": "not separately measured; independent verdicts retained in this thread"
+  },
+  "residual_gates": [
+    "Five verified preexisting Source diagnostic fixture/owner failures",
+    "rustfmt archive completion and full archive envelope",
+    "Authentic Rust cquery/action comparison/REAPI/Slug bootstrap closure",
+    "Completed same-command latency/RSS<=1.25xBazel",
+    "General production activation"
+  ],
+  "source_pins": [
+    {
+      "file": "Cargo.lock",
+      "sha256": "7af156e60012e6dc901f7171c5f7558f17454d888324c84ab98cef97bc74c28c"
+    },
+    {
+      "file": "Cargo.toml",
+      "sha256": "2908f0b74c8bb8bd16546e6c648e44bafd7e3d2b7179ba8c878aae7851271319"
+    },
+    {
+      "file": "app/slug_core_v2/Cargo.toml",
+      "sha256": "7373437637ad974eea184527d637b191cf22b54957a1165114ac369e3f4d2940"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_generated_archive.rs",
+      "sha256": "7840b64ba5d88b556fc19684d0f324c027f55d1795328ab88566c168357bb001"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_generated_archive_xz_accounting_tests.rs",
+      "sha256": "38b12a90bda93366e96022976d13cae41330ebbe3763d73eb50668b4bd0669ad"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service.rs",
+      "sha256": "66e6daea9e12b7edb7ec6f48d4f687f5dcf61cf3903fb579eae6b107a1f8c241"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/decoder_reservation.rs",
+      "sha256": "2302ad13e1b28cb472c4b080b10ce6f26507daa4e7bee50b16e403beba15d187"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/scope.rs",
+      "sha256": "3f523160ef8dfa8e03fda969c58c4a7e8331c716e6d4ec8402fa34e9c9ba69b6"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/xz_allocator.rs",
+      "sha256": "9dafc93962d55406f4a2a71cf13c69d57556e8f135238699af8c4270bf8e9e58"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/xz_allocator_tests.rs",
+      "sha256": "a625cf4889a01cd27c3c30345bebd8b61641b2cd62faaba65ede76b9e307a572"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/xz_decoder.rs",
+      "sha256": "3899f3219f6a8a620125ef329b03d29332e385904fd62128a3e5ebc616467106"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/xz_decoder_tests.rs",
+      "sha256": "48463dd0cd1c60a0a7f47e3fada41e658e31a40107d37d84c654683fe8dc1ac6"
+    }
+  ],
+  "raw_evidence": [
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-red-core-result.json",
+      "sha256": "a8146134fcde97c9d086d509446dc9e6b3b02d71dcfd19f896ad1041f81b2169"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-flat-reservation-red.json",
+      "sha256": "34eebc7743c547e10e5cd3fd64a573edfd95a81bcd16618359614ce65c4b2d5f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-flat-reservation-red-preservation.json",
+      "sha256": "1d7e5dfb5eee26e3da9033a330fc2e592e411930df7f89a6c4649c023e168b00"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-candidate-core-result.json",
+      "sha256": "5548e34597e484eb7dabad276f76ea2538b799398ce75f1b5d47d000ba4bfa5c"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-candidate-focused.json",
+      "sha256": "7f9a298b95526e8fb82d4b46bcf6d016af964dbdfc05d9850e5e1119d0c6e663"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-candidate-cli-result.json",
+      "sha256": "6f4bb09073352d60ee3c92fd5e71ed0be0dee9a9ba1b25b64ab940035c897111"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-core-result.json",
+      "sha256": "0e99f5985fa6ee47473efd556fd3494a1362e84d60f44c55185e3670a16504e2"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-focused.json",
+      "sha256": "2dc11fae049fad155367d5948f5d9dcc207812831023d01fabecd374dab5f8dc"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-probe-core-result.json",
+      "sha256": "ed66f3322a1f91f46cffb019cdb2a25b096c2d323deace9f615e8c179cb2fa98"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-ordinary.json",
+      "sha256": "41c6cfb41d79a79f46b2b8afb95066fe719ecfd9cbbea84596a8219e54f347cd"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-diagnostic-baseline.json",
+      "sha256": "0ab8aa7b3318be788f9c020b60fd0b11accf5ca838efc1ac4e564d66a414b60b"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-diagnostic-observer-baseline.json",
+      "sha256": "efdb286f4f7377dba0a4141c6a2be4929e5be66153f4ff87c965eb1bfeebc96e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-qualified-ordinary.json",
+      "sha256": "6de84637806be5b5e4cfc5838c3f77590749612123284b329d88cc561e886b8f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-native-guards.json",
+      "sha256": "105421d487868454a2f63a1a6ae1b844195a6cc15763e584de98183347ab70e2"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-authentic-warm.json",
+      "sha256": "5214189f95dda6ee09aeb5bcf9ba76c8921c77760a81111f7319cc3e3dc62283"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-rust.json",
+      "sha256": "55468a9ffca2c07e6bb3668cb81c571575b4c2c62c5215cb338f4591b9832ef9"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-native-freeze.json",
+      "sha256": "314f4a661acb316a6fff9e8d89a1edc449939560fc1e0c149f1e6908883ecb3c"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-candidate-preservation.json",
+      "sha256": "cb868ea0e493e8868932722d1f3fa49e4748a6a8fc3a858a158c1446ae81b0c1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-capture-validation.json",
+      "sha256": "496be77343254b9239bbe413f32afc1df9ebf974c09d18d8dd175ef67b40b775"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-format.json",
+      "sha256": "c690f75793ddd0b8047375763d60dc6f4a265c2e9dd240d5eff328a2e9c9873d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-review.json",
+      "sha256": "d5458a6ff4abba2556f38501902769f9086d1532e3a9eafde0f361946ef08a58"
+    }
+  ]
+}

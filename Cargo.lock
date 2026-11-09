@@ -3519,6 +3519,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-util",
  "libc",
+ "lzma-sys",
  "nix 0.30.1",
  "regex",
  "rustls",

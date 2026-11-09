@@ -2,6 +2,23 @@
 
 ## WP425 rooted repository consumers
 
+The accepted XZ allocation design uses Zabel
+`0795445f3ab60f4e49070bdd0b94425c5610f73a`'s
+`src/compress/{xz_decompress.zig,liblzma_bounded.c}` and
+`src/compress/bounded_c_allocator.zig` as concept/test input only: stable callback
+context, checked allocation headers, partial-init cleanup and full concatenated
+EOF. Slug's existing native bank remains the only bound command owner. Rust
+Layout/C alignment, exact allocation credits and original typed error handling
+are independently implemented over the already pinned lzma-sys; no Zabel code,
+default cap, fixed alignment, bridge/runtime, pool or status mapping is imported.
+The [selected owner](wp1225-general-repository-workspace-design.md#bounded-actual-xz-decoder-allocations)
+keeps full logical136MiB Source allowance while separately charging actual native
+allocations before allocation. The
+[component receipt](wp1225-xz-allocation-acceptance-2026-11-09.json) records genuine
+small-dictionary RED/GREEN, larger-dictionary pressure and partial-init cleanup,
+with exact refunds and unchanged allowance counters. Original Rust advances
+110→112 records before WorkDeadline; completed-command RSS remains unproved.
+
 Native body coverage reuses V2 Workspace
 `BudgetedImageBlock<Arc<[u8]>>` for exact allocation/header credits and
 payload-before-credit last-native-owner cleanup. The byte bank and public pure

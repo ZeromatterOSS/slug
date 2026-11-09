@@ -6,10 +6,53 @@ use super::SourceServiceError;
 use super::SourceServiceScope;
 use super::SourceTimeoutOrigin;
 
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+#[path = "xz_allocator.rs"]
+mod xz_allocator;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+#[path = "xz_decoder.rs"]
+mod xz_decoder;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+pub(in crate::runtime) use xz_decoder::SourceXzDecoder;
+
 impl SourceServiceScope {
     pub(in crate::runtime) fn reserve_decoder(
         self: &Arc<Self>,
         bytes: usize,
+    ) -> Result<SourceDecoderReservation, SourceServiceError> {
+        self.reserve_decoder_inner(bytes, true)
+    }
+
+    // Only the closed XZ owner may replace the native allowance debit with
+    // individually prepaid callback allocations. This is not a caller mode.
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    fn reserve_xz_decoder_allowance(
+        self: &Arc<Self>,
+        bytes: usize,
+    ) -> Result<SourceDecoderReservation, SourceServiceError> {
+        self.reserve_decoder_inner(bytes, false)
+    }
+
+    fn reserve_decoder_inner(
+        self: &Arc<Self>,
+        bytes: usize,
+        _native_payload: bool,
     ) -> Result<SourceDecoderReservation, SourceServiceError> {
         let mut state = self.state();
         self.check_locked(&mut state, false)?;
@@ -29,7 +72,7 @@ impl SourceServiceScope {
             target_arch = "x86_64",
             target_pointer_width = "64"
         ))]
-        let command_credit = match bytes
+        let command_credit = match (if _native_payload { bytes } else { 0 })
             .checked_add(std::mem::size_of::<SourceDecoderReservation>())
             .ok_or(SourceServiceError::Allocation)
             .and_then(|bytes| self.reserve_command_bytes(bytes))

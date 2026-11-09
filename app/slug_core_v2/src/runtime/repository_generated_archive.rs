@@ -17,14 +17,35 @@ use std::time::UNIX_EPOCH;
 
 use flate2::read::MultiGzDecoder;
 use slug_bzlmod_v2::GeneratedRepositoryArchiveFormat;
+#[cfg(not(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+)))]
 use xz2::read::XzDecoder;
+#[cfg(not(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+)))]
 use xz2::stream::CONCATENATED;
+#[cfg(not(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+)))]
 use xz2::stream::Stream;
 
 use super::repository_io::ArchiveMaterializationError;
 use super::repository_io::source_service::SourceCounter;
 use super::repository_io::source_service::SourceServiceScope;
 use super::repository_io::source_service::{self};
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+use crate::runtime::dice::source_service::SourceXzDecoder;
 
 mod destination;
 use destination::ArchiveDestination;
@@ -37,6 +58,14 @@ const HEADER_LIMIT: usize = 1024;
 const PATH_LIMIT: usize = 256;
 const COMPONENT_LIMIT: usize = 32;
 // Shared decoder allocation ceiling, independent of archive identity.
+#[cfg(any(
+    test,
+    not(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))
+))]
 const XZ_DECODER_MEMORY_LIMIT: u64 = 136 * 1024 * 1024;
 
 #[derive(Clone, Copy)]
@@ -195,14 +224,30 @@ fn extract_with_destination_and_limits(
     match format {
         GeneratedRepositoryArchiveFormat::TarXz => {
             // Bound XZ dictionary allocation and consume every concatenated stream.
-            let _decoder_credit = source_service::decoder(scope, XZ_DECODER_MEMORY_LIMIT as usize)
-                .map_err(materialization)?;
-            let stream = Stream::new_stream_decoder(XZ_DECODER_MEMORY_LIMIT, CONCATENATED)
-                .map_err(|error| {
-                    materialization(format!("initializing bounded xz decoder: {error}"))
-                })?;
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            let decoder = SourceXzDecoder::new(capture, scope).map_err(|error| {
+                materialization(format!("initializing bounded xz decoder: {error}"))
+            })?;
+            #[cfg(not(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            )))]
+            let (_decoder_credit, decoder) = {
+                let credit = source_service::decoder(scope, XZ_DECODER_MEMORY_LIMIT as usize)
+                    .map_err(materialization)?;
+                let stream = Stream::new_stream_decoder(XZ_DECODER_MEMORY_LIMIT, CONCATENATED)
+                    .map_err(|error| {
+                        materialization(format!("initializing bounded xz decoder: {error}"))
+                    })?;
+                (credit, XzDecoder::new_stream(capture, stream))
+            };
             extract_tar(
-                XzDecoder::new_stream(capture, stream),
+                decoder,
                 root,
                 strip_prefix,
                 active,
@@ -689,3 +734,12 @@ mod tests;
 #[cfg(all(test, target_os = "linux"))]
 #[path = "repository_generated_archive/rooted_tests.rs"]
 mod rooted_tests;
+
+#[cfg(all(
+    test,
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+#[path = "repository_generated_archive_xz_accounting_tests.rs"]
+mod xz_accounting_tests;

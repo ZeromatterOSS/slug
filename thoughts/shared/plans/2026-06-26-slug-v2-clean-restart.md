@@ -154,8 +154,14 @@ now carries canonical allocation leases across the full native custody path,
 with460 ordinary checks, twelve native guards and four warm originals. The
 actual Rust run completes the previously refused389MB archive (110records), then
 reaches the next XZ decoder's Source Allocation refusal under unchanged limits.
-Review bounded decoder allocation next; full archive/Rust closure and the
-completed-command memory ratio remain open.
+The [bounded XZ allocation component](./slug-v2-subplans/wp1225-xz-allocation-acceptance-2026-11-09.json)
+now replaces that blanket native debit with prepaid actual codec allocations,
+preserving the136MiB logical/codec limits and512MiB bank. Same-input Rust accepts
+clippy and cargo (112records) before the unchanged deadline interrupts rustfmt.
+All33 focused/216 qualified broader checks, twelve native guards and four warm
+commands pass; five additional Source diagnostic failures reproduce on baseline
+and remain recorded. Inspect remaining archive/deadline work next; full
+archive/Rust closure and the completed-command memory ratio remain open.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

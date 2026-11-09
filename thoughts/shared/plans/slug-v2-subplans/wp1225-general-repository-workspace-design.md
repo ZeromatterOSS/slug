@@ -1868,6 +1868,105 @@ credit custody across snapshot, transcript, epoch publication and history owners
 preserve full history, construction overlap and fixed limits. No ownership or
 credit-transfer change is accepted by this optional-checksum component.
 
+### Bounded actual XZ decoder allocations
+
+Implementation status: independent design/source/final review ACCEPT;
+executed component proof recorded below and in the component receipt.
+
+Outcome: advance the next authentic Rust TarXz archive through decoder admission
+without changing API semantics or any limit. This is Slug-native physical
+accounting. The preceding body-coverage receipt establishes the current failure;
+completed-command Rust, RSS and production gates remain open. Both natural
+PathDestination and inactive General RootIo extraction use the same generated
+archive branch; the owner applies there uniformly, including unscoped calls.
+Actual native accounting follows the existing Linux/x86_64/64-bit bank platform
+gate. Other platforms keep their existing xz2 reader and full decoder reservation;
+no new platform allocator ABI or unsupported-target capability is claimed.
+
+Use a private Rust Read owner over the already locked lzma-sys0.1.20, adding only
+an explicit dependency edge. Pinned xz2::Stream.raw is private and has no allocator
+setter: never transmute it or fork a codec. Keep the existing xz2 encoder/test
+uses. A stable, fallibly allocated callback context owns a fixed lzma_allocator,
+disjoint callback state and positive control/input-buffer credits. The raw stream
+stays separate from callback state, with no mutable Rust context borrow spanning
+lzma_stream_decoder/code/end. Establish allocator/opaque addresses after allocation
+and preserve them until lzma_end completes, including partial initialization.
+The stream is single-threaded; no unsafe Send/Sync or multithreaded decoder.
+
+Keep the full136MiB logical Source decoder allowance and liblzma memory ceiling.
+A private acquisition seam used only by this closed owner reserves that logical
+allowance but charges the native bank only for actual owner/guard/context/input
+storage. Existing reserve_decoder(bytes) retains its full-debit contract and
+tests. No public logical-only token or caller-selected accounting mode is added.
+Local allowance refusal remains DecoderLimit before counters advance; failures
+and last-owner drop preserve the original live/peak allowance counters. A bound
+scope lends only its existing command bank. Unscoped or ordinary unbound scopes
+keep the same codec/callback cap without inventing a new bank or authority.
+
+Each allocator callback checks multiplication, positive size, header/payload
+layout and isize bounds, and the live payload total<=136MiB before allocation.
+Use platform C maximum alignment together with the actual Rust header alignment;
+checked Layout extension/padding places an inline header before the returned
+payload. The header owns the exact Layout, requested payload length and optional
+same-bank credit for the entire allocation including header and padding. Prepay
+that credit before fallible uninitialized allocation; allocation failure releases
+the credit and records Allocation. No post-allocation memusage estimate, registry,
+global pool, dictionary guess, flat ceiling debit or cap increase is permitted.
+Free(null) is harmless. For a real allocation, recover the header, deallocate the
+exact allocation first, then retire its credit and live payload count. All codec
+allocations must be freed by lzma_end before context/control/allowance retirement.
+
+Callbacks record a fixed sticky failure without formatting, unwinding, active-Fn
+calls, Source state/watch access, async work or DICE computation. Synchronized
+local callback state permits safe allocation/free bookkeeping; command-bank
+admission uses its existing finite synchronization. No local/Source lock spans
+lzma calls. Check the existing Source scope outside C before and after init/code;
+publish a callback failure through scope.poison only after C returns. Existing
+sticky cancellation/deadline errors remain authoritative. Callback cap refusal
+is DecoderLimit; bank/layout/overflow/allocator failure is Allocation. Liblzma
+MEM_ERROR without a callback denial remains a codec error, as do its distinct
+format/options/data/check/memlimit statuses. Do not infer a Source cause from
+strings or copy Zabel's collapsed error mapping. Free remains unconditional after
+cancellation. An FFI no-unwind boundary and its cleanup behavior require review.
+
+Preserve xz2's streaming contract: bounded input buffering, RUN until actual
+compressed EOF then FINISH, consumed/produced progress and premature EOF/no-progress
+rejection. Clear next_in/out and avail fields immediately after every lzma_code
+before returning or reborrowing buffers. Finished and empty-output reads remain
+well-defined. Keep CONCATENATED alone, all stream checksums/footer/trailing-junk
+validation, tar zero-padding drain, decoded/aggregate counters, FD capture,
+strip/path policy, cancellation and root publication unchanged.
+
+Implementation scope: Source decoder reservation plus small private codec and
+allocator leaves/tests; thin Source reexports and generated-archive constructor
+join; Cargo dependency edges. Root owns plan/evidence and integration. No DICE,
+semantic identity/history, Source acquisition, gzip, activation or native cap
+changes. Zabel xz_decompress.zig/liblzma_bounded.c and bounded_c_allocator are
+concept/test references only; no C shim, fixed16-byte alignment, default512MiB
+limit, allocator/runtime or copied status mapping is adopted.
+
+Validation: first demonstrate a genuine tiny-dictionary XZ stream with retained
+same-bank occupancy where the old136MiB debit refuses, then success under the
+same cap with exact cleanup. Pair actual larger-dictionary/bank refusal and local
+logical-window refusal; exercise checked overflow/layout/zero sizes, simultaneous
+allocation bookkeeping, fallible allocation, partial init, repeated EOF/empty
+read, concatenation, late checksum/footer corruption, truncation/trailing junk,
+cancel/deadline and complete refunds. Reuse existing generated archive, generic
+decoder, shared-command bank and protected native guards; compile direct CLI and
+run warm originals. Freeze source/binaries/inputs before an identical original
+Rust capture. A deeper prefix is evidence only for that boundary, never completed
+Rust/action/RSS/activation proof. Revise this design if pinned allocator contracts,
+closed allowance custody or before-allocation admission cannot be met.
+
+The [component receipt](wp1225-xz-allocation-acceptance-2026-11-09.json) records33
+focused and216 qualified broader checks, twelve native guards and four warm
+commands. Five local scratch-tool diagnostic failures in the initial221 checks
+reproduce exactly on both preserved baseline builds; they remain explicit
+preexisting gaps, without changed assertions. Same-input Rust now accepts clippy
+and cargo (55roots/112records versus110), then reaches WorkDeadline while rustfmt
+has decoded7,398,400 bytes. Native peak484,668,126, FD422 and exact cleanup prove
+this bounded admission advance, not full archive/command fit, speed or RSS.
+
 ### Native canonical body allocation coverage
 
 Implementation status: source review ACCEPT; final evidence review recorded in the component receipt.

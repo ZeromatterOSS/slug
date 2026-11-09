@@ -33,6 +33,12 @@ use super::timeout_provenance::SourceTimeoutState;
 #[path = "decoder_reservation.rs"]
 mod decoder_reservation;
 pub(in crate::runtime) use decoder_reservation::SourceDecoderReservation;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+pub(in crate::runtime) use decoder_reservation::SourceXzDecoder;
 
 #[cfg(all(
     target_os = "linux",
