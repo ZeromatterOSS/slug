@@ -1,0 +1,574 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "7a975adeaf56239433d17d9e928f34221eeab907",
+  "status": "INVESTIGATION_COMPLETE_CAUSE_UNREPRODUCED",
+  "scope": "Feature/test-only borrowed32-cause static Registration classifier and strictly parsed optional reduced-observer harness. No semantic fix, native permission, request identity, cap or production activation change. No standalone diagnostic main commit selected.",
+  "source_pins": [
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests.rs",
+      "sha256": "4822323a645eae4c444e6cb6144d8ceecc09054f1258739d73bbf16459203f55"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_diagnostic.rs",
+      "sha256": "86b470b716d898b56af00281acacc039994491d953f83c31eebda8f3c46edfee"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_diagnostic/terminal_leaf.rs",
+      "sha256": "2ce0c49e85852f820f43cc68fc67628f71734d9a7349b5265dcc30360b175faa"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_diagnostic_tests.rs",
+      "sha256": "7b428989d1f06e5d2d49b23937e60b967c8e29582228632f737afd247e61f1f2"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_diagnostic_tests/terminal_leaf_tests.rs",
+      "sha256": "dac0ec6ef6ad078287dacf4d349a3e297e4e22313e0b746f93ba71badecdf082"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_expansion_tests.rs",
+      "sha256": "bfca914e2810baffdce3c3722e56199c37cb726424e8fbcec28ab9a450bfdafe"
+    }
+  ],
+  "review": {
+    "classifier_design": "ACCEPT",
+    "classifier_source": "ACCEPT subject to actual leaf capture",
+    "reduced_observer_design_and_source": "ACCEPT",
+    "artifact_reproduction_and_recurrence": "ACCEPT as diagnostic controls, not causality or semantic repair"
+  },
+  "focused_checks": {
+    "loading": 18,
+    "core_current": 10,
+    "core_initial": 9,
+    "note": "Initial9 is superseded by current10, not added to passed total."
+  },
+  "source_audit": {
+    "source": "app/slug_loading_v2/src/registration_diagnostic/terminal_leaf.rs",
+    "sha256": "2ce0c49e85852f820f43cc68fc67628f71734d9a7349b5265dcc30360b175faa",
+    "static_tags": 110,
+    "max_tag_bytes": 41,
+    "max_full_field_bytes": 61,
+    "ascii_lowercase_underscore_tags": true,
+    "forbidden_tokens_absent": [
+      "format!",
+      "write!",
+      "write_str",
+      "to_string",
+      "clone(",
+      ".message(",
+      ".family(",
+      ".row(",
+      "selected_frontier",
+      "std::fs",
+      "Vec<",
+      "HashMap"
+    ],
+    "unchanged_formatter_parent_after_removing_wire": true,
+    "scope": "Mechanical source audit supplements source review; absence of tokens alone is not semantic proof."
+  },
+  "captures": [
+    {
+      "name": "registration-leaf-original-rust",
+      "core_sha256": "e2478a084c02f266110ae59e07f88d7cf88e7e97e453e1bcf4f970bdc27cac65",
+      "cli_sha256": "f21d7389c9a66f1f5510be5bff4072efcec27f3ac83163b9b9e05557b790ac73",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "elapsed_seconds": 27.091117350006243,
+      "cycles": 818,
+      "result": {
+        "status": "driver_refusal",
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        }
+      },
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "trace_truncated": true,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "profile_enabled": true
+    },
+    {
+      "name": "registration-leaf-original-rust-warm-repeat",
+      "core_sha256": "e2478a084c02f266110ae59e07f88d7cf88e7e97e453e1bcf4f970bdc27cac65",
+      "cli_sha256": "f21d7389c9a66f1f5510be5bff4072efcec27f3ac83163b9b9e05557b790ac73",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "elapsed_seconds": 27.11153687600745,
+      "cycles": 821,
+      "result": {
+        "status": "driver_refusal",
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        }
+      },
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "trace_truncated": true,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "profile_enabled": true
+    },
+    {
+      "name": "registration-leaf-terminal-only-rust",
+      "core_sha256": "c8d415c1b4a9c02c93569b139ab698e70f0abd2958cb20ccb373a54991b09558",
+      "cli_sha256": "f21d7389c9a66f1f5510be5bff4072efcec27f3ac83163b9b9e05557b790ac73",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "elapsed_seconds": 27.092252351998468,
+      "cycles": 834,
+      "result": {
+        "status": "driver_refusal",
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        }
+      },
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "trace_truncated": true,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "profile_enabled": false
+    },
+    {
+      "name": "registration-leaf-prior-cli-rust",
+      "core_sha256": "c8d415c1b4a9c02c93569b139ab698e70f0abd2958cb20ccb373a54991b09558",
+      "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "elapsed_seconds": 27.10852700700343,
+      "cycles": 825,
+      "result": {
+        "status": "driver_refusal",
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        }
+      },
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "trace_truncated": true,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "profile_enabled": true
+    },
+    {
+      "name": "registration-leaf-exact-prior-artifacts-rust",
+      "core_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920",
+      "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "elapsed_seconds": 27.092349910002667,
+      "cycles": 805,
+      "result": {
+        "status": "driver_refusal",
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        }
+      },
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "trace_truncated": true,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "profile_enabled": true
+    }
+  ],
+  "findings": [
+    "No actual terminal leaf was observed in these five runs; all stop at unchanged27-second WorkDeadline with exact cleanup.",
+    "Byte-identical prior Core264266... and CLI8ff5... also fail to reproduce earlier opaque error. Its cause remains unknown; old evidence is retained, not invalidated.",
+    "Reduced observer still retains Trace/Census/native counters; outcomes do not prove observer causality, speed, memory fit or public Rust success.",
+    "CLI8ff prior artifact reproduced exactly by temporary removal of only default-disabled classifier wire; exact candidate restored before native. Current CLI restored by fresh default build afterward.",
+    "Initial /tmp artifact copy hit quota; only its incomplete new copy was removed. Current-turn artifact copies moved to workspace target storage, preserving hashes and accepted artifacts."
+  ],
+  "raw_receipts": [
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-loading-build-result.json",
+      "sha256": "90c268bfaf57f5341338e6b2b9aeb762929b3256ac7e9171d81a6ec8d64382b6"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-loading-tests.json",
+      "sha256": "ca8ba240e0a2b7e159dde05104c3b5221d86ab52eaa04fb196b599d675ca5653"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-core-build-result.json",
+      "sha256": "e9b89e719bad2e01e771cf9efaabf1a3a3a4dc0cfbc2392ba8e4cf99012624fb"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-core-tests.json",
+      "sha256": "7e5eb134c2120f47fec404f3ab585a00a6ea77390efe5d5a547b12055c2f3fd4"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-terminal-core-build-result.json",
+      "sha256": "c5a413833f70fd8e2ae45e9cf852b5ee665d0de2b3577c3e86e0d8d2bfc0db5e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-terminal-core-tests.json",
+      "sha256": "997540b5e1546fd2c85a9b45a4e0c73b9176b668621688b73cc615b76aee3d7d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-cli-build-result.json",
+      "sha256": "b5254ebcbe55b39c79a7a0f0396d63f6f83b7b27ae30c57cbb20e94e7bf8b039"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-source-audit.json",
+      "sha256": "1686ee25585bdef548c122de092ccdca7e0e50cdaa0768cbea3f50f626490dae"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-native-freeze.json",
+      "sha256": "6d620018971cf9472047fb621f001abfba29430070b138b3686bf0beb7bc1aee"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-capture-summary.json",
+      "sha256": "a7c7631e727b591aec476d3db167554a0321942410b5a6dddc6233102d3fb746"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-warm-capture-summary.json",
+      "sha256": "3f28527b069dbb2ad90bc2ffa4f407082b35642c0faeadf426b17c32afc5ff4a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-terminal-freeze.json",
+      "sha256": "3d8f0239b5086b3442351e3e72e5e92d50e346c699d3031982cfe5814f01a1d1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-terminal-capture-summary.json",
+      "sha256": "98252a8ea8654fe9891c605e3f5a09594abe26ee7da36a1df1aa424c3e2dcd58"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-cli-reproduction.json",
+      "sha256": "3a076ef360160256d2716e7435effa4930fb671b001e15ee567927062edb58b1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-reproduced-cli-build-result.json",
+      "sha256": "47bf999889b32684b36175e910dc2d6269dcf0a5a05277ce4154778bf56c17b3"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-restored-cli-build-result.json",
+      "sha256": "efb4b2ade0a98f92d28c51532c3577fdc208112e90f0916a36c1d01feea6cca8"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-prior-cli-freeze.json",
+      "sha256": "446547b65506d20e02a5c63fd996331cf320beb1f5e2968c75884c9508016e34"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-prior-cli-capture-summary.json",
+      "sha256": "1b81fe58a735158cce872527d6bc2e868002bcd3aa2dcc516a6a1072e7316c2d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-exact-prior-capture-summary.json",
+      "sha256": "d5e2c3b8cd965bd6a72e77cab80d69434db461d26932e3e8ff93c7800d2d054c"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-core-preservation.json",
+      "sha256": "0ec3f5268336224aa15601ff9b8342f290c959b0ad3b9ca33a32a37579d8c2ee"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-terminal-core-preservation.json",
+      "sha256": "ef4374fbd880c8d0e26ee83970816317f86592ec57431654966e395faf218637"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-original-rust.json",
+      "sha256": "8c469f377331c0ae65f41c5bbbf09d7de2a2ce4c97c74801a2e8ca9ab9b15ef9"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-original-rust-warm-repeat.json",
+      "sha256": "fb658c0b9f1e61092b4a1238ead2744e89936cb325a8ce20291d9f643993eb1d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-terminal-only-rust.json",
+      "sha256": "df4df15e735897081d051ef9bf55f506d99096b90d879111d6516d75e570432d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-prior-cli-rust.json",
+      "sha256": "4a58dde8b6ca81efb5aef8904cafbbb06c356191a127506ad343104f0ea49dab"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/registration-leaf-exact-prior-artifacts-rust.json",
+      "sha256": "608b0b90eb6ca5c2ccc3cfc94029efeb86f8125946e52a245e06d5f2a9768cab"
+    }
+  ],
+  "remaining": [
+    "Original Rust success/Archive closure and actual generic behavior repair",
+    "Equivalent completed-command memory/latency and General activation gates"
+  ],
+  "next": "Stop recurrence variants. Obtain bounded userspace IP attribution for the current fixed-deadline owner, select a causal discriminator and implement a reusable general fix. Keep diagnostic work local/coupled; no API inference from private or absent errors.",
+  "landing_scope": "Bounded classifier/reduced-observer tools may land only coupled to the independently proved shared-path ordering change. Diagnostic bounds are tested; the actual original Registration leaf and semantic repair remain unproved/deferred. This is not a standalone instrumentation milestone."
+}

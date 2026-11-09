@@ -34,6 +34,9 @@ use crate::module_extension_repository_validation::PrivateOwnerCertificateError 
 use crate::root_repository_load_route::HostRootRepositoryLoadRouteError;
 use crate::root_repository_load_route::RootLoadDiagnostic;
 
+#[cfg(any(test, feature = "native-probe-observer"))]
+mod terminal_leaf;
+
 const LIMIT: usize = 3072;
 const OUTPUT_STOP: &str = "[diagnostic incomplete: output limit]";
 const DEPTH_STOP: &str = "[diagnostic incomplete: depth limit]";

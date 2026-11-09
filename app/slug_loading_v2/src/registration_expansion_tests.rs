@@ -147,6 +147,9 @@ async fn registration_diagnostic_natural_selection_and_mapping_boundaries() {
         let error = crate::ModuleRegistrationExpansionError::diagnostic_test(kind);
         let text = error.diagnostic().to_string();
         assert!(text.ends_with(&format!("[diagnostic incomplete: {owner}]")) && !text.contains("POISON"));
+        assert_eq!(error.terminal_leaf(), if owner == "Selected" {
+            "registration_selected_opaque"
+        } else { "registration_root_mapping_opaque" });
     }
     let LoadingPreparationOutcome::Complete(builtin) = tx.compute(
         &HostBuiltinBazelToolsRepositoryMappingKey::new(workspace())).await.unwrap() else { panic!("Need") };
@@ -160,6 +163,7 @@ async fn registration_diagnostic_natural_selection_and_mapping_boundaries() {
                 canonical_repo: CanonicalRepoName::new("bazel_tools").unwrap(),
                 kind: crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind::Route(route) }));
     assert!(error.diagnostic().to_string().ends_with("Route bazel_tools: [diagnostic incomplete: Builtin]"));
+    assert_eq!(error.terminal_leaf(), "route_builtin_opaque");
 }
 
 #[tokio::test]
@@ -181,8 +185,10 @@ async fn registration_diagnostic_natural_canonical_boundaries() {
         let text = error.diagnostic().to_string();
         if owner == "CanonicalPackage" {
             assert!(text.ends_with("CanonicalPackage: Parse @@dep+//") && !text.contains("POISON"));
+            assert_eq!(error.terminal_leaf(), "repository_package_leaf_opaque");
         } else {
             assert!(text.ends_with(&format!("[diagnostic incomplete: {owner}]")) && !text.contains("POISON"));
+            assert_eq!(error.terminal_leaf(), "registration_canonical_subtree_opaque");
         }
     }
 }

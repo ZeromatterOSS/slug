@@ -3,9 +3,32 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: homogeneous FileBytes prerequisite discovery beneath registration
-rows and repository BUILD imports in original `rules-rust-073-toolchain-owner`
-`cquery //pkg:probe` with its nightly setting. The
+Current delta: avoid repeated full ordering of the same immutable path owner in
+original `rules-rust-073-toolchain-owner` `cquery //pkg:probe`. The
+[shared-path receipt](wp1225-shared-path-order-acceptance-2026-11-09.json)
+records actual PathObservationKey returned-Need RED64→GREEN0 full comparisons,
+with exact std fallback for independent owners. All 230 ordinary checks, five
+native guards and four warm compiler commands pass; final review accepts this bounded component.
+No field, constructor, Hash/SHA stream, layout, Image credit or native limit changes.
+Only the identical Arc path slot returns Equal early; every remaining Demand
+field and independent-owner value stays authoritative.
+
+ABBA cycles921/927/927/924 all stop at the unchanged WorkDeadline. Last recorded
+epochs are55 roots and131/137/137/134 records; traces truncate at128 events.
+Cleanup is exact. Those differing prefixes prove no command speed, successful
+Rust analysis, whole RSS or activation. Shared IP samples identify candidate
+work, not universal attribution to this one boundary.
+
+The [Registration investigation](wp1225-registration-leaf-investigation-2026-11-09.json)
+retains bounded privacy/depth-tested diagnostic tools in this same general fix.
+The original opaque error did not recur in five captures, including exact prior
+Core/CLI artifacts; its typed leaf and any API repair remain unproved/deferred.
+No diagnostic-only milestone, private-text parsing, caller pruning, new cache or
+cap increase is selected. Next identify the remaining measured owner and prove
+its demanded reusable behavior toward Rust/archive closure.
+
+The accepted homogeneous FileBytes discovery beneath registration rows and
+repository BUILD imports retains its nightly-input proof. The
 [component receipt](wp1225-file-bytes-lookahead-acceptance-2026-11-09.json)
 records actual Inventory/Module/Command A-only→A+B recovery, 89 ordinary checks,
 five native guards and four warm compiler commands. Independent final review
@@ -23,9 +46,9 @@ Original ABBA cycles are 198/189/189/198. All four reach the static outer catego
 `analysis_registration_opaque`; last recorded epochs are 8 roots/15 records,
 with truncated 128-event traces. Both candidates show a process-wide installed
 unique extension from false→true; this alone proves neither servicing nor
-success. Cleanup is exact. Next classify the retained typed Registration leaf
-with a bounded discriminant-only walk, then implement its demanded general
-behavior. Do not parse private messages or presume an API repair. No standalone
+success. Cleanup is exact. The bounded classifier is available if that error
+recurs; its cause remains deferred. Do not parse private messages or presume an
+API repair. No standalone
 diagnostic integration, clock/cap increase, General activation, successful
 public Rust cquery or equivalent-command latency/RSS gate closes.
 

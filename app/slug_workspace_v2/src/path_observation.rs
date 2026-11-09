@@ -37,6 +37,9 @@ mod union;
 #[cfg(test)]
 mod demand_hash_tests;
 
+#[cfg(test)]
+mod shared_path_order_tests;
+
 /// A structural path computation result.
 ///
 /// `Need` is transient scheduling state. It deliberately has no Rust equality:
@@ -181,9 +184,54 @@ impl std::error::Error for PathNormalizationError {}
 ///
 /// Construction performs no filesystem IO. Parent traversal clamps at the
 /// filesystem root, not at a workspace or repository boundary.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub struct NormalizedAbsolutePath {
     path: Arc<PathBuf>,
+}
+
+impl Ord for NormalizedAbsolutePath {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        let Self { path } = self;
+        let Self { path: other_path } = other;
+        if Arc::ptr_eq(path, other_path) {
+            return Ordering::Equal;
+        }
+        // Pinned alloc/src/sync.rs Arc::cmp dereferences both owners; retain
+        // that exact PathBuf order rather than ordering allocation addresses.
+        #[cfg(test)]
+        record_path_order_fallback_for_test();
+        path.as_ref().cmp(other_path.as_ref())
+    }
+}
+
+impl PartialOrd for NormalizedAbsolutePath {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+// Test-local work evidence only. Sample synchronously on one thread, outside
+// DICE awaits; this is neither a process-wide probe nor retained path state.
+#[cfg(test)]
+std::thread_local! {
+    static PATH_ORDER_FALLBACKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn record_path_order_fallback_for_test() {
+    PATH_ORDER_FALLBACKS.with(|count| count.set(count.get().saturating_add(1)));
+}
+
+#[cfg(test)]
+fn reset_path_order_fallbacks_for_test() {
+    PATH_ORDER_FALLBACKS.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+fn path_order_fallbacks_for_test() -> usize {
+    PATH_ORDER_FALLBACKS.with(std::cell::Cell::get)
 }
 
 impl NormalizedAbsolutePath {

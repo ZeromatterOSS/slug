@@ -556,7 +556,17 @@ fn analysis_terminal_leaf(kind: &AnalysisErrorKind) -> &'static str {
         AnalysisErrorKind::TargetNotFound { .. } => "analysis_target_not_found",
         AnalysisErrorKind::ExecutableRuleMissingExecutable { .. } => "analysis_executable_missing",
         AnalysisErrorKind::Message(_) => "analysis_message_opaque",
-        AnalysisErrorKind::Registration(_) => "analysis_registration_opaque",
+        AnalysisErrorKind::Registration(error) => {
+            #[cfg(feature = "native-probe-observer")]
+            {
+                error.error().terminal_leaf()
+            }
+            #[cfg(not(feature = "native-probe-observer"))]
+            {
+                let _ = error;
+                "analysis_registration_opaque"
+            }
+        }
     }
 }
 
@@ -581,6 +591,20 @@ fn file_bytes_discovery_report(before: bool, after: bool) -> Value {
         "request_isolated": false,
         "is_servicing_evidence": false,
     })
+}
+
+fn terminal_capture_mode(value: Option<&std::ffi::OsStr>) -> Result<bool, &'static str> {
+    match value {
+        None => Ok(false),
+        Some(value) if value == "0" => Ok(false),
+        Some(value) if value == "1" => Ok(true),
+        Some(_) => Err("invalid terminal capture mode"),
+    }
+}
+
+#[cfg(feature = "native-probe-observer")]
+fn reduced_profile_report() -> Value {
+    json!({"enabled":false,"purpose":"typed_terminal_capture"})
 }
 #[derive(Clone)]
 struct ObservedCquery {
@@ -815,6 +839,13 @@ fn verify_inputs(config: &Value, workspace: &Path) {
 #[test]
 #[ignore = "one genuine original Rust cquery diagnostic; source-only staged input JSON and finite native supervisor required"]
 fn native_original_rust_toolchain_cquery_frontier() {
+    let terminal_only =
+        terminal_capture_mode(std::env::var_os("SLUG_NATIVE_RUST_TERMINAL_ONLY").as_deref())
+            .expect("terminal capture configuration");
+    assert!(
+        !terminal_only || cfg!(feature = "native-probe-observer"),
+        "terminal capture requires the classifier feature"
+    );
     #[cfg(feature = "native-probe-observer")]
     let file_bytes_before = slug_loading_v2::file_bytes_lookahead_extended();
     let config_path =
@@ -826,7 +857,11 @@ fn native_original_rust_toolchain_cquery_frontier() {
     let mut runtime =
         WorkspaceRuntime::new(workspace, crate::runtime::ProcessHostOwner::native()).unwrap();
     #[cfg(feature = "native-probe-observer")]
-    let phase_profile = phase_profile::InstalledProfile::attach(&mut runtime).unwrap();
+    let phase_profile = if terminal_only {
+        None
+    } else {
+        Some(phase_profile::InstalledProfile::attach(&mut runtime).unwrap())
+    };
     assert!(runtime.source_scope().is_none());
     let resources = bank();
     let baseline = resources.snapshot().retained_bytes;
@@ -914,8 +949,12 @@ fn native_original_rust_toolchain_cquery_frontier() {
             file_bytes_before,
             slug_loading_v2::file_bytes_lookahead_extended(),
         );
-        report["phase_profile"] = phase_profile.finish();
-        report["progress_wall"] = trace.lock().unwrap().progress_wall.summary();
+        if let Some(phase_profile) = phase_profile {
+            report["phase_profile"] = phase_profile.finish();
+            report["progress_wall"] = trace.lock().unwrap().progress_wall.summary();
+        } else {
+            report["phase_profile"] = reduced_profile_report();
+        }
         assert!(
             report["phase_profile"].to_string().len() + report["progress_wall"].to_string().len()
                 < PHASE_BYTES
@@ -935,6 +974,37 @@ fn native_original_rust_toolchain_cquery_frontier() {
     assert!(encoded.len() + overhead <= TRACE_BYTES);
     println!("WP425_RUST_FRONTIER {encoded}");
     println!("WP425_RUST_CLEANUP {cleanup}");
+}
+
+#[test]
+fn terminal_capture_mode_is_strict_and_never_echoes_private_values() {
+    use std::ffi::OsStr;
+
+    assert_eq!(terminal_capture_mode(None), Ok(false));
+    assert_eq!(terminal_capture_mode(Some(OsStr::new("0"))), Ok(false));
+    assert_eq!(terminal_capture_mode(Some(OsStr::new("1"))), Ok(true));
+    for value in ["", "false", "true", "01", "PRIVATE\0λ"] {
+        assert_eq!(
+            terminal_capture_mode(Some(OsStr::new(value))),
+            Err("invalid terminal capture mode")
+        );
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        assert_eq!(
+            terminal_capture_mode(Some(OsStr::from_bytes(&[0xff]))),
+            Err("invalid terminal capture mode")
+        );
+    }
+    #[cfg(feature = "native-probe-observer")]
+    {
+        let report = reduced_profile_report();
+        assert_eq!(report.as_object().unwrap().len(), 2);
+        assert_eq!(report["enabled"], false);
+        assert_eq!(report["purpose"], "typed_terminal_capture");
+        assert!(report.to_string().len() < PHASE_BYTES);
+    }
 }
 
 #[test]

@@ -124,10 +124,18 @@ Actual A-only→A+B recovery, 89 ordinary checks, five native guards and four wa
 originals pass; independent final review accepts the component. Existing controls/native caps remain.
 Both candidate original captures record an installed unique extension. ABBA
 cycles198/189/189/198 all reach `analysis_registration_opaque`, with last recorded
-8 roots/15 records and truncated traces. Next classify that retained typed leaf
-without private text, then implement its demanded general behavior. These
-results prove no identical full error, servicing, successful Rust cquery,
-latency/RSS or activation.
+8 roots/15 records and truncated traces. A later local bounded classifier passes
+its privacy/depth/custody checks, but current captures and the exact prior
+artifact control reach WorkDeadline without reproducing that error. The
+[current packet](./slug-v2-subplans/current-packet.md) now joins the
+[shared-path ordering component](./slug-v2-subplans/wp1225-shared-path-order-acceptance-2026-11-09.json):
+actual returned-Need full comparisons fall64→0 for an identical immutable owner,
+with full std fallback, Hash/SHA/layout and native authority preserved. All230
+ordinary checks, five native guards and four warm originals pass; independent
+final review accepts the component. ABBA921/927/927/924 remains WorkDeadline with differing recorded
+prefixes and exact cleanup. Diagnostic tools stay bounded; the original error
+cause/API repair remains deferred. Next select the remaining measured owner.
+These results prove no successful Rust cquery, command latency/RSS or activation.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

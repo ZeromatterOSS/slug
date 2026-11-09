@@ -1678,6 +1678,68 @@ Rust completion remain unproved. Next use retained typed discriminants without
 rendering or parsing payloads. Diagnostic work stays coupled to demanded generic
 behavior, with no separate diagnostic-only integration or cap increase.
 
+### Bounded typed Registration failure projection
+
+The current original Rust failure retains an Analysis Registration wrapper.
+Classify its borrowed causal variants before selecting the demanded generic
+repair. A feature/test-only hidden Loading getter returns one fixed ASCII tag;
+it changes no retained error, equality, DICE key, validity, event or source owner.
+Use at most 32 inspected cause nodes including the initial Registration envelope.
+Each Factored/Child wrapper consumes a step; exhaustion returns a fixed depth tag.
+Match existing borrowed Node/diagnostic views without allocation, cloning, IO,
+collection scans, labels, messages, plans, predecessors or success data. Never
+call the presentation walker, Display/write helpers or recursive frontier lookup.
+A private or flattened boundary remains explicitly opaque until a narrow typed
+producer view is justified by the actual capture; infer no missing API from text.
+
+Keep each static tag within 64 ASCII bytes and its complete terminal_leaf JSON
+field within the existing 96-byte reserve. Core uses the hidden getter only for
+native-probe-observer; default projection remains opaque. Keep all aggregate,
+phase, native, work/cleanup and stream caps unchanged. Reuse natural wrapper,
+privacy/poison, Arc custody and exact 32/33-node depth fixtures, then capture one
+actual original command under the existing immutable inputs and supervisor.
+Couple this instrumentation to the source-derived demanded generic behavior;
+no diagnostic-only main integration or activation is selected.
+
+The private ignored probe may use a strictly parsed terminal-only toggle to omit
+only the optional InstalledProfile observer attachment/finish. Default profiling
+stays unchanged; the classifier feature, Trace/Census and native progress/credit
+counters remain active. Reduced mode is explicitly reported as enabled:false
+with a fixed purpose; unavailable observer interval/DICE-family metrics are
+absent rather than zero. Preserve the existing phase/aggregate reservations,
+request/configuration/environment inputs, 27+3 clocks, admission and cleanup.
+This tests instrumentation headroom; a different reached prefix or leaf proves
+neither observer causality for an earlier error nor speed/RSS or Rust success.
+
+### Shared immutable path ordering
+
+The current bounded userspace IP profile exposes shared standard-library path
+comparison work, not a complete owner attribution. Select only the natural
+NormalizedAbsolutePath ordering boundary reached by real observation-demand
+sorting/union. Its private Arc<PathBuf> is immutable and only borrowed as Path.
+Pinned Arc::Ord always invokes PathBuf::cmp, even for the same allocation.
+Use Arc::ptr_eq only as a sufficient Equal witness for that one path slot;
+otherwise invoke the exact original PathBuf::cmp. PartialOrd delegates to cmp.
+Keep derived Eq, Hash, Debug, Clone/Dupe and Allocative, all storage/constructors,
+OS-native ordering, raw UTF-16 and subsequent Demand fields unchanged. Add no
+cache, interner, field, native probe, permission or resource-cap change.
+
+Before implementation acceptance, an actual PathObservationKey returned Need
+must retain its original path owner. For 64 same-owner path/returned-demand
+comparisons, old-equivalent fallback work is RED64→GREEN0. Independently owned
+equal/different paths still take the full comparison and agree with std order;
+operation/namespace/raw-input/Image distinctions survive shared path identity.
+Private cfg(test)-only thread-local accounting measures deep fallback calls,
+not components, bytes, time or native request totals. Preserve full Hash streams,
+pinned workspace/config SHA bytes, layout and Image last-owner refunds. Validate
+named direct dependents and protected native/warm originals before integration.
+Balanced stopped prefixes and bounded codegen qualify cost and do not prove
+whole-command latency, RSS, successful Rust analysis or activation. Other Path
+users and distinct owners retain the original work.
+The [component receipt](wp1225-shared-path-order-acceptance-2026-11-09.json)
+records the accepted work boundary, preservation audits and native evidence;
+it does not close the unreproduced Registration cause or whole-command gates.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

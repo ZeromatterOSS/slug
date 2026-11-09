@@ -2,6 +2,17 @@
 
 ## WP425 rooted repository consumers
 
+Shared immutable path ordering reuses the existing Arc<PathBuf> owner and
+constant-time pointer comparison as a sufficient equality witness for one path
+slot. The exact old PathBuf ordering remains the fallback; no donor import,
+retained field, pool, interner or cached hash is introduced. Full Eq/Hash streams,
+semantic identities, positive existing path/row charges and last-owner lifetimes
+remain unchanged. Test-only closed-thread fallback accounting establishes a
+narrow work discriminator, separately from IP self samples and command/RSS gates.
+The [shared-path receipt](wp1225-shared-path-order-acceptance-2026-11-09.json)
+records actual producer-returned path ownership, exact independent-owner/OS/
+Image controls, no layout or Hash/SHA change and protected native proof.
+
 Homogeneous FileBytes discovery reuses the existing full-demand Arc union and
 Buck2-derived compact maps for a bounded attempt-local frontier. Sequential
 tracked metadata lookups retain only an aggregate known-byte scalar. Synchronous

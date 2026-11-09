@@ -2,6 +2,9 @@ use std::sync::Arc;
 
 use super::*;
 
+#[path = "registration_diagnostic_tests/terminal_leaf_tests.rs"]
+mod terminal_leaf_tests;
+
 fn render_node(node: Node<'_>) -> String {
     let mut out = Buffer::new();
     let result = walk(&mut out, node);
