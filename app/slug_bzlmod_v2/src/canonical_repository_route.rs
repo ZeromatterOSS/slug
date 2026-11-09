@@ -16,6 +16,7 @@ use compact_str::CompactString;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
 
 use crate::BuiltinBazelToolsRouteIdentity;
@@ -27,6 +28,9 @@ use crate::HostRepositoryLocalPathPolicy;
 use crate::HostSelectedExtensionOwner;
 use crate::OverrideAttributeValue;
 use crate::RepoSpec;
+
+#[cfg(test)]
+mod hash_tests;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
@@ -66,12 +70,35 @@ struct HostCanonicalGeneratedRepositoryRoute {
 /// The apparent names inside a repository mapping are contextual lookup keys;
 /// no root-apparent alias participates in this route's own identity.
 #[doc(hidden)]
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct HostCanonicalRepositoryRoute {
     workspace: NormalizedAbsolutePath,
     canonical_repo: CanonicalRepoName,
     source: HostCanonicalRepositoryRouteSource,
+    cached_hash: u64,
 }
+
+impl PartialEq for HostCanonicalRepositoryRoute {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            workspace,
+            canonical_repo,
+            source,
+            cached_hash: _,
+        } = self;
+        let Self {
+            workspace: other_workspace,
+            canonical_repo: other_canonical_repo,
+            source: other_source,
+            cached_hash: _,
+        } = other;
+        workspace == other_workspace
+            && canonical_repo == other_canonical_repo
+            && source == other_source
+    }
+}
+
+impl Eq for HostCanonicalRepositoryRoute {}
 
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy)]
@@ -97,33 +124,51 @@ impl<'a> HostGeneratedRepositoryEffectSeed<'a> {
 }
 
 impl HostCanonicalRepositoryRoute {
+    // The route and all reachable semantic fields are immutable after this
+    // constructor. This weak hash routes lookups; equality still checks every
+    // original field. Allocative includes the inline cached scalar.
+    fn new(
+        workspace: NormalizedAbsolutePath,
+        canonical_repo: CanonicalRepoName,
+        source: HostCanonicalRepositoryRouteSource,
+    ) -> Self {
+        let mut route = Self {
+            workspace,
+            canonical_repo,
+            source,
+            cached_hash: 0,
+        };
+        let mut hasher = StarlarkHasher::new();
+        route.hash_fields(&mut hasher);
+        route.cached_hash = hasher.finish();
+        route
+    }
+
     pub fn from_selected(
         workspace: NormalizedAbsolutePath,
         definition: HostCanonicalSelectedModuleDefinition,
     ) -> Self {
         let canonical_repo = definition.view().canonical_repo().clone();
-        Self {
+        Self::new(
             workspace,
             canonical_repo,
-            source: HostCanonicalRepositoryRouteSource::Selected(definition),
-        }
+            HostCanonicalRepositoryRouteSource::Selected(definition),
+        )
     }
 
     pub fn builtin(
         workspace: NormalizedAbsolutePath,
         mapping: HostBuiltinBazelToolsRepositoryMapping,
     ) -> Self {
-        Self {
+        Self::new(
             workspace,
-            canonical_repo: CanonicalRepoName::new("bazel_tools")
+            CanonicalRepoName::new("bazel_tools")
                 .expect("the pinned built-in canonical repository name is valid"),
-            source: HostCanonicalRepositoryRouteSource::Builtin(
-                HostCanonicalBuiltinRepositoryRoute {
-                    identity: BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
-                    mapping,
-                },
-            ),
-        }
+            HostCanonicalRepositoryRouteSource::Builtin(HostCanonicalBuiltinRepositoryRoute {
+                identity: BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
+                mapping,
+            }),
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -143,20 +188,18 @@ impl HostCanonicalRepositoryRoute {
         {
             return None;
         }
-        Some(Self {
+        Some(Self::new(
             workspace,
             canonical_repo,
-            source: HostCanonicalRepositoryRouteSource::Generated(
-                HostCanonicalGeneratedRepositoryRoute {
-                    owner,
-                    ordinal,
-                    internal_name: internal_name.into(),
-                    repo_spec,
-                    mapping_context,
-                    mapping: Arc::new(mapping),
-                },
-            ),
-        })
+            HostCanonicalRepositoryRouteSource::Generated(HostCanonicalGeneratedRepositoryRoute {
+                owner,
+                ordinal,
+                internal_name: internal_name.into(),
+                repo_spec,
+                mapping_context,
+                mapping: Arc::new(mapping),
+            }),
+        ))
     }
 
     pub fn view(&self) -> HostCanonicalRepositoryRouteView<'_> {
@@ -383,6 +426,12 @@ fn hash_mapping<H: Hasher>(mapping: impl Iterator<Item = (impl Hash, impl Hash)>
 
 impl Hash for HostCanonicalRepositoryRoute {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cached_hash.hash(state);
+    }
+}
+
+impl HostCanonicalRepositoryRoute {
+    fn hash_fields<H: Hasher>(&self, state: &mut H) {
         self.workspace.hash(state);
         self.canonical_repo.hash(state);
         self.view().kind().hash(state);

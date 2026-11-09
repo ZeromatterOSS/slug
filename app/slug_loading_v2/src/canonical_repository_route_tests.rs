@@ -1050,6 +1050,35 @@ ext=module_extension(implementation=impl)
         assert_eq!(route_hash(&first), route_hash(&warm));
         assert!(!HostCanonicalRepositoryRouteKey::equality(&first, &changed));
         assert_ne!(route_hash(&first), route_hash(&changed));
+
+        // These are actual immutable routes from ordinary registry DICE
+        // producers. Repeated routing hashes must read only the cached scalar,
+        // independently of the Spec/mapping payload already owned by the route.
+        #[derive(Default)]
+        struct HashWork {
+            writes: usize,
+            bytes: usize,
+        }
+        impl Hasher for HashWork {
+            fn finish(&self) -> u64 {
+                0
+            }
+            fn write(&mut self, bytes: &[u8]) {
+                self.writes += 1;
+                self.bytes += bytes.len();
+            }
+        }
+        for value in [&first, &warm, &changed] {
+            let mut work = HashWork::default();
+            for _ in 0..64 {
+                route(value).hash(&mut work);
+            }
+            assert_eq!(
+                (work.writes, work.bytes),
+                (64, 64 * std::mem::size_of::<u64>()),
+                "actual route repeated hashes must perform fixed postconstruction work"
+            );
+        }
     }
 
     #[test]

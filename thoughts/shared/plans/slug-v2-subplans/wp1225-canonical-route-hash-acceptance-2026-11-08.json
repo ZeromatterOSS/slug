@@ -1,0 +1,1226 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "3c52e7843bcf37ffedf729cb820a0da8e89249b3",
+  "classification": {
+    "exact_preserved": "All original route structural equality, Spec nested publication order, selected mapping order and source/native authority gates. No new Bazel semantic surface or oracle claim.",
+    "slug_native": "Private immutable weak in-memory routing-hash reuse and positive eight-byte retained layout cost.",
+    "unselected": "Root-route caching, BUILD synopsis reuse, new FileBytes/Archive discovery, Need cacheability and production General activation."
+  },
+  "outcome": "Canonical-route Hash performs fixed postconstruction scalar work while every original semantic field remains retained and compared in full.",
+  "source_pins": [
+    {
+      "file": "app/slug_bzlmod_v2/src/canonical_repository_route.rs",
+      "sha256": "b18407aeac462ccf2f3ce3cd337b1aad001779c421e6cb499a4b22bc5b57f327"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/canonical_repository_route/hash_tests.rs",
+      "sha256": "fd2c7384566af76bbea91919a4db7274d447d569bd027db1938fa38f508983ef"
+    },
+    {
+      "file": "app/slug_loading_v2/src/canonical_repository_route_tests.rs",
+      "sha256": "690f5a8098b76531c39940a380f400a3d23ab6109bd6aa05e13079782ba71d90"
+    },
+    {
+      "file": "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md",
+      "sha256": "41105cd16d2a1abc7f6bfa8481baefabf2020eab0920926072686fd69308811e"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/current-packet.md",
+      "sha256": "e9d207082ba239fa9d27f7fb56d6e8f00f23850a07bfe97a21072e237d12ed7b"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-general-repository-workspace-design.md",
+      "sha256": "ed2800de866276cbae7ca03ad4ae09a16500b3f10f5b6122e4fe3952f420aca4"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md",
+      "sha256": "6afd4b956f518c38de9a8f1d8303da2e539951eaca97d529ebf312ab130e4ceb"
+    }
+  ],
+  "unchanged_reference_pins": [
+    {
+      "file": "app/slug_bzlmod_v2/src/source_preparation/canonical_repository_source.rs",
+      "sha256": "ab8a47244987e00d180d3adb6cfc4afb80bd2430ad017b0cf55c099fe8753380"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_source_snapshot.rs",
+      "sha256": "a77c69582d9bcb649c42b9f8274081e0847476eb2f74f203d000fb7bd5a33066"
+    },
+    {
+      "file": "app/slug_loading_v2/src/canonical_repository_route.rs",
+      "sha256": "c40758e32dda8323555de8a12f88dcc9a9b57232cfe32d7ffa5c16162b74cb65"
+    },
+    {
+      "file": "app/slug_loading_v2/src/canonical_repository_load_route.rs",
+      "sha256": "46cbcade4f54be915ec3254ce8229e40bed0c8334158648746b2e55e59cbfd1d"
+    },
+    {
+      "file": "starlark-rust/starlark_map/src/hashed.rs",
+      "sha256": "766964b37954eeac083c4d1df78793c503a73f06ecf7866282049a76c7ff23e3"
+    },
+    {
+      "file": "starlark-rust/starlark_map/src/hasher.rs",
+      "sha256": "1ca6606297ed08aee229868032577922f23eb525d7f16aa62af81e136fcd4a38"
+    },
+    {
+      "file": "app/slug_loading_v2/src/bzl_environment.rs",
+      "sha256": "73618cbb391534cb4f3fca2859cf1e81dca4ae769b420d33ad2e47e10e6b0c20"
+    },
+    {
+      "file": "docs/developers/dice.md",
+      "sha256": "85ccdb5658acfa95e78166c7bcbdd62f51d6dc28d6f6732ed651ef23cf40ceac"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-package-child-lookahead-acceptance-2026-11-08.json",
+      "sha256": "e464e586400d3d2ee7cf04fe39d46987861d9d0b5da26cde7bd2ce5ebd9fcc0b"
+    }
+  ],
+  "design": {
+    "review": "ACCEPT before implementation; implementation-only, test/source-proof and independent final review ACCEPT.",
+    "threshold_declared_before_measurement": "Every successful immutable route constructor pays the original full structural writer once; every subsequent Hash emits exactly one u64/eight bytes, independent of mapping/Spec size. No allocation, sorting, constructor, cache fill, locking or source IO on Hash/Clone.",
+    "ownership": "Private scalar only. All3 successful constructors delegate to sole private new. Generated rejection precedes construction. Clone carries scalar; no new Arc owner, global cache/interner, native grant or mutable published access.",
+    "equality": "Manual exhaustive original workspace/canonical_repo/source field equality ignores cache. Forced same candidate hash cannot substitute for full equality. No semantic source/history/content body is replaced by a digest.",
+    "ordering": "Top-level Spec attribute membership and Generated mapping retain unordered equality. Nested Spec Map publication/Iterable order and selected mapping order retain existing semantic equality. Existing nested hash writers unchanged.",
+    "native_accounting": "Inline Allocative includes scalar; observed legacy232/current240 bytes. SourceSnapshotRequest projects route fields without retaining route scalar; no explicit route-retaining native byte forecast exists to amend. All source/process/root/metadata/stream/time/native/backing limits unchanged.",
+    "source_proof": {
+      "baseline": "3c52e7843bcf37ffedf729cb820a0da8e89249b3",
+      "original_hash_body_equals_new_full_writer": true,
+      "writer_bytes": 1190,
+      "writer_sha256": "e1445d9e3140192076926b69ac38f07665e0fd24a02c12ed2515bcbb93c1ad3a",
+      "method": "Extract matching brace body of original Hash::hash and candidate hash_fields; exact UTF8 byte equality. Nested writers are outside this unchanged body and unchanged in Git diff."
+    }
+  },
+  "causal_red": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+      "--exact",
+      "canonical_repository_route_tests::tests::selected_registry_route_retains_source_identity_and_hashes_structurally",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.009497579987510107,
+    "selected": 1,
+    "executable_sha256": "cc758389bdcf233428babcd4daf6e29309b01652ae49a353df59caa5e5c3d384",
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-actual-red.json",
+      "sha256": "d4ed0798f6595bc95c17047986204a6ac2eb73154cb0c551d533db611e36b3e1"
+    },
+    "semantic_controls": "Existing actual registry DICE producers and all prior source/equality assertions pass before the new work assertion fails. No synthetic route/source adapter.",
+    "for64calls_outer_hasher": {
+      "baseline_writes": 1664,
+      "baseline_bytes": 20608,
+      "candidate_writes": 64,
+      "candidate_bytes": 512
+    },
+    "qualification": "Counts are outerHasher writes/bytes, not total nested hash calls or elapsed time."
+  },
+  "ordinary_tests": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-29a3d0aab08beaab",
+        "--exact",
+        "canonical_repository_route::hash_tests::cached_route_clone_keeps_only_existing_payload_owners_and_positive_inline_layout",
+        "canonical_repository_route::hash_tests::cached_route_hash_collisions_keep_full_structural_equality_and_lookup",
+        "canonical_repository_route::hash_tests::cached_route_hash_is_fixed_for_all_variants_after_construction",
+        "canonical_repository_route::hash_tests::cached_route_hash_preserves_unordered_membership_and_nested_publication_order",
+        "canonical_repository_route::tests::builtin_route_is_canonical_and_structural",
+        "canonical_repository_route::tests::canonical_route_identity_has_no_apparent_spelling",
+        "canonical_repository_route::tests::generated_route_has_no_associated_module_metadata",
+        "source_preparation::canonical_repository_source::tests::archive_projection_requires_exact_natural_invocation_and_terminal_plan",
+        "source_preparation::canonical_repository_source::tests::delete_only_projection_requires_live_filesystem_realization",
+        "source_preparation::canonical_repository_source::tests::generated_routes_project_owner_cohort_not_repository_identity",
+        "source_preparation::canonical_repository_source::tests::immutable_rule_preflight_preserves_complete_label_identity",
+        "source_preparation::canonical_repository_source::tests::immutable_source_preflight_is_borrowed_and_not_authority",
+        "source_preparation::canonical_repository_source::tests::ordinary_canonical_routes_have_no_compact_group",
+        "source_preparation::canonical_repository_source::tests::original_workspace_projection_requires_full_natural_binding_even_without_operations",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.006724344988469966,
+      "selected": 14,
+      "executable_sha256": "7e03cfefc5d4c29e58645b7fda0b513a13b292f60edabe14467902dad86d9a0f",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-bzlmod-tests.json",
+        "sha256": "9050425e7c2161e27ded47c646add6bb4d3c9e6b8807351956bd3200940eb550"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+        "--exact",
+        "canonical_repository_load_route_tests::tests::admitted_registry_alias_matches_root_adapter_and_deepest_owners",
+        "canonical_repository_load_route_tests::tests::builtin_python_package_load_preserves_selected_targets_and_parent_exports",
+        "canonical_repository_load_route_tests::tests::builtin_route_source_and_listing_use_only_catalog_drivers",
+        "canonical_repository_load_route_tests::tests::cancellation_publishes_no_canonical_package_load_and_recovery_completes",
+        "canonical_repository_load_route_tests::tests::cancellation_publishes_no_canonical_package_source_and_recovery_completes",
+        "canonical_repository_load_route_tests::tests::cancellation_publishes_no_canonical_recursive_bzl_and_recovery_completes",
+        "canonical_repository_load_route_tests::tests::cancellation_publishes_no_load_route_and_recovery_completes",
+        "canonical_repository_load_route_tests::tests::canonical_external_bzl_failures_cycles_and_source_names_are_carrier_exact",
+        "canonical_repository_load_route_tests::tests::canonical_external_load_bypasses_apparent_mapping_and_reuses_self_route",
+        "canonical_repository_load_route_tests::tests::canonical_invocation_display_bounds_unicode_and_retains_typed_owner",
+        "canonical_repository_load_route_tests::tests::canonical_package_load_resolves_mapped_child_route_before_source",
+        "canonical_repository_load_route_tests::tests::complete_canonical_mapping_resolves_and_rejects_missing_apparent_repo",
+        "canonical_repository_load_route_tests::tests::constructor_fail_closed_and_hash_table_covers_keys_dispositions_and_effect_plan",
+        "canonical_repository_load_route_tests::tests::generated_canonical_build_child_need_replays_after_materialization",
+        "canonical_repository_load_route_tests::tests::generated_canonical_build_missing_route_retains_complete_error_identity",
+        "canonical_repository_load_route_tests::tests::generated_canonical_package_build_loads_foreign_canonical_bzl",
+        "canonical_repository_load_route_tests::tests::generated_route_activates_effect_then_shares_canonical_source_owners",
+        "canonical_repository_load_route_tests::tests::keys_are_complete_only_and_retained_shapes_stay_compact_and_apparent_free",
+        "canonical_repository_load_route_tests::tests::local_and_root_adapter_share_materialization_path_and_listing_owners",
+        "canonical_repository_load_route_tests::tests::original_cache_zero_import_has_one_complete_defining_mapping_on_root_and_canonical_routes",
+        "canonical_repository_load_route_tests::tests::original_http_multiple_local_loads_keep_complete_mapping_and_source_first_missing",
+        "canonical_repository_load_route_tests::tests::recursive_mapped_child_need_and_route_errors_stop_before_child_source",
+        "canonical_repository_load_route_tests::tests::request_source_origin_tests::mixed_request_source_routes_build_legacy",
+        "canonical_repository_load_route_tests::tests::request_source_origin_tests::mixed_request_source_routes_build_observed",
+        "canonical_repository_load_route_tests::tests::request_source_origin_tests::mixed_request_source_routes_bzlmod_legacy",
+        "canonical_repository_load_route_tests::tests::request_source_origin_tests::mixed_request_source_routes_bzlmod_observed",
+        "canonical_repository_load_route_tests::tests::root_builtin_external_bzl_promotes_one_public_load_without_changing_its_key",
+        "canonical_repository_load_route_tests::tests::root_request_external_bzl_preserves_exact_source_children",
+        "canonical_repository_load_route_tests::tests::route_need_suppresses_effect_and_generated_error_preserves_route_effect_prefix",
+        "canonical_repository_load_route_tests::tests::selected_child_load_stays_root_and_missing_mapping_activates_no_canonical_route",
+        "canonical_repository_load_route_tests::tests::selected_parent_routes_generated_load_through_canonical_owner",
+        "canonical_repository_load_route_tests::tests::selected_route_terminal_stops_before_effect_and_projection",
+        "canonical_repository_load_route_tests::tests::selected_spec_and_mapping_change_independently_with_a_b_a_restoration",
+        "canonical_repository_load_route_tests::tests::synthetic_need_values_are_transient_and_never_equal",
+        "canonical_repository_load_route_tests::tests::transitive_registry_repo_is_canonical_only_and_reads_shared_source_owners",
+        "canonical_repository_route_tests::tests::builtin_route_uses_complete_selected_mapping_owner",
+        "canonical_repository_route_tests::tests::canonical_route_borrows_nonregistry_selected_view",
+        "canonical_repository_route_tests::tests::canonical_route_selects_before_missing_only_generated_fallback",
+        "canonical_repository_route_tests::tests::complete_scan_rejects_missing_and_duplicate",
+        "canonical_repository_route_tests::tests::composition_branch_matrix_is_missing_only_and_selected_first",
+        "canonical_repository_route_tests::tests::generated_route_capability_is_sibling_usable",
+        "canonical_repository_route_tests::tests::mapping_context_mismatch_precedes_target_lookup",
+        "canonical_repository_route_tests::tests::observed_canonical_repository_apparent_mapping_identity_branch_and_terminal_algebra",
+        "canonical_repository_route_tests::tests::observed_canonical_repository_apparent_mapping_lifecycle_cancellation_and_nonactivation",
+        "canonical_repository_route_tests::tests::observed_canonical_repository_apparent_mapping_real_branches_events_and_parity",
+        "canonical_repository_route_tests::tests::observed_canonical_repository_route_identity_staging_and_terminal_algebra",
+        "canonical_repository_route_tests::tests::observed_canonical_repository_route_lifecycle_cancellation_and_nonactivation",
+        "canonical_repository_route_tests::tests::observed_canonical_repository_route_real_order_events_and_parity",
+        "canonical_repository_route_tests::tests::observed_generated_definition_identity_scan_and_terminal_algebra",
+        "canonical_repository_route_tests::tests::observed_generated_definition_lifecycle_cancellation_and_nonactivation",
+        "canonical_repository_route_tests::tests::observed_generated_definition_real_order_events_and_parity",
+        "canonical_repository_route_tests::tests::predecessor_need_and_error_precede_lookup",
+        "canonical_repository_route_tests::tests::real_apparent_mapping_borrows_effective_target_and_restores",
+        "canonical_repository_route_tests::tests::real_lookup_borrows_exact_definition_and_restores",
+        "canonical_repository_route_tests::tests::selected_registry_route_retains_source_identity_and_hashes_structurally",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.8210903230065014,
+      "selected": 55,
+      "executable_sha256": "fe59b67f4b4447a11bed04d7852697e820625e2600f6e68734e348fc8d8e506a",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-loading-tests.json",
+        "sha256": "2e60681d555de712bcff8d8e3d02bc9c2909983555f45577eb3f6f5eb49ed72f"
+      }
+    }
+  ],
+  "protected_native_guards": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+      "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.9455035099963425,
+    "selected": 4,
+    "core_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a",
+    "cli_sha256": "ef87cd12d761fd5d89337694c19692a8e83d89cf76a92e3b262e3f4f05332760",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "overflow": false,
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-native-guards.json",
+      "sha256": "d4194e29ca816d997bc3809e1db61d6cd3ef74c085cd58f5bd07c10a8cc32b30"
+    }
+  },
+  "protected_original_compiler": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 14.42547470999125,
+    "selected": 1,
+    "executable_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a",
+    "cli_sha256": "ef87cd12d761fd5d89337694c19692a8e83d89cf76a92e3b262e3f4f05332760",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "overflow": false,
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-authentic-warm.json",
+      "sha256": "a4378fdb5f94ed0cd073ee79f4d6f140a7691387ea6cc591d9be7f1e7e559132"
+    },
+    "actual_commands": 4,
+    "scope": "Four original compiler commands on one runtime and unchanged bank; warm ignored selector is1 test, not4 unit tests."
+  },
+  "compile": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 35.29283909899823,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-red-loading-build-result.json",
+        "sha256": "0cc0bc9393e877ca1dd7200b03546945ea6aee49e8d2040ce7af9c71d4128c16"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 43.09950219800521,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-bzlmod-build-result.json",
+        "sha256": "ebea4e11109641a401a9c19cfd0a4541af6266c77d92b6a1287725ff9f4c857d"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 88.85089242699905,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-loading-build-result.json",
+        "sha256": "143a20b84ea3044f1e056efd7abe25517e73e9c500d33850734ce8f537d885fc"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 154.5133825209923,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-core-build-result.json",
+        "sha256": "f134dcdda16e5e035e2b31470020e624f2663659dc33540c996412a8a9538a47"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 98.82181366499572,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-cli-build-result.json",
+        "sha256": "621cf157d4db2d16c54a791641436b4a9e54558172e641f8a8742618eb0d595d"
+      }
+    }
+  ],
+  "control_preservation": {
+    "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+    "preserved_executable": "/tmp/slug-wp425-validation/artifacts/repository-build-control-d0c8f461b8a433cb",
+    "executable_sha256": "d0c8f461b8a433cb5af05830b105fcd58c1803eef37902f84424590a1ddd9c62",
+    "git_head": "3c52e7843bcf37ffedf729cb820a0da8e89249b3",
+    "scope": "accepted package child lookahead baseline preserved before next compilation"
+  },
+  "candidate_preservation": {
+    "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+    "preserved_executable": "/tmp/slug-wp425-validation/artifacts/canonical-route-hash-candidate-4be06cb56e1aae46",
+    "executable_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a"
+  },
+  "cpu_diagnostic": {
+    "method": "perf6.8.12 task-clock:u F199 instruction-pointer samples only; no raw stack, register, environment or callgraph capture. Inherited helpers present and distinguished by DSO. Operational60-second supervisor/8GiBAS/1MiBstreams remain containment, never equivalent RSS proof.",
+    "tool_package": {
+      "file": "/tmp/slug-wp425-validation/perf-tool/linux-tools-6.8.0-139_6.8.0-139.139_amd64.deb",
+      "sha256": "0268e217d58694ba31cdf57740a17c9543609cc2b0436c5db4ae574e02863fa2"
+    },
+    "control_total_samples": 4217,
+    "control_mapping_associated_sip_samples": 206,
+    "control_mapping_associated_sip_share_percent": 4.884989328906806,
+    "attribution": "That Sip writer has two identified direct Map::next callers, both inline-resolved to canonical_repository_route::hash_mapping375. No runtime callchain or proof excluding every indirect/tail reference exists; mapping association is static caller evidence rather than unqualified runtime attribution. Other216Sip samples have many static parents and cannot be apportioned; no stack inference. BUILD syntax reuse was deferred on actual CPU evidence.",
+    "candidate_total_samples": 4086,
+    "candidate_mapping_associated_shared_sip_samples": 1,
+    "candidate_mapping_attributable_sip_sample_range": [
+      0,
+      1
+    ],
+    "candidate_mapping_associated_shared_sip_share_percent_upper_bound": 0.024473813020068527,
+    "construction_qualification": "Candidate mapping-associated Sip writer is shared with OverrideAttributeKey::hash, so 0\u20131 of its single sample is attributable to mapping; mapping closures have zero direct samples. Candidate direct constructor/hash_fields zero samples is below sampling resolution, not zero cost or zero calls. Exact source shows construction pays old fullwriter once; repeated Hash cannot invoke it. Different stopped prefixes prevent normalized CPU/latency or whole-command speed claims.",
+    "next": "Remaining path comparison/hash and demand structural work need their own actual owner and causal discriminator.",
+    "analysis_receipt": {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-cpu-attribution.json",
+      "sha256": "c3b5e8fa978df5c4fdf96c606a06c4ac6522544a11d357935bc9d73ccaeea7fa"
+    }
+  },
+  "rust_abba": [
+    {
+      "side": "a1",
+      "core_sha256": "d0c8f461b8a433cb5af05830b105fcd58c1803eef37902f84424590a1ddd9c62",
+      "cli_sha256": "ef87cd12d761fd5d89337694c19692a8e83d89cf76a92e3b262e3f4f05332760",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "cycles": 681,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_linux_aarch64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_linux_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_win_toolchain_config_repo"
+          }
+        ],
+        "record_count": 95,
+        "roots": 49
+      },
+      "scope_elapsed_seconds": 27.10998289899726,
+      "root_compute_interval": {
+        "aborted": true,
+        "closed_count": 682,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 20959392095,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 128,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 21146916813,
+        "wall_overflow": false
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 473,
+            "kind": "paths",
+            "max_wall_ns": 2847904,
+            "wall_ns": 138323106
+          },
+          {
+            "closed_count": 56,
+            "kind": "repositories",
+            "max_wall_ns": 509202780,
+            "wall_ns": 2697207154
+          },
+          {
+            "closed_count": 8,
+            "kind": "environment",
+            "max_wall_ns": 27130,
+            "wall_ns": 123750
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 144,
+            "kind": "workspaces",
+            "max_wall_ns": 232474150,
+            "wall_ns": 2166399441
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "event_prefix_truncated": true,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-rust-a1.json",
+        "sha256": "a82c8cb9101c8df2f3b461435fd18e4322d16aafc2a884eaacb7d3b47fd0fa49"
+      }
+    },
+    {
+      "side": "b1",
+      "core_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a",
+      "cli_sha256": "ef87cd12d761fd5d89337694c19692a8e83d89cf76a92e3b262e3f4f05332760",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "cycles": 889,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "scope_elapsed_seconds": 27.10598994900647,
+      "root_compute_interval": {
+        "aborted": true,
+        "closed_count": 890,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 19958243190,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 128,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 19854149054,
+        "wall_overflow": false
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 651,
+            "kind": "paths",
+            "max_wall_ns": 2596294,
+            "wall_ns": 240964704
+          },
+          {
+            "closed_count": 65,
+            "kind": "repositories",
+            "max_wall_ns": 530583991,
+            "wall_ns": 3182450611
+          },
+          {
+            "closed_count": 11,
+            "kind": "environment",
+            "max_wall_ns": 14050,
+            "wall_ns": 136190
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 162,
+            "kind": "workspaces",
+            "max_wall_ns": 240996054,
+            "wall_ns": 2531288468
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "event_prefix_truncated": true,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-rust-b1.json",
+        "sha256": "3685c95b354ff7e8f7a5071e832559a3e9f03de734bce27525c06dd8e407c30f"
+      }
+    },
+    {
+      "side": "b2",
+      "core_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a",
+      "cli_sha256": "ef87cd12d761fd5d89337694c19692a8e83d89cf76a92e3b262e3f4f05332760",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "cycles": 884,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "scope_elapsed_seconds": 27.1056553269882,
+      "root_compute_interval": {
+        "aborted": true,
+        "closed_count": 885,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 19985382778,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 128,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 20015341799,
+        "wall_overflow": false
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 646,
+            "kind": "paths",
+            "max_wall_ns": 3189877,
+            "wall_ns": 239770783
+          },
+          {
+            "closed_count": 65,
+            "kind": "repositories",
+            "max_wall_ns": 520448208,
+            "wall_ns": 3017640011
+          },
+          {
+            "closed_count": 11,
+            "kind": "environment",
+            "max_wall_ns": 84720,
+            "wall_ns": 227830
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 162,
+            "kind": "workspaces",
+            "max_wall_ns": 272139696,
+            "wall_ns": 2533876943
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "event_prefix_truncated": true,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-rust-b2.json",
+        "sha256": "ac7ec9364cde815e737cd0e5acf2a28e3671f8a4817e73d32054ac0f51184f4c"
+      }
+    },
+    {
+      "side": "a2",
+      "core_sha256": "d0c8f461b8a433cb5af05830b105fcd58c1803eef37902f84424590a1ddd9c62",
+      "cli_sha256": "ef87cd12d761fd5d89337694c19692a8e83d89cf76a92e3b262e3f4f05332760",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "cycles": 197,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_shell++sh_configure+local_config_shell"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "template",
+            "repository": "rules_cc++cc_configure_extension+local_config_cc_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_tools+winsdk_configure+local_config_winsdk"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_rust++rust+rust_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "platforms+host_platform+host_platform"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_cc++compatibility_proxy+cc_compatibility_proxy"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_version"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_globals"
+          }
+        ],
+        "record_count": 15,
+        "roots": 8
+      },
+      "scope_elapsed_seconds": 33.40972370200325,
+      "root_compute_interval": {
+        "aborted": false,
+        "closed_count": 197,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 1834490406,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 0,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 1833476805,
+        "wall_overflow": false
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 160,
+            "kind": "paths",
+            "max_wall_ns": 2887975,
+            "wall_ns": 23631493
+          },
+          {
+            "closed_count": 12,
+            "kind": "repositories",
+            "max_wall_ns": 517028330,
+            "wall_ns": 821572996
+          },
+          {
+            "closed_count": 3,
+            "kind": "environment",
+            "max_wall_ns": 11790,
+            "wall_ns": 31640
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 21,
+            "kind": "workspaces",
+            "max_wall_ns": 89131364,
+            "wall_ns": 383161875
+          },
+          {
+            "closed_count": 1,
+            "kind": "refused",
+            "max_wall_ns": 30199948649,
+            "wall_ns": 30199948649
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "event_prefix_truncated": true,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/canonical-route-hash-rust-a2.json",
+        "sha256": "a281a8945ec18e7ac81121cd8d30fdb8817888f731c48581eb01471c306243ba"
+      }
+    }
+  ],
+  "comparison_qualification": {
+    "all_results": "WorkDeadline; no commandcomplete.",
+    "candidates": "53roots/109records in both. Firstcontrol49/95. Finalcontrol8/15 after30.199948649-second refused materialization progress interval (includes dispatch overhead); preserve outlier. No posthoc exclusion or extra run.",
+    "counts": "Reported root_compute closed counts include aborted interval for A1/B1/B2; cycles are not comparable completed work or globally unique keys. Fixed source/input/CLI across paired runs, separate preserved control/candidate Core.",
+    "not_established": [
+      "Completed public Rust or Archive closure",
+      "General production activation",
+      "Completed-command latency/RSS or1.25xBazel memory",
+      "Normalized total-work reduction or universal deeper-progress claim",
+      "No-cost construction from zero samples"
+    ]
+  },
+  "format_evidence": {
+    "command": [
+      "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "--emit",
+      "stdout"
+    ],
+    "method": "All formatter deviations of each current changed file must equal formatter deviations of its HEAD baseline, without line-number dependence. New files require zero deviations. No source mutation.",
+    "passed": true,
+    "files": [
+      {
+        "file": "app/slug_bzlmod_v2/src/canonical_repository_route.rs",
+        "sha256": "b18407aeac462ccf2f3ce3cd337b1aad001779c421e6cb499a4b22bc5b57f327",
+        "new_format_deviations": 0,
+        "preserved_baseline_deviations": []
+      },
+      {
+        "file": "app/slug_bzlmod_v2/src/canonical_repository_route/hash_tests.rs",
+        "sha256": "fd2c7384566af76bbea91919a4db7274d447d569bd027db1938fa38f508983ef",
+        "new_format_deviations": 0,
+        "preserved_baseline_deviations": []
+      },
+      {
+        "file": "app/slug_loading_v2/src/canonical_repository_route_tests.rs",
+        "sha256": "690f5a8098b76531c39940a380f400a3d23ab6109bd6aa05e13079782ba71d90",
+        "new_format_deviations": 0,
+        "preserved_baseline_deviations": []
+      }
+    ]
+  },
+  "review": {
+    "design": "ACCEPT",
+    "production_diff": "ACCEPT",
+    "tests_and_source_proof": "ACCEPT",
+    "final": "ACCEPT: independent final review confirms corrected pins/evidence/claims, fixed hash work, full equality, conservative CPU attribution and retained control outlier; completion/latency/RSS/activation remain open."
+  },
+  "final_validation": {
+    "ordinary_selected_passed": 69,
+    "native_guards_selected_passed": 4,
+    "warm_ignored_selected_passed": 1,
+    "actual_warm_commands": 4,
+    "original_rust_diagnostics": 4,
+    "candidate_cpu_capture": 1,
+    "source_mutation_freeze": "All source/staging/temp preparation mutations frozen across native sequence; compiled Rust SHA freeze verified after sequence. Cargo serialized; no compilation overlaps workload capture.",
+    "plan_archive_diff_links": {
+      "passed": true,
+      "changed_pins": 7,
+      "reference_pins": 9,
+      "raw_pins": 27,
+      "nested_cpu_artifact_pins": 4,
+      "relative_links": 228,
+      "native_rust_freeze_verified": true,
+      "active_cargo_rustc_slugd_slug_perf_objdump": [],
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "scripts/v2_plan_status.py"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "bash",
+            "scripts/v2_archive_status.sh"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "git",
+            "diff",
+            "--check"
+          ],
+          "exit_code": 0
+        }
+      ]
+    }
+  },
+  "raw_receipts": [
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-actual-red.json",
+      "sha256": "d4ed0798f6595bc95c17047986204a6ac2eb73154cb0c551d533db611e36b3e1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-bzlmod-tests.json",
+      "sha256": "9050425e7c2161e27ded47c646add6bb4d3c9e6b8807351956bd3200940eb550"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-loading-tests.json",
+      "sha256": "2e60681d555de712bcff8d8e3d02bc9c2909983555f45577eb3f6f5eb49ed72f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-native-guards.json",
+      "sha256": "d4194e29ca816d997bc3809e1db61d6cd3ef74c085cd58f5bd07c10a8cc32b30"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-authentic-warm.json",
+      "sha256": "a4378fdb5f94ed0cd073ee79f4d6f140a7691387ea6cc591d9be7f1e7e559132"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-writer-proof.json",
+      "sha256": "78d5eb3ab45832d40b1e30168afd09b34cde75820e209a76cb65dd34fa04cf99"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-native-freeze.json",
+      "sha256": "1945c3506d69c64dee2311eb8b03f3d9d44d61d1ead7897abda1c5a4f98fba3a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-native-sequence.json",
+      "sha256": "e1dec58326b0402f0c4f6e3b2f4242043b15ef7d48abc0f4ec8f5087c48d2c50"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-format.json",
+      "sha256": "e79d4d90d448df577433a90b88386925b015e623296099ea63035f00966483e1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/repository-build-control-preservation.json",
+      "sha256": "d97e0ff9c4b915622f9b59286e291cd4bf0f0cd9d66c8ff134530ec046142156"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-control-cli-preservation.json",
+      "sha256": "a341b610dbf86639524bc9e7cf13cbe24b124fdd419ae983df6464dbd2a64627"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-candidate-preservation.json",
+      "sha256": "c2e486f6e718bf934259913e273fece52bb440a826a435292c2e240f71eca29b"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/repository-build-cpu-profile.json",
+      "sha256": "40682ba41d0e0e75d2807f02af27f63e5be87018f229e0cb2fa71382acc1e922"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/repository-build-cpu.data",
+      "sha256": "220d1aaab5bd3648027a91a16075bb1f0a1644fcd131eb29cd895fe61ebe1917"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/repository-build-cpu-compact.txt",
+      "sha256": "860571f013bc027dd88a214f738bffe9215d56ff9b42b1600c5e4fd9c2079c17"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/repository-build-sip-sample-addresses.json",
+      "sha256": "f0b5987609e87de5bc5e46ea9950af78ead6403f9f4ea8340e9c841a58725207"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/repository-build-sip-static-callers.json",
+      "sha256": "fb464a11246bbb226694fdc9aa142948780f30f4ec40920dbb60769363f54c5e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/repository-build-compact-string-got-callers.json",
+      "sha256": "ccd71b290fdf221912c3b2c11c680557f093ee082672823fb0335edee1d7bd34"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-cpu-profile.json",
+      "sha256": "be6af7ceba508c4f82347020bb4663fa9ba58050f0d90572529c5214c9758397"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-cpu.data",
+      "sha256": "d17d4e8c8cbbe1897ff7bfd942eeff0e86fdd7db26834e88d0f25ee738304c98"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-cpu-compact.txt",
+      "sha256": "cb1b11235e6096874e7b9bbcc20d3446b523b85160d1f6efe3fa678b24a751ba"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-red-loading-build-result.json",
+      "sha256": "0cc0bc9393e877ca1dd7200b03546945ea6aee49e8d2040ce7af9c71d4128c16"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-bzlmod-build-result.json",
+      "sha256": "ebea4e11109641a401a9c19cfd0a4541af6266c77d92b6a1287725ff9f4c857d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-loading-build-result.json",
+      "sha256": "143a20b84ea3044f1e056efd7abe25517e73e9c500d33850734ce8f537d885fc"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-core-build-result.json",
+      "sha256": "f134dcdda16e5e035e2b31470020e624f2663659dc33540c996412a8a9538a47"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-cli-build-result.json",
+      "sha256": "621cf157d4db2d16c54a791641436b4a9e54558172e641f8a8742618eb0d595d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/canonical-route-hash-cpu-attribution.json",
+      "sha256": "c3b5e8fa978df5c4fdf96c606a06c4ac6522544a11d357935bc9d73ccaeea7fa"
+    }
+  ],
+  "remaining": [
+    "Rust Archive/public cquery completion",
+    "General production activation",
+    "Equivalent completed-command latency/RSS",
+    "Source-backed derived Path/repeated Workspace closure inherited gates"
+  ],
+  "next": "Discriminate remaining path/demand structural work from actual Rust CPU evidence under unchanged owners/caps."
+}

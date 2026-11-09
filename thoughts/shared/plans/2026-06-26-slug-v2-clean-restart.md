@@ -100,6 +100,15 @@ Attribution reaches registration preparation rather than later declaration
 resolution. Variable stopped prefixes and final aborted candidate intervals
 prove no overall performance or deeper frontier. Remaining registration I/O,
 Rust archive extraction, completion, command latency and RSS gates remain open.
+The [canonical-route hash component](./slug-v2-subplans/wp1225-canonical-route-hash-acceptance-2026-11-08.json)
+now computes the unchanged complete writer once per immutable route and reuses
+one weak scalar while preserving full structural equality. Actual registry
+DICE-route repeated work is RED→GREEN; 69 focused tests and protected native/warm
+original gates pass. Both candidate Rust prefixes record 53 roots/109 records;
+controls vary at 49/95 and 8/15, the latter after a 30.2-second materialization
+wait. All stop at WorkDeadline; retain the outlier and keep completion, latency,
+RSS and activation open. Next discriminate remaining path/demand structural work
+from CPU evidence; broader I/O and root-route/syntax caching are unselected.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

@@ -3,28 +3,30 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: bounded package BUILD-import prerequisite discovery in original
+Current delta: immutable canonical-route hash reuse in original
 `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
-[Package-child lookahead](wp1225-package-child-lookahead-acceptance-2026-11-08.json)
-now shares the existing bounded Lstat policy with registration rows. The actual
-inventory A-only/A+B discriminator is RED→GREEN and completes after servicing
-only the returned facts in one round. All 106 ordinary tests, four native guards
-and four original warm compiler commands pass. Both original candidates add six
-demands across package frontiers; these are neither globally distinct nor
-confirmed serviced by that counter. All runs stop at the unchanged WorkDeadline
-with variable prefixes (49 roots/98 records, final control 50/99). RootCompute
-counts include final aborted candidate intervals. No reduction in total work,
-speed, deeper progress, completion, RSS or activation is established.
-The [selected contract](wp1225-general-repository-workspace-design.md#configured-toolchain-prerequisite-attribution)
-keeps first ineligible Needs unchanged, later barriers behind pending paths,
-load-label prevalidation immediate and terminal event closure authoritative.
-The shared 32-row/32-demand/4096-path-byte/64 KiB construction bound covers the
-frontier, not all speculative child values. Extra work may cause earlier bank
-or time refusal under unchanged caps. Attribution reached full registration
-preparation, not declaration/type resolution; do not select downstream batching
-on that evidence. Next discriminate remaining registration I/O. Content and
-Archive discovery need their own producer/byte/admission decisions; no clock/cap
-increase, Need cacheability or caller pruning is selected.
+The [route-hash receipt](wp1225-canonical-route-hash-acceptance-2026-11-08.json)
+records real registry DICE-route outer-hasher work RED→GREEN: 64 repeated hashes
+now write 512 bytes in 64 calls rather than 20,608 bytes in 1,664 calls. One
+original complete field writer runs at construction; full structural equality
+and all nested writers remain unchanged. The inline scalar grows the measured
+route layout 232→240 bytes, with existing Allocative ownership and no native
+credit or digest authority. All 69 focused tests, four native guards and four
+original warm compiler commands pass.
+Original ABBA cycles are 681/889/884/197, all WorkDeadline. Candidates record
+53 roots/109 records; the first control records 49/95 and the final control 8/15
+after a 30.2-second materialization wait. Retain the outlier. These are bounded
+prefix observations, not completed-command latency, RSS or activation evidence.
+The [selected contract](wp1225-general-repository-workspace-design.md#immutable-canonical-route-hash-reuse)
+keeps source/route freshness, every structural field, ordering and collision
+confirmation authoritative. Next discriminate remaining path/demand structural
+work from actual CPU samples before selecting another representation change.
+Root-route caching, BUILD synopsis reuse, FileBytes/Archive discovery and
+Need cacheability remain unselected; no clock, native cap or caller pruning is
+selected. The [prior package-import component](wp1225-package-child-lookahead-acceptance-2026-11-08.json)
+retains its bounded shared Lstat policy, ordered barriers and actual inventory
+one-round returned-facts recovery. Its 106 checks and protected native/warm
+proof remain inherited, without a command performance claim.
 The [prior registration component](wp1225-metadata-lookahead-acceptance-2026-11-08.json)
 retains its behavior and four diagnostic counters after shared-policy extraction.
 The [validated observation union](wp1225-observation-union-acceptance-2026-11-08.json)

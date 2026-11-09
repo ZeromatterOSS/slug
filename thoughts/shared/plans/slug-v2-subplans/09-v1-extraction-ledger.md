@@ -2,6 +2,20 @@
 
 ## WP425 rooted repository consumers
 
+Canonical repository routes reuse the existing Buck2-derived weak-hash pattern
+from `starlark_map::Hashed` and Loading environment inputs, adapted to one inline
+u64 because the route already owns private immutable fields. Existing full
+structural field writers run once at construction; all original structural
+fields remain authoritative in equality. The nested writers and sorted scratch
+stay unchanged. Existing Clone/Arc/Allocative ownership includes positive scalar
+layout bytes; no new owner, pool, interner, donor import or digest authority is
+introduced. Source snapshot requests project route fields without retaining the
+route scalar, so their native storage forecasts remain unchanged. Fixed repeated
+hash work is separate from command latency and equivalent-memory acceptance.
+The [route-hash receipt](wp1225-canonical-route-hash-acceptance-2026-11-08.json)
+records the observed eight-byte layout delta, exact full-writer preservation,
+actual DICE work RED/GREEN and collision/retirement/native proof.
+
 The inactive descriptor-relative delete and terminal-manifest consumers reuse
 Core's existing RootIo primitives, manifest Frontier and raw-body hash kernel.
 Deletion keeps a command-local compact row array and one UTF-8 path byte arena;

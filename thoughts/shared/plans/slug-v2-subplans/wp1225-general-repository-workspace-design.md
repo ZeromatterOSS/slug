@@ -1502,6 +1502,53 @@ candidate RootCompute totals include an aborted interval. Neither these counts
 nor operational peaks establish reduced total work, speed, deeper progress,
 completion, activation or equivalent-command memory fit.
 
+### Immutable canonical-route hash reuse
+
+Select bounded hash-work reuse for `HostCanonicalRepositoryRoute` only. An
+actual user-IP CPU sample of the original Rust command finds a 4.88% Sip writer
+group whose identified direct static callers resolve to route mapping code in
+pinned executable inline source locations. No runtime callchain or proof
+excluding every indirect/tail reference exists; this selects a hypothesis,
+independently tested by the actual-route work regression. Flat samples do not
+attribute all hash work to that owner. BUILD synopsis reuse, root-route hash changes and
+FileBytes discovery remain unselected.
+
+Every successful builtin, selected and generated route constructor computes the
+existing complete structural field writer once into one private weak routing
+word. Immutable clones retain that word. Repeated `Hash` calls emit exactly one
+u64/eight bytes, independent of mapping or specification size; this is the
+primary acceptance threshold declared before measurement. Construction pays the
+existing writer once, including its existing sorted mapping hash scratch and
+both specification identity traversals. Nested writers stay unchanged.
+
+Equality compares all original workspace, canonical repository and source
+fields; the cached word supplies no equality, content, source, persisted or
+native authority. Top-level specification attribute membership and generated
+mapping membership retain existing unordered equality. Nested specification
+dictionary publication order and selected mapping order retain their existing
+equality semantics. A forced candidate-hash collision must still distinguish
+unequal routes and actual key lookups. No DICE cacheability, source certificate,
+current-route freshness, admission cap or production activation changes.
+
+Keep the scalar inline with existing Arc/Allocative ownership and account its
+positive layout bytes. No new owner, global interner or cache is introduced.
+Require actual DICE-produced route RED/GREEN fixed-work proof, all-constructor
+order/collision/full-equality and clone/last-owner checks, relevant direct
+consumer and protected native/warm-original gates. Alternating unchanged-input
+original commands are secondary stopped-prefix evidence; construction and
+repeated-use work must remain distinct. They cannot establish completed-command
+latency, RSS, bootstrap completion or the 1.25-times-Bazel memory gate.
+
+The [route-hash receipt](wp1225-canonical-route-hash-acceptance-2026-11-08.json)
+records 69 passing focused checks, four native guards and four warm original
+compiler commands. Actual registry routes reduce outer-hasher work for 64 calls
+from 1,664 writes/20,608 bytes to 64 writes/512 bytes. The original field writer
+is byte-identical and the observed inline layout delta is eight bytes. Original
+ABBA records 681/889/884/197 cycles, all WorkDeadline; candidate epochs are 53/109,
+first control 49/95 and final control 8/15 after a 30.2-second materialization
+wait. Keep the outlier and stopped-prefix qualification. Next structural work
+requires its own actual owner/discriminator; no source class or cap expands.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)
