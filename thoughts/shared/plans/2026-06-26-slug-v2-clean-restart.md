@@ -109,6 +109,15 @@ controls vary at 49/95 and 8/15, the latter after a 30.2-second materialization
 wait. All stop at WorkDeadline; retain the outlier and keep completion, latency,
 RSS and activation open. Next discriminate remaining path/demand structural work
 from CPU evidence; broader I/O and root-route/syntax caching are unselected.
+The [Demand hash component](./slug-v2-subplans/wp1225-demand-hash-acceptance-2026-11-08.json)
+now reuses one weak routing scalar while preserving all original fields, OS
+ordering, Image custody and pinned full-path/workspace SHA streams. Actual
+inventory work is RED→GREEN; 183 ordinary checks, five native guards and four
+warm originals pass. The latest control and candidate each reach an analysis
+terminal-error category at attempt 853/epoch 53 roots/109 records; other runs
+retain the unchanged WorkDeadline. The bounded reason formatter withholds the
+full error. Next classify the typed failure without freeform output and implement
+its demanded general behavior. Success, latency/RSS and activation remain open.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

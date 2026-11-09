@@ -29,9 +29,13 @@ use dice::InjectedKey;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use starlark_map::StarlarkHasher;
 use starlark_map::sorted_map::SortedMap;
 
 mod union;
+
+#[cfg(test)]
+mod demand_hash_tests;
 
 /// A structural path computation result.
 ///
@@ -313,7 +317,7 @@ pub enum PathObservationOperation {
 }
 
 /// One exact operation requested from the outside-DICE observer.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe)]
+#[derive(Clone, Allocative, Dupe)]
 pub struct PathObservationDemand {
     namespace: PathObservationNamespace,
     path: NormalizedAbsolutePath,
@@ -322,9 +326,164 @@ pub struct PathObservationDemand {
     windows_long_path_input: Option<Arc<[u16]>>,
     // Independent Demand/Key/Need retention must retain the path reservation.
     image_path: Option<crate::ImageChargedPath>,
+    cached_hash: u64,
+}
+
+impl PartialEq for PathObservationDemand {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            namespace,
+            path,
+            operation,
+            windows_long_path_input,
+            image_path,
+            cached_hash: _,
+        } = self;
+        let Self {
+            namespace: other_namespace,
+            path: other_path,
+            operation: other_operation,
+            windows_long_path_input: other_windows_long_path_input,
+            image_path: other_image_path,
+            cached_hash: _,
+        } = other;
+        namespace == other_namespace
+            && path == other_path
+            && operation == other_operation
+            && windows_long_path_input == other_windows_long_path_input
+            && image_path == other_image_path
+    }
+}
+
+impl Eq for PathObservationDemand {}
+
+impl Ord for PathObservationDemand {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        let Self {
+            namespace,
+            path,
+            operation,
+            windows_long_path_input,
+            image_path,
+            cached_hash: _,
+        } = self;
+        let Self {
+            namespace: other_namespace,
+            path: other_path,
+            operation: other_operation,
+            windows_long_path_input: other_windows_long_path_input,
+            image_path: other_image_path,
+            cached_hash: _,
+        } = other;
+        let order = namespace.cmp(other_namespace);
+        if order != Ordering::Equal {
+            return order;
+        }
+        let order = path.cmp(other_path);
+        if order != Ordering::Equal {
+            return order;
+        }
+        let order = operation.cmp(other_operation);
+        if order != Ordering::Equal {
+            return order;
+        }
+        let order = windows_long_path_input.cmp(other_windows_long_path_input);
+        if order != Ordering::Equal {
+            return order;
+        }
+        image_path.cmp(other_image_path)
+    }
+}
+
+impl PartialOrd for PathObservationDemand {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl fmt::Debug for PathObservationDemand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (namespace, path, operation, windows_long_path_input, image_path) = self.fields();
+        f.debug_struct("PathObservationDemand")
+            .field("namespace", namespace)
+            .field("path", path)
+            .field("operation", operation)
+            .field("windows_long_path_input", windows_long_path_input)
+            .field("image_path", image_path)
+            .finish()
+    }
+}
+
+impl Hash for PathObservationDemand {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cached_hash.hash(state);
+    }
 }
 
 impl PathObservationDemand {
+    // All semantic operations retain the original field order. Exhaustive
+    // destructuring makes a future field require an explicit identity decision.
+    #[inline]
+    fn fields(
+        &self,
+    ) -> (
+        &PathObservationNamespace,
+        &NormalizedAbsolutePath,
+        &PathObservationOperation,
+        &Option<Arc<[u16]>>,
+        &Option<crate::ImageChargedPath>,
+    ) {
+        let Self {
+            namespace,
+            path,
+            operation,
+            windows_long_path_input,
+            image_path,
+            cached_hash: _,
+        } = self;
+        (
+            namespace,
+            path,
+            operation,
+            windows_long_path_input,
+            image_path,
+        )
+    }
+
+    fn hash_fields<H: Hasher>(&self, state: &mut H) {
+        let (namespace, path, operation, windows_long_path_input, image_path) = self.fields();
+        namespace.hash(state);
+        path.hash(state);
+        operation.hash(state);
+        windows_long_path_input.hash(state);
+        image_path.hash(state);
+    }
+
+    fn from_fields(
+        namespace: PathObservationNamespace,
+        path: NormalizedAbsolutePath,
+        operation: PathObservationOperation,
+        windows_long_path_input: Option<Arc<[u16]>>,
+        image_path: Option<crate::ImageChargedPath>,
+    ) -> Self {
+        let mut demand = Self {
+            namespace,
+            path,
+            operation,
+            windows_long_path_input,
+            image_path,
+            cached_hash: 0,
+        };
+        let mut hasher = StarlarkHasher::new();
+        demand.hash_fields(&mut hasher);
+        demand.cached_hash = hasher.finish();
+        demand
+    }
+
     pub fn new(
         namespace: PathObservationNamespace,
         path: NormalizedAbsolutePath,
@@ -336,13 +495,7 @@ impl PathObservationDemand {
                 && !matches!(operation, PathObservationOperation::InputImage(_)),
             "Windows UTF-16 operations require their dedicated Host demand constructors"
         );
-        Self {
-            namespace,
-            path,
-            operation,
-            windows_long_path_input: None,
-            image_path: None,
-        }
+        Self::from_fields(namespace, path, operation, None, None)
     }
 
     /// Requests Windows short-name expansion while retaining the exact raw
@@ -351,13 +504,13 @@ impl PathObservationDemand {
         path: NormalizedAbsolutePath,
         windows_long_path_input: Arc<[u16]>,
     ) -> Self {
-        Self {
-            namespace: PathObservationNamespace::Host,
+        Self::from_fields(
+            PathObservationNamespace::Host,
             path,
-            operation: PathObservationOperation::WindowsLongPath,
-            windows_long_path_input: Some(windows_long_path_input),
-            image_path: None,
-        }
+            PathObservationOperation::WindowsLongPath,
+            Some(windows_long_path_input),
+            None,
+        )
     }
 
     /// Requests the pre-lexical long-name branch used by Windows option-path
@@ -367,13 +520,13 @@ impl PathObservationDemand {
         path: NormalizedAbsolutePath,
         windows_long_path_input: Arc<[u16]>,
     ) -> Self {
-        Self {
-            namespace: PathObservationNamespace::Host,
+        Self::from_fields(
+            PathObservationNamespace::Host,
             path,
-            operation: PathObservationOperation::WindowsOptionPathLongName,
-            windows_long_path_input: Some(windows_long_path_input),
-            image_path: None,
-        }
+            PathObservationOperation::WindowsOptionPathLongName,
+            Some(windows_long_path_input),
+            None,
+        )
     }
 
     pub fn input_image(
@@ -387,13 +540,13 @@ impl PathObservationDemand {
         {
             return Err(crate::ImageDescriptorBudgetError::ForeignBudget);
         }
-        Ok(Self {
+        Ok(Self::from_fields(
             namespace,
-            path: path.normalized(),
-            operation: PathObservationOperation::InputImage(request),
-            windows_long_path_input: None,
-            image_path: Some(path),
-        })
+            path.normalized(),
+            PathObservationOperation::InputImage(request),
+            None,
+            Some(path),
+        ))
     }
 
     pub fn image_path(&self) -> Option<&crate::ImageChargedPath> {

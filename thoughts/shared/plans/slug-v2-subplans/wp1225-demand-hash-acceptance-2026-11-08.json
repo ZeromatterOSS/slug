@@ -1,0 +1,1839 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "b6e78bf0abfc3257f5bffdf4bc129ad1d3c10f6a",
+  "classification": {
+    "exact_preserved": "All original five-field Demand Eq/Ord/Debug, platform path/raw UTF16/Image semantics, source/current-fact/native authority and pinned workspace spelling SHA bytes. No new Bazel semantic surface.",
+    "slug_native": "Private immutable weak operational routing-hash reuse and positive eight-byte per-value layout cost.",
+    "unsupported_deferred": "Successful original Rust cquery, General production activation, completed-command latency/RSS; global-path/RootRoute/syntax caching and new FileBytes/Archive discovery unselected."
+  },
+  "outcome": "Actual inventory-returned demands perform one scalar hash write on reuse while complete original identities and owner credits remain authoritative.",
+  "source_pins": [
+    {
+      "file": "app/slug_workspace_v2/src/path_observation.rs",
+      "sha256": "f41edb1b79d4154809e4a9b160de60e7c55029c13e24cc6ccd3b4d881d695046"
+    },
+    {
+      "file": "app/slug_workspace_v2/src/path_observation/demand_hash_tests.rs",
+      "sha256": "eac97db8934bd77e54e3f0d4d150404f9d6b0d6d22bbeac09df856ee7bdba740"
+    },
+    {
+      "file": "app/slug_loading_v2/src/host_package_load_tests/package_load_frontier_tests.rs",
+      "sha256": "e545d920f3b0a5259d35ce12dd98d20d1575b7598f2a54b653b63bc3713fb595"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/source_preparation/workspace_identity.rs",
+      "sha256": "2211f6a48a6fffff345d142f8c8c4145a43abd70cb63dbbd411febbc1baeb2b5"
+    },
+    {
+      "file": "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md",
+      "sha256": "2483235b370498cdffe26b27b1b6af0febeb6f4715578fcd6acb569c3bb88fa9"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/current-packet.md",
+      "sha256": "598d6bf522bd5b53df38086539d54a58bda6dd0b72a63eb3d4036c2ca4b15da1"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md",
+      "sha256": "1f6e3bb00667f303ea13555f2f21366093d35480fd2167bd32a6459acbc7ac16"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-general-repository-workspace-design.md",
+      "sha256": "662a1480f77971909a7e1e849e3c022553bee624e79d40723fe73c67ba44a392"
+    }
+  ],
+  "unchanged_reference_pins": [
+    {
+      "file": "app/slug_workspace_v2/src/input_image.rs",
+      "sha256": "16579af669c8d60116850c09711ed531afef0e6c08584c01309ba112632be363"
+    },
+    {
+      "file": "app/slug_workspace_v2/src/input_image/elf_metadata.rs",
+      "sha256": "0a6a75eaa893b60f48c83133c7e459ca2519574a2d61e192fcf6be86d9a7798d"
+    },
+    {
+      "file": "app/slug_workspace_v2/src/input_image/budget.rs",
+      "sha256": "3143cf41463a68cc3cbefaf1a626675994d6809488832f07a364d309e4972fcb"
+    },
+    {
+      "file": "app/slug_loading_v2/src/path_need_lookahead.rs",
+      "sha256": "173ba8a76a2f0b5ff49e57cba3a0de571a5c175350cda91240cef10b03a952a4"
+    },
+    {
+      "file": "app/slug_loading_v2/src/bzl_module.rs",
+      "sha256": "ca3d0177d61ab2caba6f04062a5ca801be037777810a13725b73379499639f23"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/path_observation/rooted.rs",
+      "sha256": "796775e274856e0df23fa90da6728d191b85a214111701ade63e5cd3f66582a6"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/input_image_bridge.rs",
+      "sha256": "8412150c5e2f4ad00ceed3e30a8bc0d84f5636e3215d2b7415f275de311761a8"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/input_image_bridge/label_source.rs",
+      "sha256": "df5e70b12e4892178b32a0b32f4a4689fb1d89041e5334e8d2361bf238f41761"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_io/source_snapshots.rs",
+      "sha256": "09297e4fa0bc3fa5ee1e75a5c61461892c3cb0ef8cfdb970ada18e388ef5c090"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_io/physical_roots.rs",
+      "sha256": "20d04867d76f991387bac8ca0366d1c44c894268aa07cc647bd9d5085fe789c4"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/selected_scratch_source.rs",
+      "sha256": "666c00d98bde59db41dc18c66126f044507249ab613ae419a14f15c6e6d8cb21"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/dice.rs",
+      "sha256": "f2fc8f93d5952f1a829e0fa542f52442b09c12f210ddaaaa2d5065172fbe3dd0"
+    },
+    {
+      "file": "docs/developers/dice.md",
+      "sha256": "85ccdb5658acfa95e78166c7bcbdd62f51d6dc28d6f6732ed651ef23cf40ceac"
+    },
+    {
+      "file": "starlark-rust/starlark_map/src/hashed.rs",
+      "sha256": "766964b37954eeac083c4d1df78793c503a73f06ecf7866282049a76c7ff23e3"
+    },
+    {
+      "file": "starlark-rust/starlark_map/src/hasher.rs",
+      "sha256": "1ca6606297ed08aee229868032577922f23eb525d7f16aa62af81e136fcd4a38"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-canonical-route-hash-acceptance-2026-11-08.json",
+      "sha256": "ebb3e3d5c0af7569a652239589727041997e8a8610c8001d0bf800f276058099"
+    }
+  ],
+  "design": {
+    "approval": "Independent design ACCEPT before implementation; source/test, direct-comparison correction and independent final review ACCEPT.",
+    "threshold_before_measurement": "64 repeated hashes of each actual inventory returned Demand emit64u64writes/512bytes, independent of path length; successful constructor pays original full5field writer once; clone/reuse performs no constructor/fullwriter/source IO.",
+    "representation": "One private cached_hash:u64 in existing immutable Demand, all4successful constructor families through sole private from_fields using existing StarlarkHasher; InputImage validation before construction. Clone/Dupe/Allocative retained, no new allocation/owner/global cache/interner.",
+    "semantic_fields": [
+      "namespace",
+      "path",
+      "operation",
+      "windows_long_path_input",
+      "image_path"
+    ],
+    "equality_order": "Manual exhaustive original-field Eq short-circuits; typed-field Ord returns early in original lexicographic order; PartialOrd delegatescmp. Cache ignored by Eq/Ord/Debug; full platform comparisons retained.",
+    "domain_audit": "Demand Hash consumers are weak operational map/DICE/shard routing only. Epoch is notHash; strong workspace/source/state/CAS writers do not consume Demand Hash. Both64-way shard publisher and lookup retain one selector; bucket assignment explicitly nonpersistent.",
+    "generic_path_stream": "A global NormalizedPath cache was rejected before code because StableKey.candidate SHA256s its pinned full Rust Hash stream. NormalizedPath definition/storage/Hash region and all production workspace-identity definitions are byte-exact baseline; real prechange fixturecandidate pinned in Linux test."
+  },
+  "causal_red": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+      "--exact",
+      "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_load_siblings_collect_independent_lstat_prerequisites",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.007635189002030529,
+    "selected": 1,
+    "expected_exit_code": 101,
+    "executable_sha256": "4e1fc7809935015058107c039eabb701f628654fc9f4eea6db635f97312de0ff",
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/demand-hash-actual-inventory-red.json",
+      "sha256": "ddf344c8efbb717c27b836d5d0f60cc7ed0964fed96f9564b10a2f3329d37d6d"
+    },
+    "original_semantic_assertions": "Actual DICE A+B Lstat inventory Need and Need invalidity assertions pass before work failure; final green runs preserve original one-round service/order/certificate assertions afterward.",
+    "outer_hasher_for64calls": {
+      "control_writes": 512,
+      "control_bytes": 3648,
+      "candidate_writes": 64,
+      "candidate_bytes": 512
+    },
+    "scope": "OuterHasher writes/bytes, not total nested work/time or whole-command speed."
+  },
+  "ordinary_tests": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_workspace_v2-c99f5940e39d0187",
+        "--exact",
+        "input_image::budget::tests::concurrent_reservations_share_highwater_and_foreign_banks_stay_separate",
+        "input_image::budget::tests::freeze_headers_shared_clones_and_owner_drop_preserve_highwater",
+        "input_image::budget::tests::normal_image_history_retires_credit_without_erasing_highwater",
+        "input_image::budget::tests::reservation_highwater_records_retired_overlap_and_refuses_without_growth",
+        "input_image::elf_metadata::tests::authenticated_rejection_is_a_valid_source_bound_fact",
+        "input_image::elf_metadata::tests::foreign_cold_and_warm_result_consumption_are_guarded",
+        "input_image::elf_metadata::tests::freshness_content_mode_digest_and_restoration_are_distinct",
+        "input_image::elf_metadata::tests::key_identity_keeps_namespace_selector_and_complete_policy",
+        "input_image::elf_metadata::tests::need_and_historical_facts_keep_credit_until_actual_last_drop",
+        "input_image::elf_metadata::tests::normal_image_need_then_exact_metadata_need_replays_complete_frontier",
+        "input_image::elf_metadata::tests::request_binding_policy_budget_and_issued_path_cannot_be_substituted",
+        "input_image::elf_metadata::tests::selection_and_operational_failure_have_precise_validity",
+        "input_image::elf_metadata::tests::wire_bounds_and_order_are_semantic_but_capacity_is_physical",
+        "input_image::tests::absolute_alias_path_limit_uses_normalized_target_spelling",
+        "input_image::tests::alias_hop_limit_counts_defining_alias_exactly",
+        "input_image::tests::discovered_child_descriptor_limit_precedes_path_allocation",
+        "input_image::tests::foreign_budget_cold_compute_and_warm_consumption_are_rejected",
+        "input_image::tests::growth_is_geometric_and_charge_survives_need_retirement",
+        "input_image::tests::historical_engine_ownership_keeps_credits_and_exhaustion_is_invalid",
+        "input_image::tests::hundred_file_tree_uses_bounded_batched_needs_and_keeps_modes",
+        "input_image::tests::metadata_freshness_changes_wrapper_without_changing_content_and_restores",
+        "input_image::tests::ordinary_image_key_refuses_missing_kind_depth_and_aggregate_limits",
+        "input_image::tests::preserving_freeze_refusal_keeps_exact_owner_credit_and_owner_first_drop",
+        "input_image::tests::regular_root_file_byte_limit_refuses_before_digest_demand",
+        "input_image::tests::regular_root_kind_bytes_modes_missing_and_restoration_are_normal_dependencies",
+        "input_image::tests::regular_root_replays_only_ancestor_lstat_leaf_lstat_and_leaf_digest",
+        "input_image::tests::result_constructor_checks_scope_and_actual_bounds",
+        "input_image::tests::returned_need_retains_full_path_charge_after_original_owner_drops",
+        "input_image::tests::runtime_alias_profile_refuses_parent_components_before_normalization",
+        "input_image::tests::selector_pin_counts_retained_path_capacity",
+        "input_image::tests::semantic_identity_ignores_credit_but_foreign_owner_is_rejected",
+        "input_image::tests::shared_descriptor_credit_retires_only_at_last_drop",
+        "input_image::tests::unfinished_siblings_remain_in_monotonic_discovery_limit",
+        "path_observation::demand_hash_tests::actual_path_key_short_and_long_needs_hash_with_fixed_postconstruction_work",
+        "path_observation::demand_hash_tests::demand_cache_collisions_preserve_original_five_field_equality_order_and_debug",
+        "path_observation::demand_hash_tests::demand_cached_hash_binds_all_four_constructor_families_and_clones",
+        "path_observation::demand_hash_tests::demand_inline_cache_layout_and_existing_payload_owners_retire_exactly",
+        "path_observation::memory_tests::per_demand_equal_reread_reuses_penultimate_payload_with_revocation_and_old_versions",
+        "path_observation::memory_tests::per_demand_full_result_namespace_a_b_a_preserves_old_live_transaction",
+        "path_observation::memory_tests::per_demand_history_retains_constant_result_references_against_aggregate_control",
+        "path_observation::memory_tests::per_demand_revoked_and_unknown_inputs_never_resurrect_legacy_maps",
+        "path_observation::memory_tests::per_demand_unrelated_addition_keeps_exact_path_cached",
+        "path_observation::repository_workspace_storage_tests::normalized_path_storage_counts_owner_and_actual_spare_capacity",
+        "path_observation::tests::directory_kind_transitions_are_complete_semantic_state",
+        "path_observation::tests::generic_demand_constructor_rejects_windows_option_path_long_name",
+        "path_observation::tests::generic_demand_constructor_rejects_windows_utf16_operations",
+        "path_observation::tests::partitioned_epoch_add_change_remove_and_restore_preserve_exact_path_values",
+        "path_observation::tests::path_observation_demand_identity_includes_namespace_path_and_operation",
+        "path_observation::tests::path_observation_dice_distinguishes_need_observed_missing_and_change",
+        "path_observation::tests::path_observation_directory_entries_are_typed_stable_and_semantic",
+        "path_observation::tests::path_observation_epoch_equality_is_exact_but_payload_can_be_semantically_equal",
+        "path_observation::tests::path_observation_epoch_rejects_duplicate_and_mismatched_operations",
+        "path_observation::tests::path_observation_key_provides_exact_demand_through_dyn_key",
+        "path_observation::tests::path_observation_need_is_nonempty_sorted_deduplicated_union",
+        "path_observation::tests::path_observation_normalizes_lexically_and_clamps_only_at_root",
+        "path_observation::tests::path_observation_outcome_maps_and_need_is_never_complete_equal",
+        "path_observation::tests::path_observation_preserves_non_utf8_path_link_and_directory_names",
+        "path_observation::tests::path_observation_results_cover_operations_missing_and_errors",
+        "path_observation::tests::shared_epoch_coalesces_equal_arcs_and_rejects_conflicts",
+        "path_observation::tests::shared_epoch_compaction_preserves_sorted_row_error_precedence",
+        "path_observation::tests::shared_epoch_compaction_retains_source_buffer_and_first_arcs",
+        "path_observation::tests::windows_long_path_demand_retains_lossless_input_in_identity",
+        "path_observation::tests::windows_long_path_dice_replays_a_b_a_and_need_remains_transient",
+        "path_observation::tests::windows_option_path_long_name_demand_retains_raw_input_and_kind_in_identity",
+        "path_observation::tests::windows_option_path_long_name_dice_replays_outcomes_without_collapsing_fallback",
+        "path_observation::union::tests::union_conflicts_preserve_first_sorted_reference_error",
+        "path_observation::union::tests::union_growth_preserves_left_charged_key_and_result_owners",
+        "path_observation::union::tests::union_matches_shared_reference_and_reuses_noop_owners",
+        "path_resolution::anchored_tests::anchored_directory_listing_identity_and_raw_membership_are_explicit",
+        "path_resolution::anchored_tests::anchored_directory_listing_preserves_missing_and_wrong_kind",
+        "path_resolution::anchored_tests::anchored_directory_listing_refuses_escape_without_outside_demand",
+        "path_resolution::anchored_tests::anchored_directory_listing_stops_at_root_and_follows_only_internal_links",
+        "path_resolution::anchored_tests::anchored_resolution_constructor_and_structural_identity",
+        "path_resolution::anchored_tests::anchored_resolution_demands_real_root_without_host_ancestors",
+        "path_resolution::anchored_tests::anchored_resolution_follows_nested_relative_and_absolute_internal_links",
+        "path_resolution::anchored_tests::anchored_resolution_observed_epoch_tracks_complete_root_changes_and_restoration",
+        "path_resolution::anchored_tests::anchored_resolution_preserves_cycle_and_expansion_frontiers",
+        "path_resolution::anchored_tests::anchored_resolution_refuses_absolute_relative_and_reentering_link_escapes",
+        "path_resolution::anchored_tests::anchored_resolution_rejects_foreign_namespace_and_preserves_host_resolver",
+        "path_resolution::anchored_tests::guarded_sync_parent_growth_refuses_or_cancels_before_first_fact",
+        "path_resolution::anchored_tests::guarded_sync_preserves_cycle_expansion_and_mixed_source_demand_order",
+        "path_resolution::anchored_tests::guarded_sync_simple_path_uses_actual_small_work_peak_and_matches_unguarded",
+        "path_resolution::anchored_tests::source_anchor_context_rejects_aliasing_overlap_and_extra_authority",
+        "path_resolution::anchored_tests::source_content_digest_and_listing_preserve_the_complete_mixed_frontier",
+        "path_resolution::anchored_tests::source_directory_links_keep_remaining_components_and_missing_origin",
+        "path_resolution::anchored_tests::source_link_resolution_keeps_logical_owner_and_terminal_content_namespace",
+        "path_resolution::anchored_tests::source_resolution_refuses_undeclared_roots_relative_escape_and_source_reentry",
+        "path_resolution::tests::observed_directory_listing_preserves_errors_and_outer_polarity",
+        "path_resolution::tests::observed_directory_listing_retains_exact_arcs_without_legacy_activation",
+        "path_resolution::tests::observed_resolution_assembly_returns_typed_outer_errors",
+        "path_resolution::tests::observed_resolution_retains_complete_error_frontiers",
+        "path_resolution::tests::observed_resolution_retains_exact_symlink_frontier_after_need",
+        "path_resolution::tests::path_directory_listing_cumulative_projection_is_total_and_exact",
+        "path_resolution::tests::path_directory_listing_semantic_equality_is_field_complete_and_physical_identity_free",
+        "path_resolution::tests::path_file_bytes_cumulative_projection_is_total_and_exact",
+        "path_resolution::tests::path_file_bytes_lifecycle_has_exact_operational_and_semantic_counts",
+        "path_resolution::tests::path_file_bytes_prunes_equal_not_a_link_errors_and_invalidates_io_transitions",
+        "path_resolution::tests::path_file_bytes_prunes_equal_typed_errors_but_retains_io_fields",
+        "path_resolution::tests::path_file_bytes_prunes_metadata_route_instance_and_restores_operational_value",
+        "path_resolution::tests::path_file_bytes_semantic_equality_is_field_complete_and_physical_identity_free",
+        "path_resolution::tests::path_resolution_basics_suppress_children_and_preserve_routes",
+        "path_resolution::tests::path_resolution_complete_equality_is_fully_structural_and_need_is_transient",
+        "path_resolution::tests::path_resolution_detects_exact_cycles_and_expansion_chains",
+        "path_resolution::tests::path_resolution_dice_dependency_errors_fail_fast",
+        "path_resolution::tests::path_resolution_distinguishes_dangling_inconsistent_and_io_errors",
+        "path_resolution::tests::path_resolution_follows_direct_transitive_parent_and_escaping_links",
+        "path_resolution::tests::path_resolution_preserves_non_utf8_raw_link_targets",
+        "path_resolution::tests::path_resolution_public_schema_roots_and_pure_route_admission",
+        "path_resolution::tests::path_resolution_retains_first_marker_and_parent_provenance",
+        "path_resolution::work::tests::guarded_parent_projection_prepays_all_children_before_mutation_and_checks_each_join",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.1142242729983991,
+      "selected": 110,
+      "executable_sha256": "6ff59a647c89ac7ccb7acfe726a8081072cb4b3bff91dba3a5f709a95a5be14e",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-final-workspace-tests.json",
+        "sha256": "618a93a7836b6c1c849012445af2f96c9edf6e273f245f0ad43e5d5633dfaae1"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-29a3d0aab08beaab",
+        "--exact",
+        "source_preparation::workspace_identity::tests::realization_memoizes_content_without_turning_equal_final_digest_into_history_identity",
+        "source_preparation::workspace_identity::tests::request_storage_counts_foreign_shared_spare_maps_and_bounds_recursive_values",
+        "source_preparation::workspace_identity::tests::stable_candidate_uses_complete_owner_identity_and_preserves_structural_authority",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.0016111079894471914,
+      "selected": 3,
+      "executable_sha256": "e50bbc7292ea6087251f22db28d2dfead44f75993c573a93ca1bab51e1eebc2d",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-final-bzlmod-tests.json",
+        "sha256": "27cb66654a33391429f9444282c8e29cd1bb3b1dc6d48df6024d3a3621c91fbb"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+        "--exact",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::earlier_semantic_error_does_not_probe_missing_later_sibling",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::external_bzl_child_prefix_retains_original_carriers_until_settlement",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::external_bzl_synopsis_preserves_source_identity_encoding_and_error_order",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::external_bzl_synopsis_reuses_across_child_need_and_current_epoch_changes",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::observed_sibling_need_precedes_later_semantic_error_and_repairs_strict_closure",
+        "bzl_module::host_package_load_tests::external_bzl_module_cycle_releases_and_recovers_with_fresh_detector",
+        "bzl_module::host_package_load_tests::observed_external_bzl_child_positions_collect_needs_and_stop_at_first_semantic",
+        "bzl_module::host_package_load_tests::observed_external_bzl_cycle_retains_all_sources_and_recovers",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_child_terminals_keep_prefixes",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_keeps_terminal_prefixes_and_error_batches",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_recovers_after_cancel",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_replays_a_b_a",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_retains_source_child_arcs_and_local_batch",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_source_terminals_keep_prefixes",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_deferred_error_keeps_selected_event_closure_and_first_error",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_load_siblings_collect_independent_lstat_prerequisites",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_load_siblings_repair_preserves_targets_order_and_certificate",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_lstat_window_stops_at_whole_file_bytes_barrier",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_pending_lstat_defers_later_cycle_and_fresh_retry_recovers",
+        "bzl_module::host_package_load_tests::repository_package_load_prevalidates_all_loads_and_gates_loaded_target_kinds",
+        "bzl_module::host_package_load_tests::repository_package_load_renders_missing_and_cycle_and_recovers_on_same_dice",
+        "bzl_module::repository_package_child_probe::tests::local_counter_layout_saturation_and_concurrency_preserve_all_cells",
+        "bzl_module::repository_package_child_probe::tests::whole_need_classification_keeps_mixed_and_nonsingleton_needs_other",
+        "path_need_lookahead::tests::duplicate_only_extension_keeps_pending_backing_and_unique_count",
+        "path_need_lookahead::tests::first_ineligible_or_large_spare_owner_returns_original_need",
+        "path_need_lookahead::tests::metadata_peak_has_exact_boundary_and_checked_overflow",
+        "path_need_lookahead::tests::unique_bound_and_later_operation_barriers_keep_only_earlier_paths",
+        "path_need_lookahead::tests::window_counts_first_hole_and_every_complete_slot",
+        "registration_expansion::path_lookahead::probe::tests::local_concurrent_counts_preserve_all_scalar_updates",
+        "registration_expansion::path_lookahead::probe::tests::local_counter_saturates_without_a_process_reset",
+        "registration_expansion_tests::ambiguity_facts_participate_in_a_b_a_equality_when_labels_match",
+        "registration_expansion_tests::ambiguity_warning_is_owned_by_requested_family_only",
+        "registration_expansion_tests::canonical_route_error_stops_before_later_package_row",
+        "registration_expansion_tests::command_apparent_external_recursive_rows_reuse_canonical_subtree_walker",
+        "registration_expansion_tests::command_apparent_external_rows_use_final_root_mapping",
+        "registration_expansion_tests::command_configuration_a_b_a_restores_equal_arc_backed_expansion",
+        "registration_expansion_tests::command_key_identity_includes_configuration_and_family",
+        "registration_expansion_tests::command_recursive_negative_removal_and_reinsertion_reuse_package_walker",
+        "registration_expansion_tests::command_rows_apply_signed_order_and_family_specific_reversal",
+        "registration_expansion_tests::empty_command_list_activates_no_mapping_or_package_owner",
+        "registration_expansion_tests::exact_missing_target_is_a_typed_family_and_row_error",
+        "registration_expansion_tests::family_key_identity_is_independent",
+        "registration_expansion_tests::mapped_and_canonical_rows_use_selected_nonroot_inventory",
+        "registration_expansion_tests::need_has_no_family_event_batch_and_recovers_with_complete_epoch",
+        "registration_expansion_tests::negative_exact_missing_target_remains_a_typed_row_error",
+        "registration_expansion_tests::observed_cancellation_publishes_no_family_owner_then_recovers_and_reuses",
+        "registration_expansion_tests::observed_canonical_recursion_orders_route_subtree_and_inventories_with_exact_arcs",
+        "registration_expansion_tests::observed_command_cancellation_publishes_nothing_then_recovers_and_reuses",
+        "registration_expansion_tests::observed_command_mapping_route_and_package_frontiers_are_exact_and_ordered",
+        "registration_expansion_tests::observed_expansion_preserves_epoch_identity_dependency_order_and_family_isolation",
+        "registration_expansion_tests::package_error_stops_before_later_row_and_retains_decisive_epoch",
+        "registration_expansion_tests::path_prerequisite_tests::observed_command_pending_rows_preserve_signed_order_and_toolchain_reversal",
+        "registration_expansion_tests::path_prerequisite_tests::observed_independent_literal_rows_union_lstat_prerequisites_and_recover_in_order",
+        "registration_expansion_tests::path_prerequisite_tests::observed_later_error_defers_behind_pending_lstat_and_earlier_error_wins",
+        "registration_expansion_tests::path_prerequisite_tests::observed_non_path_need_defers_behind_pending_lstat_and_stops_before_c",
+        "registration_expansion_tests::path_prerequisite_tests::observed_recursive_partial_row_discards_scratch_before_lstat_window_retry",
+        "registration_expansion_tests::recursive_expansion_uses_descendant_before_prefix_and_lexical_targets",
+        "registration_expansion_tests::recursive_package_order_is_lexical_sibling_postorder",
+        "registration_expansion_tests::registration_diagnostic_natural_canonical_boundaries",
+        "registration_expansion_tests::registration_diagnostic_natural_selection_and_mapping_boundaries",
+        "registration_expansion_tests::root_exact_and_wildcard_expansion_are_family_specific_and_stably_deduped",
+        "registration_expansion_tests::selected_module_and_declaration_order_drive_first_seen_deduplication",
+        "registration_expansion_tests::subtree_error_stops_before_later_package_row_and_retains_prefix",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.4537987229996361,
+      "selected": 63,
+      "executable_sha256": "95a74a252dcdefb1ed1cd9899433b5782e44bd571d7c819d3b36b26bd708c779",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-final-loading-tests.json",
+        "sha256": "80af83733c8a7cbcb3eaada734a82bce7f6dfa0caa5aa012ce388fbd747a7aba"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+        "--exact",
+        "runtime::path_observation::rooted::tests::rooted_observation_rejects_entire_foreign_above_anchor_and_duplicate_batches_before_io",
+        "runtime::path_observation::rooted::tests::rooted_observation_filebytes_exact_object_limit_and_digest_streaming_have_distinct_bounds",
+        "runtime::path_observation::rooted::tests::rooted_content_attempts_share_exact_64_boundary_and_refuse_65_before_lstat",
+        "runtime::path_observation::rooted::tests::rooted_observation_scope_attempt_decoded_and_native_buffer_refusals_release_credits",
+        "runtime::dice::source_service::regular_file::tests::scoped_host_inode_and_current_name_mutation_refuse_without_credit_leaks",
+        "runtime::dice::source_service::regular_file::tests::scoped_host_conversion_overlap_and_cumulative_history_are_bounded",
+        "runtime::dice::source_service::regular_file::tests::scoped_host_final_storage_refuses_partial_and_cancelled_publication",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.0063185820035869256,
+      "selected": 7,
+      "expected_exit_code": 0,
+      "executable_sha256": "3a23e9440a02cb73839f91a655f0a41fef0defc49fecba8860b8e3fe620f3c5d",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-core-source-controls.json",
+        "sha256": "82b4c5b0c5e1425a1fd4b5994222b482dfff8f9332cefdd9f8482ceda21a4da2"
+      }
+    }
+  ],
+  "protected_native_guards": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+      "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+      "runtime::repository_physical_root::initialize::tests::owned_observation_tests::native_owned_file_observation_reuses_canonical_body_and_preserves_history_after_root_drop",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.0858846650080523,
+    "selected": 5,
+    "expected_exit_code": 0,
+    "core_sha256": "3a23e9440a02cb73839f91a655f0a41fef0defc49fecba8860b8e3fe620f3c5d",
+    "cli_sha256": "eb287003d70f62ba4a947ed028c81b1d9930f55b239e0ad8e5efa401f5f9948c",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "overflow": false,
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/demand-hash-native-guards.json",
+      "sha256": "45d51520022546e3f35407404586a6c11252698c96658adcce12de86d7adf284"
+    }
+  },
+  "protected_warm_originals": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 14.318321628990816,
+    "selected": 1,
+    "executable_sha256": "3a23e9440a02cb73839f91a655f0a41fef0defc49fecba8860b8e3fe620f3c5d",
+    "cli_sha256": "eb287003d70f62ba4a947ed028c81b1d9930f55b239e0ad8e5efa401f5f9948c",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "overflow": false,
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/demand-hash-authentic-warm.json",
+      "sha256": "d87c1c132b4feedf3d0b3d09e35d67a57847ef955dbce8ba6c8150d1ac6aff5e"
+    },
+    "actual_commands": 4,
+    "scope": "One ignored test drives four actual original compiler commands on one runtime and unchanged bank; not four unit tests."
+  },
+  "layout_accounting": {
+    "baseline": "b6e78bf0abfc3257f5bffdf4bc129ad1d3c10f6a",
+    "measured_layout": {
+      "legacy_demand": 152,
+      "demand": 160,
+      "path_key": 160,
+      "legacy_demand_result_row": 160,
+      "demand_result_row": 168,
+      "positive_delta": 8
+    },
+    "policy": "All positive bytes retained; no Native/Image/Need cap increases or metadata subtraction. Existing path backing/capacity formulas remain unchanged. Demand owns no new allocation; Allocative derives inline field accounting.",
+    "sites": [
+      {
+        "file": "app/slug_workspace_v2/src/input_image.rs",
+        "sha256": "16579af669c8d60116850c09711ed531afef0e6c08584c01309ba112632be363",
+        "audit": "Need Arc-slice and conversion rows use size_of<Demand>/row; positive size automatically included."
+      },
+      {
+        "file": "app/slug_workspace_v2/src/input_image/elf_metadata.rs",
+        "sha256": "0a6a75eaa893b60f48c83133c7e459ca2519574a2d61e192fcf6be86d9a7798d",
+        "audit": "Need scratch uses size_of<Demand>."
+      },
+      {
+        "file": "app/slug_workspace_v2/src/input_image/budget.rs",
+        "sha256": "3143cf41463a68cc3cbefaf1a626675994d6809488832f07a364d309e4972fcb",
+        "audit": "Path owner charges unchanged: NormalizedAbsolutePath Arc<PathBuf> representation unchanged; new scalar is in Demand only."
+      },
+      {
+        "file": "app/slug_loading_v2/src/path_need_lookahead.rs",
+        "sha256": "173ba8a76a2f0b5ff49e57cba3a0de571a5c175350cda91240cef10b03a952a4",
+        "audit": "Frontier arrays and construction peaks multiply actual size_of<Demand>;64KiB cap unchanged."
+      },
+      {
+        "file": "app/slug_loading_v2/src/bzl_module.rs",
+        "sha256": "ca3d0177d61ab2caba6f04062a5ca801be037777810a13725b73379499639f23",
+        "audit": "Comparison row scratch uses actual Demand/result row size."
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/path_observation/rooted.rs",
+        "sha256": "796775e274856e0df23fa90da6728d191b85a214111701ade63e5cd3f66582a6",
+        "audit": "Whole batch/overlap maps and vectors use actual Demand/result row and array layouts before IO."
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/input_image_bridge.rs",
+        "sha256": "8412150c5e2f4ad00ceed3e30a8bc0d84f5636e3215d2b7415f275de311761a8",
+        "audit": "Bridge row forecast uses actual Demand/result row size."
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/input_image_bridge/label_source.rs",
+        "sha256": "df5e70b12e4892178b32a0b32f4a4689fb1d89041e5334e8d2361bf238f41761",
+        "audit": "Bridge row forecast uses actual Demand/result row size."
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/repository_io/source_snapshots.rs",
+        "sha256": "09297e4fa0bc3fa5ee1e75a5c61461892c3cb0ef8cfdb970ada18e388ef5c090",
+        "audit": "Observation row scratch uses actual size_of<Demand>."
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/repository_io/physical_roots.rs",
+        "sha256": "20d04867d76f991387bac8ca0366d1c44c894268aa07cc647bd9d5085fe789c4",
+        "audit": "Observation work forecast uses actual size_of<Demand>."
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/selected_scratch_source.rs",
+        "sha256": "666c00d98bde59db41dc18c66126f044507249ab613ae419a14f15c6e6d8cb21",
+        "audit": "Snapshot rows and scratch use actual Demand/result row size."
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/dice.rs",
+        "sha256": "f2fc8f93d5952f1a829e0fa542f52442b09c12f210ddaaaa2d5065172fbe3dd0",
+        "audit": "Need delta forecast uses actual size_of<Demand>."
+      }
+    ]
+  },
+  "full_stream_preservation": {
+    "baseline": "b6e78bf0abfc3257f5bffdf4bc129ad1d3c10f6a",
+    "regions": [
+      {
+        "file": "app/slug_workspace_v2/src/path_observation.rs",
+        "region": "NormalizedAbsolutePath definition, constructors, storage and full Hash derive",
+        "bytes": 3364,
+        "sha256": "85fc6de89cdf0b7fc698e54040c5258d72ad6476b6a8015d91bb04cfce90e83f",
+        "exact_head_match": true
+      },
+      {
+        "file": "app/slug_bzlmod_v2/src/source_preparation/workspace_identity.rs",
+        "region": "All production definitions including StableKey SHA writer and content identity",
+        "bytes": 13952,
+        "sha256": "a44387734226665e2a5fbd10db439540573d65ecfafb64e983c325c0f2539f1f",
+        "exact_head_match": true
+      }
+    ],
+    "demand_identity_field_order": [
+      "namespace",
+      "path",
+      "operation",
+      "windows_long_path_input",
+      "image_path"
+    ],
+    "hash_domain": "Operational Demand map/DICE/shard routing; no persisted/strong/source/state/CAS SHA consumer found in audit. Generic full path stream unchanged."
+  },
+  "workspace_sha_golden": {
+    "baseline": "b6e78bf0abfc3257f5bffdf4bc129ad1d3c10f6a",
+    "actual_baseline_candidate_bytes": [
+      233,
+      116,
+      247,
+      202,
+      5,
+      244,
+      243,
+      9,
+      165,
+      175,
+      208,
+      52,
+      164,
+      103,
+      224,
+      35,
+      185,
+      211,
+      130,
+      250,
+      237,
+      34,
+      52,
+      110,
+      246,
+      209,
+      232,
+      216,
+      71,
+      45,
+      127,
+      46
+    ],
+    "actual_baseline_candidate_hex": "e974f7ca05f4f309a5afd034a467e023b9d382faed22346ef6d1e8d8472d7f2e",
+    "selector": "source_preparation::workspace_identity::tests::stable_candidate_uses_complete_owner_identity_and_preserves_structural_authority",
+    "platform": "Linux pinned nightly; other targets do not assert this platform-specific fixture byte stream"
+  },
+  "correction": {
+    "finding": "Bounded codegen found10reference-address tuple setup/0x58frame in intermediate manual tuple Eq/Ord copies, unlike inspected old derived copies. These were code-shape observations across artifacts, not runtime regression proof.",
+    "fix": "Ordinary inline hints removed fields() calls but tuple setup remained. Direct exhaustive original-field Eq/Ord removed the identified setup before final Workspace/Bzlmod/Loading/Core/CLI builds and native runs; independent tuple oracle unchanged.",
+    "final_evidence": "Final Workspace SHA6ff59a647c89ac7ccb7acfe726a8081072cb4b3bff91dba3a5f709a95a5be14e,9Ord plus2Eq bounded copies inspected; no10-reference setup, remaining spills/expanded path comparisons explicit. HashedDemand consumers show scalarload0x98 +u64hasher; ownedvariant160Bcopy is ownership, not hashing. Static code shape is not comparison-time or zero-cost proof.",
+    "historical_artifact_scope": "Intermediate Workspace executable at shared target path was superseded by final6ff59a; captured SHA/disassembly records preserve that investigation, not a still-retained intermediate executable. Final source/artifact/gates are authoritative."
+  },
+  "compile": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 20.33029767400876,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-baseline-bzlmod-build-result.json",
+        "sha256": "be8f1bc6a7578502fa92036eb97f2d202ada207e43cc1cc89dbacecb4375ea77"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 42.309689421992516,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-red-loading-build-result.json",
+        "sha256": "ab3bb7d8b3367c942b55b3540aa35c4887cee24c13d891eab25d303604d30479"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_workspace_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.4796886240073945,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-workspace-build-result.json",
+        "sha256": "94710aa0235d42e5c00bd8332eeafa8a75e452aa157216004651df243ade55c4"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 43.39054854500864,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-bzlmod-build-result.json",
+        "sha256": "bd738c46dd38373bf4e9b484bb06e4d5e9010a9848781518c0748e30011a555f"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 95.1462469019898,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-loading-build-result.json",
+        "sha256": "8ab28a6471fc5075a9d32f4ddabbbe6650585be8cdee9123a78b9b9734d953b5"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_workspace_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.631931757001439,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-final-workspace-build-result.json",
+        "sha256": "d2a07e4b3baa5594fd0a5065df6c16181530c579d821edbebbe5b48df3e9e0a8"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 17.017537191000883,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-final-bzlmod-build-result.json",
+        "sha256": "3c2033b8bc710a6926429436a3fe4480a9b844cfe833ac6fcf6ea4a2df9df64e"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 35.8964077319979,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-final-loading-build-result.json",
+        "sha256": "468bf2afcafb06af16c0976cce5cc38eeec3f32326a7cea357b926f409c867b6"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 145.08138558999053,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-core-build-result.json",
+        "sha256": "3f0e34923a68fdb80a2653bb9a2eb9460ff329c72571f6b4a7a8b4addc46d325"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 107.03960169099446,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-cli-build-result.json",
+        "sha256": "161f476be2ed0cb85cb8e086aa821e3ecf9d65ce5f465dc4b36046f4bfeb54f9"
+      }
+    }
+  ],
+  "artifact_scope": {
+    "core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "preserved_executable": "/tmp/slug-wp425-validation/artifacts/demand-hash-candidate-3a23e9440a02cb73",
+      "executable_sha256": "3a23e9440a02cb73839f91a655f0a41fef0defc49fecba8860b8e3fe620f3c5d"
+    },
+    "control": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "preserved_executable": "/tmp/slug-wp425-validation/artifacts/canonical-route-hash-candidate-4be06cb56e1aae46",
+      "executable_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a",
+      "baseline": "b6e78bf0abfc3257f5bffdf4bc129ad1d3c10f6a",
+      "scope": "Accepted canonical-route implementation before Demand hash changes; reuse preserved exact artifact without another copy."
+    },
+    "same_cli_for_abba": "eb287003d70f62ba4a947ed028c81b1d9930f55b239e0ad8e5efa401f5f9948c",
+    "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203"
+  },
+  "cpu_diagnostic": {
+    "selection_evidence": {
+      "baseline_head": "b6e78bf0abfc3257f5bffdf4bc129ad1d3c10f6a",
+      "sampled_artifact": "/tmp/slug-wp425-validation/artifacts/canonical-route-hash-candidate-4be06cb56e1aae46",
+      "sampled_artifact_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a",
+      "cpu_data": "/tmp/slug-wp425-validation/canonical-route-hash-cpu.data",
+      "load_bias": "0x558812859000",
+      "samples": {
+        "all": 4086,
+        "compare_components": {
+          "address": "0x5bcae90",
+          "samples": 277,
+          "percentage": 6.779246206558982
+        },
+        "Path_hash": {
+          "address": "0x58b7800",
+          "samples": 199,
+          "percentage": 4.870288790993637
+        },
+        "Demand_Hash_direct_self": {
+          "address": "0x5877680",
+          "samples": 20
+        },
+        "Demand_Ord_direct_self": [
+          {
+            "address": "0x58e8bc0",
+            "samples": 1
+          },
+          {
+            "address": "0x58ee3a0",
+            "samples": 6
+          }
+        ],
+        "Arc_PathBuf_Ord_direct_self": 26,
+        "Arc_PathBuf_PartialOrd_direct_self": 14
+      },
+      "identified_static_hash_chain": [
+        "Demand::hash@0x5877680 call@0x58776c6 through GOT0x5fb7db8",
+        "Arc<PathBuf>::Hash@0x58740d0 tail jump through GOT0x5fc6e08",
+        "PathBuf::hash@0x58b7e60 tail jump through GOT0x6060558",
+        "Path::hash@0x58b7800"
+      ],
+      "other_identified_path_hash_branch": "Hashed<&Path>::new@0x58775a0 is called by WorkspaceDirectorySnapshot::value@0x589d700; other PathBuf parents include BzlModuleIdentity/source-origin/BzlModuleEvalKey/cycle identities.",
+      "proposed_minimal_fixed_work_discriminator": "Use an actual Loading source/inventory returned PathObservationDemand, hash the same immutable demand and its clones64 times into a counting Hasher. A reviewed demand-local cached weak hash should emit64 scalar writes/512bytes independently of path depth, versus current structural-path work. Keep full original five-field Eq/Ord and all four constructors; global NormalizedAbsolutePath Hash is unchanged because StableKey candidates consume that full stream in SHA256. This is a proposal, not selected implementation or performance claim.",
+      "qualification": [
+        "Counts in shared path functions cannot be apportioned to operational demands without runtime callchains.",
+        "Only identified direct/GOT/static references are proved; not every indirect or tail reference is excluded.",
+        "Direct Demand Hash20 self samples establish that owner executed, not that it caused199 shared PathHash samples.",
+        "Comparison evidence is broad; do not replace Path component ordering with byte ordering or cached weak-hash order.",
+        "No runtime sampling, raw stacks/registers/environment, source edits, Cargo or native execution performed."
+      ],
+      "derived_artifacts": {
+        "/tmp/slug-wp425-validation/path-demand-static-callers.json": "4f0ffdbb709ab7dedea17b23c513e796f8e3b8d7e06a42e7c87b8c77ff53c4c3",
+        "/tmp/slug-wp425-validation/path-demand-static-callers-resolved.json": "98cce900a25c25a0c81b444b616beafbf0c635badb6a5984e97c12d97815b25b",
+        "/tmp/slug-wp425-validation/path-demand-wrapper-static-callers.json": "61a128f5414a7c15a13a377c551912a535006ba768e70b8d6063df1551deb35f",
+        "/tmp/slug-wp425-validation/path-demand-wrapper-static-callers-resolved.json": "4abd0678fede2c9537106c512a361b163174a8184f00aaa058d80342cb68be4c"
+      }
+    },
+    "candidate_capture": {
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "cycles": 832,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "elapsed_seconds": 35.42958325499785,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      }
+    },
+    "method": "perf6.8.12 user task-clock F199 instruction-pointer samples only, no raw stacks/registers/environment/callgraph capture. Inherited helpers present. Operational60s/8GiBAS/1MiBstream supervisor is containment, not memory-fit evidence.",
+    "comparison": "Different reached prefixes and materialization waits prevent normalized CPU/whole-command performance inference. Shared PathHash/compare samples cannot be wholly assigned to Demand. No postcandidate attribution or zero-cost claim is made.",
+    "next": "Actual analysis terminal failure now takes priority over another speculative performance optimization."
+  },
+  "rust_abba": [
+    {
+      "side": "a1",
+      "core_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a",
+      "cli_sha256": "eb287003d70f62ba4a947ed028c81b1d9930f55b239e0ad8e5efa401f5f9948c",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "cycles": 609,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_macos_aarch64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_macos_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_linux_s390x_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_linux_riscv64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_linux_ppc64le_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk21_linux_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 83,
+        "roots": 43
+      },
+      "elapsed_seconds": 27.074994572991272,
+      "root_compute_interval": {
+        "aborted": true,
+        "closed_count": 610,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 11251739925,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 128,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 11040286705,
+        "wall_overflow": false
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 429,
+            "kind": "paths",
+            "max_wall_ns": 2601914,
+            "wall_ns": 106551319
+          },
+          {
+            "closed_count": 49,
+            "kind": "repositories",
+            "max_wall_ns": 11174500085,
+            "wall_ns": 13358518987
+          },
+          {
+            "closed_count": 5,
+            "kind": "environment",
+            "max_wall_ns": 24640,
+            "wall_ns": 70971
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 126,
+            "kind": "workspaces",
+            "max_wall_ns": 254438974,
+            "wall_ns": 1894826927
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "precleanup_modeled_retained_bytes": 16552,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "event_prefix_truncated": true,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-rust-a1.json",
+        "sha256": "5cc0f3157d17a85eeb00ecd8aeb31031ec476df6e64c4509158ecf6459faab1b"
+      }
+    },
+    {
+      "side": "b1",
+      "core_sha256": "3a23e9440a02cb73839f91a655f0a41fef0defc49fecba8860b8e3fe620f3c5d",
+      "cli_sha256": "eb287003d70f62ba4a947ed028c81b1d9930f55b239e0ad8e5efa401f5f9948c",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "cycles": 832,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "elapsed_seconds": 35.12857673200779,
+      "root_compute_interval": {
+        "aborted": false,
+        "closed_count": 832,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 17727070596,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 0,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 17447698030,
+        "wall_overflow": false
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 594,
+            "kind": "paths",
+            "max_wall_ns": 2640133,
+            "wall_ns": 175022246
+          },
+          {
+            "closed_count": 64,
+            "kind": "repositories",
+            "max_wall_ns": 525393563,
+            "wall_ns": 2840916249
+          },
+          {
+            "closed_count": 11,
+            "kind": "environment",
+            "max_wall_ns": 25450,
+            "wall_ns": 149971
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 162,
+            "kind": "workspaces",
+            "max_wall_ns": 259743661,
+            "wall_ns": 2541814009
+          },
+          {
+            "closed_count": 1,
+            "kind": "refused",
+            "max_wall_ns": 11115530323,
+            "wall_ns": 11115530323
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "precleanup_modeled_retained_bytes": 3840752,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "event_prefix_truncated": true,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-rust-b1.json",
+        "sha256": "282f38ac93680970b8338e28c248c22124d5004e69c79db225357e8c36f2a953"
+      }
+    },
+    {
+      "side": "b2",
+      "core_sha256": "3a23e9440a02cb73839f91a655f0a41fef0defc49fecba8860b8e3fe620f3c5d",
+      "cli_sha256": "eb287003d70f62ba4a947ed028c81b1d9930f55b239e0ad8e5efa401f5f9948c",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "attempts": 853,
+        "kind": "analysis",
+        "reason": "reason_format_limit",
+        "status": "accepted_terminal_error"
+      },
+      "cycles": 853,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "elapsed_seconds": 24.66511185199488,
+      "root_compute_interval": {
+        "aborted": false,
+        "closed_count": 853,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 18348994949,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 0,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 18048228579,
+        "wall_overflow": false
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 614,
+            "kind": "paths",
+            "max_wall_ns": 2859375,
+            "wall_ns": 192711875
+          },
+          {
+            "closed_count": 65,
+            "kind": "repositories",
+            "max_wall_ns": 533771926,
+            "wall_ns": 2921358509
+          },
+          {
+            "closed_count": 11,
+            "kind": "environment",
+            "max_wall_ns": 76831,
+            "wall_ns": 226142
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 162,
+            "kind": "workspaces",
+            "max_wall_ns": 235199196,
+            "wall_ns": 2441916601
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "precleanup_modeled_retained_bytes": 758783,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "event_prefix_truncated": true,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-rust-b2.json",
+        "sha256": "b3da166d8dcb6fb17ae91e975bb221bf6335cf300aab922ad7545514a5b44b99"
+      }
+    },
+    {
+      "side": "a2",
+      "core_sha256": "4be06cb56e1aae467b0c14e7a6c7ceea86060224e6a2f1e0b36b40ff9aee977a",
+      "cli_sha256": "eb287003d70f62ba4a947ed028c81b1d9930f55b239e0ad8e5efa401f5f9948c",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "attempts": 853,
+        "kind": "analysis",
+        "reason": "reason_format_limit",
+        "status": "accepted_terminal_error"
+      },
+      "cycles": 853,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 4,
+            "kind": "file",
+            "repository": "rules_python++config+rules_python_internal"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_swift++non_module_deps+build_bazel_rules_swift_local_config"
+          },
+          {
+            "archive": null,
+            "index": 3,
+            "kind": "template",
+            "repository": "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_python++uv+uv"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_python++python+pythons_hub"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_arm64_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_win_toolchain_config_repo"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_java++toolchains+remotejdk25_macos_aarch64_toolchain_config_repo"
+          }
+        ],
+        "record_count": 109,
+        "roots": 53
+      },
+      "elapsed_seconds": 26.03420707899204,
+      "root_compute_interval": {
+        "aborted": false,
+        "closed_count": 853,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 19417679272,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 0,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 19054002615,
+        "wall_overflow": false
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 614,
+            "kind": "paths",
+            "max_wall_ns": 2272361,
+            "wall_ns": 211249998
+          },
+          {
+            "closed_count": 65,
+            "kind": "repositories",
+            "max_wall_ns": 559916330,
+            "wall_ns": 2997360691
+          },
+          {
+            "closed_count": 11,
+            "kind": "environment",
+            "max_wall_ns": 36111,
+            "wall_ns": 161833
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 162,
+            "kind": "workspaces",
+            "max_wall_ns": 260998738,
+            "wall_ns": 2573120159
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      },
+      "precleanup_modeled_retained_bytes": 742143,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "event_prefix_truncated": true,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/demand-hash-rust-a2.json",
+        "sha256": "25893db990c1163a8ad9a7bba938305fc314092a4fb9c1bdf16b8c56e8c8682a"
+      }
+    }
+  ],
+  "terminal_bounded_comparison": {
+    "comparison": "Final controlA2 vs candidateB2",
+    "equal_bounded_fields": {
+      "result": true,
+      "computes": true,
+      "events": true,
+      "family_totals": true,
+      "progress_totals": true,
+      "content_census": true,
+      "invalid_counter_delta": true,
+      "peak_backing_bytes": true,
+      "peak_native_fds": true,
+      "peak_retained_bytes": true
+    },
+    "retained_event_count": 128,
+    "trace_truncated": [
+      true,
+      true
+    ],
+    "content_census_complete": [
+      false,
+      false
+    ],
+    "live_precleanup_retained_bytes": {
+      "control_a2": 742143,
+      "candidate_b2": 758783
+    },
+    "qualification": "Exact equality of these bounded records does not prove identical full errors, all853steps, successful Rust cquery, speed or wholeRSS. Live modeled retention differs; final refunds are exact."
+  },
+  "comparison_qualification": {
+    "results": "A1/B1 WorkDeadline, B2/A2 accepted analysis terminal error at853 with reason_format_limit; no success. Profiling run alsoWorkDeadline.",
+    "scope": "B2/A2 match bounded result,128retained events, census, scalar progress/family/peak fields exactly. Traces truncated and census incomplete; this does not prove identical full error, all853steps, successful Rust cquery or speed.",
+    "memory": "Live modeled retention candidate758783 vscontrol742143 (+16640), peak modeled retained28323621 equal; these are not wholeRSS. All final backing/FD zero and retained168baseline. All positive layout/peak credits retained, no caps increased.",
+    "intervals": "Closed root_compute intervals may include aborts; retain flags/counts as recorded. Categories overlap, helperCPU excluded, runtime construction omitted, observer disable not an atomic snapshot.",
+    "outliers": "B1/profile have longer refused progress intervals and~35s elapsed; preserve them without exclusion or another run. Operational caps unchanged; no latency acceptance."
+  },
+  "format_evidence": {
+    "command": [
+      "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "--emit",
+      "stdout"
+    ],
+    "method": "All formatter deviations of each current changed file must equal formatter deviations of its HEAD baseline, without line-number dependence. New files require zero deviations. No source mutation.",
+    "passed": true,
+    "files": [
+      {
+        "file": "app/slug_bzlmod_v2/src/source_preparation/workspace_identity.rs",
+        "sha256": "2211f6a48a6fffff345d142f8c8c4145a43abd70cb63dbbd411febbc1baeb2b5",
+        "new_format_deviations": 0,
+        "preserved_baseline_deviations": []
+      },
+      {
+        "file": "app/slug_loading_v2/src/host_package_load_tests/package_load_frontier_tests.rs",
+        "sha256": "e545d920f3b0a5259d35ce12dd98d20d1575b7598f2a54b653b63bc3713fb595",
+        "new_format_deviations": 0,
+        "preserved_baseline_deviations": []
+      },
+      {
+        "file": "app/slug_workspace_v2/src/path_observation.rs",
+        "sha256": "f41edb1b79d4154809e4a9b160de60e7c55029c13e24cc6ccd3b4d881d695046",
+        "new_format_deviations": 0,
+        "preserved_baseline_deviations": []
+      },
+      {
+        "file": "app/slug_workspace_v2/src/path_observation/demand_hash_tests.rs",
+        "sha256": "eac97db8934bd77e54e3f0d4d150404f9d6b0d6d22bbeac09df856ee7bdba740",
+        "new_format_deviations": 0,
+        "preserved_baseline_deviations": []
+      }
+    ]
+  },
+  "review": {
+    "design": "ACCEPT",
+    "source_tests": "ACCEPT",
+    "direct_comparison_correction": "ACCEPT",
+    "final": "ACCEPT: independent final pins/validation/claims agree; full identity/order/Image custody/accounting/pinned SHA preserved; bounded terminal-error agreement and outliers qualified, success/latency/RSS/activation remain open."
+  },
+  "final_validation": {
+    "ordinary_selected_passed": 183,
+    "native_guards_selected_passed": 5,
+    "warm_ignored_selected_passed": 1,
+    "actual_warm_commands": 4,
+    "original_rust_diagnostics": 4,
+    "candidate_cpu_captures": 1,
+    "mutation_freeze": "All source/staging/temp preparation frozen across native sequence; Rust SHA freeze verified afterward; Cargo serialized and separate from native measurement.",
+    "plan_archive_diff_links": {
+      "passed": true,
+      "changed_pins": 8,
+      "reference_pins": 16,
+      "raw_pins": 35,
+      "nested_final_artifact_audit_pins": 18,
+      "relative_links": 232,
+      "native_rust_freeze_verified": true,
+      "active_cargo_rustc_slugd_slug_perf_objdump": [],
+      "historical_artifact_scope": "Intermediate Workspace target was superseded; its captured SHA/disassembly are historical evidence, not a live executable pin. Final6ff59a codegen and all final gates verified.",
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "scripts/v2_plan_status.py"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "bash",
+            "scripts/v2_archive_status.sh"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "git",
+            "diff",
+            "--check"
+          ],
+          "exit_code": 0
+        }
+      ]
+    }
+  },
+  "raw_receipts": [
+    {
+      "file": "/tmp/slug-wp425-validation/path-demand-owner-attribution.json",
+      "sha256": "dc956eddbd20988a4e006ca2a97e5599f18b912f94f20c44931c7c99abf377b6"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-baseline-workspace-spelling.json",
+      "sha256": "14d60a45a587c01b8b4c85bacbc710ee123a8162226cffe15cb7dd2ca567f952"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-workspace-spelling-golden.json",
+      "sha256": "bd66158c7779af9100650ae81a03cb874fda28c51417b060efa8f9e3ccc6d722"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-full-stream-proof.json",
+      "sha256": "93072fd0997155be4f1291d5376f1741280134bf799c118c901df1bb1fa3ce89"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-actual-inventory-red.json",
+      "sha256": "ddf344c8efbb717c27b836d5d0f60cc7ed0964fed96f9564b10a2f3329d37d6d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-accounting-audit.json",
+      "sha256": "3b40a6e078c59c642f565bd37bff9719f68e864dc9a7f5f2a0e184a30a63b6f1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-workspace-codegen.json",
+      "sha256": "62b12bbf6a0f84a7c364f5be6fcd8f746381f2a6ac8a82d6b47df2090f835e4c"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-baseline-comparison-codegen.json",
+      "sha256": "0bac6aad574d89cf11056b766d4db57332a2325541448300cf554d1839580fda"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-final-workspace-codegen.json",
+      "sha256": "9ee991382348cc95b4f9bcb37faf72097d971c42623cba8d1748042517325d63"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-final-workspace-tests.json",
+      "sha256": "618a93a7836b6c1c849012445af2f96c9edf6e273f245f0ad43e5d5633dfaae1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-final-bzlmod-tests.json",
+      "sha256": "27cb66654a33391429f9444282c8e29cd1bb3b1dc6d48df6024d3a3621c91fbb"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-final-loading-tests.json",
+      "sha256": "80af83733c8a7cbcb3eaada734a82bce7f6dfa0caa5aa012ce388fbd747a7aba"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-core-source-controls.json",
+      "sha256": "82b4c5b0c5e1425a1fd4b5994222b482dfff8f9332cefdd9f8482ceda21a4da2"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-native-guards.json",
+      "sha256": "45d51520022546e3f35407404586a6c11252698c96658adcce12de86d7adf284"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-authentic-warm.json",
+      "sha256": "d87c1c132b4feedf3d0b3d09e35d67a57847ef955dbce8ba6c8150d1ac6aff5e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-native-freeze.json",
+      "sha256": "049300095d404b1e9cd91dd6d3a38f637fd019586744280dd75e8e31096d6140"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-native-sequence.json",
+      "sha256": "2fd3487f283c963d99eea4d85568cc7511a440a9eab9638ea3bfeb4f1083126b"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-control-preservation.json",
+      "sha256": "c0fc79e349cc7d3c53cb816515939ff4068ebed38b71719bf8c435600c3289da"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-control-cli-preservation.json",
+      "sha256": "66fa36b7a7b9fb072e3fa8a665c45e29838ac756ac43fd03c993aeac70caa727"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-candidate-preservation.json",
+      "sha256": "c5ba7644b986c30f32e437be9a5172eaa2aaf66107704d8aa84f67b379b8d41e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-cpu-profile.json",
+      "sha256": "6ecd54a7eb683042ea2f7d8fe473d81d6dd402c139097bcc483095b5ff9efeb7"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-cpu.data",
+      "sha256": "5c69dcdb9a23aec017fdd1875324c6632eb7e20ce3b89a370ca32e2e5597037c"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-cpu-compact.txt",
+      "sha256": "23252ff7bcb7578c4701f7c5fc4008226eaf47c3c1c25a7d33f9aa7223fdc7e7"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-terminal-bounded-comparison.json",
+      "sha256": "7744b623a34b3b69c2761b8d69154735a3244156a3ae80c37a92d1e19f49d957"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-format.json",
+      "sha256": "db2edc7ea826cc64fb326600a1393b9981b246554a3c7a90153bfaa0cb38a2ce"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-baseline-bzlmod-build-result.json",
+      "sha256": "be8f1bc6a7578502fa92036eb97f2d202ada207e43cc1cc89dbacecb4375ea77"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-red-loading-build-result.json",
+      "sha256": "ab3bb7d8b3367c942b55b3540aa35c4887cee24c13d891eab25d303604d30479"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-workspace-build-result.json",
+      "sha256": "94710aa0235d42e5c00bd8332eeafa8a75e452aa157216004651df243ade55c4"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-bzlmod-build-result.json",
+      "sha256": "bd738c46dd38373bf4e9b484bb06e4d5e9010a9848781518c0748e30011a555f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-loading-build-result.json",
+      "sha256": "8ab28a6471fc5075a9d32f4ddabbbe6650585be8cdee9123a78b9b9734d953b5"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-final-workspace-build-result.json",
+      "sha256": "d2a07e4b3baa5594fd0a5065df6c16181530c579d821edbebbe5b48df3e9e0a8"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-final-bzlmod-build-result.json",
+      "sha256": "3c2033b8bc710a6926429436a3fe4480a9b844cfe833ac6fcf6ea4a2df9df64e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-final-loading-build-result.json",
+      "sha256": "468bf2afcafb06af16c0976cce5cc38eeec3f32326a7cea357b926f409c867b6"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-core-build-result.json",
+      "sha256": "3f0e34923a68fdb80a2653bb9a2eb9460ff329c72571f6b4a7a8b4addc46d325"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/demand-hash-cli-build-result.json",
+      "sha256": "161f476be2ed0cb85cb8e086aa821e3ecf9d65ce5f465dc4b36046f4bfeb54f9"
+    }
+  ],
+  "remaining": [
+    "Actual original Rust cquery success and Archive closure",
+    "General production activation",
+    "Equivalent completed-command memory/latency proof",
+    "Inherited derived Source Path/repeated Workspace closure gates"
+  ],
+  "next": "Use a bounded static typed terminal-leaf projection through retained Analysis/Registration/Loading error variants; if producer already flattened cause, retain a typed category there before to_string. Couple diagnostic work to demanded generic semantic fix; no freeform output/message parsing/cap increase."
+}

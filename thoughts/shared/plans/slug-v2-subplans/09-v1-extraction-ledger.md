@@ -2,6 +2,18 @@
 
 ## WP425 rooted repository consumers
 
+Observation demands apply the same Buck2-derived weak-hash reuse pattern to an
+existing immutable value, with one inline scalar and no new allocation or owner.
+The full five-field identity remains authoritative for Eq/Ord and source facts;
+original normalized-path storage/Hash and workspace spelling SHA bytes stay
+unchanged. Existing size-of-value/row forecasts and Allocative include positive
+cache layout bytes, including Image and Need scratch. No donor import, global
+interner, digest authority or resource exemption appears. Constructor work and
+fixed repeated hashing remain distinct from command latency and memory gates.
+The [demand-hash receipt](wp1225-demand-hash-acceptance-2026-11-08.json) records
+152→160-byte Demand and 160→168-byte row layout, actual inventory RED/GREEN,
+full SHA/identity/custody proof and removal of the intermediate comparison tuple.
+
 Canonical repository routes reuse the existing Buck2-derived weak-hash pattern
 from `starlark_map::Hashed` and Loading environment inputs, adapted to one inline
 u64 because the route already owns private immutable fields. Existing full

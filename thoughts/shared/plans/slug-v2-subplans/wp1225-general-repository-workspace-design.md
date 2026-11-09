@@ -1549,6 +1549,60 @@ first control 49/95 and final control 8/15 after a 30.2-second materialization
 wait. Keep the outlier and stopped-prefix qualification. Next structural work
 requires its own actual owner/discriminator; no source class or cap expands.
 
+### Immutable observation-demand hash reuse
+
+Select one private weak routing word on immutable `PathObservationDemand`.
+The actual Rust CPU sample reaches Demand hashing directly and its static path
+to the sampled OS path writer. Other path/hash/comparison callers share those
+writers; do not attribute their complete sample groups to Demand. This owner
+selection requires an actual inventory-returned Demand work regression.
+
+Compute the original five fields once at each successful constructor: namespace,
+normalized path, operation, raw Windows UTF-16 input and charged Image path.
+Image eligibility validation remains before construction. Clone/Dupe retain the
+scalar. Repeated hashes of each actual returned inventory Demand must write
+exactly one u64/eight bytes per call (64 writes/512 bytes for 64 calls),
+independent of path length; this is the acceptance threshold declared before
+measurement. Construction still pays the original full field writer once.
+
+Full equality and ordering compare all five original fields in their existing
+order using platform Path semantics, ignoring the weak word. Keep Debug's
+original fields, raw Windows spelling, operation/namespace identity, Image
+selector identity and independent budget custody. No weak hash supplies source,
+content, state, history, native admission or persisted identity authority.
+`NormalizedAbsolutePath` storage and full generic Hash remain unchanged: the
+repository workspace spelling candidate's pinned version-one SHA stream depends
+on that full writer and must keep its exact bytes. Demand Hash is operational
+map/DICE/shard routing only. Both shard injection and lookup retain the same
+shared selector, whose bucket assignment is explicitly nonpersistent.
+
+The positive per-value layout bytes flow through existing `size_of<Demand>` and
+row-sized Image, Need, native/source and driver scratch forecasts. Measure
+actual Demand/key/row deltas and retain Allocative ownership; add no heap owner,
+interner, global cache, metadata exemption or cap increase. Existing path-owner
+capacity charges remain exact because their representation does not change.
+Prove full-field constructor binding, forced collisions/full OS ordering, raw
+UTF-16 distinctions, actual DICE current-fact A/B/A/removal/cancellation and Image
+left-key/result custody with exact final refunds. Relevant consumer builds,
+native guards and warm originals precede acceptance. Original ABBA prefixes
+remain secondary diagnostics, with outliers and aborted intervals retained;
+completion, latency, RSS and General activation remain separate gates.
+
+The [demand-hash receipt](wp1225-demand-hash-acceptance-2026-11-08.json)
+records actual inventory RED→GREEN, 183 ordinary checks, five protected native
+guards and four warm original commands. Demand/key layout grows 152→160 bytes
+and rows 160→168; the original full path region and workspace identity production
+remain byte-identical, and the real Linux v1 candidate golden stays exact.
+An intermediate borrowed comparison tuple was found in codegen and removed via
+direct original-field Eq/Ord before final builds and measurements. Final static
+inspection qualifies remaining spills and makes no timing claim.
+ABBA cycles609/832/853/853 retain two WorkDeadline refusals and two accepted
+analysis terminal errors in the same bounded category/attempt/recorded epoch.
+The full errors are withheld by the existing reason formatter, so identical full
+error and successful completion are unproved. Next typed failure classification
+must remain bounded/static and coupled to the demanded generic semantic fix;
+no freeform data, new report cap or arbitrary error-output escape is selected.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

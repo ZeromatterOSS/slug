@@ -3,30 +3,37 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: immutable canonical-route hash reuse in original
+Current delta: immutable observation-demand hash reuse in original
 `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
-The [route-hash receipt](wp1225-canonical-route-hash-acceptance-2026-11-08.json)
-records real registry DICE-route outer-hasher work RED→GREEN: 64 repeated hashes
-now write 512 bytes in 64 calls rather than 20,608 bytes in 1,664 calls. One
-original complete field writer runs at construction; full structural equality
-and all nested writers remain unchanged. The inline scalar grows the measured
-route layout 232→240 bytes, with existing Allocative ownership and no native
-credit or digest authority. All 69 focused tests, four native guards and four
-original warm compiler commands pass.
-Original ABBA cycles are 681/889/884/197, all WorkDeadline. Candidates record
-53 roots/109 records; the first control records 49/95 and the final control 8/15
-after a 30.2-second materialization wait. Retain the outlier. These are bounded
-prefix observations, not completed-command latency, RSS or activation evidence.
-The [selected contract](wp1225-general-repository-workspace-design.md#immutable-canonical-route-hash-reuse)
-keeps source/route freshness, every structural field, ordering and collision
-confirmation authoritative. Next discriminate remaining path/demand structural
-work from actual CPU samples before selecting another representation change.
-Root-route caching, BUILD synopsis reuse, FileBytes/Archive discovery and
-Need cacheability remain unselected; no clock, native cap or caller pruning is
-selected. The [prior package-import component](wp1225-package-child-lookahead-acceptance-2026-11-08.json)
+The [demand-hash receipt](wp1225-demand-hash-acceptance-2026-11-08.json)
+records actual inventory Demand work RED→GREEN: 64 hashes now emit 64 writes/
+512 bytes instead of 512 writes/3,648 bytes. All four constructors bind the
+original five fields once; full Eq/Ord/Debug, raw Windows input and Image custody
+remain authoritative. Generic normalized-path storage/Hash and the pinned
+workspace spelling SHA bytes remain unchanged. The measured eight-byte Demand
+and row growth flows through existing size-based forecasts without cap changes.
+All 183 ordinary checks, five native guards and four original warm compiler
+commands pass. Bounded codegen caught an intermediate comparison tuple and
+confirms its removal from inspected final copies; it establishes no timing claim.
+Original ABBA cycles are 609/832/853/853. A1 stops at WorkDeadline at 43 roots/
+83 records; B1 at 53/109. B2 and A2 both reach the bounded analysis terminal-error
+category at attempt 853 and 53/109, with reason `reason_format_limit`. These are
+not successful commands or proof of identical full errors. A later CPU capture
+also stops at WorkDeadline. Cleanup returns exactly to baseline throughout.
+The [selected contract](wp1225-general-repository-workspace-design.md#immutable-observation-demand-hash-reuse)
+keeps construction work, full semantic fields, per-value charges, transient Needs
+and shared nonpersistent shard routing explicit. Next identify the actual typed
+analysis failure through a bounded static classifier, then implement its demanded
+general behavior; freeform errors remain private. No latency/RSS, public Rust
+completion or General activation gate closes. Root-route/syntax/global-path
+caching and FileBytes/Archive discovery remain unselected; no caller pruning,
+Need cacheability, clock or native-cap increase is selected.
+The [prior canonical-route component](wp1225-canonical-route-hash-acceptance-2026-11-08.json)
+retains full equality and immutable scalar reuse, with its accepted 69 checks
+and protected native/warm proof. The
+[package-import component](wp1225-package-child-lookahead-acceptance-2026-11-08.json)
 retains its bounded shared Lstat policy, ordered barriers and actual inventory
-one-round returned-facts recovery. Its 106 checks and protected native/warm
-proof remain inherited, without a command performance claim.
+one-round returned-facts recovery without a command performance claim.
 The [prior registration component](wp1225-metadata-lookahead-acceptance-2026-11-08.json)
 retains its behavior and four diagnostic counters after shared-policy extraction.
 The [validated observation union](wp1225-observation-union-acceptance-2026-11-08.json)

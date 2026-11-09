@@ -455,6 +455,16 @@ mod tests {
         let b = key(same_name_other_kind);
         assert_eq!(a, a2);
         assert_eq!(a.candidate(), a2.candidate());
+        // Recorded from the full version-one stream before Demand hash reuse.
+        #[cfg(target_os = "linux")]
+        assert_eq!(
+            a.candidate(),
+            [
+                233, 116, 247, 202, 5, 244, 243, 9, 165, 175, 208, 52, 164, 103, 224, 35, 185, 211,
+                130, 250, 237, 34, 52, 110, 246, 209, 232, 216, 71, 45, 127, 46
+            ],
+            "version-one spelling must retain its full path hash stream"
+        );
         assert_eq!(a.owner().unique_name(), b.owner().unique_name());
         assert_ne!(a, b);
         assert_ne!(a.candidate(), b.candidate());

@@ -97,6 +97,36 @@ async fn observed_inventory_load_siblings_collect_independent_lstat_prerequisite
     assert!(!RepositoryPackageInventoryObservationKey::equality(
         &value, &value
     ));
+    // Count the actual returned DICE prerequisite keys, after their complete
+    // semantic identity is established above. Construction pays field hashing;
+    // repeated operational routing must read one cached scalar per demand.
+    use std::hash::Hash;
+    use std::hash::Hasher;
+    #[derive(Default)]
+    struct HashWork {
+        writes: usize,
+        bytes: usize,
+    }
+    impl Hasher for HashWork {
+        fn finish(&self) -> u64 {
+            0
+        }
+        fn write(&mut self, bytes: &[u8]) {
+            self.writes += 1;
+            self.bytes += bytes.len();
+        }
+    }
+    for demand in needs.path_observations().unwrap().demands() {
+        let mut work = HashWork::default();
+        for _ in 0..64 {
+            demand.hash(&mut work);
+        }
+        assert_eq!(
+            (work.writes, work.bytes),
+            (64, 64 * std::mem::size_of::<u64>()),
+            "actual inventory demand repeated hashes must have fixed postconstruction work"
+        );
+    }
     let rows = no_inventory_batch(&tracker, &key);
     for name in ["a.bzl", "b.bzl"] {
         assert!(
