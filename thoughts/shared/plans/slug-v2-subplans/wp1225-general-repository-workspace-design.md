@@ -1926,6 +1926,89 @@ Rust records113 operations, with LLVM-tools partially decoded before sticky
 WorkDeadline and exact cleanup. A temporary unoptimized capture already reached
 that epoch; no timing/frontier/RSS improvement or full-command success is claimed.
 
+### Bounded cross-path native body recovery
+
+Status: independent design/source/final review ACCEPT; component proof in receipt.
+
+Outcome: let a native snapshot reuse a live same-root body at another path after
+fresh payload admission refuses, toward authentic Rust archive closure under the
+unchanged bank. This is Slug-native physical admission. The existing canonical
+body coverage, complete semantic histories, exact API validation/identity and
+production gate remain authoritative.
+
+A bounded read-only inspection of the five original toolchain archives found
+457,699,407 bytes of prior unique size/SHA fingerprints. LLVM-tools adds
+194,603,423 selected regular bytes, including a186,887,776-byte candidate matching
+prior rustc at a different path; new unique fingerprints total7,162,196 bytes.
+These are candidate-selection evidence, never byte equality, native coverage,
+whole-command fit or RSS proof. The full original command currently stops at
+sticky Source WorkDeadline during LLVM extraction, before its snapshot.
+
+Preserve normal same-path fresh comparison and reserve-before-allocation capture.
+Split fresh body admission so only refusal of the exact payload/Pending control
+byte-bank reservation is recoverable, specifically the bank's ResourceLimit;
+ChargeOverflow stays fatal Resource. Origin/Scope checks, layout arithmetic,
+BodyMap growth/actual-capacity validation and arbitrary Resource errors remain
+errors. Existing reserve_new callers retain their original Result behavior.
+Recovery never clears or bypasses sticky Source refusal. Perform current Scope
+and active checks before selecting a recovery candidate.
+
+Search only existing pending candidates and the committed root-local ledger.
+Capture their finite row endpoints and visit pending then committed insertion
+order, inspecting at most128 rows TOTAL. The maps stay append-only; ignore later
+appends. Hold no candidate array, digest/index, third map or global interner.
+Prepay the bounded cursor, one cloned lease and comparison control from the same
+bank before search; existing snapshot IO scratch remains charged. If this small
+admission refuses, preserve Resource. Under a brief ledger mutex, clone at most
+one exact-length known lease, then release it before every active/Scope callback,
+RootIo read, DICE call or async work. A cursor cannot migrate to another origin.
+Inspecting other lengths consumes the row allowance but no comparison allowance.
+
+Permit at most4 complete comparisons and512MiB cumulative comparison bytes per
+recovery. Debit the full candidate length with checked arithmetic BEFORE IO;
+an exhausted window preserves Resource. These are local recovery-work bounds,
+not Source attempt/decoded-byte allowances or changes to existing caps. Reuse
+RootIo::read_file unchanged: actual regular FD and named-frame checks, exact
+length, true EOF and SHA over the same streamed bytes. Compare every byte even
+after mismatch, then also match the captured frame to the snapshot frame. Only
+full equality permits retain_claimed on the exact live lease in this same
+pending/ledger association, followed by returning its existing Arc. No new body
+allocation or partial snapshot is published. Mismatch continues within the
+window; no match returns the original Resource. Current deadline/cancellation,
+IO or frame drift discovered during recovery may outrank that admission refusal;
+declare and test this error order rather than masking those failures as Resource.
+
+Scope: private Core body_coverage helper/tests and narrow snapshot capture join;
+reuse existing native command/archive fixtures in small test leaves. No Bzlmod
+representation, semantic Eq/Hash/SHA writer, Source/RootIo algorithm, public API,
+cap, dependency or production activation change. Compare Buck2-derived SmallMap
+indexed traversal and existing credited leases; no donor runtime/code import.
+
+Validation: execute an actual native48MiB different-path duplicate under64MiB
+retained credit as RED before the fix, then GREEN through capture, completion,
+following operations, materialization/seal and final reader with full histories
+and exact cleanup. A genuinely different48MiB body must still refuse. Cover
+pending and committed discovery, fixed row/compare/byte windows, foreign origin,
+sticky Scope, cancellation and FD/frame drift; reuse accepted protected guards.
+Then run the five original payloads through the ordinary generic native archive
+chain with512MiB and27+3 seconds, separately from full authentic Starlark cquery.
+The same-input original Rust command retains its independent closure/latency/RSS
+gate; archive-only success cannot close it. Replan if actual unique payload and
+mandatory live controls cannot fit, rather than discounting history or raising
+limits. Independent design ACCEPT precedes code; final review precedes landing.
+
+The [component receipt](wp1225-cross-path-body-recovery-acceptance-2026-11-09.json)
+records224 Core checks, actual scaled RED→GREEN, preserved changed-body refusal,
+three new native cases, twelve protected guards and four warm commands. All five
+original artifacts complete the generic native archive chain and final-reader
+cleanup with464,861,603 unique retained body bytes and526,975,068 peak admitted
+credit under the original512MiB/27+3 limits. Direct effects pin expectations;
+this is separate from authentic Starlark cquery and from RSS. The same-input full
+original records111 accepted operations then Cargo Archive WorkDeadline with
+exact cleanup; prior stopped captures reached113. No speed/frontier attribution
+or command/RSS/activation closure follows. Next investigate reached end-to-end
+work; the archive-only ownership envelope now has actual native proof.
+
 ### Bounded actual XZ decoder allocations
 
 Implementation status: independent design/source/final review ACCEPT;

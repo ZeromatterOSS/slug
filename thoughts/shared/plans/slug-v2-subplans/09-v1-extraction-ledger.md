@@ -2,6 +2,19 @@
 
 ## WP425 rooted repository consumers
 
+The selected [cross-path native recovery](wp1225-general-repository-workspace-design.md#bounded-cross-path-native-body-recovery)
+uses indexed traversal of the existing Buck2-derived SmallMap and the existing
+same-bank body leases. A prepaid bounded cursor routes only candidate discovery
+after exact payload admission refusal; full fresh RootIo FD/frame/EOF/byte
+comparison and exact same-origin membership remain necessary. No donor code,
+new collection, retained content index, digest authority or cap change is selected.
+The offline size/SHA envelope identifies a large different-path candidate, not
+native equality or completed-command RSS. Design/source review is accepted. The
+[component receipt](wp1225-cross-path-body-recovery-acceptance-2026-11-09.json) now
+records actual scaled RED→GREEN and five-original generic archive closure under
+512MiB, including full fresh comparisons and exact cleanup. Independent final
+review accepts this scope; full original cquery still reaches WorkDeadline.
+
 The selected [canonical body routing](wp1225-general-repository-workspace-design.md#archive-completion-canonical-body-routing)
 reuses existing Buck2-derived SmallMap/SmallSet backing and capacity. The pointer
 set is rebuilt from actual retained pool keys after full admission; discarded

@@ -12,9 +12,13 @@ use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceResult;
 use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
 
+use super::body_coverage::NativeBodyAdmission;
 use super::body_coverage::NativeBodyCandidates;
 use super::body_coverage::NativeBodyLedger;
 use super::*;
+
+#[path = "repository_workspace_snapshot/body_recovery.rs"]
+mod body_recovery;
 
 /// Entries/bodies precede their credit on destruction. No uncredited owned
 /// entries accessor exists; protocol completion prepays its successor first.
@@ -630,25 +634,7 @@ fn capture_body_covered(
         .map(|e| e.node())
     {
         if old.len() == length {
-            let mut offset = 0usize;
-            let mut same = true;
-            let captured = io.read_file(path, &running, |chunk| {
-                let end = offset
-                    .checked_add(chunk.len())
-                    .ok_or_else(|| io::Error::other("workspace compare overflow"))?;
-                if end > old.len() {
-                    return Err(io::Error::other("workspace comparison grew"));
-                }
-                same &= old[offset..end] == *chunk;
-                offset = end;
-                Ok(())
-            });
-            check(scope, active)?;
-            let captured = captured?;
-            if !seal::unchanged(framed, &captured.metadata) || offset != length {
-                return Err(PhysicalRootError::Snapshot);
-            }
-            if same {
+            if body_recovery::observed_equal(io, path, framed, old, scope, active)? {
                 if let Some(candidates) = candidates.as_deref_mut() {
                     candidates.retain(old, active)?;
                 }
@@ -657,7 +643,14 @@ fn capture_body_covered(
         }
     }
     let pending = match candidates.as_deref_mut() {
-        Some(candidates) => Some(candidates.reserve_new(length, active)?),
+        Some(candidates) => match candidates.reserve_new_for_capture(length, active)? {
+            NativeBodyAdmission::New(pending) => Some(pending),
+            NativeBodyAdmission::Refused(refusal) => {
+                return body_recovery::capture_existing(
+                    io, path, framed, candidates, refusal, scope, active,
+                );
+            }
+        },
         None => None,
     };
     let mut body = Arc::<[u8]>::new_uninit_slice(length);

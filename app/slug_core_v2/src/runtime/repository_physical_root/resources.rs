@@ -85,6 +85,18 @@ impl RepositoryRootResources {
             .try_reserve(bytes)
             .map_err(|_| PhysicalRootError::Resource)
     }
+    /// Only an actual byte-budget limit refusal permits bounded recovery.
+    /// Arithmetic/invariant failures retain their ordinary fatal Resource class.
+    pub(super) fn try_reserve_body_bytes(
+        &self,
+        bytes: usize,
+    ) -> Result<Option<ImageDescriptorReservation>, PhysicalRootError> {
+        match self.bytes.try_reserve(bytes) {
+            Ok(credit) => Ok(Some(credit)),
+            Err(slug_workspace_v2::ImageDescriptorBudgetError::ResourceLimit) => Ok(None),
+            Err(_) => Err(PhysicalRootError::Resource),
+        }
+    }
     pub(super) fn owns_body_block<T>(
         &self,
         block: &slug_workspace_v2::BudgetedImageBlock<T>,

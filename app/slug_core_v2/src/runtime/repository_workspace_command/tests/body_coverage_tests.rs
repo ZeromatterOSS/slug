@@ -34,6 +34,7 @@ fn command_scope(selected: &RepositoryWorkspaceReservation) -> Arc<SourceService
 }
 fn archive_input(
     directory: &Path,
+    large_path: &str,
     byte: u8,
 ) -> (tempfile::NamedTempFile, RepositoryWorkspaceOperation) {
     let mut source = tempfile::NamedTempFile::new_in(directory).unwrap();
@@ -42,7 +43,7 @@ fn archive_input(
         let mut tar = tar::Builder::new(gzip);
         // Stream the fixture to avoid a second 48MiB producer allocation.
         let mut header = tar::Header::new_gnu();
-        header.set_path("large").unwrap();
+        header.set_path(large_path).unwrap();
         header.set_size(LARGE as u64);
         header.set_mode(0o644);
         header.set_mtime(1_600_000_000);
@@ -143,7 +144,7 @@ fn native_deleted_archive_body_retires_with_history_while_final_reader_survives(
         .enable_all()
         .build()
         .unwrap();
-    let (source, operation) = archive_input(fixture.path(), b'a');
+    let (source, operation) = archive_input(fixture.path(), "large", b'a');
     let (command, fd) = start(selected.clone(), bank.clone(), scope.clone());
     let command = apply(command, &selected, operation, &runtime, &scope);
     let weak_large = {
@@ -227,8 +228,8 @@ fn native_changed_archive_body_requires_real_old_new_allocation_overlap() {
         .enable_all()
         .build()
         .unwrap();
-    let (source_a, operation_a) = archive_input(fixture.path(), b'a');
-    let (source_b, operation_b) = archive_input(fixture.path(), b'b');
+    let (source_a, operation_a) = archive_input(fixture.path(), "large", b'a');
+    let (source_b, operation_b) = archive_input(fixture.path(), "large", b'b');
     let (command, fd) = start(selected.clone(), bank.clone(), scope.clone());
     let command = apply(command, &selected, operation_a.clone(), &runtime, &scope);
     // A new index must really acquire/extract identical A again and reuse only
@@ -253,3 +254,9 @@ fn native_changed_archive_body_requires_real_old_new_allocation_overlap() {
     release(&bank, baseline, fd);
     drop((source_a, source_b, runtime, scope));
 }
+
+#[path = "cross_path_tests.rs"]
+mod cross_path_tests;
+
+#[path = "toolchain_archive_tests.rs"]
+mod toolchain_archive_tests;

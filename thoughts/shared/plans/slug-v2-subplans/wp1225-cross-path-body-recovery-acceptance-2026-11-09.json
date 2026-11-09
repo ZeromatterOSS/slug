@@ -1,0 +1,193 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "date": "2026-11-09",
+  "baseline": "dfdd3ca7210e183bf8fdc8d6f26b6bf963ca4faa",
+  "classification": "Slug-native private physical admission; no semantic API/identity/cap/production activation change",
+  "review": {
+    "design": "ACCEPT /root/reviewer; exact ResourceLimit origin and bounded full-byte ownership contract",
+    "source": "ACCEPT /root/reviewer, including readonly retain_claimed and live cursor credit",
+    "final": "ACCEPT /root/reviewer: actual source, all16 provenance/evidence pins, scaled RED/GREEN, changed-byte refusal, five-original archive chain and protected gates verified; full command/RSS/activation qualifications retained."
+  },
+  "outcome": "Native snapshot recovers a different-path equal historical/pending allocation after genuine fresh-payload budget limit refusal, with complete fresh FD/frame/name/EOF/byte verification. Five original distribution archives complete ordinary generic archive operations, following File/Read, materialization/seal, reader retirement and exact refunds.",
+  "failure_origin": "Only ImageDescriptorBudgetError::ResourceLimit from payload+Pending debit is recoverable. Origin/Scope, map control/growth/invariants, layout, overflow and freeze failures remain fatal. Existing reserve_new Result behavior preserved.",
+  "recovery": {
+    "row_limit_total_pending_then_committed": 128,
+    "comparison_limit": 4,
+    "comparison_bytes_limit": 536870912,
+    "debit": "Full length checked before IO; fixed insertion-order endpoints ignore later appends",
+    "custody": "Same-root closed refusal token, same-bank prepaid cursor and temporary leases. No locks across IO or callbacks; live credit through exact readonly retain_claimed and temporary lease retirement.",
+    "authority": "Full RootIo read unchanged; exact same-origin known allocation witness after equality. No new map/index/digest authority/cache/semantic body representation.",
+    "error_order": "No match/window/control limit retains original Resource; new Source/cancel/IO/frame errors during recovery outrank admission refusal."
+  },
+  "validation": {
+    "scaled_native_red_green": {
+      "body_bytes": 50331648,
+      "bank_bytes": 67108864,
+      "baseline_features": [],
+      "candidate_features": [],
+      "baseline_duplicate_exit": 101,
+      "baseline_failure": "Resource; paired changed-path test establishes successful same first-Archive/delete prelude with sourceAttempts2 and exactcleanup",
+      "candidate_duplicate_pass": true,
+      "changed_new_path_still_resource": true,
+      "coverage": "Deleted history -> different-path real Archive -> identical allocation -> following Read -> materialization/seal -> live final reader after history release -> exactlastdrop refunds"
+    },
+    "core": {
+      "selected": 224,
+      "passed": 224,
+      "elapsed_seconds": 3.901444005983649,
+      "coverage": "All protected216 Core selectors plus8 new helper/snapshot tests; observer feature required by7 existing selectors. Five known Source diagnostic failures remain qualified by existing XZ baseline receipts, unchanged assertions.",
+      "executable_sha256": "a920261bdb1810855237ef3ae9e0d3bdd51d314e15a3316823675f3316acec8b"
+    },
+    "new_native": {
+      "selected": 3,
+      "passed": 3,
+      "elapsed_seconds": 9.473513305012602,
+      "core_sha256": "b5ee68c4d0f557801f992d87a66ee26892be5d52208d7fde63c0717c9e8b1071",
+      "cli_sha256": "02de7050b3d98acc971741484cea771397821665a9e87c72ccab178e7dc7a57e"
+    },
+    "protected_native": {
+      "selected": 12,
+      "passed": 12,
+      "elapsed_seconds": 2.0078861720103305
+    },
+    "authentic_warm_commands": {
+      "commands": 4,
+      "selector_count": 1,
+      "passed": true,
+      "elapsed_seconds": 12.239646973001072
+    },
+    "five_original_archive_chain": {
+      "expected_checksum": "Explicit Some(pinned digest), unlike the original Starlark None intents; direct generic owner proof only",
+      "same_native_bank_bytes": 536870912,
+      "native_fd_limit": 512,
+      "backing_bytes_limit": 8589934592,
+      "work_seconds": 27,
+      "cleanup_seconds": 3,
+      "source_scope": "new_command bound to the same native bank; unchanged defaults",
+      "decoded_bytes": 654041088,
+      "unique_retained_body_bytes": [
+        387736179,
+        408884143,
+        450380318,
+        457699407,
+        464861603
+      ],
+      "observed_peak_credit_by_archive": [
+        389094777,
+        456494631,
+        477734204,
+        477734204,
+        526975068
+      ],
+      "per_archive_progress": "Each actual digest/operation/record checked; strict decoded and unique retained-body growth. Exact independent decoded total.",
+      "cleanup": "Exact native bytes/FD/backing refunds after lastreader; source live buffers/decoder zero",
+      "qualification": "Peak credit is not RSS; archive-only command does not close authentic cquery or full equivalent-command memory gate."
+    }
+  },
+  "original_rust": {
+    "harness_exit_code": 0,
+    "command_success": false,
+    "result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "elapsed_seconds": 27.10944147600094,
+    "attempts": 837,
+    "roots": 55,
+    "accepted_records": 111,
+    "pending_archive": "Cargo TarXz index2, expected checksum None",
+    "first_sticky_source_error": "WorkDeadline",
+    "peak_native_credit_bytes": 484668126,
+    "peak_native_fds": 422,
+    "peak_backing_bytes": 8187281408,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "core_sha256": "a920261bdb1810855237ef3ae9e0d3bdd51d314e15a3316823675f3316acec8b",
+    "cli_sha256": "02de7050b3d98acc971741484cea771397821665a9e87c72ccab178e7dc7a57e",
+    "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+    "prior_capture_records": 113,
+    "qualification": "Stopped earlier than prior113 capture; no timing/frontier improvement or regression attribution from these stopped runs. This new recovery route is not established reached in the full original. Full Rust/action/REAPI/Slug closure, RSS<=1.25xBazel and activation remain open."
+  },
+  "reuse_and_growth": {
+    "primitive": "Existing Buck2-derived SmallMap.get_index and V2 credited immutable body leases; no donor source/runtime import",
+    "new_authored_rust_leaves": 6,
+    "new_fixture_corpus": false,
+    "notes": "Existing actual native fixture/helpers reused, no new external payload preparation. New chain consumes the already pinned original inventory."
+  },
+  "evidence": [
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-baseline-validation.json",
+      "sha256": "21be39c8bf6a687b987d4abc67d53e2f6c008122c4a77e80d8e52d7db7790307"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-baseline-duplicate-red.json",
+      "sha256": "3c1cebfa98f43d25973e3ab281883b3078d9c918384b286d4a83fd7ca6d9f859"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-baseline-changed-control.json",
+      "sha256": "6c9f059cb262bb424cfc95296c2f3a366579dcc98df3108f985eefb1a5c66ee3"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-observer-core-tests.json",
+      "sha256": "d5b0250a7c803261fd3deab59084b4471d1420c7175c0ddaf169b5e2b256966e"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-candidate-three-native.json",
+      "sha256": "054d53b6a2fa0335611ed63841f26b5520b8a908f6f56c4ec8b78a2f881d8d10"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-protected-native-guards.json",
+      "sha256": "6ca9d71c6e9a8cc7f54f2df0dc4a872d3fc4a74296577a560d951eecda592501"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-protected-authentic-warm.json",
+      "sha256": "a27f64a5bf8a11ed3eeb12a2a78b7c17b3a59e7a7f00b3ae3457dda278426375"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-final-rust.json",
+      "sha256": "63abf9839e22f195d98f48524bf67034f2f077a331ea7225ab9b7dddf63b800c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-capture-validation.json",
+      "sha256": "1ad009d618086f00ad6b471ac576ad1f6f4bf9b7753aa9c6d3073d44364b52cf"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/llvm-toolchain-envelope-inspection.json",
+      "sha256": "6904e0020cbe3658e580c19f99791a6bc307f827c89f57e73c93d97b45e734ee"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-candidate-default-native-freeze.json",
+      "sha256": "63d6c97c8b74ce0d1d25432ab84421c292df0cfc7d595f618ce36f0218cb2b47"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-final-rust-native-freeze.json",
+      "sha256": "15e1215a370fdb521d30e8cfe5bb00a8b40fd47afaa4d8b5f19381139c05cedd"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-baseline-native-freeze.json",
+      "sha256": "8f88cdc984549e9b2ccada0732057d421ee5de19cbfc64611d97ff4b4247e9c0"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-baseline-candidate-preservation.json",
+      "sha256": "249316c4a52f58e29b2af89ccd22691829b8a83cf79d5d1e716f94f85602b822"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-candidate-default-candidate-preservation.json",
+      "sha256": "7bc81c5d84de1e16864149e2984798959db11983874370b479cca2cba1ada011"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/cross-path-final-rust-candidate-preservation.json",
+      "sha256": "c3afd99f62125cc53dd4551cef20cf65bd0f14a6f2b42f740bb710881609c6da"
+    }
+  ]
+}

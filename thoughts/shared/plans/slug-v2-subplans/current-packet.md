@@ -3,32 +3,29 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [canonical body lookup routing](wp1225-general-repository-workspace-design.md#archive-completion-canonical-body-routing)
-now reuses the existing pointer set only after rebuilding it from actual retained
-pool keys. Full foreign-byte fallback, canonical replacement, validation,
-forecasts, identities and complete history stay unchanged. The
-[component receipt](wp1225-canonical-body-routing-acceptance-2026-11-09.json)
-records actual128KiB Exists/Read lookup work RED→GREEN131072→0 bytes (seed work
-unchanged), equal-distinct old-key controls, foreign Weak retirement, different
-contents and refusal order. All562 qualified checks, twelve native guards and
-four warm original commands pass; the five known Source diagnostic failures
-remain explicitly baseline-qualified without changed assertions.
+Current delta: [bounded cross-path native body recovery](wp1225-general-repository-workspace-design.md#bounded-cross-path-native-body-recovery)
+now passes actual48MiB/64MiB RED→GREEN while changed bytes still refuse. It recovers
+only an exact payload-bank limit refusal, with finite same-origin discovery and
+full fresh FD/frame/EOF/byte comparison; histories, identities and caps remain.
+The [component receipt](wp1225-cross-path-body-recovery-acceptance-2026-11-09.json)
+records224 Core checks, three new native cases, twelve protected native guards
+and four warm commands. The five original archives complete the ordinary native
+Archive chain, File/Read, seal and last-reader cleanup under512MiB and27+3sec.
+Final retained bodies464,861,603 bytes and observed peak credit526,975,068 fit;
+credit is not RSS. Direct effects supply the pinned expected checksums; they do
+not reconstruct the original omitted-checksum Starlark command.
 
-Temporary four-stage attribution established reached completion work, then was
-preserved with exact source/binary/raw evidence and removed before final source
-validation. Core/Source/report schemas keep their baseline bytes. This is a
-bounded byte-work result, not a whole-command speed or RSS comparison.
+The same-input full original still refuses at sticky WorkDeadline:837 attempts,
+55roots/111records, Cargo Archive pending (index2), exact cleanup. Prior stopped
+captures reached113; no timing/frontier gain or regression is attributed. Next
+select reached end-to-end work under the existing deadline; do not repeat the
+now-passing archive-only fit proof or raise limits. Full Rust/action/REAPI/Slug
+closure, completed-command latency/RSS<=1.25xBazel and activation remain open.
 
-The same-input final Rust run records55roots/113records at839 attempts, with
-rustfmt accepted. Next LLVM-tools transfers40,619,320 compressed bytes and decodes
-4,932,734 before refusal; first sticky Source error is WorkDeadline, while the
-outer materialization error remains unclassified. Peak native credit533,922,678,
-FD422 and exact cleanup stay within unchanged limits. The temporary unoptimized
-capture already recorded113 operations, so no frontier gain is attributed to the
-fix. Full archive fit, Rust/action/REAPI/Slug closure, completed-command
-latency/RSS<=1.25xBazel and production activation remain open. Next inspect the
-remaining LLVM archive work and its retained/decoder/snapshot envelope without
-raising limits or skipping fresh verification.
+Accepted [canonical body lookup routing](wp1225-general-repository-workspace-design.md#archive-completion-canonical-body-routing)
+continues to skip repeated canonical byte-key lookup after rebuilding the existing
+pointer set from actual pool keys. Full foreign fallback, old seed work, metadata
+and identities remain unchanged; its accepted receipt preserves prior evidence.
 
 The [XZ allocation prerequisite](wp1225-xz-allocation-acceptance-2026-11-09.json)
 continues to prepay actual codec allocations against the same bank while keeping

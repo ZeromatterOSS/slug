@@ -169,7 +169,15 @@ is RED→GREEN with unchanged seed work;562 qualified checks, twelve native guar
 and four warm commands pass. Final Rust records113 operations before LLVM-tools
 partially decodes and reaches sticky WorkDeadline. Temporary attribution already
 reached113 without the fix; no speed/frontier/RSS gain is claimed. Inspect the
-remaining archive/retained envelope next under unchanged limits.
+remaining archive/retained envelope under unchanged limits. The selected
+[cross-path native recovery](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#bounded-cross-path-native-body-recovery)
+now passes actual scaled RED→GREEN and the five-original generic native archive
+chain under512MiB/27+3 with full verification and exact cleanup. Its
+[receipt](./slug-v2-subplans/wp1225-cross-path-body-recovery-acceptance-2026-11-09.json)
+keeps this separate from the full original:111 operations then Cargo Archive
+WorkDeadline, versus113 in a prior stopped capture, with no timing attribution.
+Next select reached end-to-end work under the unchanged deadline; full command
+latency/RSS, Rust/action/REAPI/Slug closure and activation remain open.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

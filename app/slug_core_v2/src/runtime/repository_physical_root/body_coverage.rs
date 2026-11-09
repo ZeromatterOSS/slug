@@ -11,6 +11,10 @@ use starlark_map::small_map::SmallMap;
 
 use super::*;
 
+mod recovery;
+pub(in crate::runtime) use recovery::NativeBodyAdmission;
+pub(in crate::runtime) use recovery::NativeBodyRefusal;
+
 type BodyKey = (usize, usize);
 type Visitor<'a> = dyn FnMut(&Arc<[u8]>) -> Result<(), PhysicalRootError> + 'a;
 
@@ -370,16 +374,10 @@ impl NativeBodyCandidates {
         length: usize,
         active: &dyn Fn() -> bool,
     ) -> Result<PendingNativeBody, PhysicalRootError> {
-        self.ledger.origin.check(active)?;
-        self.storage.ensure(1)?;
-        Ok(PendingNativeBody {
-            length,
-            origin: self.ledger.origin.clone(),
-            credit: self.ledger.origin.resources.reserve_body_bytes(add(
-                body_bytes(length)?,
-                std::mem::size_of::<PendingNativeBody>(),
-            )?)?,
-        })
+        match self.reserve_new_for_capture(length, active)? {
+            NativeBodyAdmission::New(pending) => Ok(pending),
+            NativeBodyAdmission::Refused(_) => Err(PhysicalRootError::Resource),
+        }
     }
     pub(in crate::runtime) fn finish(
         &mut self,
@@ -412,7 +410,7 @@ impl NativeBodyCandidates {
     /// A supplied witness must cover this exact allocation and native bank.
     /// Unknown ordinary bodies instead use retain's fully charged admission.
     pub(in crate::runtime) fn retain_claimed(
-        &mut self,
+        &self,
         body: &Arc<[u8]>,
         witness: &NativeBodyLease,
         active: &dyn Fn() -> bool,

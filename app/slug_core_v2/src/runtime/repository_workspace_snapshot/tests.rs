@@ -14,6 +14,9 @@ use super::super::native_tests::reservation;
 use super::super::tests::scope;
 use super::*;
 
+#[path = "cross_path_tests.rs"]
+mod cross_path_tests;
+
 fn resources() -> Arc<RepositoryRootResources> {
     RepositoryRootResources::new(
         RepositoryRootResourceLimits::new(256 * 1024 * 1024, 16, 4 * ARCHIVE_BYTES).unwrap(),
