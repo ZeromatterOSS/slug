@@ -3,25 +3,37 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [bounded actual XZ allocations](wp1225-general-repository-workspace-design.md#bounded-actual-xz-decoder-allocations)
-now prepay each codec allocation, header and control against the same native bank,
-while retaining the full136MiB Source allowance and codec ceiling. The
-[component receipt](wp1225-xz-allocation-acceptance-2026-11-09.json) records genuine
-small-dictionary RED→GREEN beside a retained body, true larger-dictionary refusal,
-partial-init/cancel/EOF/checksum/refill cleanup and unchanged generic reservations.
-All33 focused and216 qualified broader checks, twelve native guards and four warm
-original commands pass. The initial221-test run retains five Source diagnostic
-failures reproduced with identical assertions on both preserved baseline builds;
-their local scratch-tool preparation does not reach XZ. No assertion was changed.
+Current delta: [canonical body lookup routing](wp1225-general-repository-workspace-design.md#archive-completion-canonical-body-routing)
+now reuses the existing pointer set only after rebuilding it from actual retained
+pool keys. Full foreign-byte fallback, canonical replacement, validation,
+forecasts, identities and complete history stay unchanged. The
+[component receipt](wp1225-canonical-body-routing-acceptance-2026-11-09.json)
+records actual128KiB Exists/Read lookup work RED→GREEN131072→0 bytes (seed work
+unchanged), equal-distinct old-key controls, foreign Weak retirement, different
+contents and refusal order. All562 qualified checks, twelve native guards and
+four warm original commands pass; the five known Source diagnostic failures
+remain explicitly baseline-qualified without changed assertions.
 
-The same-input original Rust run advances from110 to112 records in55 roots:
-clippy and cargo archives now complete. At838 attempts the next rustfmt archive
-decodes7,398,400 bytes before the unchanged WorkDeadline. Native peak484,668,126,
-422 FDs and exact cleanup remain within the fixed bank. The completed archive
-success bucket is480,520,192 decoded bytes; the remaining partial archive is not
-accepted. Full archive fit, Rust/action/REAPI/Slug closure, completed-command
+Temporary four-stage attribution established reached completion work, then was
+preserved with exact source/binary/raw evidence and removed before final source
+validation. Core/Source/report schemas keep their baseline bytes. This is a
+bounded byte-work result, not a whole-command speed or RSS comparison.
+
+The same-input final Rust run records55roots/113records at839 attempts, with
+rustfmt accepted. Next LLVM-tools transfers40,619,320 compressed bytes and decodes
+4,932,734 before refusal; first sticky Source error is WorkDeadline, while the
+outer materialization error remains unclassified. Peak native credit533,922,678,
+FD422 and exact cleanup stay within unchanged limits. The temporary unoptimized
+capture already recorded113 operations, so no frontier gain is attributed to the
+fix. Full archive fit, Rust/action/REAPI/Slug closure, completed-command
 latency/RSS<=1.25xBazel and production activation remain open. Next inspect the
-remaining archive/deadline work under the existing resource and observation bounds.
+remaining LLVM archive work and its retained/decoder/snapshot envelope without
+raising limits or skipping fresh verification.
+
+The [XZ allocation prerequisite](wp1225-xz-allocation-acceptance-2026-11-09.json)
+continues to prepay actual codec allocations against the same bank while keeping
+the full136MiB logical allowance and memory ceiling. Its prior decoder admission
+advance and complete cleanup/format/refill guards remain protected.
 
 The [body-coverage prerequisite](wp1225-body-coverage-acceptance-2026-11-09.json)
 continues to carry canonical native allocations across capture, completion,

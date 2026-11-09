@@ -9,6 +9,10 @@ use starlark_map::small_set::SmallSet;
 use super::*;
 
 mod body_coverage;
+#[cfg(test)]
+mod body_pool_work;
+#[cfg(test)]
+mod body_pool_work_tests;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Allocative)]
 pub struct RepositoryWorkspaceRetention {
@@ -822,6 +826,8 @@ impl RepositoryWorkspaceTranscript {
         let mut seen: SmallSet<(usize, usize)> = SmallSet::with_capacity(refs);
         self.visit_bodies(&mut |body| {
             if seen.insert((body.as_ptr() as usize, body.len())) {
+                #[cfg(test)]
+                body_pool_work::record(body_pool_work::Kind::Seed, body.len());
                 pool.insert(body.clone(), ());
             }
         });
@@ -834,7 +840,19 @@ impl RepositoryWorkspaceTranscript {
         if actual > scratch {
             return Err(RepositoryWorkspaceError::RetentionLimit);
         }
+        // Initial seen entries may name equal foreign allocations whose keys
+        // pool.insert did not retain. Only pool-owned canonical keys witness
+        // reuse; their strong Arcs prevent address reuse throughout completion.
+        seen.clear();
+        for body in pool.keys() {
+            seen.insert((body.as_ptr() as usize, body.len()));
+        }
         let mut canonicalize = |body: &mut Arc<[u8]>| -> Result<(), RepositoryWorkspaceError> {
+            if seen.contains(&(body.as_ptr() as usize, body.len())) {
+                return Ok(());
+            }
+            #[cfg(test)]
+            body_pool_work::record(body_pool_work::Kind::Canonical, body.len());
             if let Some((_, shared, _)) = pool.get_full(body.as_ref()) {
                 *body = shared.clone();
             } else {
@@ -852,8 +870,11 @@ impl RepositoryWorkspaceTranscript {
                 {
                     return Err(RepositoryWorkspaceError::RetentionLimit);
                 }
+                #[cfg(test)]
+                body_pool_work::record(body_pool_work::Kind::Canonical, body.len());
                 pool.insert(body.clone(), ());
             }
+            seen.insert((body.as_ptr() as usize, body.len()));
             Ok(())
         };
         request.operation.bodies_mut(&mut canonicalize)?;

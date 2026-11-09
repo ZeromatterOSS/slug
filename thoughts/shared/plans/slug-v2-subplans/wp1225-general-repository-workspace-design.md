@@ -1868,6 +1868,64 @@ credit custody across snapshot, transcript, epoch publication and history owners
 preserve full history, construction overlap and fixed limits. No ownership or
 credit-transfer change is accepted by this optional-checksum component.
 
+### Archive completion canonical body routing
+
+Implementation status: independent design/source/final review ACCEPT;
+executed component proof recorded in the component receipt.
+
+Outcome: avoid repeated full body-key hashing for already canonical immutable
+allocations during general transcript completion, toward authentic Rust archive
+and command closure under the unchanged limits. This is Slug-native physical
+work routing. Complete histories, API validation, source binding, Eq/Hash/SHA,
+fresh FD verification and production activation retain their current contracts.
+
+Preserve the original byte-key pool construction and full validation/metadata/
+scratch admission. Its initial pointer set includes equal foreign allocations
+whose attempted insertion did not replace the retained key. Clear and rebuild
+that SAME prepaid set from actual pool keys before canonicalizing incoming bodies.
+Only exact pointer+length membership may retain the current canonical Arc without
+another byte lookup. Every miss follows the original full-byte Hash/Eq,
+replacement/new-body admission and process-limit path, then adds only its
+resulting canonical pointer. Strong pool-key Arcs prevent address reuse; neither
+an insertion attempt nor content equality alone certifies pointer membership.
+
+Both maps keep their existing refs capacity and scratch forecasts. SmallSet.clear
+preserves backing; canonical keys are no more numerous than the old distinct
+allocations plus incoming references already counted by the forecast. No third
+collection, retained field, cache, new hash domain, global interner, body wrapper,
+cap or native authority is introduced. Old pool-seeding hash work remains full;
+all logical body/history accounting and independent foreign allocation costs stay
+unchanged. Native capture, fresh comparison and SHA/identity writers are untouched.
+
+The component's temporary four-stage observer separated capture/verification,
+extraction, snapshot and exact pure transcript.complete. Four reached completion
+calls totaled430,875,597ns, with clean qualifiers and exact cleanup. This supports
+investigating reached work, not attributing that entire time to hashing. The
+actual128KiB transcript discriminator is RED→GREEN for redundant lookup bytes;
+seed work, foreign canonical replacement and refusal order remain its controls.
+A same-input stopped run already recorded113 operations without the fix, so
+frontier differences cannot establish a speed change.
+
+Temporary timers, Scope/control layout additions and versioned lossless counter
+reporting were fully preserved with frozen source, binary and raw evidence, then
+removed before final source validation. They are not shipped by this component;
+final Core/Source/report schemas retain the baseline implementation. No standalone
+diagnostic milestone or timing comparison across different scaffolding is claimed.
+
+Scope: Bzlmod sequence canonicalization plus two small cfg(test) work/regression
+leaves. Validation covers canonical same-Arc Exists/Read completion, equal-distinct
+initial/history edges selecting the true first retained key, new equal foreign
+Weak retirement, differing same-length bodies and full history, invalid results
+before hashing, and explicit counter overflow. Reuse owner/direct-dependent and
+protected native/warm checks; freeze the same-input original separately and retain
+exact cleanup, limits and all incomplete command/RSS/activation qualifications.
+
+The [component receipt](wp1225-canonical-body-routing-acceptance-2026-11-09.json)
+records562 qualified checks, twelve native guards and four warm originals. Final
+Rust records113 operations, with LLVM-tools partially decoded before sticky
+WorkDeadline and exact cleanup. A temporary unoptimized capture already reached
+that epoch; no timing/frontier/RSS improvement or full-command success is claimed.
+
 ### Bounded actual XZ decoder allocations
 
 Implementation status: independent design/source/final review ACCEPT;

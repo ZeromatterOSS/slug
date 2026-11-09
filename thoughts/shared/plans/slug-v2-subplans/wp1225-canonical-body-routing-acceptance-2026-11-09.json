@@ -1,0 +1,429 @@
+{
+  "schema_version": 1,
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "component": "Canonical body lookup routing",
+  "date": "2026-11-09",
+  "baseline": "9d5bdb4f907ee809616ae8454f8c72c706c79e9b",
+  "status": "accepted",
+  "compatibility": "Slug-native physical work routing; existing admitted semantic surfaces unchanged",
+  "contract": "wp1225-general-repository-workspace-design.md#archive-completion-canonical-body-routing",
+  "reviews": {
+    "design": "ACCEPT conditional on reached attribution",
+    "selection_gate": "ACCEPT after430,875,597ns across4 reached pure completion intervals plus actual byte-work RED",
+    "source": "ACCEPT; actual retained pool keys only, full unknown-allocation fallback",
+    "temporary_instrumentation_retirement": "ACCEPT; preserve exact source/artifact/raw evidence, rebuild final source",
+    "final": "ACCEPT"
+  },
+  "implementation": {
+    "production_delta": "11 lines/comments in existing completion owner; no new production leaf or collection",
+    "algorithm": "Keep original pool seed and all validation/scratch admission; clear/reseed SAME existing seen set from actual retained pool.keys; exact pointer+length membership skips canonical body lookup; all misses take unchanged full byte Hash/Eq/replacement/new-body budget path, then remember only resulting canonical pointer",
+    "lifetime": "Retained pool keys strongly own Arcs throughout lookup; discarded equal insertion candidates are not membership authority",
+    "bounds": "Same two collections, capacity/refs/scratch forecasts, full metadata/body/history/process limits; no extra retained fields or global cache",
+    "unchanged": [
+      "Initial pool seeding hashes every distinct old allocation as before",
+      "Full structural equality and all ordinary/canonical/StrongHash/SHA writers",
+      "Source/FD/frame/EOF/byte verification, native body leases and cleanup",
+      "Archive/checksum/decode/work/cleanup/retained/FD/backing limits",
+      "Core/Source/observer/report baseline schemas",
+      "General production Disabled"
+    ],
+    "test_only": "Private TLS checked calls/payload-length counters at existing full-hash call sites; actual Transcript fixtures, no extra Hash/Eq work or native authority"
+  },
+  "temporary_attribution": {
+    "status": "fully preserved then removed from final source",
+    "stages": {
+      "buckets": [
+        {
+          "active": 0,
+          "closed_count": 5,
+          "guard_aborted": 0,
+          "max_wall_ns": 1638546401,
+          "refused_count": 1,
+          "stage": "capture_and_verify",
+          "started_count": 5,
+          "wall_ns": 2101350563
+        },
+        {
+          "active": 0,
+          "closed_count": 4,
+          "guard_aborted": 0,
+          "max_wall_ns": 3073340015,
+          "refused_count": 0,
+          "stage": "extract",
+          "started_count": 4,
+          "wall_ns": 3710680381
+        },
+        {
+          "active": 0,
+          "closed_count": 4,
+          "guard_aborted": 0,
+          "max_wall_ns": 336945534,
+          "refused_count": 0,
+          "stage": "snapshot",
+          "started_count": 4,
+          "wall_ns": 1016536883
+        },
+        {
+          "active": 0,
+          "closed_count": 4,
+          "guard_aborted": 0,
+          "max_wall_ns": 117562055,
+          "refused_count": 0,
+          "stage": "pure_completion",
+          "started_count": 4,
+          "wall_ns": 430875597
+        }
+      ],
+      "clock_reversed": false,
+      "closed_count_includes_guard_aborted": false,
+      "exclusive_cpu": false,
+      "guard_aborted_means": "guard dropped without finish; no process-termination observation",
+      "identifies_individual_archive": false,
+      "includes_clock_and_guard_overhead": true,
+      "inclusive_wall": true,
+      "overflow": false,
+      "overlap": false,
+      "rendered_after_runtime_retirement": true,
+      "scope": "last_observed_command_source_scope",
+      "snapshot_before_scope_retirement": true,
+      "unmeasured_remainder": "native coverage admission and commit, dispatch and other operations",
+      "wall_includes_guard_aborted": true
+    },
+    "source_frozen_files": 14,
+    "core_sha256": "63d9209491e079ad320273490264205dcbaf76c0ea2a6f75a7e9031592268b31",
+    "cli_sha256": "8c850c4f150adc541f4d5831fee8b7b1b6240f656d165d94b80116659dae203e",
+    "report_bytes": 11122,
+    "budget_correction": "Initial worst-case combined report failed16848+1024 under unchanged16384 budget; lossless fixed-row u64LE/base64 retained all150 counts/25masks/labels/qualifiers, maximum+nonuniform+malformed controls pass12/12. Entire temporary timer/report change was retired before final validation. Old raw evidence is immutable.",
+    "retired_paths": [
+      "app/slug_core_v2/src/runtime/source_service.rs",
+      "app/slug_core_v2/src/runtime/source_service/scope.rs",
+      "app/slug_core_v2/src/runtime/source_service/command_scope.rs",
+      "app/slug_core_v2/src/runtime/repository_workspace_progress.rs",
+      "app/slug_core_v2/src/runtime/repository_workspace_snapshot.rs",
+      "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests.rs",
+      "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests/phase_profile.rs",
+      "app/slug_core_v2/src/runtime/source_service/archive_timing.rs",
+      "app/slug_core_v2/src/runtime/source_service/archive_timing_tests.rs"
+    ],
+    "qualification": "Inclusive reached completion time is not all hash time. This baseline already reached113records; no speed/frontier gain or timing comparison across different scaffolding."
+  },
+  "discriminating_evidence": {
+    "primary_test": "repository_workspace::sequence::body_pool_work_tests::actual_unchanged_exists_and_read_completion_avoid_canonical_body_hashes",
+    "red": {
+      "selected": 4,
+      "passed": 3,
+      "failed": 1,
+      "exit_code": 101,
+      "canonical_exists_hash_payload_bytes": 131072
+    },
+    "green": {
+      "all_four_tests_pass_in_bzlmod95": true,
+      "canonical_exists_hash_payload_bytes": 0,
+      "canonical_read_hash_payload_bytes": 0,
+      "seed_payload_bytes_each": 131072,
+      "seed_calls_each": 1
+    },
+    "controls": [
+      "Equal-distinct initial/history allocations choose the actual first retained pool key, not discarded original seen members",
+      "Incoming equal foreign allocation uses full fallback, canonical replacement and Weak retirement",
+      "Different same-length data retains independent body and full historical records",
+      "Invalid result fails before any pool hash work; counter overflow explicit"
+    ],
+    "unchanged_test_sources_since_red": [
+      {
+        "file": "app/slug_bzlmod_v2/src/repository_workspace/sequence/body_pool_work.rs",
+        "sha256": "a1f1ea49dd2b84da9352fa6c0c892a41b43f49f60403e33dcc03ded01ed94360"
+      },
+      {
+        "file": "app/slug_bzlmod_v2/src/repository_workspace/sequence/body_pool_work_tests.rs",
+        "sha256": "1c340609efc3ff7ce57a5e6dd3b7b1a997b4d0ec40843adcdd537562b24f08a1"
+      }
+    ]
+  },
+  "validation": {
+    "qualified_ordinary": {
+      "passed": true,
+      "selected": 562,
+      "records": [
+        {
+          "target": "slug_bzlmod_v2",
+          "selected": 95,
+          "passed": 95,
+          "reused_fresh_unchanged_executable": true,
+          "evidence": "/tmp/slug-wp425-validation/archive-pool-candidate-ordinary-slug_bzlmod_v2.json",
+          "executable_sha256": "2405a1c2741f4906cf3eb1fba5262020655f024c3cc4e22e2821b208764a4b93"
+        },
+        {
+          "target": "slug_loading_v2",
+          "selected": 54,
+          "passed": 54,
+          "reused_fresh_unchanged_executable": true,
+          "evidence": "/tmp/slug-wp425-validation/archive-pool-candidate-ordinary-slug_loading_v2.json",
+          "executable_sha256": "b602af380685a75c9ecf22a54be56bf02bd8cabb17a48ed1c48f8e7df01ba273"
+        },
+        {
+          "target": "slug_analysis_v2",
+          "selected": 197,
+          "passed": 197,
+          "reused_fresh_unchanged_executable": true,
+          "evidence": "/tmp/slug-wp425-validation/archive-pool-candidate-ordinary-slug_analysis_v2.json",
+          "executable_sha256": "b5f9cf2c35f31c58e16f9391c7da1c2194c326aa16408a518ac50056e28a09f6"
+        },
+        {
+          "target": "slug_core_v2",
+          "selected": 216,
+          "passed": 216,
+          "reused_fresh_unchanged_executable": false,
+          "evidence": "/tmp/slug-wp425-validation/archive-pool-final-core-tests.json",
+          "executable_sha256": "ef5b4aa3e73fbc34f7fd68a7323065eeac63ccba1a48b8a521cdcdbaf3fa9341"
+        }
+      ],
+      "baseline_qualification": "Five preexisting Source diagnostic failures remain qualified by immutable XZ baseline receipts; all prior216 Core passing selectors are present, no assertions changed."
+    },
+    "reused_artifact_rule": "Bzlmod95/Loading54/Analysis197 were Cargo fresh=true with identical executable hashes after Core-only diagnostic retirement; prior exact preflight/execution reused. Rebuilt final Core216 was re-preflighted/executed.",
+    "native_guards": {
+      "selected": 12,
+      "passed": 12,
+      "elapsed_seconds": 1.9681447350012604
+    },
+    "warm_originals": {
+      "selected_tests": 1,
+      "actual_commands": 4,
+      "passed_commands": 4,
+      "elapsed_seconds": 11.799978120980086
+    },
+    "default_cli_build": "passed",
+    "formatting": "3 changed Rust files pinned rustfmt --check passed",
+    "baseline_failures": "Five Source diagnostic assertions reproduced exactly on both preserved XZ baselines remain explicitly qualified; no assertion changed."
+  },
+  "original_rust": {
+    "core_sha256": "ef5b4aa3e73fbc34f7fd68a7323065eeac63ccba1a48b8a521cdcdbaf3fa9341",
+    "cli_sha256": "c5011a65ab0bd525d77cbd89e380ae80911f7423f116e09d0731f37480a12557",
+    "same_input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+    "same_preparation_sha256": "b2372b3168174c472b7499203b21c48d509d17aa0d9f32bb4721b5f7c55deac0",
+    "frozen_files": 5,
+    "attempts": 839,
+    "roots": 55,
+    "records": 113,
+    "last_completed": "rustfmt Archive index3",
+    "next": "llvm-tools TarXz Archive index4",
+    "refused_delta": {
+      "calls": 1,
+      "decoded_bytes": 4932734,
+      "registry_attempts": 0,
+      "registry_bytes": 0,
+      "source_attempts": 1,
+      "transferred_bytes": 40619320,
+      "written_bytes": 45504383
+    },
+    "result": {
+      "error": {
+        "detail": {
+          "kind": "mutation",
+          "reason": "unclassified",
+          "stage": "Materialization"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "first_scope_error": "WorkDeadline",
+    "scope": {
+      "decoded_bytes": 492973068,
+      "first_error": "WorkDeadline",
+      "live_buffer_bytes": 0,
+      "live_decoder_bytes": 0,
+      "peak_buffer_bytes": 852795,
+      "peak_decoder_bytes": 142606336,
+      "registry_attempts": 0,
+      "registry_bytes": 0,
+      "source_attempts": 22,
+      "transferred_bytes": 165850353,
+      "written_bytes": 657986247
+    },
+    "resource_peaks": {
+      "peak_backing_bytes": 8187281408,
+      "peak_native_fds": 422,
+      "peak_retained_bytes": 533922678
+    },
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "Harness exit0 proves capture/cleanup only. First sticky Source WorkDeadline is authoritative; outer error remains Materialization/unclassified. Peak credit is not instantaneous failed allocation or RSS. Temporary attribution already reached113 records without fix; no speed/frontier-improvement claim or timing comparison across different scaffolding."
+  },
+  "reuse": {
+    "mode": "Existing V2 Buck2-derived SmallMap/SmallSet reused; no donor import",
+    "source_anchors": [
+      "starlark-rust/starlark_map/src/small_map.rs510\u2013522 retains original key on equal insertion",
+      "starlark-rust/starlark_map/src/small_map.rs698 clear retains backing",
+      "starlark-rust/starlark_map/src/small_set.rs376 delegates clear"
+    ],
+    "fixture_growth": "Two small Rust unit-test leaves; authored128KiB data generated at runtime. No new external fixture/corpus/staging input or copied ruleset source."
+  },
+  "residual_gates": [
+    "Full LLVM/tools archive and complete archive envelope",
+    "Authentic Rust cquery/action/REAPI/Slug bootstrap closure",
+    "Completed same-command latency/RSS<=1.25xBazel",
+    "Five preexisting Source diagnostic fixture/owner failures",
+    "General production activation"
+  ],
+  "timing": {
+    "recorded_compile_seconds": 279.8548531049746,
+    "review_time": "not separately measured; independent verdicts retained in thread"
+  },
+  "source_pins": [
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/sequence.rs",
+      "sha256": "32c31740a9b61401511dbcb248658674f30a4bbd4699a9002bda0092351fb491"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/sequence/body_pool_work.rs",
+      "sha256": "a1f1ea49dd2b84da9352fa6c0c892a41b43f49f60403e33dcc03ded01ed94360"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/sequence/body_pool_work_tests.rs",
+      "sha256": "1c340609efc3ff7ce57a5e6dd3b7b1a997b4d0ec40843adcdd537562b24f08a1"
+    }
+  ],
+  "raw_evidence": [
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-red-bzlmod-result.json",
+      "sha256": "4ec1aa113a18fdb6cad3ab7277cb2cbb0a68f4d70ce19a62afcfb0b4feeabaeb"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-body-hash-red.json",
+      "sha256": "9c0827beb5f1c3860d96b36f6a1dd211db6458fe4c98094da968864dda6ba5d5"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-red-preservation.json",
+      "sha256": "214d5f69c96abec0ef3d1740ec77403e49d26bc6e4e44cbe61b3089013091b48"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-baseline-core-result.json",
+      "sha256": "a0b6914980b2f71640ee2804e7b6b5a9ebe6a76e13b12bad92cbed12494b9b97"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-baseline-focused.json",
+      "sha256": "081e02c27974d2629b8c6d305156d24651ecff5f442f5f5a7b62fe22ed89cf33"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-packed-core-result.json",
+      "sha256": "aea5b60acf2edaf72b0505de4b63da01b71019fd11b290b3bb41e0040166013f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-packed-focused.json",
+      "sha256": "240cb77dbf806cc44d834e43d7cdb3196349b31b9029b0c315723d79cab0d025"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-baseline-cli-result.json",
+      "sha256": "d9f517b6b2a3d68126d81660f7129fd1b38de009f8506882bac6f91ad892ea8b"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-baseline-native-freeze.json",
+      "sha256": "ed44cb496ad944a68cd7b8bded83e4844cc69477e34a664377e7dbfc1e20e094"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-baseline-candidate-preservation.json",
+      "sha256": "98029e9541e2dcbb11c06f89c1bb9f57d0b6c4458b4cd774eec14dc97b8b670d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-baseline-rust.json",
+      "sha256": "78ea52c86d1e032a823ecb3a6082f3a6707f95086a106d1b193550c552829c47"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-stage-baseline-validation.json",
+      "sha256": "3121a16a34137c193c7a9761bf3c1f66f850234c9e018cb128d05bc3bdcc9e63"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-temporary-instrumentation-retirement.json",
+      "sha256": "f5049b6e1c2a7c7456aa377499f190d491a5ac04235382b3b694204ed9bd3ac8"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-candidate-owners-result.json",
+      "sha256": "2f4ca68ddec4245b8d1a01297e2267f1d7cb20b064464cde37a4e08cd61dd984"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-candidate-ordinary-slug_bzlmod_v2.json",
+      "sha256": "58a484702e1a7efa67664609325dd8bc10e846b9c88f1eb71fe3bb485e7f1703"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-candidate-ordinary-slug_loading_v2.json",
+      "sha256": "f295ae6314245163baccf49f0f88eb269199f41a0093db50695f3d6be8742eb9"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-candidate-ordinary-slug_analysis_v2.json",
+      "sha256": "d0cdf0ccf06aab6029867ec51af96f05914bbb21ac46455fc02ffa4b4e79b8a5"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-candidate-ordinary-slug_core_v2.json",
+      "sha256": "af0c7b58ebc41afd614f01f0d375f990e3a3e6c156ae1bb877064fc1ed4f784d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-candidate-ordinary-summary.json",
+      "sha256": "87c3bcfd8bc5059f01611765c054e64c82c10e47a662336bc8bcb2b5b3f53d91"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-owners-result.json",
+      "sha256": "436c353a47e98ef1c9f004b354e1666c43a5e6c7d324a4b6631290003bca847c"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-core-tests.json",
+      "sha256": "5d06b75602274fc8b5d0f8c0978a6ac6a1ad0f35235706cd7e395c56bfa31b46"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-ordinary.json",
+      "sha256": "034449bb70777270020f62abd31fc178daf23f67b3844515d9a9885e8cca7743"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-cli-result.json",
+      "sha256": "b95df565e7c062e2607cd2df26751533c26f59926e96b471add284bd8e68670b"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-format.json",
+      "sha256": "9c6534cea4a99556f2b6e29ae8c807e5b49ef3fe69defe9d0426d24513f9e582"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-native-guards.json",
+      "sha256": "a2a21b882f5cc6aa7bad2aa97ae8c5dd0dd860eb16953279aa48d81657520169"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-authentic-warm.json",
+      "sha256": "9d452b48c29b4447504310fb74edd4d1efce229d1d5e0e398c64580c789698cc"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-native-freeze.json",
+      "sha256": "ecde5be82838d59e1390e43bf19e8f676573dbf26f6ae185d6525c8b8ed3d8c0"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-candidate-preservation.json",
+      "sha256": "d0eb81bb907b6d5f1c8348f04e2bb24d96fc103ba9ec534b15312794d9687f11"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-rust.json",
+      "sha256": "e19337df5105c077886db877707aa977725e4a4eda3f030b82f0e38ea7b28817"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-capture-validation.json",
+      "sha256": "c3e08b19c576cc9ffb7ae6bb0aef224b3cc19cecccc061a36d503d2f5fbe6e02"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-final-ordinary.json",
+      "sha256": "41c6cfb41d79a79f46b2b8afb95066fe719ecfd9cbbea84596a8219e54f347cd"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-diagnostic-baseline.json",
+      "sha256": "0ab8aa7b3318be788f9c020b60fd0b11accf5ca838efc1ac4e564d66a414b60b"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/xz-accounting-diagnostic-observer-baseline.json",
+      "sha256": "efdb286f4f7377dba0a4141c6a2be4929e5be66153f4ff87c965eb1bfeebc96e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/archive-pool-final-review.json",
+      "sha256": "a7b0342a2ce8e86cff67d1b8a3806a36b16bf3ba7e87e7fb740b9655cab77475"
+    }
+  ]
+}

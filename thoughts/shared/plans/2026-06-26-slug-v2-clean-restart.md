@@ -161,7 +161,15 @@ clippy and cargo (112records) before the unchanged deadline interrupts rustfmt.
 All33 focused/216 qualified broader checks, twelve native guards and four warm
 commands pass; five additional Source diagnostic failures reproduce on baseline
 and remain recorded. Inspect remaining archive/deadline work next; full
-archive/Rust closure and the completed-command memory ratio remain open.
+archive/Rust closure and the completed-command memory ratio remain open. The
+[canonical-body routing component](./slug-v2-subplans/wp1225-canonical-body-routing-acceptance-2026-11-09.json)
+now avoids repeated byte-key lookup for actual canonical Arcs, preserving full
+foreign fallback and all history/identity/admission. Its actual128KiB completion
+is RED→GREEN with unchanged seed work;562 qualified checks, twelve native guards
+and four warm commands pass. Final Rust records113 operations before LLVM-tools
+partially decodes and reaches sticky WorkDeadline. Temporary attribution already
+reached113 without the fix; no speed/frontier/RSS gain is claimed. Inspect the
+remaining archive/retained envelope next under unchanged limits.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

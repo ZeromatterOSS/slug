@@ -2,6 +2,15 @@
 
 ## WP425 rooted repository consumers
 
+The selected [canonical body routing](wp1225-general-repository-workspace-design.md#archive-completion-canonical-body-routing)
+reuses existing Buck2-derived SmallMap/SmallSet backing and capacity. The pointer
+set is rebuilt from actual retained pool keys after full admission; discarded
+insertion candidates never certify reuse. Unknown allocations retain complete
+byte-key comparison/replacement and retention checks. No donor code, third
+collection, retained cache, cap, forecast or identity change appears. Temporary
+stage instrumentation served selection and is preserved in evidence, with no
+Core/Source/report layout change in the final component.
+
 The accepted XZ allocation design uses Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a`'s
 `src/compress/{xz_decompress.zig,liblzma_bounded.c}` and
