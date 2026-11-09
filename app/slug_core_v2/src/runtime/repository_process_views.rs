@@ -233,7 +233,7 @@ impl FinalizedRepositoryView {
             return Err(MountLeaseError::Request);
         };
         if realization.reservation() != sealed.root().reservation()
-            || realization.final_state() != sealed.root().state()
+            || !sealed.root().matches_state(realization.final_state())?
         {
             return Err(MountLeaseError::Request);
         }

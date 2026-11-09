@@ -386,10 +386,7 @@ fn run(family: Family, commands: usize) {
             else {
                 panic!("Host-derived output")
             };
-            assert_eq!(
-                host_copy.as_ref(),
-                format!("host:{generation}\n").as_bytes()
-            );
+            assert!(host_copy.equals_slice(format!("host:{generation}\n").as_bytes()));
             let records = realization
                 .transcript()
                 .records()
@@ -488,7 +485,7 @@ fn run(family: Family, commands: usize) {
             else {
                 panic!("actual regular process output")
             };
-            assert_eq!(body.as_ref(), output.as_bytes());
+            assert!(body.equals_slice(output.as_bytes()));
             let slug_bzlmod_v2::RepositoryWorkspaceNode::File(copied) = realization
                 .final_state()
                 .entry("source-copy")
@@ -499,7 +496,7 @@ fn run(family: Family, commands: usize) {
             };
             assert!(!copied.is_empty());
             if matches!(family, Family::Immutable) {
-                assert_eq!(copied.as_ref(), script_contents("archive", "A").as_bytes());
+                assert!(copied.equals_slice(script_contents("archive", "A").as_bytes()));
                 let source = views[0].source_state().unwrap();
                 let actual = source
                     .reservation()

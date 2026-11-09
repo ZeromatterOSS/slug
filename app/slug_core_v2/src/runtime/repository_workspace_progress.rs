@@ -162,6 +162,13 @@ impl RepositoryWorkspaceProgress {
             let sources = SourceLinkSet::empty(&self.builder.resources, scope, active)?;
             self.admit_link_sources(sources)?;
         }
+        // Admit after the existing scope/origin/declared-source checks, but
+        // before replay can compare independent operation/Read-result bodies.
+        let _semantic_working = self.builder.resources.reserve(
+            2 * RepositoryWorkspaceBody::decode_scratch_bytes(),
+            0,
+            0,
+        )?;
         if self
             .transcript()
             .replay(&incoming.request)
@@ -317,6 +324,13 @@ impl RepositoryWorkspaceProgress {
             let sources = SourceLinkSet::empty(&self.builder.resources, scope, active)?;
             self.admit_link_sources(sources)?;
         }
+        // Admit after the existing scope/origin/declared-source checks, but
+        // before replay can compare independent operation/Read-result bodies.
+        let _semantic_working = self.builder.resources.reserve(
+            2 * RepositoryWorkspaceBody::decode_scratch_bytes(),
+            0,
+            0,
+        )?;
         if self
             .transcript()
             .replay(&incoming.request)
@@ -345,12 +359,18 @@ impl RepositoryWorkspaceProgress {
                     if let Some(parent) = path.parent() {
                         io.ensure_directory(parent, 0o777)?;
                     }
-                    io.write_file(
+                    let _decode = self.builder.resources.reserve(
+                        RepositoryWorkspaceBody::decode_scratch_bytes(),
+                        0,
+                        0,
+                    )?;
+                    io.write_file_chunks(
                         path,
-                        body,
+                        body.len() as u64,
                         *mode as u32,
                         WriteMode::ReplaceRegular,
                         &running,
+                        |visit| body.try_for_each_chunk(&mut |chunk| visit(chunk)),
                     )?;
                     RepositoryWorkspaceResult::Unit
                 }
@@ -432,16 +452,21 @@ impl RepositoryWorkspaceProgress {
         active: &dyn Fn() -> bool,
     ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
         self.check_scope(scope)?;
-        if !ViewComparison::new(&self.builder.resources, scope, active)?
-            .transcript_equal(self.transcript(), realization.transcript())?
-        {
+        let mut comparison = ViewComparison::new(&self.builder.resources, scope, active)?;
+        if !comparison.transcript_equal(self.transcript(), realization.transcript())? {
             return Err(PhysicalRootError::Protocol(
                 slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
             ));
         }
-        // Seal the native canonical transcript after exact foreign comparison;
-        // equal foreign Source allocations must not replace our covered data.
-        self.seal(realization.transcript().records().len(), scope, active)
+        self.check_scope(scope)?;
+        let _realization_credit = self.realization_credit()?;
+        // Preserve the closed SHA while selecting the native allocation graph.
+        // Keep decoder working credit through canonicalized_for's full Eq.
+        let canonical = realization
+            .canonicalized_for(self.transcript())
+            .map_err(PhysicalRootError::Protocol)?;
+        drop(comparison);
+        self.seal_canonical(canonical, _realization_credit, scope, active)
     }
 
     pub(super) fn seal(
@@ -451,6 +476,28 @@ impl RepositoryWorkspaceProgress {
         active: &dyn Fn() -> bool,
     ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
         self.check_scope(scope)?;
+        let _realization_credit = self.realization_credit()?;
+        // Preserve realize's body-free error before admitting decode work.
+        if consumed_records != self.transcript().records().len() {
+            return Err(PhysicalRootError::Protocol(
+                slug_bzlmod_v2::RepositoryWorkspaceError::UnusedRecords,
+            ));
+        }
+        // Direct Progress callers have no enclosing Command working credit.
+        let decode = self.builder.resources.reserve(
+            RepositoryWorkspaceBody::decode_scratch_bytes(),
+            0,
+            0,
+        )?;
+        let realization = self
+            .transcript()
+            .realize(consumed_records)
+            .map_err(PhysicalRootError::Protocol)?;
+        drop(decode);
+        self.seal_canonical(realization, _realization_credit, scope, active)
+    }
+
+    fn realization_credit(&self) -> Result<ResourceCredit, PhysicalRootError> {
         // The old complete transcript guard remains armed throughout this
         // borrowed clone. Prepay only its additional realization/cache storage.
         let full = self
@@ -474,30 +521,54 @@ impl RepositoryWorkspaceProgress {
                     .map_err(PhysicalRootError::Protocol)?,
             )
         };
-        let _realization_credit = self.builder.resources.reserve(
+        self.builder.resources.reserve(
             full.checked_sub(existing)
                 .ok_or(PhysicalRootError::Resource)?,
             0,
             0,
-        )?;
-        let realization = self
-            .transcript()
-            .realize(consumed_records)
-            .map_err(PhysicalRootError::Protocol)?;
-        let deps = match &self.transcript.dependencies {
-            Some(deps) => deps.clone(),
-            None => NativeReadViewDependencies::empty(&self.builder.resources, 0)?,
+        )
+    }
+
+    fn seal_canonical(
+        self,
+        realization: RepositoryWorkspaceRealization,
+        realization_credit: ResourceCredit,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
+        struct SealInput {
+            // The realization borrows full historical allocations through its
+            // transcript. Retire it before the progress graph and its credits.
+            realization: RepositoryWorkspaceRealization,
+            progress: RepositoryWorkspaceProgress,
+            _credit: ResourceCredit,
+        }
+        let input = SealInput {
+            realization,
+            progress: self,
+            _credit: realization_credit,
         };
-        let final_bodies = self.body_ledger().final_set(
+        let deps = match &input.progress.transcript.dependencies {
+            Some(deps) => deps.clone(),
+            None => NativeReadViewDependencies::empty(&input.progress.builder.resources, 0)?,
+        };
+        let final_bodies = input.progress.body_ledger().final_set(
             |visit| {
-                self.transcript()
+                input
+                    .progress
+                    .transcript()
                     .current()
                     .try_visit_body_allocations(&mut |body| visit(body))
             },
             active,
         )?;
-        self.builder
-            .seal_with_body_coverage(&realization, deps, final_bodies, scope, active)
+        input.progress.builder.seal_with_body_coverage(
+            &input.realization,
+            deps,
+            final_bodies,
+            scope,
+            active,
+        )
     }
 }
 

@@ -404,6 +404,57 @@ impl<'root> RootIo<'root> {
 
     /// Convenience replacement for already captured file/template bytes. Errors
     /// can leave a partial mutation; the caller must discard that generation.
+    /// Stream a preadmitted logical body without materializing a full file.
+    /// Mode and size are checked before opening/truncation, as in write_file.
+    pub fn write_file_chunks(
+        &self,
+        relative: &Path,
+        length: u64,
+        mode: u32,
+        write_mode: WriteMode,
+        active: &dyn Fn() -> bool,
+        produce: impl FnOnce(&mut dyn FnMut(&[u8]) -> io::Result<()>) -> io::Result<()>,
+    ) -> io::Result<()> {
+        let mode = checked_mode(mode)?;
+        self.admit_file_size(length)?;
+        check_active(active)?;
+        let mut file = self.open_write_regular(relative, write_mode)?;
+        let mut written = 0u64;
+        produce(&mut |chunk| {
+            if chunk.len() > 64 * 1024 {
+                return Err(limit());
+            }
+            let next = written
+                .checked_add(chunk.len() as u64)
+                .filter(|n| *n <= length)
+                .ok_or_else(limit)?;
+            let mut remaining = chunk;
+            while !remaining.is_empty() {
+                check_active(active)?;
+                let count = file.write(remaining)?;
+                if count == 0 {
+                    return Err(io::Error::from(io::ErrorKind::WriteZero));
+                }
+                remaining = &remaining[count..];
+            }
+            written = next;
+            Ok(())
+        })?;
+        check_active(active)?;
+        if written != length {
+            return Err(stale());
+        }
+        self.chmod_regular(&file, mode)?;
+        let opened = self.check_regular(&file)?;
+        if opened.st_size < 0
+            || opened.st_size as u64 != length
+            || !unchanged(&opened, &self.lstat(relative)?)
+        {
+            return Err(stale());
+        }
+        Ok(())
+    }
+
     pub fn write_file(
         &self,
         relative: &Path,

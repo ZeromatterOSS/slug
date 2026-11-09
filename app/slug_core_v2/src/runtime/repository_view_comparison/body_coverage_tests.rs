@@ -59,10 +59,10 @@ fn comparison_memo_retains_body_coverage_after_frontier_arguments_retire() {
         };
         let left_body = body(&left);
         let right_body = body(&right);
-        assert!(!Arc::ptr_eq(&left_body, &right_body));
+        assert!(!RepositoryWorkspaceBody::ptr_eq(&left_body, &right_body));
         let weak = (
-            Arc::downgrade(&left_body),
-            Arc::downgrade(&right_body),
+            left_body.downgrade(),
+            right_body.downgrade(),
             Arc::downgrade(&left),
             Arc::downgrade(&right),
         );

@@ -40,7 +40,7 @@ async fn general_original_archive_without_checksum_replays_observed_digest_and_s
     archive_entries.push(entry(
         "extracted",
         0o644,
-        RepositoryWorkspaceNode::File(extracted.clone()),
+        RepositoryWorkspaceNode::File(extracted.clone().into()),
     ));
     epoch = epoch
         .complete(
@@ -60,7 +60,7 @@ async fn general_original_archive_without_checksum_replays_observed_digest_and_s
     epoch = epoch
         .complete(
             read.request().as_ref().clone(),
-            RepositoryWorkspaceResult::Read(extracted),
+            RepositoryWorkspaceResult::Read(extracted.into()),
             RepositoryWorkspaceMode::Archive,
             read.request().predecessor().entries().to_vec(),
         )
@@ -78,7 +78,7 @@ async fn general_original_archive_without_checksum_replays_observed_digest_and_s
         slug_bzlmod_v2::generated_repository_archive_sha256_sri(observed_digest),
     );
     assert_eq!(path, "result");
-    assert_eq!(body.as_ref(), expected.as_bytes());
+    assert!(body.equals_slice(expected.as_bytes()));
     assert_eq!(*mode, 0o644);
     let mut entries = file.request().predecessor().entries().to_vec();
     entries.push(entry(
@@ -108,4 +108,106 @@ fn legacy_original_archive_without_checksum_refuses_before_filesystem_need() {
             slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError::MissingArchiveChecksum
         )),
     ));
+}
+
+#[tokio::test]
+async fn general_packed_archive_body_replays_latin1_read_and_cross_block_template() {
+    // Pure protocol fixture, like the archive result above. Native capture,
+    // credits and the archive checksum remain separate Core proof obligations.
+    let source = r#"
+def implementation(ctx):
+    ctx.download_and_extract('file:///independent/packed.tar.gz', type='tar.gz')
+    expected = 'a' * 65532 + '\xffTOKEN\x00tail'
+    if ctx.read('packed') != expected: fail('packed Latin1 read')
+    ctx.template('copy', ctx.path('packed'), {'TOKEN':'changed'}, False)
+    if ctx.read('copy') != 'a' * 65532 + '\xffchanged\x00tail': fail('cross-block template')
+"#;
+    let mut logical = vec![b'a'; 65532];
+    logical.extend_from_slice(b"\xffTOKEN\0tail");
+    let mut builder = slug_bzlmod_v2::RepositoryWorkspaceBodyBuilder::new(logical.len()).unwrap();
+    for chunk in logical.chunks(65536) {
+        builder
+            .append(chunk, &mut |_| Ok::<_, std::convert::Infallible>(()))
+            .unwrap();
+    }
+    let packed = builder.finish().unwrap();
+    assert!(packed.raw_arc().is_none());
+    assert!(packed.native_storage_bytes() < packed.len());
+    assert!(packed.equals_slice(&logical));
+
+    let (mut epoch, demand) = binding(42).await;
+    let mut operations = Vec::new();
+    let complete = loop {
+        match attempt(source, &epoch, &demand).result {
+            Ok(complete) => break complete,
+            Err(RepositoryRuleInvocationError::WorkspaceNeed(need)) => {
+                let request = need.request();
+                let mut entries = request.predecessor().entries().to_vec();
+                let result = match request.operation() {
+                    RepositoryWorkspaceOperation::Archive(effect) => {
+                        assert!(operations.is_empty());
+                        assert_eq!(effect.expected_sha256(), None);
+                        entries.push(entry(
+                            "packed",
+                            0o644,
+                            RepositoryWorkspaceNode::File(packed.clone()),
+                        ));
+                        operations.push("archive");
+                        RepositoryWorkspaceResult::Archive([0x6b; 32])
+                    }
+                    RepositoryWorkspaceOperation::Read(path) => {
+                        let RepositoryWorkspaceNode::File(body) =
+                            request.predecessor().entry(path).unwrap().node()
+                        else {
+                            panic!("read must use the current complete state")
+                        };
+                        operations.push("read");
+                        RepositoryWorkspaceResult::Read(body.clone())
+                    }
+                    RepositoryWorkspaceOperation::Template {
+                        path,
+                        body,
+                        source_body,
+                        mode,
+                        ..
+                    } => {
+                        assert_eq!(path, "copy");
+                        assert!(source_body.ptr_eq(&packed));
+                        let mut expected = vec![b'a'; 65532];
+                        expected.extend_from_slice(b"\xffchanged\0tail");
+                        assert!(body.equals_slice(&expected));
+                        entries.push(entry(
+                            path,
+                            *mode,
+                            RepositoryWorkspaceNode::File(body.clone()),
+                        ));
+                        operations.push("template");
+                        RepositoryWorkspaceResult::Unit
+                    }
+                    _ => panic!("unexpected operation in packed read/template replay"),
+                };
+                entries.sort_unstable_by(|a, b| a.path().cmp(b.path()));
+                epoch = epoch
+                    .complete(
+                        request.as_ref().clone(),
+                        result,
+                        request.predecessor().mode(),
+                        entries,
+                    )
+                    .unwrap();
+            }
+            Err(error) => panic!("packed original replay failed: {error:?}"),
+        }
+    };
+    assert_eq!(operations, ["archive", "read", "read", "template", "read"]);
+    let realization = complete.workspace_realization.unwrap();
+    assert_eq!(realization.transcript().records().len(), operations.len());
+    let RepositoryWorkspaceNode::File(retained) =
+        realization.final_state().entry("packed").unwrap().node()
+    else {
+        panic!("packed history must survive subsequent text operations")
+    };
+    assert!(retained.ptr_eq(&packed));
+    assert!(retained.equals_slice(&logical));
+    assert!(attempt(source, &epoch, &demand).result.is_ok());
 }

@@ -158,7 +158,7 @@ fn generation_with_adoption_spec(
             ticket.reservation(),
             RepositoryWorkspaceOperation::File {
                 path: "input".into(),
-                body: Arc::from(body),
+                body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(body)),
                 mode: 0o644,
             },
             scope,

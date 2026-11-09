@@ -11,6 +11,10 @@ use std::io;
 use std::os::fd::AsRawFd;
 use std::sync::Arc;
 
+use slug_bzlmod_v2::RepositoryWorkspaceBody;
+use slug_bzlmod_v2::RepositoryWorkspaceBodyAllocation;
+use slug_bzlmod_v2::RepositoryWorkspaceBodyBuildError;
+use slug_bzlmod_v2::RepositoryWorkspaceBodyBuilder;
 use slug_bzlmod_v2::RepositoryWorkspaceMode;
 use slug_bzlmod_v2::RepositoryWorkspaceRealization;
 use slug_bzlmod_v2::RepositoryWorkspaceReservation;

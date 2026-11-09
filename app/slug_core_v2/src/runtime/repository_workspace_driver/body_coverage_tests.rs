@@ -10,26 +10,81 @@ use super::*;
 const BODY_BYTES: usize = 48 * 1024 * 1024;
 const BANK_BYTES: usize = 64 * 1024 * 1024;
 
-fn archive() -> Vec<u8> {
+struct FixtureBytes {
+    state: u64,
+    position: usize,
+    samples: [u8; 3],
+}
+impl FixtureBytes {
+    fn new() -> Self {
+        Self {
+            state: 0x9e3779b97f4a7c15,
+            position: 0,
+            samples: [0; 3],
+        }
+    }
+}
+impl std::io::Read for FixtureBytes {
+    fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+        let count = output.len().min(BODY_BYTES - self.position);
+        for byte in &mut output[..count] {
+            self.state ^= self.state << 13;
+            self.state ^= self.state >> 7;
+            self.state ^= self.state << 17;
+            *byte = (self.state >> 24) as u8;
+            for (slot, position) in [0, BODY_BYTES / 2, BODY_BYTES - 1].into_iter().enumerate() {
+                if self.position == position {
+                    self.samples[slot] = *byte;
+                }
+            }
+            self.position += 1;
+        }
+        Ok(count)
+    }
+}
+fn archive(path: &std::path::Path) -> ([u8; 32], [u8; 3]) {
+    use std::io::Read;
+    use std::io::Write;
+    let output = std::fs::File::create(path).unwrap();
     let mut tar = tar::Builder::new(
         flate2::GzBuilder::new()
             .mtime(0)
-            .write(Vec::new(), flate2::Compression::fast()),
+            .write(output, flate2::Compression::fast()),
     );
-    for (path, body) in [
-        ("large", vec![0x6d; BODY_BYTES]),
-        ("small", b"actual small body\n".to_vec()),
-    ] {
-        let mut header = tar::Header::new_gnu();
-        header.set_size(body.len() as u64);
-        header.set_mode(0o644);
-        header.set_uid(0);
-        header.set_gid(0);
-        header.set_mtime(0);
-        header.set_cksum();
-        tar.append_data(&mut header, path, body.as_slice()).unwrap();
+    let mut header = tar::Header::new_gnu();
+    header.set_size(BODY_BYTES as u64);
+    header.set_mode(0o644);
+    header.set_uid(0);
+    header.set_gid(0);
+    header.set_mtime(0);
+    header.set_cksum();
+    let mut payload = FixtureBytes::new();
+    // Stream incompressible input; neither the raw nor compressed full file
+    // needs a producer Vec outside the actual archive capture owner.
+    tar.append_data(&mut header, "large", &mut payload).unwrap();
+    assert_eq!(payload.position, BODY_BYTES);
+    let mut header = tar::Header::new_gnu();
+    let small = b"actual small body\n";
+    header.set_size(small.len() as u64);
+    header.set_mode(0o644);
+    header.set_uid(0);
+    header.set_gid(0);
+    header.set_mtime(0);
+    header.set_cksum();
+    tar.append_data(&mut header, "small", small.as_slice())
+        .unwrap();
+    tar.into_inner().unwrap().finish().unwrap().flush().unwrap();
+    let mut input = std::fs::File::open(path).unwrap();
+    let mut digest = sha2::Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let count = input.read(&mut buffer).unwrap();
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
     }
-    tar.into_inner().unwrap().finish().unwrap()
+    (digest.finalize().into(), payload.samples)
 }
 
 #[test]
@@ -38,9 +93,7 @@ fn native_original_archive_above_half_bank_keeps_full_history_through_publicatio
     assert!(BODY_BYTES > BANK_BYTES / 2 && BODY_BYTES < BANK_BYTES);
     let input = tempfile::tempdir().unwrap();
     let path = input.path().join("observed.tar.gz");
-    let bytes = archive();
-    let digest: [u8; 32] = sha2::Sha256::digest(&bytes).into();
-    std::fs::write(&path, &bytes).unwrap();
+    let (digest, samples) = archive(&path);
     let url = url::Url::from_file_path(&path).unwrap();
     let source = format!(
         r#"
@@ -117,8 +170,12 @@ ext = module_extension(implementation=_extension)
         panic!("complete final state must retain the large file")
     };
     assert_eq!(large.len(), BODY_BYTES);
-    for index in [0, BODY_BYTES / 2, BODY_BYTES - 1] {
-        assert_eq!(large[index], 0x6d);
+    assert!(
+        large.native_storage_bytes() >= BODY_BYTES,
+        "the physical-pressure premise must survive the encoded representation"
+    );
+    for (index, expected) in [0, BODY_BYTES / 2, BODY_BYTES - 1].into_iter().zip(samples) {
+        assert!(large.range_eq(index, &[expected]));
     }
     for record in records {
         let RepositoryWorkspaceNode::File(historical) =
@@ -126,16 +183,13 @@ ext = module_extension(implementation=_extension)
         else {
             panic!("every historical state must retain its complete large body")
         };
-        assert!(Arc::ptr_eq(large, historical));
+        assert!(large.ptr_eq(historical));
     }
     let RepositoryWorkspaceNode::File(out) = realization.final_state().entry("out").unwrap().node()
     else {
         panic!("actual Starlark output must be retained")
     };
-    assert_eq!(
-        out.as_ref(),
-        format!("{}|actual small body\n", hex::encode(digest)).as_bytes()
-    );
+    assert!(out.equals_slice(format!("{}|actual small body\n", hex::encode(digest)).as_bytes()));
     let peak = resources.snapshot().peak_retained_bytes;
     assert!(peak >= BODY_BYTES && peak <= BANK_BYTES);
     eprintln!(

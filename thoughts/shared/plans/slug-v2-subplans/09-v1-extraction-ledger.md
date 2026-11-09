@@ -673,6 +673,30 @@ and all limits remain. Proof/memo tables and consumed output-array backings are
 fully paid producer scratch and end before publication. No donor import, global
 cache or new semantic identity is introduced.
 
+## Compact workspace body representation
+
+Design/source/final review accepted; executed bounded component proof is in the
+[compact-body receipt](wp1225-compact-body-acceptance-2026-11-09.json). The WP425 body owner reuses
+existing Arc/Dupe/Allocative, SmallMap hashed lookup and the already locked
+miniz_oxide0.8.9 codec. This is dependency/API reuse, with no copied donor code,
+global pool, native authority in DICE or decoded cache. Raw Arc ownership remains
+available; private Packed owners hold validated independent64KiB blocks. Full
+logical Eq, canonical SHA and decoded history limits stay authoritative. The
+ordinary body Hash writer changes explicitly and consistently across forms;
+its private construction-time Starlark value routes only the canonical pool.
+Native leases cover complete encoded allocation/control storage and construction
+overlap, separately from logical body facts. The
+[owner contract](wp1225-general-repository-workspace-design.md#compact-immutable-workspace-bodies)
+requires the actual six-archive gate and qualified original command. Offline
+codec payload sums and modeled credits establish no whole-command RSS result.
+Closed-realization reuse carries the privately derived canonical identity only
+after full transcript equality, replacing aliases with native canonical owners.
+It adds no cache or digest authority and preserves fresh FD verification; the
+actual six-archive seal/reader gate now passes once under the original limits,
+with339ms observed work headroom. Compaction adds codec CPU work and the original
+command still stops at WorkDeadline earlier than the main695 allocation-refusal
+prefix; original advance, completed-command latency and RSS remain unproved.
+
 ## Goal
 
 Track every deliberate extraction from Slug V1 or Buck2-derived infrastructure

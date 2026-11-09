@@ -124,7 +124,9 @@ pub(super) fn realization(
                 RepositoryWorkspaceEntry::new(
                     "dir/body".into(),
                     0o644,
-                    RepositoryWorkspaceNode::File(Arc::from(body)),
+                    RepositoryWorkspaceNode::File(
+                        slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(body)),
+                    ),
                 )
                 .unwrap(),
                 RepositoryWorkspaceEntry::new(
@@ -196,7 +198,7 @@ fn native_archive_and_process_roots_seal_same_backing_and_readers_own_last_relea
             panic!("sealed fixture owns the regular body")
         };
         assert!(
-            matches!(observed.get(&bytes).unwrap().as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(body)) if body.as_ref() == BODY && Arc::ptr_eq(body,canonical))
+            matches!(observed.get(&bytes).unwrap().as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(body)) if body.as_ref() == BODY && Arc::ptr_eq(body,canonical.raw_arc().unwrap()))
         );
         assert_eq!(scope.snapshot().source_attempts, 0);
         assert_eq!(

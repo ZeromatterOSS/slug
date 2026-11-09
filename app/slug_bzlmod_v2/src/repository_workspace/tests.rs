@@ -48,7 +48,7 @@ fn transcript() -> RepositoryWorkspaceTranscript {
 fn root() -> RepositoryWorkspaceEntry {
     RepositoryWorkspaceEntry::new("".into(), 0o755, RepositoryWorkspaceNode::Directory).unwrap()
 }
-fn file(path: &str, body: Arc<[u8]>) -> RepositoryWorkspaceEntry {
+fn file(path: &str, body: RepositoryWorkspaceBody) -> RepositoryWorkspaceEntry {
     RepositoryWorkspaceEntry::new(path.into(), 0o644, RepositoryWorkspaceNode::File(body)).unwrap()
 }
 fn write(
@@ -58,12 +58,15 @@ fn write(
     t.complete(
         t.request(RepositoryWorkspaceOperation::File {
             path: "out".into(),
-            body: Arc::from(body),
+            body: RepositoryWorkspaceBody::from_arc(Arc::from(body)),
             mode: 0o644,
         })?,
         RepositoryWorkspaceResult::Unit,
         t.current().mode(),
-        vec![root(), file("out", Arc::from(body))],
+        vec![
+            root(),
+            file("out", RepositoryWorkspaceBody::from_arc(Arc::from(body))),
+        ],
     )
 }
 fn host_path(path: &str) -> HostRepositoryLabelPathValue {
@@ -314,7 +317,8 @@ fn all_position_arguments_environment_removal_empty_and_requested_timeout_are_li
 fn nonzero_exit_keeps_writes_deletions_modes_and_later_read() {
     let before = write(&transcript(), b"old").unwrap();
     let request = before.request(execute()).unwrap();
-    let body: Arc<[u8]> = Arc::from(&b"new\xff"[..]);
+    let body: RepositoryWorkspaceBody =
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"new\xff"[..]));
     let next = before
         .complete(
             request,
@@ -372,7 +376,7 @@ fn replay_requires_full_operation_index_predecessor_and_generation() {
             0,
             RepositoryWorkspaceOperation::File {
                 path: "out".into(),
-                body: Arc::from(&b"left"[..]),
+                body: RepositoryWorkspaceBody::from_arc(Arc::from(&b"left"[..])),
                 mode: 0o644,
             },
         )
@@ -383,7 +387,7 @@ fn replay_requires_full_operation_index_predecessor_and_generation() {
             0,
             RepositoryWorkspaceOperation::File {
                 path: "out".into(),
-                body: Arc::from(&b"wrong"[..]),
+                body: RepositoryWorkspaceBody::from_arc(Arc::from(&b"wrong"[..])),
                 mode: 0o644,
             },
         )
@@ -438,8 +442,21 @@ fn state_rejects_missing_parent_duplicate_special_modes_and_escaping_link() {
             entries,
         )
     };
-    assert!(check(&[root(), file("a/b", Arc::from([]))]).is_err());
-    assert!(check(&[root(), file("a", Arc::from([])), file("a", Arc::from([]))]).is_err());
+    assert!(
+        check(&[
+            root(),
+            file("a/b", RepositoryWorkspaceBody::from_arc(Arc::from([])))
+        ])
+        .is_err()
+    );
+    assert!(
+        check(&[
+            root(),
+            file("a", RepositoryWorkspaceBody::from_arc(Arc::from([]))),
+            file("a", RepositoryWorkspaceBody::from_arc(Arc::from([])))
+        ])
+        .is_err()
+    );
     assert!(
         RepositoryWorkspaceEntry::new("bad".into(), 0o10000, RepositoryWorkspaceNode::Directory)
             .is_err()
@@ -487,7 +504,10 @@ fn process_entry_and_depth_exact_plus_one_do_not_lower_archive_admission() {
     let t = transcript();
     let mut entries = vec![root()];
     for i in 0..8191 {
-        entries.push(file(&format!("f{i:05}"), Arc::from([])));
+        entries.push(file(
+            &format!("f{i:05}"),
+            RepositoryWorkspaceBody::from_arc(Arc::from([])),
+        ));
     }
     assert!(
         RepositoryWorkspaceState::validate(
@@ -497,7 +517,10 @@ fn process_entry_and_depth_exact_plus_one_do_not_lower_archive_admission() {
         )
         .is_ok()
     );
-    entries.push(file("f99999", Arc::from([])));
+    entries.push(file(
+        "f99999",
+        RepositoryWorkspaceBody::from_arc(Arc::from([])),
+    ));
     assert_eq!(
         RepositoryWorkspaceState::validate(
             t.reservation(),
@@ -568,14 +591,28 @@ fn equal_foreign_bodies_are_compared_then_replaced_without_double_retention() {
         RepositoryWorkspaceNode::File(body) => body,
         _ => unreachable!(),
     };
-    let foreign: Arc<[u8]> = Arc::from(&b"same"[..]);
-    assert!(!Arc::ptr_eq(previous, &foreign));
-    let next = write(&first, &foreign).unwrap();
+    let foreign: RepositoryWorkspaceBody =
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"same"[..]));
+    assert!(!previous.ptr_eq(&foreign));
+    let next = first
+        .complete(
+            first
+                .request(RepositoryWorkspaceOperation::File {
+                    path: "out".into(),
+                    body: foreign.clone(),
+                    mode: 0o644,
+                })
+                .unwrap(),
+            RepositoryWorkspaceResult::Unit,
+            first.current().mode(),
+            vec![root(), file("out", foreign)],
+        )
+        .unwrap();
     let retained = match next.current().entry("out").unwrap().node() {
         RepositoryWorkspaceNode::File(body) => body,
         _ => unreachable!(),
     };
-    assert!(Arc::ptr_eq(previous, retained));
+    assert!(previous.ptr_eq(retained));
     assert!(Arc::ptr_eq(&first.records()[0], &next.records()[0]));
     assert_eq!(next.retention().body_bytes(), 4);
     assert_eq!(write(&next, b"diff").unwrap().retention().body_bytes(), 8);
@@ -871,7 +908,9 @@ fn incorrect_read_write_delete_results_and_reverse_mode_are_not_certificates() {
     assert_eq!(
         t.complete(
             read,
-            RepositoryWorkspaceResult::Read(Arc::from(&b"wrong"[..])),
+            RepositoryWorkspaceResult::Read(RepositoryWorkspaceBody::from_arc(Arc::from(
+                &b"wrong"[..]
+            ))),
             RepositoryWorkspaceMode::Archive,
             t.current().entries().to_vec()
         )
@@ -965,7 +1004,7 @@ fn protocol_debug_redacts_body_argv_environment_and_captured_bytes() {
 #[test]
 fn process_names_and_absolute_path_have_exact_plus_one_limits() {
     let t = transcript();
-    let empty: Arc<[u8]> = Arc::from([]);
+    let empty: RepositoryWorkspaceBody = RepositoryWorkspaceBody::from_arc(Arc::from([]));
     let mut entries = vec![root()];
     for i in 0..4112 {
         entries.push(file(&format!("{i:05}{}", "x".repeat(250)), empty.clone()));
@@ -1050,7 +1089,8 @@ fn process_names_and_absolute_path_have_exact_plus_one_limits() {
 #[test]
 fn process_body_exact_limit_and_new_version_plus_one_count_complete_history() {
     let initial = transcript();
-    let body: Arc<[u8]> = vec![b'x'; REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES as usize].into();
+    let body: RepositoryWorkspaceBody =
+        vec![b'x'; REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES as usize].into();
     let complete = initial
         .complete(
             initial.request(execute()).unwrap(),
@@ -1076,7 +1116,10 @@ fn process_body_exact_limit_and_new_version_plus_one_count_complete_history() {
     let too_big = vec![
         root(),
         file("out", body),
-        file("plus", Arc::from(&b"y"[..])),
+        file(
+            "plus",
+            RepositoryWorkspaceBody::from_arc(Arc::from(&b"y"[..])),
+        ),
     ];
     assert_eq!(
         RepositoryWorkspaceState::validate(
@@ -1112,8 +1155,9 @@ fn owner_layout_rounds_byte_tails_and_refuses_impossible_array_layouts() {
 #[test]
 fn equal_foreign_predecessor_and_reservation_are_released_before_retention() {
     let process = |initial: &RepositoryWorkspaceTranscript| {
-        let body: Arc<[u8]> = vec![b'x'; REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES as usize].into();
-        let weak_body = Arc::downgrade(&body);
+        let body: RepositoryWorkspaceBody =
+            vec![b'x'; REPOSITORY_WORKSPACE_PROCESS_BODY_BYTES as usize].into();
+        let weak_body = body.downgrade();
         let complete = initial
             .complete(
                 initial.request(execute()).unwrap(),
@@ -1176,10 +1220,10 @@ fn template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equa
         }
         RepositoryWorkspaceOperation::Template {
             path: "out".into(),
-            body: Arc::from(&b"unchanged"[..]),
+            body: RepositoryWorkspaceBody::from_arc(Arc::from(&b"unchanged"[..])),
             mode: 0o644,
             source: host_path("/template"),
-            source_body: Arc::from(&b"unchanged"[..]),
+            source_body: RepositoryWorkspaceBody::from_arc(Arc::from(&b"unchanged"[..])),
             substitutions,
         }
     };
@@ -1190,7 +1234,13 @@ fn template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equa
             selected.clone(),
             RepositoryWorkspaceResult::Unit,
             RepositoryWorkspaceMode::Archive,
-            vec![root(), file("out", Arc::from(&b"unchanged"[..]))],
+            vec![
+                root(),
+                file(
+                    "out",
+                    RepositoryWorkspaceBody::from_arc(Arc::from(&b"unchanged"[..])),
+                ),
+            ],
         )
         .unwrap();
     assert!(completed.replay(&selected).unwrap().is_some());
@@ -1207,7 +1257,13 @@ fn template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equa
                 initial.request(template(true)).unwrap(),
                 RepositoryWorkspaceResult::Unit,
                 RepositoryWorkspaceMode::Archive,
-                vec![root(), file("out", Arc::from(&b"unchanged"[..]))],
+                vec![
+                    root(),
+                    file(
+                        "out",
+                        RepositoryWorkspaceBody::from_arc(Arc::from(&b"unchanged"[..]))
+                    )
+                ],
             )
             .unwrap()
     );
@@ -1330,7 +1386,7 @@ async fn dice_observes_completed_state_fresh_commands_revocation_and_workspace_i
             0,
             RepositoryWorkspaceOperation::File {
                 path: "out".into(),
-                body: Arc::from(&b"observed"[..]),
+                body: RepositoryWorkspaceBody::from_arc(Arc::from(&b"observed"[..])),
                 mode: 0o644,
             },
         )
@@ -1340,7 +1396,13 @@ async fn dice_observes_completed_state_fresh_commands_revocation_and_workspace_i
             request.clone(),
             RepositoryWorkspaceResult::Unit,
             RepositoryWorkspaceMode::Archive,
-            vec![root(), file("out", Arc::from(&b"observed"[..]))],
+            vec![
+                root(),
+                file(
+                    "out",
+                    RepositoryWorkspaceBody::from_arc(Arc::from(&b"observed"[..])),
+                ),
+            ],
         )
         .unwrap();
     let next_command = RepositoryWorkspaceEpoch::fresh(workspace.clone(), 8, limits()).unwrap();
@@ -1375,7 +1437,9 @@ async fn dice_observes_completed_state_fresh_commands_revocation_and_workspace_i
             assert!(transcript.replay(&request).unwrap().is_some());
             assert_eq!(
                 transcript.current().entry("out").unwrap().node(),
-                &RepositoryWorkspaceNode::File(Arc::from(&b"observed"[..]))
+                &RepositoryWorkspaceNode::File(RepositoryWorkspaceBody::from_arc(Arc::from(
+                    &b"observed"[..]
+                )))
             );
         } else if actual.lease().is_some() {
             assert!(actual.transcripts().unwrap().is_empty());
@@ -1389,7 +1453,13 @@ async fn dice_observes_completed_state_fresh_commands_revocation_and_workspace_i
                         request.clone(),
                         RepositoryWorkspaceResult::Unit,
                         RepositoryWorkspaceMode::Archive,
-                        vec![root(), file("out", Arc::from(&b"observed"[..]))],
+                        vec![
+                            root(),
+                            file(
+                                "out",
+                                RepositoryWorkspaceBody::from_arc(Arc::from(&b"observed"[..]))
+                            )
+                        ],
                     )
                     .unwrap_err(),
                 RepositoryWorkspaceError::ForeignReservation
@@ -1425,11 +1495,14 @@ fn native_storage_forecast_covers_initial_unique_and_reused_completion() {
         let request = t
             .request(RepositoryWorkspaceOperation::File {
                 path: "out".into(),
-                body: Arc::from(body),
+                body: RepositoryWorkspaceBody::from_arc(Arc::from(body)),
                 mode: 0o644,
             })
             .unwrap();
-        let entries = vec![root(), file("out", Arc::from(body))];
+        let entries = vec![
+            root(),
+            file("out", RepositoryWorkspaceBody::from_arc(Arc::from(body))),
+        ];
         let forecast = t
             .completion_storage_bytes(
                 &request,
@@ -1461,11 +1534,17 @@ fn native_storage_forecast_refuses_foreign_replay_and_invalid_effects() {
     let request = t
         .request(RepositoryWorkspaceOperation::File {
             path: "out".into(),
-            body: Arc::from(b"required".as_slice()),
+            body: RepositoryWorkspaceBody::from_arc(Arc::from(b"required".as_slice())),
             mode: 0o644,
         })
         .unwrap();
-    let bad_entries = vec![root(), file("out", Arc::from(b"different".as_slice()))];
+    let bad_entries = vec![
+        root(),
+        file(
+            "out",
+            RepositoryWorkspaceBody::from_arc(Arc::from(b"different".as_slice())),
+        ),
+    ];
     assert_eq!(
         t.completion_storage_bytes(
             &request,
@@ -1486,7 +1565,13 @@ fn native_storage_forecast_refuses_foreign_replay_and_invalid_effects() {
         ),
         Err(RepositoryWorkspaceError::ForeignReservation)
     );
-    let entries = vec![root(), file("out", Arc::from(b"required".as_slice()))];
+    let entries = vec![
+        root(),
+        file(
+            "out",
+            RepositoryWorkspaceBody::from_arc(Arc::from(b"required".as_slice())),
+        ),
+    ];
     let completed = t
         .complete(
             request.clone(),
@@ -1622,7 +1707,13 @@ fn native_epoch_publication_cannot_bypass_other_process_root_history_admission()
                 Arc::from([]),
             )),
             RepositoryWorkspaceMode::Process,
-            vec![root(), file("out", Arc::from(vec![b'a'; 40 * 1024 * 1024]))],
+            vec![
+                root(),
+                file(
+                    "out",
+                    RepositoryWorkspaceBody::from_arc(Arc::from(vec![b'a'; 40 * 1024 * 1024])),
+                ),
+            ],
         )
         .unwrap();
     let epoch = epoch.publish_completed(a1).unwrap();

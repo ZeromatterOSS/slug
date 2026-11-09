@@ -30,7 +30,7 @@ fn file_entry(path: &str, body: &[u8]) -> RepositoryWorkspaceEntry {
     RepositoryWorkspaceEntry::new(
         path.into(),
         0o644,
-        RepositoryWorkspaceNode::File(Arc::from(body)),
+        RepositoryWorkspaceNode::File(Arc::<[u8]>::from(body).into()),
     )
     .unwrap()
 }
@@ -48,6 +48,17 @@ fn archive() -> RepositoryWorkspaceOperation {
         .unwrap(),
     )
 }
+fn incompressible(length: usize, seed: u64) -> Vec<u8> {
+    let mut state = seed;
+    (0..length)
+        .map(|_| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 24) as u8
+        })
+        .collect()
+}
 fn prior(
     selected: Arc<RepositoryWorkspaceReservation>,
     entries: Vec<RepositoryWorkspaceEntry>,
@@ -62,7 +73,7 @@ fn prior(
         )
         .unwrap()
 }
-fn body<'a>(entries: &'a [RepositoryWorkspaceEntry], path: &str) -> &'a Arc<[u8]> {
+fn body<'a>(entries: &'a [RepositoryWorkspaceEntry], path: &str) -> &'a RepositoryWorkspaceBody {
     match entries.iter().find(|e| e.path() == path).unwrap().node() {
         RepositoryWorkspaceNode::File(body) => body,
         _ => panic!(),
@@ -137,10 +148,16 @@ fn snapshot_samples_actual_changes_deletions_modes_links_and_reuses_only_observe
         &|| true,
     )
     .unwrap();
-    assert!(Arc::ptr_eq(&same, body(captured.entries(), "keep")));
-    assert!(!Arc::ptr_eq(&changed, body(captured.entries(), "changed")));
-    assert_eq!(body(captured.entries(), "changed").as_ref(), b"NEW");
-    assert_eq!(body(captured.entries(), "newdir/file").as_ref(), b"actual");
+    assert!(RepositoryWorkspaceBody::ptr_eq(
+        &same,
+        body(captured.entries(), "keep")
+    ));
+    assert!(!RepositoryWorkspaceBody::ptr_eq(
+        &changed,
+        body(captured.entries(), "changed")
+    ));
+    assert!(body(captured.entries(), "changed").equals_slice(b"NEW"));
+    assert!(body(captured.entries(), "newdir/file").equals_slice(b"actual"));
     assert!(!captured.entries().iter().any(|e| e.path() == "removed"));
     assert_eq!(
         captured
@@ -163,7 +180,7 @@ fn snapshot_samples_actual_changes_deletions_modes_links_and_reuses_only_observe
             RepositoryWorkspaceResult::Archive([0; 32]),
         )
         .unwrap();
-    assert!(Arc::ptr_eq(
+    assert!(RepositoryWorkspaceBody::ptr_eq(
         &same,
         body(completed.transcript().current().entries(), "keep")
     ));
@@ -200,7 +217,7 @@ fn snapshot_retained_descriptor_ignores_absent_and_foreign_display_tree() {
         &|| true,
     )
     .unwrap();
-    assert_eq!(body(a.entries(), "file").as_ref(), b"original");
+    assert!(body(a.entries(), "file").equals_slice(b"original"));
     assert!(!display.exists());
     drop(a);
     fs::create_dir(&display).unwrap();
@@ -215,7 +232,7 @@ fn snapshot_retained_descriptor_ignores_absent_and_foreign_display_tree() {
         &|| true,
     )
     .unwrap();
-    assert_eq!(body(b.entries(), "file").as_ref(), b"original");
+    assert!(body(b.entries(), "file").equals_slice(b"original"));
     assert_eq!(fs::read(display.join("file")).unwrap(), b"foreign");
 }
 
@@ -678,7 +695,7 @@ fn snapshot_completion_rejects_foreign_owner_and_failed_protocol_without_orphani
         &|| true,
     )
     .unwrap();
-    let weak = Arc::downgrade(body(captured.entries(), "file"));
+    let weak = RepositoryWorkspaceBody::downgrade(body(captured.entries(), "file"));
     let request = old
         .request(RepositoryWorkspaceOperation::Exists("file".into()))
         .unwrap();
@@ -693,16 +710,20 @@ fn snapshot_completion_rejects_foreign_owner_and_failed_protocol_without_orphani
 #[test]
 fn covered_snapshot_completion_shares_one_actual_body_allocation_with_history() {
     // Borrowed ordinary RootIo kernel only, not a native backing/factory proof.
-    // Two full 2MiB payload debits cannot fit this bank, but one payload plus
+    // Two full 4MiB payload debits cannot fit this bank, but one payload plus
     // all temporary/control forecasts can. Pure fallback tests stay unchanged.
     let fixture = tempfile::tempdir().unwrap();
     prepare(fixture.path());
-    let length = 2 * 1024 * 1024;
-    fs::write(fixture.path().join("large"), vec![b'x'; length]).unwrap();
+    let length = 4 * 1024 * 1024;
+    fs::write(
+        fixture.path().join("large"),
+        incompressible(length, 0x123456789abcdef),
+    )
+    .unwrap();
     let selected = reservation(Path::new("/absent/covered-snapshot"), 229);
     let scope = scope();
     let bank = RepositoryRootResources::new(
-        RepositoryRootResourceLimits::new(3 * 1024 * 1024, 16, 4 * ARCHIVE_BYTES).unwrap(),
+        RepositoryRootResourceLimits::new(7 * 1024 * 1024, 16, 4 * ARCHIVE_BYTES).unwrap(),
     )
     .unwrap();
     let baseline = bank.snapshot().retained_bytes;
@@ -730,7 +751,11 @@ fn covered_snapshot_completion_shares_one_actual_body_allocation_with_history() 
     )
     .unwrap();
     let actual = body(captured.entries(), "large").clone();
-    let weak = Arc::downgrade(&actual);
+    assert!(
+        actual.native_storage_bytes() >= length,
+        "physical-pressure premise must hold after encoding"
+    );
+    let weak = RepositoryWorkspaceBody::downgrade(&actual);
     let completed = captured
         .with_body_candidates(candidates)
         .complete_active(
@@ -741,11 +766,11 @@ fn covered_snapshot_completion_shares_one_actual_body_allocation_with_history() 
             &|| true,
         )
         .unwrap();
-    assert!(Arc::ptr_eq(
+    assert!(RepositoryWorkspaceBody::ptr_eq(
         body(completed.transcript().current().entries(), "large"),
         &actual
     ));
-    assert!(Arc::ptr_eq(
+    assert!(RepositoryWorkspaceBody::ptr_eq(
         ledger.lookup(&actual, &|| true).unwrap().unwrap().body(),
         &actual
     ));
@@ -807,7 +832,7 @@ fn covered_snapshot_refuses_foreign_bank_scope_or_reservation_before_control_dis
             &|| true,
         )
         .unwrap();
-        let weak = Arc::downgrade(body(captured.entries(), "file"));
+        let weak = RepositoryWorkspaceBody::downgrade(body(captured.entries(), "file"));
         let before = ledger_bank.snapshot();
         assert!(
             matches!(

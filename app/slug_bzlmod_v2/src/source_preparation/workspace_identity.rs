@@ -300,7 +300,7 @@ impl RepositoryMaterializationRequest {
     #[doc(hidden)]
     pub fn try_visit_general_workspace_body_allocations<E>(
         &self,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&crate::RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<Result<(), RepositoryWorkspaceError>, E> {
         if let Err(error) = self.validate_general_workspace_binding() {
             return Ok(Err(error));
@@ -342,9 +342,19 @@ impl RepoSpec {
 pub fn general_workspace_source_identity(realization: &RepositoryWorkspaceRealization) -> Arc<str> {
     realization.source_identity().clone()
 }
+#[cfg(test)]
+std::thread_local! {
+    static SOURCE_IDENTITY_DERIVATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+#[cfg(test)]
+pub(crate) fn source_identity_derivation_count() -> usize {
+    SOURCE_IDENTITY_DERIVATIONS.get()
+}
 pub(crate) fn derive_workspace_source_identity(
     state: &crate::RepositoryWorkspaceState,
 ) -> Arc<str> {
+    #[cfg(test)]
+    SOURCE_IDENTITY_DERIVATIONS.with(|count| count.set(count.get().checked_add(1).unwrap()));
     let mut hash = Sha256::new();
     hash.update(b"slug-general-workspace-content-v2\0");
     hash.update((state.entries().len() as u64).to_le_bytes());
@@ -357,7 +367,7 @@ pub(crate) fn derive_workspace_source_identity(
             crate::RepositoryWorkspaceNode::File(bytes) => {
                 hash.update([1]);
                 hash.update((bytes.len() as u64).to_le_bytes());
-                hash.update(bytes.as_ref());
+                bytes.for_each_chunk(&mut |chunk| hash.update(chunk));
             }
             crate::RepositoryWorkspaceNode::Link(target) => {
                 hash.update([2]);
@@ -452,7 +462,13 @@ mod tests {
         transcript: RepositoryWorkspaceTranscript,
         body: &[u8],
     ) -> RepositoryWorkspaceTranscript {
-        let bytes: Arc<[u8]> = Arc::from(body);
+        let bytes = crate::RepositoryWorkspaceBody::from_arc(Arc::from(body));
+        write_body(transcript, bytes)
+    }
+    fn write_body(
+        transcript: RepositoryWorkspaceTranscript,
+        bytes: crate::RepositoryWorkspaceBody,
+    ) -> RepositoryWorkspaceTranscript {
         let request = transcript
             .request(RepositoryWorkspaceOperation::File {
                 path: "out".into(),
@@ -540,6 +556,46 @@ mod tests {
                 .realize(1)
                 .unwrap()
                 .source_identity()
+        );
+    }
+    #[test]
+    fn raw_and_packed_content_sha_keep_the_full_v2_byte_stream() {
+        let bytes = vec![0x5a; 128 * 1024 + 17];
+        let raw = write(initial(1, 7), &bytes);
+        let mut builder = crate::RepositoryWorkspaceBodyBuilder::new(bytes.len()).unwrap();
+        for chunk in bytes.chunks(crate::REPOSITORY_WORKSPACE_BODY_CHUNK_BYTES) {
+            builder.append(chunk, &mut |_| Ok::<_, ()>(())).unwrap();
+        }
+        let packed = write_body(initial(2, 9), builder.finish().unwrap());
+        let mut old = Sha256::new();
+        old.update(b"slug-general-workspace-content-v2\0");
+        old.update(2u64.to_le_bytes());
+        old.update(0u64.to_le_bytes());
+        old.update(0o755u16.to_le_bytes());
+        old.update([0]);
+        old.update(3u64.to_le_bytes());
+        old.update(b"out");
+        old.update(0o644u16.to_le_bytes());
+        old.update([1]);
+        old.update((bytes.len() as u64).to_le_bytes());
+        old.update(&bytes);
+        old.update(0u64.to_le_bytes());
+        let expected = old
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        assert_eq!(
+            derive_workspace_source_identity(raw.current()).as_ref(),
+            expected
+        );
+        assert_eq!(
+            derive_workspace_source_identity(packed.current()).as_ref(),
+            expected
+        );
+        assert_ne!(
+            raw, packed,
+            "storage encoding is not an equality domain, but the changed lease still is"
         );
     }
     fn spec(attributes: SmallMap<CompactString, OverrideAttributeValue>) -> RepoSpec {

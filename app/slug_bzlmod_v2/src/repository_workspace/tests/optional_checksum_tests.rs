@@ -25,7 +25,10 @@ fn complete(
         RepositoryWorkspaceMode::Archive,
         vec![
             root(),
-            file("out", Arc::from(&b"same extracted content"[..])),
+            file(
+                "out",
+                RepositoryWorkspaceBody::from_arc(Arc::from(&b"same extracted content"[..])),
+            ),
         ],
     )
 }

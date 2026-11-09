@@ -154,7 +154,7 @@ ext = module_extension(implementation=_extension)
         else {
             panic!("actual extracted regular payload")
         };
-        assert_eq!(extracted.as_ref(), payload);
+        assert!(extracted.equals_slice(payload));
         let reads = realization
             .transcript()
             .records()
@@ -175,13 +175,13 @@ ext = module_extension(implementation=_extension)
         let RepositoryWorkspaceResult::Read(read) = reads[0].result() else {
             panic!("actual observed Read result")
         };
-        assert_eq!(read.as_ref(), payload);
+        assert!(read.equals_slice(payload));
         let RepositoryWorkspaceNode::File(out) =
             realization.final_state().entry("out").unwrap().node()
         else {
             panic!("actual output file")
         };
-        assert_eq!(out.as_ref(), expected.as_bytes());
+        assert!(out.equals_slice(expected.as_bytes()));
         identities.push(realization.source_identity().clone());
         assert_eq!(
             std::fs::read(workspace.path().join("MODULE.bazel")).unwrap(),

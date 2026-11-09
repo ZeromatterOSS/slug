@@ -46,6 +46,31 @@ fn control_bytes() -> Result<usize, PhysicalRootError> {
     )
 }
 
+impl PendingNativeBody {
+    /// Only exact retained block allocation pressure mints a recovery witness.
+    pub(in crate::runtime) fn admit_packed_arc(
+        &mut self,
+        bytes: usize,
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), PhysicalRootError> {
+        self.origin.check(active)?;
+        match self.credit.try_grow(bytes) {
+            Ok(()) => Ok(()),
+            Err(slug_workspace_v2::ImageDescriptorBudgetError::ResourceLimit) => {
+                self.payload_refused = true;
+                Err(PhysicalRootError::Resource)
+            }
+            Err(_) => Err(PhysicalRootError::Resource),
+        }
+    }
+    pub(in crate::runtime) fn take_payload_refusal(&mut self) -> Option<NativeBodyRefusal> {
+        std::mem::take(&mut self.payload_refused).then(|| NativeBodyRefusal {
+            length: self.length,
+            origin: self.origin.clone(),
+        })
+    }
+}
+
 impl NativeBodyCandidates {
     pub(in crate::runtime) fn reserve_new_for_capture(
         &mut self,
@@ -65,6 +90,7 @@ impl NativeBodyCandidates {
                 length,
                 origin: self.ledger.origin.clone(),
                 credit,
+                payload_refused: false,
             })),
             None => Ok(NativeBodyAdmission::Refused(NativeBodyRefusal {
                 length,

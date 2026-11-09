@@ -482,7 +482,9 @@ ext = module_extension(implementation=impl)
         else {
             panic!("rendered output must be a file")
         };
-        (body.to_vec(), realization.source_identity().clone())
+        let mut bytes = vec![0; body.len()];
+        assert!(body.copy_into(0, &mut bytes));
+        (bytes, realization.source_identity().clone())
     }
     fn replay_refused(outcome: SourcePreparationOutcome<EffectResult>) {
         assert!(matches!(outcome, SourcePreparationOutcome::Complete(result)

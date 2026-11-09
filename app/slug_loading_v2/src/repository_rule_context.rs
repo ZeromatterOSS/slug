@@ -5,7 +5,7 @@
  * LICENSE-MIT file in the root directory of this source tree or the Apache
  * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
  * of this source tree. You may select either.
- */
+*/
 
 use std::cell::RefCell;
 use std::fmt;
@@ -37,7 +37,7 @@ use slug_bzlmod_v2::RepositoryFilesystemResult;
 use slug_bzlmod_v2::RepositoryFilesystemTranscript;
 use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatform;
-#[rustfmt::skip] use slug_workspace_v2::{NormalizedAbsolutePath, PathObservationNamespace};
+#[rustfmt::skip]use slug_workspace_v2::{NormalizedAbsolutePath, PathObservationNamespace};
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
@@ -539,8 +539,8 @@ pub(crate) use workspace::bindings::RepositoryWorkspaceSourceBinding;
 pub(crate) type PreparedRepositoryLabelPaths =
     SmallMap<RepositoryLabelPathAddress, HostRepositoryLabelPathValue>;
 pub(crate) type PreparedRepositoryLabelSources = SmallMap<RepositoryLabelPathAddress, Arc<[u8]>>;
-#[rustfmt::skip] pub(crate) type PreparedRepositoryWhichCandidates = SmallMap<NormalizedAbsolutePath, RepositoryWhichCandidate>;
-#[rustfmt::skip] pub(crate) type PreparedRepositoryHostPaths = SmallMap<NormalizedAbsolutePath, bool>;
+#[rustfmt::skip]pub(crate) type PreparedRepositoryWhichCandidates = SmallMap<NormalizedAbsolutePath, RepositoryWhichCandidate>;
+#[rustfmt::skip]pub(crate) type PreparedRepositoryHostPaths = SmallMap<NormalizedAbsolutePath, bool>;
 
 #[rustfmt::skip] #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RepositoryWhichCandidate { Executable, Miss }
@@ -565,7 +565,7 @@ fn normalized_generated_path(base: &str, input: &str) -> Option<CompactString> {
     let path = parts.join("/"); (path.len() <= 4096).then(|| path.into())
 }
 
-#[rustfmt::skip] fn record_generated_path(present: &mut SmallSet<CompactString>, path: &str) { present.insert(CompactString::new("")); for (index, byte) in path.bytes().enumerate() { if byte == b'/' { present.insert(CompactString::new(&path[..index])); } } present.insert(CompactString::new(path)); }
+#[rustfmt::skip]fn record_generated_path(present: &mut SmallSet<CompactString>, path: &str) { present.insert(CompactString::new("")); for (index, byte) in path.bytes().enumerate() { if byte == b'/' { present.insert(CompactString::new(&path[..index])); } } present.insert(CompactString::new(path)); }
 
 #[rustfmt::skip]
 impl RepositoryRuleInvocationState {
@@ -610,9 +610,9 @@ impl RepositoryRuleInvocationState {
 
 }
 
-#[rustfmt::skip] fn existing_repository_path<'v>(value: Value<'v>) -> Option<Value<'v>> { RepositoryStarlarkPath::from_value(value).map(|_| value) }
+#[rustfmt::skip]fn existing_repository_path<'v>(value: Value<'v>) -> Option<Value<'v>> { RepositoryStarlarkPath::from_value(value).map(|_| value) }
 
-#[rustfmt::skip] impl RepositoryStarlarkPath {
+#[rustfmt::skip]impl RepositoryStarlarkPath {
     fn text(&self) -> String { match self { Self::Workspace { absolute, .. } => absolute.as_path().to_str().expect("Unicode workspace path").to_owned(), Self::Label { path, .. } | Self::Which(path) => path.path_str().to_owned(), Self::Host { path, .. } => path.as_path().to_str().expect("repository Host paths originate from Unicode Starlark text").to_owned(), Self::Generated { repository, relative, .. } => format!("@@{repository}//{relative}") } }
     fn label_address(&self) -> Option<&RepositoryLabelPathAddress> { match self { Self::Label { address, .. } => Some(address), _ => None } }
 }
@@ -685,7 +685,7 @@ impl<'v> StarlarkValue<'v> for RepositoryStarlarkPath {
     }
 }
 
-#[starlark_module] #[rustfmt::skip] fn repository_starlark_path_methods(builder: &mut MethodsBuilder) {
+#[starlark_module] #[rustfmt::skip]fn repository_starlark_path_methods(builder: &mut MethodsBuilder) {
     fn get_child<'v>(this: Value<'v>, #[starlark(args)] relative_paths: UnpackTuple<String>, eval: &mut Evaluator<'v, '_, '_>) -> anyhow::Result<Value<'v>> {
         let Some(path) = RepositoryStarlarkPath::from_value(this) else { return Err(anyhow::anyhow!("invalid path receiver")); };
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
@@ -773,28 +773,28 @@ const MAX_TEMPLATE_OUTPUT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TEMPLATE_SUBSTITUTIONS: usize = 64;
 const MAX_TEMPLATE_SUBSTITUTION_BYTES: usize = 64 * 1024;
 struct WhichLimits;
-#[rustfmt::skip] impl WhichLimits { const PROGRAM_BYTES: usize = 255; const PATH_BYTES: usize = 4 * 1024; const COMPONENTS: usize = 64; const CANDIDATES: usize = 64; }
+#[rustfmt::skip]impl WhichLimits { const PROGRAM_BYTES: usize = 255; const PATH_BYTES: usize = 4 * 1024; const COMPONENTS: usize = 64; const CANDIDATES: usize = 64; }
 
-#[rustfmt::skip] fn java_trim(value: &str) -> &str {
+#[rustfmt::skip]fn java_trim(value: &str) -> &str {
     let start = value.char_indices().find_map(|(index, character)| (character > '\u{20}').then_some(index)).unwrap_or(value.len());
     let end = value[start..].char_indices().rev().find_map(|(index, character)| (character > '\u{20}').then_some(start + index + character.len_utf8())).unwrap_or(start);
     &value[start..end]
 }
 
-#[rustfmt::skip] fn normalized_which_component(component: &str, program: &str) -> Result<Option<NormalizedAbsolutePath>, RepositoryRuleInvocationError> {
+#[rustfmt::skip]fn normalized_which_component(component: &str, program: &str) -> Result<Option<NormalizedAbsolutePath>, RepositoryRuleInvocationError> {
     let raw = std::path::Path::new(component);
     if !raw.is_absolute() { return Ok(None); }
     let normalized = NormalizedAbsolutePath::new(raw).map_err(|_| RepositoryRuleInvocationError::WhichLimit)?;
     NormalizedAbsolutePath::new(normalized.as_path().join(program)).map(Some).map_err(|_| RepositoryRuleInvocationError::WhichLimit)
 }
 
-#[rustfmt::skip] fn admit_which_candidate(candidates: &mut Vec<NormalizedAbsolutePath>, candidate: NormalizedAbsolutePath) -> Result<(), RepositoryRuleInvocationError> {
+#[rustfmt::skip]fn admit_which_candidate(candidates: &mut Vec<NormalizedAbsolutePath>, candidate: NormalizedAbsolutePath) -> Result<(), RepositoryRuleInvocationError> {
     if candidates.contains(&candidate) { return Ok(()); }
     if candidates.len() == WhichLimits::CANDIDATES { return Err(RepositoryRuleInvocationError::WhichLimit); }
     candidates.push(candidate); Ok(())
 }
 
-#[rustfmt::skip] fn which_candidates(
+#[rustfmt::skip]fn which_candidates(
     path: Option<&str>,
     program: &str,
 ) -> Result<Vec<NormalizedAbsolutePath>, RepositoryRuleInvocationError> {
@@ -950,7 +950,7 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
             if bytes.len() > MAX_READ_BYTES {
                 return Err(state.fail(RepositoryRuleInvocationError::ReadLimit));
             }
-            return Ok(eval.heap().alloc(latin1_text(&bytes)));
+            return Ok(eval.heap().alloc(workspace::body_latin1_text(&bytes)));
         }
         if watch != "auto" {
             return Err(state.fail(RepositoryRuleInvocationError::ReadArgument));
@@ -994,7 +994,7 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
             let (source, source_body) = workspace::read_bytes(state, template)?;
             let converted =
                 latin1_substitutions(&substitutions).map_err(|error| state.fail(error))?;
-            let body = replace_template_bytes(source_body.to_vec(), &converted)
+            let body = replace_template_bytes(workspace::template_input(&source_body), &converted)
                 .map_err(|error| state.fail(error))?;
             let substitutions = substitutions
                 .into_iter()
@@ -1119,7 +1119,7 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
                 state,
                 slug_bzlmod_v2::RepositoryWorkspaceOperation::File {
                     path,
-                    body: Arc::from(content.as_bytes()),
+                    body: Arc::<[u8]>::from(content.as_bytes()).into(),
                     mode: if executable { 0o755 } else { 0o644 },
                 },
             )?;

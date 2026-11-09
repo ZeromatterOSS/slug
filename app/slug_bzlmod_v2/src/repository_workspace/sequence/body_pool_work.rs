@@ -1,4 +1,6 @@
-//! Test-only requested full-hash inputs. Not CPU, allocation or native IO data.
+//! Test-only pool operation sites and their requested full-hash input lengths.
+//! Cached routing sites request zero payload hashing. Actual Body hash/decode
+//! work is independently observed by the body test counter. Not CPU/native IO.
 use std::cell::Cell;
 
 #[derive(Clone, Copy)]

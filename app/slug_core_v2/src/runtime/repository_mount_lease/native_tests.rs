@@ -164,7 +164,7 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
             .unwrap();
         let record = completed.transcript().records().last().unwrap();
         assert!(
-            matches!(record.next().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.as_ref()==native_fixture::BODIES[phase])
+            matches!(record.next().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.equals_slice(native_fixture::BODIES[phase]))
         );
         let next = pending
             .accept(
@@ -197,7 +197,11 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
                         RepositoryWorkspaceEntry::new(
                             "out".into(),
                             0o644,
-                            RepositoryWorkspaceNode::File(Arc::from(&b"wrong"[..])),
+                            RepositoryWorkspaceNode::File(
+                                slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                                    &b"wrong"[..],
+                                )),
+                            ),
                         )
                         .unwrap(),
                     ],

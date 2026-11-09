@@ -187,7 +187,9 @@ fn native_small_archive_finalization_contracts_same_original_root_only_after_rea
         &selected,
         RepositoryWorkspaceOperation::File {
             path: "data".into(),
-            body: Arc::from(&b"small archive"[..]),
+            body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                &b"small archive"[..],
+            )),
             mode: 0o644,
         },
         &runtime,
@@ -305,7 +307,11 @@ fn native_archive_compaction_does_not_promote_deleted_large_history_to_process()
         &selected,
         RepositoryWorkspaceOperation::File {
             path: "large".into(),
-            body: Arc::from(vec![0x5a; 65 * 1024 * 1024]),
+            body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(vec![
+                0x5a;
+                65 * 1024
+                    * 1024
+            ])),
             mode: 0o644,
         },
         &runtime,
@@ -489,7 +495,7 @@ fn native_archive_compaction_refusal_after_successor_reaps_without_publishing_or
         &selected,
         RepositoryWorkspaceOperation::File {
             path: "data".into(),
-            body: Arc::from(&b"unpublished"[..]),
+            body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(&b"unpublished"[..])),
             mode: 0o644,
         },
         &runtime,

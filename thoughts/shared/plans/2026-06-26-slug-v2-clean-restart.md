@@ -36,6 +36,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 Packet: WP-7-425-m7a-general-repository-process
 
+The selected compact-body implementation now addresses an actual XZ byte-bank
+refusal after LLVM, preserving full logical history and identity under the fixed
+caps. The compact six-archive chain now passes seal/reader closure; its
+[bounded component proof](./slug-v2-subplans/wp1225-compact-body-acceptance-2026-11-09.json)
+has final ACCEPT. Compaction adds codec CPU work, and the full original
+still stops at rustfmt3/WorkDeadline. Next diagnose that work under unchanged
+limits; original completion, completed-command latency/RSS and activation remain open.
+
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.
 Inactive Core now covers rooted mutation/archive IO, complete snapshots/sealing,

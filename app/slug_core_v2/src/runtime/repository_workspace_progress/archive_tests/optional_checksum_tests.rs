@@ -46,7 +46,7 @@ fn native_optional_archive_replay_retains_actual_digest_without_reacquisition() 
     );
     assert!(
         matches!(progress.transcript().current().entry("body").unwrap().node(),
-        RepositoryWorkspaceNode::File(body) if body.as_ref()==b"archive replacement")
+        RepositoryWorkspaceNode::File(body) if body.equals_slice(b"archive replacement"))
     );
     let counters = scope.snapshot();
     let decoded = progress.decoded;

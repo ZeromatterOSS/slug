@@ -62,7 +62,11 @@ pub(super) fn open(
     let credit = root
         .resources
         .reserve(std::mem::size_of::<RepositoryRootReader>(), 1, 0)?;
-    let _scratch = root.resources.reserve(IO_SCRATCH, 3, 0)?;
+    let _scratch = root.resources.reserve(
+        add(IO_SCRATCH, RepositoryWorkspaceBody::decode_scratch_bytes())?,
+        3,
+        0,
+    )?;
     root.validate_backing()?;
     let io = RootIo::new(&root.file, io_limits(root.mode, &root.reservation))?;
     let before = io.lstat(Path::new(relative))?;
@@ -148,7 +152,12 @@ impl Read for RepositoryRootReader {
         let _scratch = self
             .root
             .resources
-            .reserve(IO_SCRATCH, 3, 0)
+            .reserve(
+                add(IO_SCRATCH, RepositoryWorkspaceBody::decode_scratch_bytes())
+                    .map_err(read_error)?,
+                3,
+                0,
+            )
             .map_err(read_error)?;
         self.validate().map_err(read_error)?;
         if self
@@ -186,7 +195,10 @@ impl Read for RepositoryRootReader {
             self.validate().map_err(read_error)?;
             return Ok(0);
         }
-        let requested = out.len().min(available.try_into().unwrap_or(usize::MAX));
+        let requested = out
+            .len()
+            .min(64 * 1024)
+            .min(available.try_into().unwrap_or(usize::MAX));
         let count = self
             .file
             .as_ref()
@@ -194,7 +206,7 @@ impl Read for RepositoryRootReader {
             .read_at(&mut out[..requested], self.offset)?;
         let start =
             usize::try_from(self.offset).map_err(|_| read_error(PhysicalRootError::Snapshot))?;
-        if count == 0 || out[..count] != body[start..start + count] {
+        if count == 0 || !body.range_eq(start, &out[..count]) {
             return Err(read_error(PhysicalRootError::Snapshot));
         }
         self.validate().map_err(read_error)?;
@@ -207,6 +219,46 @@ impl Read for RepositoryRootReader {
 }
 
 impl RepositoryPhysicalRoot {
+    /// Allocation identity is a fast path, never a foreign-state substitute.
+    /// No SourceScope/IO check is added to existing metadata-only callers.
+    pub(in crate::runtime) fn matches_state(
+        &self,
+        state: &Arc<slug_bzlmod_v2::RepositoryWorkspaceState>,
+    ) -> Result<bool, PhysicalRootError> {
+        if Arc::ptr_eq(&self.state, state) {
+            return Ok(true);
+        }
+        let _working =
+            self.resources
+                .reserve(2 * RepositoryWorkspaceBody::decode_scratch_bytes(), 0, 0)?;
+        Ok(self.state.as_ref() == state.as_ref())
+    }
+    /// Pure direct-member digest check with working storage paid by this root.
+    /// It deliberately adds no SourceScope/deadline/FD/route activity check.
+    pub(in crate::runtime) fn verify_direct_body_digest(
+        &self,
+        relative: &str,
+        expected: FileContentDigest,
+    ) -> Result<(), PhysicalRootError> {
+        let _working =
+            self.resources
+                .reserve(RepositoryWorkspaceBody::decode_scratch_bytes(), 0, 0)?;
+        let Some(RepositoryWorkspaceNode::File(body)) =
+            self.state.entry(relative).map(|e| e.node())
+        else {
+            return Err(PhysicalRootError::Snapshot);
+        };
+        if body.len() as u64 != expected.size_bytes() {
+            return Err(PhysicalRootError::Snapshot);
+        }
+        let mut hash = Sha256::new();
+        body.for_each_chunk(&mut |chunk| hash.update(chunk));
+        let actual: [u8; 32] = hash.finalize().into();
+        if &actual != expected.sha256() {
+            return Err(PhysicalRootError::Snapshot);
+        }
+        Ok(())
+    }
     pub(in crate::runtime) fn verify_routed_source_metadata(
         &self,
         logical_relative: &str,
@@ -235,7 +287,7 @@ impl RepositoryPhysicalRoot {
         self.check_origin(scope, &|| true)?;
         let _scratch = self.resources.reserve(
             add(
-                IO_SCRATCH,
+                add(IO_SCRATCH, RepositoryWorkspaceBody::decode_scratch_bytes())?,
                 self.state
                     .source_bindings()
                     .len()
@@ -275,10 +327,11 @@ impl RepositoryPhysicalRoot {
                 return Err(PhysicalRootError::Snapshot);
             };
             let mut hash = Sha256::new();
-            for chunk in body.chunks(64 * 1024) {
-                scope.check()?;
+            body.try_for_each_chunk(&mut |chunk| {
+                self.check_origin(scope, &|| true)?;
                 hash.update(chunk);
-            }
+                Ok::<_, PhysicalRootError>(())
+            })?;
             FileContentDigest::new(hash.finalize().into(), body.len() as u64)
                 .ok_or(PhysicalRootError::Snapshot)?
         } else {
@@ -392,7 +445,12 @@ impl Seek for RepositoryRootReader {
         let _scratch = self
             .root
             .resources
-            .reserve(IO_SCRATCH, 3, 0)
+            .reserve(
+                add(IO_SCRATCH, RepositoryWorkspaceBody::decode_scratch_bytes())
+                    .map_err(read_error)?,
+                3,
+                0,
+            )
             .map_err(read_error)?;
         self.validate().map_err(read_error)?;
         if self

@@ -384,7 +384,7 @@ fn fixture(large: bool) -> Fixture {
                 &a,
                 RepositoryWorkspaceOperation::File {
                     path: path.into(),
-                    body: Arc::from(body),
+                    body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(body)),
                     mode,
                 },
                 &scope,
@@ -409,7 +409,9 @@ fn fixture(large: bool) -> Fixture {
                 &a,
                 RepositoryWorkspaceOperation::File {
                     path: "large".into(),
-                    body: Arc::from(vec![0x5a; 65 * 1024 * 1024]),
+                    body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                        vec![0x5a; 65 * 1024 * 1024],
+                    )),
                     mode: 0o644,
                 },
                 &scope,

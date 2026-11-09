@@ -7,21 +7,23 @@ fn covered_new_path_reuses_pending_bytes_but_mismatch_and_sticky_scope_stay_clos
     for case in 0..4 {
         let fixture = tempfile::tempdir().unwrap();
         prepare(fixture.path());
-        let length = 2 * 1024 * 1024;
-        let old: Arc<[u8]> = vec![b'a'; length].into();
+        let length = 4 * 1024 * 1024;
+        let old: RepositoryWorkspaceBody = incompressible(length, 0x123456789abcdef).into();
         fs::write(
             fixture.path().join("new"),
             if case == 1 {
-                vec![b'b'; length]
+                let mut changed = old.raw_arc().unwrap().to_vec();
+                changed[0] ^= 1;
+                changed
             } else {
-                old.to_vec()
+                old.raw_arc().unwrap().to_vec()
             },
         )
         .unwrap();
         let selected = reservation(Path::new("/absent/cross-path"), 231);
         let scope = scope();
         let bank = RepositoryRootResources::new(
-            RepositoryRootResourceLimits::new(3 * 1024 * 1024, 16, 4 * ARCHIVE_BYTES).unwrap(),
+            RepositoryRootResourceLimits::new(7 * 1024 * 1024, 16, 4 * ARCHIVE_BYTES).unwrap(),
         )
         .unwrap();
         let baseline = bank.snapshot().retained_bytes;
@@ -60,7 +62,7 @@ fn covered_new_path_reuses_pending_bytes_but_mismatch_and_sticky_scope_stay_clos
         match case {
             0 => {
                 let actual = result.unwrap();
-                assert!(Arc::ptr_eq(&actual, &old));
+                assert!(RepositoryWorkspaceBody::ptr_eq(&actual, &old));
                 assert!(candidates.lookup(&actual, &|| true).unwrap().is_some());
             }
             1 => assert!(matches!(result, Err(PhysicalRootError::Resource))),
@@ -127,7 +129,8 @@ fn observed_recovery_bytes_require_current_fd_name_and_snapshot_frames() {
             }
             true
         };
-        let old: Arc<[u8]> = Arc::from(&b"aaa"[..]);
+        let old: RepositoryWorkspaceBody =
+            RepositoryWorkspaceBody::from_arc(Arc::from(&b"aaa"[..]));
         let result =
             body_recovery::observed_equal(&io, Path::new("new"), &framed, &old, &scope, &active);
         assert!(changed.get(), "post-payload mutation must execute");
@@ -166,7 +169,7 @@ fn observed_equal_body_still_rejects_changed_snapshot_frame() {
     .unwrap();
     let framed = io.lstat(Path::new("new")).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
-    let old: Arc<[u8]> = Arc::from(&b"aaa"[..]);
+    let old: RepositoryWorkspaceBody = RepositoryWorkspaceBody::from_arc(Arc::from(&b"aaa"[..]));
     assert!(matches!(
         body_recovery::observed_equal(&io, Path::new("new"), &framed, &old, &scope, &|| true),
         Err(PhysicalRootError::Snapshot)

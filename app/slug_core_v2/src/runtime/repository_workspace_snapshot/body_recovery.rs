@@ -11,7 +11,7 @@ pub(super) fn capture_existing(
     refusal: NativeBodyRefusal,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
-) -> Result<Arc<[u8]>, PhysicalRootError> {
+) -> Result<RepositoryWorkspaceBody, PhysicalRootError> {
     // This is reached only after the exact fresh-payload bank limit refuses.
     // New deadline/cancellation/IO/frame errors outrank that original Resource.
     check(scope, active)?;
@@ -36,7 +36,7 @@ pub(super) fn observed_equal(
     io: &RootIo<'_>,
     path: &Path,
     framed: &libc::stat,
-    old: &Arc<[u8]>,
+    old: &RepositoryWorkspaceBody,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<bool, PhysicalRootError> {
@@ -52,7 +52,7 @@ pub(super) fn observed_equal(
         }
         // Complete the read even after mismatch, preserving RootIo's full EOF,
         // SHA and opened/named-frame validation contract.
-        same &= old[offset..end] == *chunk;
+        same &= old.range_eq(offset, chunk);
         offset = end;
         Ok(())
     });

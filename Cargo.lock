@@ -3445,6 +3445,7 @@ dependencies = [
  "dice_futures",
  "dupe",
  "hex",
+ "miniz_oxide",
  "serde",
  "serde_json",
  "sha2",

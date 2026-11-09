@@ -34,7 +34,7 @@ fn source_reservation(
 }
 fn source(
     reservation: Arc<RepositoryWorkspaceReservation>,
-    body: Arc<[u8]>,
+    body: RepositoryWorkspaceBody,
 ) -> RepositoryWorkspaceTranscript {
     let t = RepositoryWorkspaceTranscript::new(reservation, 0o755).unwrap();
     t.complete(
@@ -195,8 +195,14 @@ fn manifest_canonicalizes_exact_bound_and_refuses_aliases_and_foreign_command_fa
 #[test]
 fn view_identity_uses_full_spec_state_mode_literal_link_and_instance() {
     let r = source_reservation("source", 100, "/views/source");
-    let a = source(r.clone(), Arc::from(&b"a"[..]));
-    let b = source(r.clone(), Arc::from(&b"b"[..]));
+    let a = source(
+        r.clone(),
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"a"[..])),
+    );
+    let b = source(
+        r.clone(),
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"b"[..])),
+    );
     let base = operation(manifest(vec![projection(&a)]));
     assert_ne!(base, operation(manifest(vec![projection(&b)])));
     let mut changed = spec();
@@ -207,7 +213,7 @@ fn view_identity_uses_full_spec_state_mode_literal_link_and_instance() {
     );
     let other = source(
         source_reservation("source", 101, "/views/source"),
-        Arc::from(&b"a"[..]),
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"a"[..])),
     );
     assert_ne!(base, operation(manifest(vec![projection(&other)])));
     let command = RepositoryWorkspaceExecute::new(
@@ -258,7 +264,10 @@ fn view_identity_uses_full_spec_state_mode_literal_link_and_instance() {
             RepositoryWorkspaceMode::Process,
             vec![
                 root(),
-                file("data", Arc::from(&b"a"[..])),
+                file(
+                    "data",
+                    RepositoryWorkspaceBody::from_arc(Arc::from(&b"a"[..])),
+                ),
                 RepositoryWorkspaceEntry::new(
                     "link".into(),
                     0o777,
@@ -278,8 +287,14 @@ fn view_identity_uses_full_spec_state_mode_literal_link_and_instance() {
 #[test]
 fn exact_prefix_replay_keeps_old_views_and_rehomes_equal_foreign_state_without_copying() {
     let r = source_reservation("source", 100, "/views/source");
-    let a = source(r.clone(), Arc::from(&b"same"[..]));
-    let foreign = source(r, Arc::from(&b"same"[..]));
+    let a = source(
+        r.clone(),
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"same"[..])),
+    );
+    let foreign = source(
+        r,
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"same"[..])),
+    );
     assert_eq!(a.current(), foreign.current());
     assert!(!Arc::ptr_eq(a.current(), foreign.current()));
     let selected = manifest(vec![projection(&a)]);
@@ -295,7 +310,7 @@ fn exact_prefix_replay_keeps_old_views_and_rehomes_equal_foreign_state_without_c
     });
     let b = source(
         source_reservation("later", 101, "/views/later"),
-        Arc::from(&b"later"[..]),
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"later"[..])),
     );
     let expanded = manifest(vec![projection(&b), projection(&a)]);
     let changed = t.request_at(0, operation(expanded.clone())).unwrap();
@@ -317,7 +332,8 @@ fn exact_prefix_replay_keeps_old_views_and_rehomes_equal_foreign_state_without_c
 
 #[test]
 fn archive_source_storage_stays_outside_mutable_history_and_forecasts_remain_complete() {
-    let body: Arc<[u8]> = Arc::from(vec![0x5a; 65 * 1024 * 1024]);
+    let body: RepositoryWorkspaceBody =
+        RepositoryWorkspaceBody::from_arc(Arc::from(vec![0x5a; 65 * 1024 * 1024]));
     let source = source(
         source_reservation("large", 100, "/views/large"),
         body.clone(),
@@ -359,7 +375,7 @@ fn archive_source_storage_stays_outside_mutable_history_and_forecasts_remain_com
         else {
             unreachable!()
         };
-        assert!(Arc::ptr_eq(retained, &body));
+        assert!(retained.ptr_eq(&body));
     });
 }
 
@@ -367,7 +383,7 @@ fn archive_source_storage_stays_outside_mutable_history_and_forecasts_remain_com
 fn repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies() {
     let source = source(
         source_reservation("source", 100, "/views/source"),
-        Arc::from(vec![1u8; 1024 * 1024]),
+        RepositoryWorkspaceBody::from_arc(Arc::from(vec![1u8; 1024 * 1024])),
     );
     let selected = manifest(vec![projection(&source)]);
     let mut t = transcript();
@@ -427,8 +443,14 @@ fn repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies() {
 #[test]
 fn bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_fields() {
     let reservation = source_reservation("source", 100, "/views/source");
-    let a = source(reservation.clone(), Arc::from(&b"same"[..]));
-    let foreign = source(reservation, Arc::from(&b"same"[..]));
+    let a = source(
+        reservation.clone(),
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"same"[..])),
+    );
+    let foreign = source(
+        reservation,
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"same"[..])),
+    );
     let selected = manifest(vec![projection(&a)]);
     let t = complete_execute(&transcript(), selected.clone());
     let other = complete_execute(&transcript(), manifest(vec![projection(&foreign)]));
@@ -689,7 +711,10 @@ fn bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_
             Ok(false)
         );
     }
-    let changed_source = source(a.reservation().clone(), Arc::from(&b"different"[..]));
+    let changed_source = source(
+        a.reservation().clone(),
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"different"[..])),
+    );
     let changed = complete_execute(&transcript(), manifest(vec![projection(&changed_source)]));
     let crate::RepositoryMaterializationKind::GeneralWorkspace(original_realization) =
         &terminal_a.kind

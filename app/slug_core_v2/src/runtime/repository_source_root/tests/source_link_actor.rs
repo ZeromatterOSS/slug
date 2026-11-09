@@ -578,7 +578,7 @@ fn native_source_link_selected_general_view_requires_its_source_independently_in
                 matches!(transcript.records().last().unwrap().result(), ResultValue::Execute(result) if result.return_code() == 0)
             );
             assert!(
-                matches!(transcript.current().entry("out").unwrap().node(), slug_bzlmod_v2::RepositoryWorkspaceNode::File(body) if body.as_ref() == b"source bytes")
+                matches!(transcript.current().entry("out").unwrap().node(), slug_bzlmod_v2::RepositoryWorkspaceNode::File(body) if body.equals_slice(b"source bytes"))
             );
             drop(command);
         } else {

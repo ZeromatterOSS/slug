@@ -120,7 +120,7 @@ fn native_archive_progress_uses_same_root_and_replays_without_reacquisition() {
         0o755
     );
     assert!(
-        matches!(progress.transcript().current().entry("body").unwrap().node(), RepositoryWorkspaceNode::File(body) if body.as_ref()==b"archive replacement")
+        matches!(progress.transcript().current().entry("body").unwrap().node(), RepositoryWorkspaceNode::File(body) if body.equals_slice(b"archive replacement"))
     );
     let decoded = progress.decoded;
     let counters = scope.snapshot();
@@ -158,10 +158,14 @@ fn native_archive_progress_uses_same_root_and_replays_without_reacquisition() {
         progress,
         RepositoryWorkspaceOperation::Template {
             path: "final".into(),
-            body: Arc::from(b"template".as_slice()),
+            body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                b"template".as_slice(),
+            )),
             mode: 0o644,
             source,
-            source_body: Arc::from(b"template".as_slice()),
+            source_body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                b"template".as_slice(),
+            )),
             substitutions: starlark_map::small_map::SmallMap::new(),
         },
         &scope,

@@ -41,7 +41,10 @@ impl<'a> SealedGeneralObservation<'a> {
     }
     /// Only direct canonical regular members qualify. Links, missing paths and
     /// digest-only Source snapshots never become owned-body verification.
-    pub(in crate::runtime) fn file(&self, relative: &Path) -> Option<(&Arc<[u8]>, u16)> {
+    pub(in crate::runtime) fn file(
+        &self,
+        relative: &Path,
+    ) -> Option<(&RepositoryWorkspaceBody, u16)> {
         let entry = self.root.state.entry(relative.to_str()?)?;
         let RepositoryWorkspaceNode::File(body) = entry.node() else {
             return None;

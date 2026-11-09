@@ -12,8 +12,8 @@ fn difference(
 }
 
 fn bodies(
-    walk: impl FnOnce(&mut dyn FnMut(&Arc<[u8]>) -> Result<(), ()>) -> Result<(), ()>,
-) -> Vec<Arc<[u8]>> {
+    walk: impl FnOnce(&mut dyn FnMut(&RepositoryWorkspaceBody) -> Result<(), ()>) -> Result<(), ()>,
+) -> Vec<RepositoryWorkspaceBody> {
     let mut found = Vec::new();
     walk(&mut |body| {
         found.push(body.clone());
@@ -34,9 +34,11 @@ fn other_reservation() -> Arc<RepositoryWorkspaceReservation> {
 #[test]
 fn body_covered_forecasts_remove_payload_only_and_preserve_full_bounds() {
     let before = transcript();
-    let input: Arc<[u8]> = Arc::from(&b"payload"[..]);
-    let foreign: Arc<[u8]> = Arc::from(input.as_ref());
-    assert!(!Arc::ptr_eq(&input, &foreign));
+    let input: RepositoryWorkspaceBody =
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"payload"[..]));
+    let foreign: RepositoryWorkspaceBody =
+        RepositoryWorkspaceBody::from_arc(Arc::from(input.raw_arc().unwrap().as_ref()));
+    assert!(!input.ptr_eq(&foreign));
     let request = before
         .request(RepositoryWorkspaceOperation::File {
             path: "out".into(),
@@ -71,8 +73,8 @@ fn body_covered_forecasts_remove_payload_only_and_preserve_full_bounds() {
         )
     });
     assert_eq!(incoming.len(), 2);
-    assert!(Arc::ptr_eq(&incoming[0], &input));
-    assert!(Arc::ptr_eq(&incoming[1], &foreign));
+    assert!(incoming[0].ptr_eq(&input));
+    assert!(incoming[1].ptr_eq(&foreign));
     let completed = before
         .complete(
             request,
@@ -101,7 +103,7 @@ fn body_covered_forecasts_remove_payload_only_and_preserve_full_bounds() {
     );
     let canonical = bodies(|v| completed.try_visit_body_allocations(&mut |b| v(b)));
     assert_eq!(canonical.len(), 2);
-    assert!(canonical.iter().all(|body| Arc::ptr_eq(body, &input)));
+    assert!(canonical.iter().all(|body| body.ptr_eq(&input)));
     assert_eq!(
         before
             .completion_storage_partition(
@@ -174,7 +176,9 @@ fn body_visitors_cover_template_read_and_deleted_history_but_not_execute_outputs
             written
                 .request(RepositoryWorkspaceOperation::Read("out".into()))
                 .unwrap(),
-            RepositoryWorkspaceResult::Read(Arc::from(&b"historical"[..])),
+            RepositoryWorkspaceResult::Read(RepositoryWorkspaceBody::from_arc(Arc::from(
+                &b"historical"[..],
+            ))),
             RepositoryWorkspaceMode::Archive,
             written.current().entries().to_vec(),
         )
@@ -191,7 +195,7 @@ fn body_visitors_cover_template_read_and_deleted_history_but_not_execute_outputs
     assert!(bodies(|v| deleted.current().try_visit_body_allocations(&mut |b| v(b))).is_empty());
     let history = bodies(|v| deleted.try_visit_body_allocations(&mut |b| v(b)));
     assert_eq!(history.len(), 4);
-    assert!(history.iter().all(|b| b.as_ref() == b"historical"));
+    assert!(history.iter().all(|b| b.equals_slice(b"historical")));
     assert_eq!(
         difference(
             deleted.storage_partition().unwrap(),
@@ -201,16 +205,16 @@ fn body_visitors_cover_template_read_and_deleted_history_but_not_execute_outputs
     );
     let template = RepositoryWorkspaceOperation::Template {
         path: "rendered".into(),
-        body: Arc::from(&b"rendered"[..]),
+        body: RepositoryWorkspaceBody::from_arc(Arc::from(&b"rendered"[..])),
         mode: 0o644,
         source: host_path("/input"),
-        source_body: Arc::from(&b"template"[..]),
+        source_body: RepositoryWorkspaceBody::from_arc(Arc::from(&b"template"[..])),
         substitutions: SmallMap::new(),
     };
     assert_eq!(
         bodies(|v| template.try_visit_body_allocations(&mut |b| v(b)))
             .iter()
-            .map(|b| b.as_ref())
+            .map(|b| b.raw_arc().unwrap().as_ref())
             .collect::<Vec<_>>(),
         [b"rendered".as_slice(), b"template".as_slice()]
     );
@@ -350,7 +354,7 @@ fn epoch_body_projections_replace_only_the_validated_slot_and_preserve_sources()
     assert!(
         bodies(|v| request.try_visit_body_allocations(&mut |b| v(b)))
             .iter()
-            .all(|b| b.as_ref() == b"A")
+            .all(|b| b.equals_slice(b"A"))
     );
 }
 

@@ -18,7 +18,7 @@ fn without_payload(
 
 fn payload_bytes(
     mut walk: impl FnMut(
-        &mut dyn FnMut(&Arc<[u8]>) -> Result<(), RepositoryWorkspaceError>,
+        &mut dyn FnMut(&RepositoryWorkspaceBody) -> Result<(), RepositoryWorkspaceError>,
     ) -> Result<(), RepositoryWorkspaceError>,
 ) -> Result<usize, RepositoryWorkspaceError> {
     let mut bytes = 0;
@@ -42,7 +42,7 @@ impl RepositoryWorkspaceOperation {
     #[doc(hidden)]
     pub fn try_visit_body_allocations<E>(
         &self,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<(), E> {
         match self {
             Self::File { body, .. } => visit(body)?,
@@ -69,7 +69,7 @@ impl RepositoryWorkspaceResult {
     #[doc(hidden)]
     pub fn try_visit_body_allocations<E>(
         &self,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<(), E> {
         match self {
             Self::Read(body) => visit(body)?,
@@ -87,7 +87,7 @@ impl RepositoryWorkspaceState {
     #[doc(hidden)]
     pub fn try_visit_body_allocations<E>(
         &self,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<(), E> {
         for entry in self.entries() {
             if let RepositoryWorkspaceNode::File(body) = entry.node() {
@@ -113,7 +113,7 @@ impl RepositoryWorkspaceRequest {
     #[doc(hidden)]
     pub fn try_visit_body_allocations<E>(
         &self,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<(), E> {
         self.predecessor.try_visit_body_allocations(visit)?;
         self.operation.try_visit_body_allocations(visit)
@@ -136,7 +136,7 @@ impl RepositoryWorkspaceTranscript {
     #[doc(hidden)]
     pub fn try_visit_body_allocations<E>(
         &self,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<(), E> {
         self.initial.try_visit_body_allocations(visit)?;
         for record in self.records.iter() {
@@ -166,7 +166,7 @@ impl RepositoryWorkspaceTranscript {
         request: &RepositoryWorkspaceRequest,
         result: &RepositoryWorkspaceResult,
         entries: &[RepositoryWorkspaceEntry],
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<(), E> {
         self.try_visit_body_allocations(visit)?;
         request.operation.try_visit_body_allocations(visit)?;
@@ -189,7 +189,7 @@ impl RepositoryWorkspaceTranscript {
     ) -> Result<RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
         let full = self.completion_storage_partition(request, result, mode, entries)?;
         let mut payload = retained_payload(self)?;
-        let mut visit = |body: &Arc<[u8]>| -> Result<(), RepositoryWorkspaceError> {
+        let mut visit = |body: &RepositoryWorkspaceBody| -> Result<(), RepositoryWorkspaceError> {
             payload = add(payload, body.len())?;
             Ok(())
         };
@@ -218,7 +218,7 @@ impl RepositoryWorkspaceRealization {
     #[doc(hidden)]
     pub fn try_visit_body_allocations<E>(
         &self,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<(), E> {
         self.transcript.try_visit_body_allocations(visit)
     }
@@ -248,7 +248,7 @@ impl RepositoryWorkspaceEpoch {
     #[doc(hidden)]
     pub fn try_visit_body_allocations<E>(
         &self,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<(), E> {
         if let Some(active) = &self.active {
             for transcript in active.transcripts.iter() {
@@ -284,7 +284,7 @@ impl RepositoryWorkspaceEpoch {
         &self,
         reservation: &RepositoryWorkspaceReservation,
         root_mode: u16,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<Result<(), RepositoryWorkspaceError>, E> {
         if let Err(error) = self.reserve_storage_partition(reservation, root_mode) {
             return Ok(Err(error));
@@ -315,7 +315,7 @@ impl RepositoryWorkspaceEpoch {
     pub fn try_visit_publish_body_allocations<E>(
         &self,
         transcript: &RepositoryWorkspaceTranscript,
-        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+        visit: &mut impl FnMut(&RepositoryWorkspaceBody) -> Result<(), E>,
     ) -> Result<Result<(), RepositoryWorkspaceError>, E> {
         if let Err(error) = self.publish_storage_partition(transcript) {
             return Ok(Err(error));

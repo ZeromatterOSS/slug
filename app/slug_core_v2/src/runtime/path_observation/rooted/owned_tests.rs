@@ -53,7 +53,7 @@ impl Fixture {
         owned::verify(
             &self.root(),
             Path::new("file"),
-            &self.body,
+            &slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(self.body.clone()),
             0o644,
             operation,
             resources,
@@ -321,7 +321,7 @@ fn owned_kernel_does_not_bypass_sticky_acquisition_refusal() {
         owned::verify(
             &root,
             Path::new("file"),
-            &fixture.body,
+            &slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(fixture.body.clone()),
             0o644,
             PathObservationOperation::FileBytes,
             &resources,
@@ -338,4 +338,61 @@ fn owned_kernel_does_not_bypass_sticky_acquisition_refusal() {
     assert_eq!(resources.snapshot().source_attempts, before.source_attempts);
     assert_eq!(resources.snapshot().decoded_bytes, before.decoded_bytes);
     assert_eq!(resources.snapshot().live_buffer_bytes, 0);
+}
+
+#[test]
+fn packed_owned_kernel_materializes_only_file_bytes_with_independent_history_charge() {
+    // Ordinary expected-body kernel evidence only; no native eligibility is minted.
+    let fixture = Fixture::new(vec![0x5a; 128 * 1024 + 7].into());
+    let mut builder =
+        slug_bzlmod_v2::RepositoryWorkspaceBodyBuilder::new(fixture.body.len()).unwrap();
+    for chunk in fixture.body.chunks(64 * 1024) {
+        builder.append(chunk, &mut |_| Ok::<_, ()>(())).unwrap();
+    }
+    let expected = builder.finish().unwrap();
+    assert!(expected.raw_arc().is_none());
+    let expected_weak = expected.downgrade();
+    let resources = scope(SourceServiceLimits::default());
+    let bytes = owned::verify(
+        &fixture.root(),
+        Path::new("file"),
+        &expected,
+        0o644,
+        PathObservationOperation::FileBytes,
+        &resources,
+        &|| true,
+    )
+    .unwrap();
+    let PathObservationResult::FileBytes(PathOperationResult::Present(actual)) = bytes else {
+        panic!("verified materialized bytes expected")
+    };
+    assert_eq!(actual.as_ref(), fixture.body.as_ref());
+    assert!(!Arc::ptr_eq(&actual, &fixture.body));
+    let weak_returned = Arc::downgrade(&actual);
+    let digest = owned::verify(
+        &fixture.root(),
+        Path::new("file"),
+        &expected,
+        0o644,
+        PathObservationOperation::FileDigest,
+        &resources,
+        &|| true,
+    )
+    .unwrap();
+    assert!(
+        matches!(digest, PathObservationResult::FileDigest(PathOperationResult::Present(value)) if value == fixture.digest())
+    );
+    assert_eq!(resources.snapshot().source_attempts, 0);
+    assert_eq!(
+        resources.snapshot().decoded_bytes,
+        2 * fixture.body.len() as u64
+    );
+    assert_eq!(resources.snapshot().live_buffer_bytes, 0);
+    drop(expected);
+    assert!(expected_weak.upgrade().is_none());
+    assert!(weak_returned.upgrade().is_some());
+    let charged = resources.snapshot().decoded_bytes;
+    drop(actual);
+    assert!(weak_returned.upgrade().is_none());
+    assert_eq!(resources.snapshot().decoded_bytes, charged);
 }

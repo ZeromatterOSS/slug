@@ -20,16 +20,38 @@ use crate::RepositorySourceSnapshotNode;
 
 #[derive(Debug)]
 pub enum RepositoryWorkspaceReadExpectation<'a> {
-    Owned(&'a Arc<[u8]>),
+    Owned(&'a RepositoryWorkspaceBody),
     Source(FileContentDigest),
 }
 impl RepositoryWorkspaceReadExpectation<'_> {
+    pub fn validate_body(
+        &self,
+        body: &RepositoryWorkspaceBody,
+    ) -> Result<(), RepositoryWorkspaceError> {
+        if body.len() > 2 * 1024 * 1024 {
+            return Err(RepositoryWorkspaceError::InvalidResult);
+        }
+        let matches = match self {
+            Self::Owned(expected) => *expected == body,
+            Self::Source(expected) => {
+                let mut hash = Sha256::new();
+                body.for_each_chunk(&mut |chunk| hash.update(chunk));
+                expected.size_bytes() == body.len() as u64
+                    && expected.sha256() == &<[u8; 32]>::from(hash.finalize())
+            }
+        };
+        if matches {
+            Ok(())
+        } else {
+            Err(RepositoryWorkspaceError::InvalidResult)
+        }
+    }
     pub fn validate(&self, body: &[u8]) -> Result<(), RepositoryWorkspaceError> {
         if body.len() > 2 * 1024 * 1024 {
             return Err(RepositoryWorkspaceError::InvalidResult);
         }
         let matches = match self {
-            Self::Owned(expected) => expected.as_ref() == body,
+            Self::Owned(expected) => expected.equals_slice(body),
             Self::Source(expected) => {
                 expected.size_bytes() == body.len() as u64
                     && expected.sha256() == &<[u8; 32]>::from(Sha256::digest(body))

@@ -419,7 +419,10 @@ impl RepositoryMaterializer {
             || request.id.canonical_repo != *ticket.reservation.repository()
             || realization.reservation() != &ticket.reservation
             || sealed.root().reservation() != &ticket.reservation
-            || sealed.root().state() != realization.final_state()
+            || !sealed
+                .root()
+                .matches_state(realization.final_state())
+                .map_err(|_| refusal())?
         {
             return Err(refusal());
         }

@@ -731,7 +731,11 @@ fn native_original_starlark_uses_general_needs_normal_records_and_same_root_adop
             .unwrap()
             .node()
         {
-            slug_bzlmod_v2::RepositoryWorkspaceNode::File(body) => body.as_ref(),
+            slug_bzlmod_v2::RepositoryWorkspaceNode::File(body) => {
+                let mut bytes = vec![0; body.len()];
+                assert!(body.copy_into(0, &mut bytes));
+                bytes
+            }
             _ => panic!("regular final file"),
         };
         assert_eq!(body("out"), b"rendered!");

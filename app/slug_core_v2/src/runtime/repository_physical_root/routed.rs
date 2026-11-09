@@ -156,7 +156,7 @@ pub(super) fn model(
     })
 }
 pub(super) struct CapturedRead {
-    body: Arc<[u8]>,
+    body: RepositoryWorkspaceBody,
     _body_lease: Option<NativeBodyLease>,
     _native: ResourceCredit,
     _source: SourceBufferReservation,
@@ -282,7 +282,7 @@ impl<'a> RouteRoots<'a> {
                 body_bytes
                     .checked_mul(if candidates.is_some() { 1 } else { 2 })
                     .ok_or(PhysicalRootError::Resource)?,
-                IO_SCRATCH,
+                add(IO_SCRATCH, RepositoryWorkspaceBody::decode_scratch_bytes())?,
             )?,
             3,
             0,
@@ -324,7 +324,7 @@ impl<'a> RouteRoots<'a> {
                             .checked_add(chunk.len())
                             .filter(|end| *end <= body.len())
                             .ok_or_else(|| io::Error::other("source read size changed"))?;
-                        if body[offset..end] != *chunk {
+                        if !body.range_eq(offset, chunk) {
                             return Err(io::Error::other("source read bytes changed"));
                         }
                         offset = end;
@@ -393,7 +393,8 @@ impl<'a> RouteRoots<'a> {
                 expected
                     .validate(&bytes)
                     .map_err(PhysicalRootError::Protocol)?;
-                let body = Arc::from(bytes.into_boxed_slice());
+                let body =
+                    RepositoryWorkspaceBody::from(Arc::<[u8]>::from(bytes.into_boxed_slice()));
                 if let (Some(candidates), Some(pending)) = (candidates.as_deref_mut(), pending) {
                     body_lease = Some(candidates.finish(pending, body, self.active)?);
                     body_lease.as_ref().unwrap().body().clone()
@@ -740,7 +741,7 @@ mod tests {
             Entry::new(
                 format!("{parent}/body").into(),
                 0o644,
-                Node::File(Arc::from([])),
+                Node::File(Arc::<[u8]>::from([]).into()),
             )
             .unwrap(),
         );

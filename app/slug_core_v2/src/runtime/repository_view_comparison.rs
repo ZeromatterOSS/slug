@@ -21,9 +21,12 @@ enum ComparedState {
         _state: Arc<RepositorySourceSnapshotState>,
     },
 }
-type BodyKey = (usize, usize, usize, usize);
+type BodyKey = (
+    RepositoryWorkspaceBodyAllocation,
+    RepositoryWorkspaceBodyAllocation,
+);
 type StateValue = (ComparedState, ComparedState, bool);
-type BodyValue = (Arc<[u8]>, Arc<[u8]>, bool);
+type BodyValue = (RepositoryWorkspaceBody, RepositoryWorkspaceBody, bool);
 type Memo<K, V> = HashMap<K, V, StarlarkHasherBuilder>;
 
 struct NativeComparisonCoverage {
@@ -53,7 +56,16 @@ impl<'a> ViewComparison<'a> {
         active: &'a dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         check(scope, active)?;
-        let credit = resources.reserve(std::mem::size_of::<Self>() + 256, 0, 0)?;
+        // Operation/Read-result equality may decode without calling body_equal.
+        // Pay the complete semantic-comparison workspace at the outer entry.
+        let credit = resources.reserve(
+            add(
+                std::mem::size_of::<Self>() + 256,
+                2 * RepositoryWorkspaceBody::decode_scratch_bytes(),
+            )?,
+            0,
+            0,
+        )?;
         Ok(Self {
             states: Memo::default(),
             bodies: Memo::default(),
@@ -174,35 +186,37 @@ impl<'a> ViewComparison<'a> {
     }
     fn body_equal(
         &mut self,
-        left: &Arc<[u8]>,
-        right: &Arc<[u8]>,
+        left: &RepositoryWorkspaceBody,
+        right: &RepositoryWorkspaceBody,
     ) -> Result<bool, PhysicalRootError> {
         self.check()?;
-        if Arc::ptr_eq(left, right) {
+        if left.ptr_eq(right) {
             return Ok(true);
         }
-        let key = (
-            left.as_ptr() as usize,
-            left.len(),
-            right.as_ptr() as usize,
-            right.len(),
-        );
+        let key = (left.allocation_identity(), right.allocation_identity());
         if let Some((_, _, equal)) = self.bodies.get(&key) {
             return Ok(*equal);
         }
         self.body_slot()?;
         let mut equal = left.len() == right.len();
         if equal {
-            for (a, b) in left.chunks(64 * 1024).zip(right.chunks(64 * 1024)) {
-                self.check()?;
+            let mut offset = 0;
+            let compared = left.try_for_each_chunk(&mut |a| {
+                self.check().map_err(Some)?;
                 #[cfg(test)]
                 {
                     self.compared_bytes += a.len();
                 }
-                if a != b {
-                    equal = false;
-                    break;
+                if !right.range_eq(offset, a) {
+                    return Err(None);
                 }
+                offset += a.len();
+                Ok(())
+            });
+            match compared {
+                Ok(()) => {}
+                Err(None) => equal = false,
+                Err(Some(error)) => return Err(error),
             }
         }
         self.check()?;
@@ -384,8 +398,8 @@ mod tests {
         let active = || true;
         {
             let mut comparison = ViewComparison::new(&bank, &scope, &active).unwrap();
-            let a: Arc<[u8]> = vec![7; 128 * 1024].into();
-            let b: Arc<[u8]> = vec![7; 128 * 1024].into();
+            let a: RepositoryWorkspaceBody = vec![7; 128 * 1024].into();
+            let b: RepositoryWorkspaceBody = vec![7; 128 * 1024].into();
             for _ in 0..128 {
                 assert!(comparison.body_equal(&a, &b).unwrap());
             }
@@ -415,8 +429,8 @@ mod tests {
         };
         {
             let mut comparison = ViewComparison::new(&bank, &scope, &active).unwrap();
-            let a: Arc<[u8]> = vec![7; 256 * 1024].into();
-            let b: Arc<[u8]> = vec![7; 256 * 1024].into();
+            let a: RepositoryWorkspaceBody = vec![7; 256 * 1024].into();
+            let b: RepositoryWorkspaceBody = vec![7; 256 * 1024].into();
             assert!(matches!(
                 comparison.body_equal(&a, &b),
                 Err(PhysicalRootError::Inactive)
@@ -425,18 +439,28 @@ mod tests {
             assert!(comparison.bodies.is_empty());
         }
         assert_eq!(bank.snapshot().retained_bytes, baseline);
-        let tiny =
-            RepositoryRootResources::new(RepositoryRootResourceLimits::new(2048, 1, 1).unwrap())
-                .unwrap();
+        let working = 2 * RepositoryWorkspaceBody::decode_scratch_bytes();
+        let tiny = RepositoryRootResources::new(
+            RepositoryRootResourceLimits::new(working + 2048, 1, 1).unwrap(),
+        )
+        .unwrap();
         let initial = tiny.snapshot().retained_bytes;
         {
             let mut comparison = ViewComparison::new(&tiny, &scope, &|| true).unwrap();
-            let a: Arc<[u8]> = Arc::from(b"a".as_slice());
-            let b: Arc<[u8]> = Arc::from(b"a".as_slice());
+            let admitted = tiny.snapshot().retained_bytes;
+            assert_eq!(
+                admitted,
+                initial + working + std::mem::size_of::<ViewComparison<'_>>() + 256
+            );
+            let a: RepositoryWorkspaceBody = Arc::<[u8]>::from(b"a".as_slice()).into();
+            let b: RepositoryWorkspaceBody = Arc::<[u8]>::from(b"a".as_slice()).into();
             assert!(matches!(
                 comparison.body_equal(&a, &b),
                 Err(PhysicalRootError::Resource)
             ));
+            assert!(comparison.bodies.is_empty());
+            assert_eq!(tiny.snapshot().retained_bytes, admitted);
+            assert_eq!(tiny.snapshot().peak_retained_bytes, admitted);
         }
         assert_eq!(tiny.snapshot().retained_bytes, initial);
     }
@@ -453,7 +477,7 @@ mod tests {
         );
         let make = |mode| {
             let initial = RepositoryWorkspaceTranscript::new(reservation.clone(), 0o755).unwrap();
-            let body: Arc<[u8]> = vec![8; 128 * 1024].into();
+            let body: RepositoryWorkspaceBody = vec![8; 128 * 1024].into();
             let request = initial
                 .request(RepositoryWorkspaceOperation::File {
                     path: "data".into(),

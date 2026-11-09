@@ -261,7 +261,7 @@ async fn builtin_prepared_read_template_and_execute_require_matching_source_snap
         panic!("template operation")
     };
     assert_eq!(path.as_str(), "copy");
-    assert_eq!(body.as_ref(), sources.get(&address).unwrap().as_ref());
+    assert!(body.equals_slice(sources.get(&address).unwrap().as_ref()));
     assert_eq!(source_body, body);
     let mut entries = template.request().predecessor().entries().to_vec();
     entries.push(
@@ -585,7 +585,7 @@ async fn general_source_alias_read_template_and_delete_use_logical_workspace_ope
                 assert!(realization.final_state().source_bindings().is_empty());
                 assert!(realization.final_state().entry("alias").is_none());
                 assert!(
-                    matches!(realization.final_state().entry("copy").unwrap().node(),RepositoryWorkspaceNode::File(actual) if actual==&body)
+                    matches!(realization.final_state().entry("copy").unwrap().node(),RepositoryWorkspaceNode::File(actual) if actual.equals_slice(&body))
                 );
                 let mut history_sources = 0;
                 realization.visit_read_views(&mut |_| history_sources += 1);
@@ -604,7 +604,7 @@ async fn general_source_alias_read_template_and_delete_use_logical_workspace_ope
                 let result = match need.request().operation() {
                     RepositoryWorkspaceOperation::Read(path) => {
                         assert_eq!(path.as_str(), "alias");
-                        RepositoryWorkspaceResult::Read(body.clone())
+                        RepositoryWorkspaceResult::Read(body.clone().into())
                     }
                     RepositoryWorkspaceOperation::Template {
                         path,
@@ -612,7 +612,7 @@ async fn general_source_alias_read_template_and_delete_use_logical_workspace_ope
                         mode,
                         ..
                     } => {
-                        assert_eq!(rendered, &body);
+                        assert!(rendered.equals_slice(&body));
                         entries.push(
                             RepositoryWorkspaceEntry::new(
                                 path.clone(),

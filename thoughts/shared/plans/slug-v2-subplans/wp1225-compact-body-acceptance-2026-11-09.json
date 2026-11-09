@@ -1,0 +1,320 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "component": "Compact immutable repository workspace bodies and checked closed-realization reuse",
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "baseline_revision": "695ee2705f216d16f5fd84cf18ea9f35487f5e09",
+  "compatibility": "Slug-native retained representation and operational Hash writer; full structural history and exact logical canonical SHA/StableKey/REAPI bytes remain authoritative.",
+  "production": "General Execute remains Disabled. This bounded prerequisite does not close original Rust, M7A, M8, release, M7B/M9 or completed-command memory gates.",
+  "contract": "wp1225-general-repository-workspace-design.md#compact-immutable-workspace-bodies",
+  "selection": {
+    "cause": "Actual main695 optimized original accepts LLVM4 then std5 refuses a67108928-byte XZ allocation against512MiB native bank; decoder136MiB allowance is not the refused limit. Temporary first-refusal instrumentation was preserved and retired.",
+    "capacity": "Six candidate-unique logical file payloads631202064 exceed512MiB before controls. Exact independent64KiB raw-deflate census roundtrips every block; payload totals alone do not prove native fit.",
+    "primary_component_gate": "Complete generic six-archive chain, File/Read, seal and last-reader retirement under the original bank and27+3 clock. Original-command advance remains a separate unfinished outcome."
+  },
+  "implementation": [
+    "Closed Raw/Packed Body uses Arc/Dupe/Allocative, private independent64KiB blocks, locked miniz_oxide0.8.9 raw Deflate level1, raw storage when not smaller, strict full roundtrip before publication and no decoded cache/native authority in pure DICE.",
+    "Full logical Eq and exact canonical SHA remain; ordinary body Hash explicitly becomes representation-independent len plus fixed logical chunks. Construction caches only the exact Starlark routing word; SmallMap uses hashed insertion/lookup with full collision Eq, avoiding historical decode merely for routing.",
+    "Covered native capture encodes verified FD chunks without a full raw file allocation; positive builder/table/Arc/control/transfer admission and2MiB codec workspace cover overlap. Full actual encoded allocation leases retire after payloads. Logical decoded history/archive limits remain unchanged; uncovered Raw remains prepaid and no refusal retries through it.",
+    "Root IO, capture, comparison, verification, readers, seals, recovery, digest and Loading text/template consumers stream logical bytes. Public FileBytes stays Arc-backed and1MiB bounded; Packed decode targets get separate Source prepay and fresh FD/frame/EOF verification.",
+    "Pure Eq/Hash stay heap-free; capture assembly and roundtrip validation use prepaid bounded heap workspace under the fixed256KiB worker stack. Full fixed-thread regression and authentic warm process proof remain.",
+    "Closed realization rebind requires literal full transcript equality, then selects native canonical aliases and reuses only a privately derived identity. Command/Progress retain comparison credit through Eq, preserve directUnusedRecords and explicitly prepay standalone decode. A consuming seal input retires realization before historical coverage; fresh physical tree verification is unchanged."
+  ],
+  "validation": {
+    "bzlmod_ordinary": {
+      "selected": 854,
+      "passed": 854,
+      "elapsed_seconds": 1.1985097670112737,
+      "scope": "Includes8 body codec/stack tests,10 pool/rebind tests and4 identity tests; these are subsets, not additional counts."
+    },
+    "core_owner_focused": {
+      "selected": 60,
+      "passed": 60,
+      "elapsed_seconds": 0.6228251040156465,
+      "artifact": "core source6"
+    },
+    "core_direct_dependents": {
+      "selected": 79,
+      "passed_each": 62,
+      "failed_each": 17,
+      "qualification": "Same17 failed names executed on actual695 opt3 observerCorebe4f and source5 candidate. Source6 differs only in one new native-test fixture prefix; production code identical. No assertion removed or failure omitted.",
+      "receipt": "compact-body-rebind-baseline-qualification.json"
+    },
+    "loading_ordinary": {
+      "selected": 1196,
+      "passed": 1190,
+      "failed": 6,
+      "qualification": "All six names match actual695 matching-profile baseline controls; source5 full sweep contains all24 focused streamed-consumer cases. Source6 changes only a Core cfg(test) prefix. Not an all-green sweep."
+    },
+    "new_native_realization_cases": {
+      "selected": 2,
+      "passed": 2,
+      "elapsed_seconds": 0.14147740698535927,
+      "scope": "Independent Packed aliases, native State Arc selection, foreign Weak retirement, full-history mismatch with identical final SHA, original unused-record refusal and exact resource cleanup."
+    },
+    "protected_native": {
+      "selected": 16,
+      "passed": 16,
+      "native_guards": 15,
+      "warm_case": 1,
+      "warm_original_commands": 4,
+      "elapsed_seconds": 17.053818660991965
+    },
+    "six_archive_closure": {
+      "selected": 1,
+      "passed": 1,
+      "elapsed_seconds": 26.82755402199109,
+      "archive_body_logical_bytes": 631202064,
+      "decoded_tar_bytes": 820514816,
+      "source_attempts": 6,
+      "records": 8,
+      "peak_native_credit_bytes": 277843042,
+      "realization_phase_ms": 1974,
+      "native_seal_phase_ms": 2048,
+      "seal_work_elapsed_ms": 26661,
+      "work_clock_headroom_ms": 339,
+      "cleanup": "Final Source scope check, sentinel reader, root Weak retirement, payload/control credit and nativeFD/backing baseline assertions pass; input frames unchanged.",
+      "qualification": "One qualified pass with narrow headroom. No repeatability or causal latency/RSS claim. Explicit pinned checksum effects do not reconstruct original omitted-checksum Starlark intent."
+    },
+    "reapi": {
+      "selected": 2,
+      "passed": 2,
+      "fresh_backend_each": true,
+      "scopes": [
+        "Genuine original Execute -> sealed physical sources -> CAS/cache/runfiles surviving shutdown",
+        "Corrupt CAS refuses publication and restores actual bytes"
+      ],
+      "elapsed_seconds": [
+        3.553926627006149,
+        2.5666812769777607
+      ],
+      "runner": "Accepted finite v2 supervisor pins REAPI/CLI/launcher/backend before and after, final stream/time checks, finite pipe drain and owned process-group cleanup."
+    },
+    "builds": {
+      "labels": [
+        "compact-body-bzlmod-rebind-build",
+        "compact-body-integration-build-5",
+        "compact-body-integration-build-6",
+        "compact-body-cli-rebind-build",
+        "compact-body-reapi-build"
+      ],
+      "elapsed_seconds": 270.76391477001016,
+      "qualification": "Pinned nightly2025-09-14 offline/locked. Native Core/CLI and REAPI are opt3 with debug assertions/overflow checks true, including build dependencies; pure Bzlmod default test profile. Test-only fixture correction does not affect the preserved default CLI or Loading production build."
+    },
+    "supervision": "Native60s/8GiBAS/1MiBstreams; transport20sreadiness40stest/8GiBAS/1MiBstreams+log with bounded cleanup. These are containment, not whole RSS proof.",
+    "checks": "Archive boundary, plan status and diff checks pass.73 Rust files pass full rustfmt; the remaining legacy observation-test file has byte-identical formatter differences on main695 and candidate, with no new issue in changed hunks. One Loading test call was line-wrapped with an optional trailing comma after execution; no production or behavioral change."
+  },
+  "original_comparison": {
+    "result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 838,
+    "roots": 55,
+    "records": 112,
+    "last_archive_accepted": "Cargo index2",
+    "pending_archive": "rustfmt index3",
+    "peak_native_credit_bytes": 250411443,
+    "peak_backing_bytes": 8187281408,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "elapsed_seconds": 27.124506910011405,
+    "qualification": "The original command is NOT complete or advanced by this component. Compaction introduces codec CPU work; the observed stopped prefix is earlier than main695 std5 allocation refusal. Single stopped runs do not quantify causal slowdown or completed latency. Further deadline work is required."
+  },
+  "caps": {
+    "native_bytes": 536870912,
+    "native_fds": 512,
+    "native_backing_bytes": 8589934592,
+    "work_seconds": 27,
+    "cleanup_seconds": 3,
+    "owned_worker_stack_bytes": 262144,
+    "xz_per_decoder_bytes": 142606336,
+    "archive_decoded_per_call_bytes": 536870912,
+    "archive_decoded_aggregate_bytes": 1073741824,
+    "qualification": "All other original Source/process/root/tar/FD/mode/frame/cancellation limits unchanged."
+  },
+  "artifacts": {
+    "bzlmod": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-f5532eeae18332b3",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/compact-body-rebind-bzlmod-slug_bzlmod_v2-b6a022ecf3988dc9",
+      "executable_sha256": "b6a022ecf3988dc94bc089f5c840f903214e0394a8764fb72aa34733e2bc2729",
+      "build": "compact-body-bzlmod-rebind-build",
+      "target": "slug_bzlmod_v2"
+    },
+    "core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-4a63d96e058f0e7c",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/compact-body-source6-core-slug_core_v2-15e8d3cc7d34e07f",
+      "executable_sha256": "15e8d3cc7d34e07f458313981e0896ec8c8e8eae4e69fb01afe7c463dbdccbd4",
+      "build": "compact-body-integration-build-6",
+      "target": "slug_core_v2"
+    },
+    "loading": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_loading_v2-6ab669d472d3b31c",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/compact-body-rebind-loading-slug_loading_v2-4738bdbe5167f9af",
+      "executable_sha256": "4738bdbe5167f9af7b28642be157864f444dc9886e433f3f5a2fd0e6fa353bc7",
+      "build": "compact-body-integration-build-5",
+      "target": "slug_loading_v2"
+    },
+    "cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/compact-body-rebind-cli-slug-70d715ceb77c7283",
+      "executable_sha256": "70d715ceb77c7283eb099d53ba85d0b0aa328e94140cfd5313092b4c88ce8e82",
+      "build": "compact-body-cli-rebind-build",
+      "target": "slug"
+    },
+    "reapi": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_reapi_v2-e709bb7a574ab16a",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/compact-body-reapi-slug_reapi_v2-41a4c01988d701d3",
+      "executable_sha256": "41a4c01988d701d3787467c44b03330d7c1730bde3d74b6eebd90d5c245803dd",
+      "build": "compact-body-reapi-build",
+      "target": "slug_reapi_v2"
+    }
+  },
+  "reuse_and_growth": {
+    "reuse": "Existing Arc/Dupe/Allocative/SmallMap and locked miniz API; no copied donor code, global pool, new interner, FD/Scope in DICE or semantic side cache.",
+    "changed_source_files_at_execution": 81,
+    "new_rust_files": 6,
+    "source_lines_added_including_new": 3483,
+    "source_lines_removed": 475,
+    "fixture_hygiene": "No new oracle directories or expected-output recipes; existing genuine authored API/native fixtures extended. Large owners receive thin joins; body codec/capture/text kernels stay in bounded children."
+  },
+  "residuals": [
+    "Full original Rust cquery still stops at WorkDeadline; codec/capture CPU work needs follow-up without higher caps.",
+    "Six closure has only one measured pass and339ms observed work headroom.",
+    "Native credit and AS containment do not establish matching-command RSS<=1.25xBazel.",
+    "Full Rust action/REAPI/Slug bootstrap and production General activation remain open; no new caller/ruleset/source/hash semantic adapters."
+  ],
+  "evidence": [
+    {
+      "path": "/tmp/slug-wp425-validation/compact-workspace-body-design-v2.json",
+      "sha256": "1071a0c816cff293fd51a266a5aa4f9676e45ee6e4c300f833dad626cc375986"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/std-allocation-probe-original-validation.json",
+      "sha256": "3834a7162865b9b680cf0e0baa4b219475cefd995148f16cd9ef5374d1c476df"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/std-allocation-probe-retirement.json",
+      "sha256": "c6e2ecdda74d794828e14be5f288d14f98bdbccadd71606547288fc9f2f6181f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rust-std-six-archive-envelope.json",
+      "sha256": "1e0c501199dcc250430cdde63ca776761475078dce0790b09111ed6e795aa67d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/body-codec-census-six-archives.json",
+      "sha256": "72f6f682b5061427c69bd10585d89e7254ccc5be1eacacdcdf3e6d873f3f37ed"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-source-6-freeze.json",
+      "sha256": "b1915b20bf91c6dafcb4c7b06649e5ec5c5fc41127830024870aceea1a028268"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-source-5-from-source4.diff",
+      "sha256": "b16e0b7b8c45998257810bfcf29ea259c318a990740dedbeed228c823085880c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-source-6-from-source5.diff",
+      "sha256": "b6b98b5d5ca215076d492041ec12244f383bcec11c4d8663f4e978ddef3f987d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-bzlmod-rebind-full.json",
+      "sha256": "bbb5f3ff1fba52cad132e6761386395c7792b0fe4ab7207d07aeb4e85fd3abb5"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-core-source6-focused.json",
+      "sha256": "82df045f7407a211ac27b38c0369abd6aeffd1caefd0e32ba4fb0e033b7656fd"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-rebind-baseline-qualification.json",
+      "sha256": "725ba18a85168e1ed08ac2ba55ce3e7b9bd78a3f39c4794acd892064165fef61"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-native-source6-new.json",
+      "sha256": "8169685cdabdb02a81db2987b0b693e1ccaebfd2a42f69c93e99c8b92bf4086e"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-native-source6-six.json",
+      "sha256": "578d484aab22944d9166b702237ec029c0a55daf0efa912ecc90e7ed12eb304b"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-native-source6-protected.json",
+      "sha256": "b94da686a83c2cfae1f559d9c0d5cf1e9a06ba6a30cb56e3536e44e3b2254d5f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-source6-original.json",
+      "sha256": "e872fa84b01e15e43eb69d955503c97a55a287aa2e4bf15be3e1871b3afc8b9f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-source6-native-freeze.json",
+      "sha256": "1c964c117820c6d3e3ba18b556a7a1e7fac44219bde47dfbc8415337b3f7ceb5"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-source6-native-results.json",
+      "sha256": "dcf7f45c1f0acbf5c473c9d76554b7707895337638928b48355b51db6be0f43c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-transport-freeze.json",
+      "sha256": "f82a11a0dacb5ce2d1f88d4f63d1fa83cd249048a372829858fdf4f5680e9c2d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-transport-results.json",
+      "sha256": "56bdf86ae70cb1617f3de0b228ce11b2fd2664c2eddaba1f22f8c998edce86bf"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-reapi-execute.json",
+      "sha256": "8084128493619563dfa924546d8fefda25d58402761b6ed8b5daa08e6b19c6de"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-reapi-corruption.json",
+      "sha256": "bf74288bf34af2e86fad3be139fff9b41cabaa7d1b3d4ba55bdaf1072417612a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-rebind-panic.json",
+      "sha256": "a20dcd234dda928b8ac0a4a248b3562104f69581d380701c1f9a59360dbd961f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-native-guards.json",
+      "sha256": "ceb91813aac92c32c19251b9441808ed141c6e921dc2192ee666833d67a7e67b"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-native-six-archives-pinned.json",
+      "sha256": "755d051744d5037a0d4fb1598ef9a4d5cff065a26f693dfd105460869862fe08"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-native-rebind-new.json",
+      "sha256": "b31d4694813819341acafa1708424d7cccc85630bc1d9850b68f3420ccdddad2"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/run-root-route-native.py",
+      "sha256": "43884a1583535291b29547ef489cf2fd396550afa6123a8210e64db95c752c14"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/run-root-route-comparison.py",
+      "sha256": "a01a07334767e9bbb31d6823827d4161ccdf3fd1dc67a6ca334f62c00fea18be"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/run-compact-body-transport-v2.py",
+      "sha256": "322cfee775befb166553b2e60ded2b4eec5567146f379d1082cb3d5a5e107e2f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/compact-body-final-checks.json",
+      "sha256": "a00d42e5813ea797d2aa85bb60f286fb37bc3d31c7cc86b7ac83b5871e282df2"
+    }
+  ],
+  "independent_final_review": {
+    "design": "ACCEPT",
+    "source_and_scoped_corrections": "ACCEPT",
+    "executed_final_join": "ACCEPT",
+    "scope": "Bounded capacity/ownership prerequisite only; original completion and timing/RSS outcomes remain open."
+  }
+}

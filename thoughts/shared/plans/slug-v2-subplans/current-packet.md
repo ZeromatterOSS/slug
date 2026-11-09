@@ -3,7 +3,25 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [immutable root-route operational hash reuse](wp1225-general-repository-workspace-design.md#immutable-root-route-operational-hash-reuse)
+Current delta: [compact immutable workspace bodies](wp1225-general-repository-workspace-design.md#compact-immutable-workspace-bodies)
+now pass the generic six-archive/File/Read/seal/last-reader gate under the fixed
+bank and27+3 clock; the [bounded component receipt](wp1225-compact-body-acceptance-2026-11-09.json)
+records independent final ACCEPT for this capacity prerequisite. The chain
+retains631,202,064 logical archive body bytes
+with277,843,042 peak native credit. Its one qualified pass leaves339ms observed
+work headroom. Closed-realization reuse preserves native allocations and full
+transcript equality while avoiding repeated canonical SHA derivation. Warm
+originals,15 protected guards, two native alias/history cases and two genuine
+fresh-backend REAPI transport/restoration checks pass; broader dependent sweeps
+remain explicitly baseline-qualified.
+Compaction adds codec CPU work: the exact original still stops at rustfmt3 with
+WorkDeadline and exact cleanup, earlier than main695's std5 allocation refusal.
+Next diagnose codec/capture CPU work toward the complete original command under
+unchanged limits. Single stopped prefixes and native credit establish no
+completed-command latency or RSS result; original-command advance is unproved.
+Production remains Disabled; full Rust/action/REAPI/Slug and memory gates remain.
+
+Accepted [immutable root-route operational hash reuse](wp1225-general-repository-workspace-design.md#immutable-root-route-operational-hash-reuse)
 now passes genuine DICE key/cycle RED→GREEN:64 shared wrapper hashes emit512bytes,
 previously21,120. Full generic Hash and structural identity remain unchanged.
 Private immutable Arc data keeps SourceRoute48bytes under the unchanged256 guard;
@@ -32,9 +50,10 @@ captures reached113. The new A/B/B/A records839attempts/55roots/113records each:
 three outer WorkDeadline refusals and one candidate unclassified Materialization
 mutation with sticky scope WorkDeadline. Cleanup is exact; inner mutation cause
 is unproved. Root-compute wall intervals are14.249/12.339/12.309/14.334sec, separate
-from completed-command latency/RSS. Next inspect reached archive/capture work
-under the existing deadline; do not repeat the
-now-passing archive-only fit proof or raise limits. Full Rust/action/REAPI/Slug
+from completed-command latency/RSS. These historical stopped prefixes precede
+the selected compact-body design and do not identify its allocator cause.
+The unchanged five-archive proof need not repeat in isolation; the changed
+representation requires the extended six-archive gate above. Full Rust/action/REAPI/Slug
 closure, completed-command latency/RSS<=1.25xBazel and activation remain open.
 
 Accepted [canonical body lookup routing](wp1225-general-repository-workspace-design.md#archive-completion-canonical-body-routing)

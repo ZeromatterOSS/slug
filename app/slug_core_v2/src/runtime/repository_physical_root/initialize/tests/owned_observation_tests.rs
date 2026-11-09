@@ -54,7 +54,7 @@ fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_aft
     else {
         panic!("actual File snapshot must own its canonical body")
     };
-    let weak_canonical = Arc::downgrade(canonical);
+    let weak_canonical = canonical.downgrade();
     let namespace = generation.source.namespace();
     let path = generation.source.real_path().clone();
     let bytes =
@@ -106,7 +106,7 @@ fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_aft
     else {
         panic!("FileBytes must contain the observed body")
     };
-    let same_first = Arc::ptr_eq(body, canonical);
+    let same_first = Arc::ptr_eq(body, canonical.raw_arc().unwrap());
     let kept = body.clone();
     assert_eq!(kept.as_ref(), BODY);
     assert!(
@@ -114,7 +114,7 @@ fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_aft
     );
     let repeated = actor.observe_native(token, [bytes.clone(), hash]).unwrap();
     let after_repeat = scope.snapshot();
-    let same_repeat = repeated.observations().values().any(|value| matches!(value.as_ref(),PathObservationResult::FileBytes(PathOperationResult::Present(body)) if Arc::ptr_eq(body,canonical)));
+    let same_repeat = repeated.observations().values().any(|value| matches!(value.as_ref(),PathObservationResult::FileBytes(PathOperationResult::Present(body)) if Arc::ptr_eq(body,canonical.raw_arc().unwrap())));
     drop(first);
     drop(repeated);
     let weak_body = Arc::downgrade(&kept);

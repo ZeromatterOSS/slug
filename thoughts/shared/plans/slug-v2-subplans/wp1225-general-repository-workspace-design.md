@@ -1962,6 +1962,135 @@ credit custody across snapshot, transcript, epoch publication and history owners
 preserve full history, construction overlap and fixed limits. No ownership or
 credit-transfer change is accepted by this optional-checksum component.
 
+### Compact immutable workspace bodies
+
+Status: independent design/source/final review ACCEPT; executed bounded component
+proof is recorded in the [component receipt](wp1225-compact-body-acceptance-2026-11-09.json).
+The generic six-archive chain, File/Read, seal and last-reader retirement pass
+under the original bank and27+3 clock. One qualified run reaches sealing at
+26,661ms, leaving339ms observed work headroom; this proves no repeatability,
+causal latency saving or RSS result. This Slug-native representation changes
+no caller permissions, limits or production activation.
+The separate optimized original reaches LLVM4 and refuses std5 before decoding:
+the first typed native ResourceLimit is a67,108,928-byte XZ allocation for a
+64MiB payload. Its native-use endpoints are observations, not atomic transaction
+state. Cleanup is exact. The decoder's136MiB allowance is not the refused limit.
+Six selected archives require631,202,064 candidate-unique whole-file bytes before
+controls. An exact miniz block census round-trips every block and measures
+332,690,138 stored bytes over all150 selected occurrences, without assuming
+deduplication. This selects a representation experiment, not native fit or RSS.
+
+Bzlmod owns a closed immutable `RepositoryWorkspaceBody`: Raw transfers an
+existing Arc plus an inline routing word; Packed shares private data owning
+independent64KiB blocks. Reuse locked miniz_oxide0.8.9 Raw Deflate at level1;
+store a raw block when compression is not smaller. No blocks are shared between
+distinct Packed owners. Only whole-body clones share the private allocations.
+No FD, IO, Scope, resource bank, mutable root, global pool or decoded cache enters
+pure DICE. Existing Source digest states and Execute output types stay unchanged.
+
+Packed construction knows the complete logical length. Require exact full blocks
+and one final short block, strict codec Done/input consumption/output length and
+full comparison with original bytes before any immutable block publication.
+All count, storage and extent arithmetic is checked; no malformed public factory
+or fallible decode appears in pure Eq/Hash. Independent values compare every
+logical byte, including across Raw/Packed forms. Same actual allocation may
+shortcut; a weak word or storage membership cannot authenticate content.
+
+Ordinary body Hash deliberately becomes one representation-independent writer:
+logical usize length, then fixed logical64KiB byte writes, final short write and
+no byte write for empty. This is an explicit operational-domain revision to the
+prior components' unchanged-Hash wording. The scratch canonicalization pool is
+its only identified consumer. Raw construction and Packed input traversal cache
+the exact StarlarkHashValue of that writer before returning the value. SmallMap
+hashed insertion and lookup use that value consistently, with full Eq on
+collisions. There is no raw-slice borrowed lookup with a different hash, nor
+historical decoding merely to seed or route the pool. Generic Hash still writes
+all logical bytes. Canonical workspace SHA and StableKey owner/reservation streams
+retain their exact domains, framing, ordering and bytes; compression is absent
+from semantic identity.
+
+Core's covered snapshot producer encodes directly from verified FD chunks; it
+never allocates a complete raw file first. Prepay builder tables, final controls
+and transfer overlap before construction, plus a conservatively justified2MiB
+encoder/raw/decode workspace. The pinned encoder has five boxed buffers and a
+growing Vec; sizeof alone cannot prove this bound. After encoding/validation,
+admit the selected block's actual Arc Layout before its retained copy. Every XZ,
+capture, metadata and prior-body credit remains concurrent. Failure/cancel/frame/
+EOF refusal drops partial payloads before their credits. The existing uncovered
+capture remains fully prepaid Raw; Packed refusal never retries through it.
+The owned process worker keeps its existing256KiB stack. Native block assembly
+and encoder roundtrip validation use fallible fixed-capacity heap buffers under
+the same2MiB encoding credit, never a decoded cache. Pure Eq/Hash stay heap-free;
+range comparison decodes into one block buffer without a nested copy buffer.
+An actual fixed-stack regression and authentic warm process proof discriminate
+this placement; a semantic memory allowance alone proves no ABI stack fit.
+
+Logical archive/history1GiB and Process64MiB totals use full decoded lengths.
+Full uncovered forecasts remain logical payload plus complete owner controls.
+Covered forecasts still subtract only independently leased logical payload terms;
+controls stay conservative in both metadata and full native body leases. The
+native ledger covers actual encoded/raw payload, Arc headers, tables and private
+controls using whole-owner identity and held guards. No negative compression
+subtraction, bank-total refund, partial-block sharing or logical-to-backing
+reclassification is permitted. Existing flat history and filtered final-data
+owners retain all origin checks and payload-before-credit release boundaries.
+Native completion checks body-free reservation and coverage origin before decode
+admission or foreign-state traversal. A foreign bank/scope/reservation therefore
+refuses without spending comparison credit; if both coverage origin and a
+predecessor are foreign, the coverage-origin refusal takes precedence. This is
+an explicit Slug-native refusal-order choice for the new decoding requirement.
+
+File writes, full verification, recovery, sealing, readers and SHA stream logical
+chunks while preserving fresh FD/name/frame/EOF/mode and cancellation checks.
+Loading reads append directly into the existing bounded evaluator String;
+template materialization replaces its existing source Vec copy. Preserve its
+actual limit/error order, including external source routes; no invented native
+grant covers evaluator allocations. Public FileBytes stays Arc-backed and1MiB
+bounded. A Packed body requires a separately prepaid Source decoded target with
+the encoded owner live, unchanged cumulative DecodedBytes and owned SourceAttempts.
+Raw transfers the original Arc. No permanent decoded copy is retained.
+
+Closed realizations retain their privately derived canonical source identity.
+After exact full transcript equality, `canonicalized_for` may clone that identity
+while replacing the transcript aliases with the native canonical transcript.
+The comparison includes reservation, initial state, every record, retention and
+logical body bytes; a mismatch remains `ForeignPredecessor`. No caller-provided
+digest, comparison witness or weak routing hash can authorize the rebind. Core
+holds decoder credit through the pure comparison and preserves all origin,
+coverage, construction and release checks. The command and progress sealing
+owners forward this checked realization rather than deriving its SHA twice more.
+Direct `realize(consumed)` and `seal(consumed)` keep their unused-record checks.
+Fresh physical verification still reads and compares the complete actual tree.
+Independent design review accepts this reuse; execution must prove unchanged SHA,
+native alias ownership, mismatch refusal and zero additional SHA derivations.
+The completed six-chain retains631,202,064 logical archive body bytes with
+277,843,042 peak native credit, all820,514,816 decoded tar bytes and eight complete
+records. Final scope, reader, full-refund and unchanged input-frame assertions
+pass. Native credit is not RSS; explicit pinned effects do not reconstruct
+omitted-checksum intent from original Starlark.
+
+The original end-to-end outcome remains unproved. Compaction adds codec CPU work;
+the qualified original stops at838 computes/55roots/112records with Cargo2
+accepted and rustfmt3 pending at WorkDeadline, with exact cleanup. This observed
+prefix is earlier than the main695 std5 allocation refusal. Single stopped
+runs do not quantify causal slowdown or completed latency. The accepted scope
+is the necessary bounded capacity/ownership prerequisite, not original-command
+advance. Next diagnose codec/capture CPU work within the same limits and full
+fresh-byte/history contract; original completion and RSS remain required.
+
+Before acceptance, prove cross-form full Eq/arbitrary-Hasher method streams,
+cached routing equality, exact canonical SHA and unchanged logical limits.
+Repeated transcript completion must not decode history for bucket routing;
+forced collisions and equal foreign allocations keep complete comparison.
+Prove actual encoded exact/+1 admission, partial-construction/cancel retirement,
+changed old/new physical overlap and deleted-history/final-reader release.
+Tests whose physical-byte premise equalled logical bytes must retain a real
+representation-aware refusal/release discriminator, never lose assertions merely
+to pass. Validate named dependents, fresh default CLI and protected originals,
+then the actual six-archive chain/File/Read/seal/last-reader closure under512MiB,
+FD512, backing8GiB and27+3sec, plus the exact original separately. Whole-command
+RSS<=1.25xBazel, public Rust and General activation remain independent open gates.
+
 ### Archive completion canonical body routing
 
 Implementation status: independent design/source/final review ACCEPT;

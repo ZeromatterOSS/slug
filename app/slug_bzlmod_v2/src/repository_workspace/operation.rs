@@ -271,15 +271,15 @@ impl RepositoryWorkspaceExecute {
 pub enum RepositoryWorkspaceOperation {
     File {
         path: CompactString,
-        body: Arc<[u8]>,
+        body: RepositoryWorkspaceBody,
         mode: u16,
     },
     Template {
         path: CompactString,
-        body: Arc<[u8]>,
+        body: RepositoryWorkspaceBody,
         mode: u16,
         source: HostRepositoryLabelPathValue,
-        source_body: Arc<[u8]>,
+        source_body: RepositoryWorkspaceBody,
         substitutions: SmallMap<CompactString, CompactString>,
     },
     Symlink {
@@ -463,7 +463,7 @@ impl RepositoryWorkspaceOperation {
         };
         views.iter().filter(|view| view.source_state().is_some())
     }
-    pub(super) fn bodies(&self, visit: &mut impl FnMut(&Arc<[u8]>)) {
+    pub(super) fn bodies(&self, visit: &mut impl FnMut(&RepositoryWorkspaceBody)) {
         match self {
             Self::File { body, .. } => visit(body),
             Self::Template {
@@ -477,7 +477,7 @@ impl RepositoryWorkspaceOperation {
     }
     pub(super) fn bodies_mut(
         &mut self,
-        visit: &mut impl FnMut(&mut Arc<[u8]>) -> Result<(), RepositoryWorkspaceError>,
+        visit: &mut impl FnMut(&mut RepositoryWorkspaceBody) -> Result<(), RepositoryWorkspaceError>,
     ) -> Result<(), RepositoryWorkspaceError> {
         match self {
             Self::File { body, .. } => visit(body)?,
@@ -558,7 +558,7 @@ impl RepositoryWorkspaceOperation {
 #[derive(Clone, PartialEq, Eq, Allocative)]
 pub enum RepositoryWorkspaceResult {
     Unit,
-    Read(Arc<[u8]>),
+    Read(RepositoryWorkspaceBody),
     Exists(bool),
     Archive([u8; 32]),
     Delete(bool),
@@ -577,12 +577,12 @@ impl fmt::Debug for RepositoryWorkspaceResult {
     }
 }
 impl RepositoryWorkspaceResult {
-    pub(super) fn bodies(&self, visit: &mut impl FnMut(&Arc<[u8]>)) {
+    pub(super) fn bodies(&self, visit: &mut impl FnMut(&RepositoryWorkspaceBody)) {
         if let Self::Read(body) = self {
             visit(body);
         }
     }
-    pub(super) fn body_mut(&mut self) -> Option<&mut Arc<[u8]>> {
+    pub(super) fn body_mut(&mut self) -> Option<&mut RepositoryWorkspaceBody> {
         if let Self::Read(body) = self {
             Some(body)
         } else {

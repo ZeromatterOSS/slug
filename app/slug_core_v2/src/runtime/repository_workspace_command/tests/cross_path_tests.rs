@@ -42,7 +42,11 @@ fn native_deleted_history_body_is_recovered_at_new_path_through_read_and_materia
             panic!()
         };
         assert_eq!(body.len(), LARGE);
-        Arc::downgrade(body)
+        assert!(
+            body.native_storage_bytes() >= LARGE,
+            "fixture must retain real encoded allocation pressure"
+        );
+        body.downgrade()
     };
     let command = apply(
         command,
@@ -72,7 +76,7 @@ fn native_deleted_history_body_is_recovered_at_new_path_through_read_and_materia
             panic!()
         };
         assert!(
-            Arc::ptr_eq(new, &old_body.upgrade().unwrap()),
+            new.ptr_eq(&old_body.upgrade().unwrap()),
             "fresh rooted comparison must recover the actual historical allocation"
         );
         assert_eq!(
@@ -100,7 +104,7 @@ fn native_deleted_history_body_is_recovered_at_new_path_through_read_and_materia
         else {
             panic!()
         };
-        assert_eq!(read.as_ref(), KEPT);
+        assert!(read.equals_slice(KEPT));
         assert_eq!(transcript.records().len(), 4);
     }
     let request = final_request(&command, &selected);
@@ -113,7 +117,7 @@ fn native_deleted_history_body_is_recovered_at_new_path_through_read_and_materia
     else {
         panic!()
     };
-    assert!(Arc::ptr_eq(final_body, &old_body.upgrade().unwrap()));
+    assert!(final_body.ptr_eq(&old_body.upgrade().unwrap()));
     let weak_root = Arc::downgrade(&root);
     let mut reader = root.open_member("new/large", &scope, &|| true).unwrap();
     drop((command, request, root));
@@ -125,12 +129,15 @@ fn native_deleted_history_body_is_recovered_at_new_path_through_read_and_materia
     );
     let mut scratch = [0; 64 * 1024];
     let mut count = 0usize;
+    let mut expected = FixtureBytes::new(b'a');
+    let mut expected_chunk = [0u8; 64 * 1024];
     loop {
         let read = reader.read(&mut scratch).unwrap();
         if read == 0 {
             break;
         }
-        assert!(scratch[..read].iter().all(|byte| *byte == b'a'));
+        expected.read_exact(&mut expected_chunk[..read]).unwrap();
+        assert_eq!(&scratch[..read], &expected_chunk[..read]);
         count += read;
     }
     assert_eq!(count, LARGE);
@@ -158,7 +165,11 @@ fn native_deleted_history_different_bytes_at_new_path_still_refuse_full_overlap(
         else {
             panic!()
         };
-        Arc::downgrade(body)
+        assert!(
+            body.native_storage_bytes() >= LARGE,
+            "fixture must retain real encoded allocation pressure"
+        );
+        body.downgrade()
     };
     let command = apply(
         command,

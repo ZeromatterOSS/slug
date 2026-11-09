@@ -19,6 +19,8 @@ use super::*;
 
 #[path = "repository_workspace_snapshot/body_recovery.rs"]
 mod body_recovery;
+#[path = "repository_workspace_snapshot/packed.rs"]
+mod packed;
 
 /// Entries/bodies precede their credit on destruction. No uncredited owned
 /// entries accessor exists; protocol completion prepays its successor first.
@@ -90,11 +92,14 @@ impl CapturedWorkspaceSnapshot<'_> {
             request: Option<RepositoryWorkspaceRequest>,
             result: Option<RepositoryWorkspaceResult>,
             snapshot: CapturedWorkspaceSnapshot<'a>,
+            // Last field: graph/payload owners always retire before this workspace.
+            body_working: Option<ResourceCredit>,
         }
         let mut input = Input {
             request: Some(request),
             result: Some(result),
             snapshot: self,
+            body_working: None,
         };
         let request = input.request.as_ref().unwrap();
         let result = input.result.as_ref().unwrap();
@@ -104,6 +109,23 @@ impl CapturedWorkspaceSnapshot<'_> {
         {
             return Err(PhysicalRootError::Reservation);
         }
+        // Coverage authentication is body-free and must precede ANY discounted
+        // forecast or decoder admission, even if the predecessor is also foreign.
+        if let Some(candidates) = snapshot.body_candidates.as_ref() {
+            candidates.ledger().check_request_origin(
+                &snapshot.resources,
+                &snapshot.scope,
+                transcript.reservation(),
+                active,
+            )?;
+        }
+        // Preserve the existing body-free reservation refusal before admission,
+        // then pay independent predecessor/pool collision decoding through completion.
+        input.body_working = Some(snapshot.resources.reserve(
+            2 * RepositoryWorkspaceBody::decode_scratch_bytes(),
+            0,
+            0,
+        )?);
         if transcript.current().as_ref() != snapshot.prior
             || request.predecessor().as_ref() != snapshot.prior
         {
@@ -112,12 +134,6 @@ impl CapturedWorkspaceSnapshot<'_> {
             ));
         }
         let body_ledger = if let Some(candidates) = snapshot.body_candidates.as_mut() {
-            candidates.ledger().check_request_origin(
-                &snapshot.resources,
-                &snapshot.scope,
-                transcript.reservation(),
-                active,
-            )?;
             transcript.try_visit_completion_body_allocations(
                 request,
                 result,
@@ -213,7 +229,7 @@ impl Limits {
 
 enum Node {
     Directory,
-    File(Option<Arc<[u8]>>),
+    File(Option<RepositoryWorkspaceBody>),
     Link(Option<CompactString>),
 }
 struct Row {
@@ -270,7 +286,11 @@ fn capture_builder<'prior>(
     {
         return Err(PhysicalRootError::Mode);
     }
-    let _scratch = builder.resources.reserve(IO_SCRATCH, 3, 0)?;
+    let _scratch = builder.resources.reserve(
+        add(IO_SCRATCH, RepositoryWorkspaceBody::decode_scratch_bytes())?,
+        3,
+        0,
+    )?;
     if backing_identity(&builder.file, builder.mode)? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
     }
@@ -607,7 +627,7 @@ fn capture_body(
     credit: &mut resources::ResourceCredit,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
-) -> Result<Arc<[u8]>, PhysicalRootError> {
+) -> Result<RepositoryWorkspaceBody, PhysicalRootError> {
     capture_body_covered(io, path, framed, prior, credit, None, scope, active)
 }
 fn capture_body_covered(
@@ -619,7 +639,7 @@ fn capture_body_covered(
     mut candidates: Option<&mut NativeBodyCandidates>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
-) -> Result<Arc<[u8]>, PhysicalRootError> {
+) -> Result<RepositoryWorkspaceBody, PhysicalRootError> {
     let length = usize::try_from(framed.st_size).map_err(|_| PhysicalRootError::Snapshot)?;
     // Pure sampler retains its original full, conservative body forecast.
     if candidates.is_none() {
@@ -642,17 +662,9 @@ fn capture_body_covered(
             }
         }
     }
-    let pending = match candidates.as_deref_mut() {
-        Some(candidates) => match candidates.reserve_new_for_capture(length, active)? {
-            NativeBodyAdmission::New(pending) => Some(pending),
-            NativeBodyAdmission::Refused(refusal) => {
-                return body_recovery::capture_existing(
-                    io, path, framed, candidates, refusal, scope, active,
-                );
-            }
-        },
-        None => None,
-    };
+    if let Some(candidates) = candidates {
+        return packed::capture(io, path, framed, candidates, scope, active);
+    }
     let mut body = Arc::<[u8]>::new_uninit_slice(length);
     let mut offset = 0usize;
     let captured = io.read_file(path, &running, |chunk| {
@@ -677,11 +689,7 @@ fn capture_body_covered(
     // SAFETY: every exact admitted slot was initialized once; actual EOF and
     // FD/name identity were checked by RootIo before this view can escape.
     let body = unsafe { body.assume_init() };
-    if let (Some(candidates), Some(pending)) = (candidates, pending) {
-        Ok(candidates.finish(pending, body, active)?.body().clone())
-    } else {
-        Ok(body)
-    }
+    Ok(RepositoryWorkspaceBody::from(body))
 }
 fn valid_link(
     reservation: &RepositoryWorkspaceReservation,

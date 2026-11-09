@@ -1,4 +1,4 @@
-//! Generic native Archive chain over five pinned original distribution payloads.
+//! Generic native Archive chain over six pinned original distribution payloads.
 //! This isolates archive-owner closure; it is not the full Rust cquery or an RSS
 //! proof. No repository/caller selector or completed-result injection is used.
 use std::fs::File;
@@ -11,8 +11,8 @@ use super::*;
 const CONFIG_SHA: &str = "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203";
 const MAX_CONFIG: u64 = 128 * 1024;
 const MAX_COMPRESSED: u64 = 128 * 1024 * 1024;
-const SENTINEL: &[u8] = b"five original archives completed through the generic owner\n";
-const INPUTS: [(&str, &str); 5] = [
+const SENTINEL: &[u8] = b"six original archives completed through the generic owner\n";
+const INPUTS: [(&str, &str); 6] = [
     ("rustc-nightly-x86_64-unknown-linux-gnu", "rustc"),
     ("clippy-nightly-x86_64-unknown-linux-gnu", "clippy-preview"),
     ("cargo-nightly-x86_64-unknown-linux-gnu", "cargo"),
@@ -23,6 +23,10 @@ const INPUTS: [(&str, &str); 5] = [
     (
         "llvm-tools-nightly-x86_64-unknown-linux-gnu",
         "llvm-tools-preview",
+    ),
+    (
+        "rust-std-nightly-x86_64-unknown-linux-gnu",
+        "rust-std-x86_64-unknown-linux-gnu",
     ),
 ];
 
@@ -158,8 +162,8 @@ fn inputs() -> (std::path::PathBuf, Frame, Vec<Input>) {
 }
 
 #[test]
-#[ignore = "five pinned original tar.xz archives; actual trusted factory and fixed512MiB/27+3 native supervisor required"]
-fn native_five_pinned_toolchain_archives_complete_one_generic_root() {
+#[ignore = "six pinned original tar.xz archives; actual trusted factory and fixed512MiB/27+3 native supervisor required"]
+fn native_six_pinned_toolchain_archives_complete_one_generic_root() {
     // All source pin validation/preparation precedes the ONE command clock.
     let (config_path, config_frame, inputs) = inputs();
     let fixture = tempfile::Builder::new()
@@ -178,7 +182,8 @@ fn native_five_pinned_toolchain_archives_complete_one_generic_root() {
         .enable_all()
         .build()
         .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(27);
+    let work_start = Instant::now();
+    let deadline = work_start + Duration::from_secs(27);
     let scope = SourceServiceScope::new_command(
         selected.workspace().clone(),
         deadline,
@@ -218,13 +223,14 @@ fn native_five_pinned_toolchain_archives_complete_one_generic_root() {
         previous_bodies = bodies;
         previous_decoded = decoded;
         eprintln!(
-            "NativeToolchainArchive index={index} bodies={bodies} decoded={decoded} peak={}",
-            bank.snapshot().peak_retained_bytes
+            "NativeToolchainArchive index={index} bodies={bodies} decoded={decoded} peak={} work_elapsed_ms={}",
+            bank.snapshot().peak_retained_bytes,
+            work_start.elapsed().as_millis()
         );
     }
     // Complete decoded tar sizes from the independently verified original
     // envelope. This scalar is a progress discriminator, never byte identity.
-    assert_eq!(previous_decoded, 654_041_088);
+    assert_eq!(previous_decoded, 820_514_816);
     assert_eq!(scope.snapshot().source_attempts, INPUTS.len() as u64);
     assert_eq!(
         scope.snapshot().transferred_bytes,
@@ -235,7 +241,7 @@ fn native_five_pinned_toolchain_archives_complete_one_generic_root() {
         &selected,
         RepositoryWorkspaceOperation::File {
             path: "archive-chain-kept".into(),
-            body: Arc::from(SENTINEL),
+            body: Arc::<[u8]>::from(SENTINEL).into(),
             mode: 0o644,
         },
         &runtime,
@@ -249,14 +255,26 @@ fn native_five_pinned_toolchain_archives_complete_one_generic_root() {
         &scope,
     );
     let transcript = &command.epoch().transcripts().unwrap()[0];
-    assert_eq!(transcript.records().len(), 7);
+    assert_eq!(transcript.records().len(), 8);
     assert!(
-        matches!(transcript.records().last().unwrap().result(), RepositoryWorkspaceResult::Read(body) if body.as_ref()==SENTINEL)
+        matches!(transcript.records().last().unwrap().result(), RepositoryWorkspaceResult::Read(body) if body.equals_slice(SENTINEL))
     );
+    let realization_start = Instant::now();
     let request = final_request(&command, &selected);
+    eprintln!(
+        "NativeToolchainRealization elapsed_ms={} work_elapsed_ms={}",
+        realization_start.elapsed().as_millis(),
+        work_start.elapsed().as_millis()
+    );
+    let seal_start = Instant::now();
     let (command, sealed) = command
         .seal_for_materialization(request, &scope, &|| true)
         .unwrap();
+    eprintln!(
+        "NativeToolchainSeal elapsed_ms={} work_elapsed_ms={}",
+        seal_start.elapsed().as_millis(),
+        work_start.elapsed().as_millis()
+    );
     command.check_epoch_body_coverage(&scope, &|| true).unwrap();
     let (request, root, history) = sealed.into_parts();
     let weak = Arc::downgrade(&root);

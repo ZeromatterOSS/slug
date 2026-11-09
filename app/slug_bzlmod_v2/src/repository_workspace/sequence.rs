@@ -3,6 +3,7 @@ use dice::DiceComputations;
 use dice::InjectedKey;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
+use starlark_map::Hashed;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -133,7 +134,7 @@ impl RepositoryWorkspaceRequest {
         let mut failure = None;
         self.operation.bodies(&mut |body| {
             if failure.is_none() {
-                match array_bytes::<u8>(body.len()).and_then(|size| add(bytes, size)) {
+                match add(bytes, body.retained_storage_bytes()) {
                     Ok(next) => bytes = next,
                     Err(error) => failure = Some(error),
                 }
@@ -580,7 +581,7 @@ impl RepositoryWorkspaceTranscript {
             None => Err(RepositoryWorkspaceError::WrongIndex),
         }
     }
-    fn visit_bodies(&self, visit: &mut impl FnMut(&Arc<[u8]>)) {
+    fn visit_bodies(&self, visit: &mut impl FnMut(&RepositoryWorkspaceBody)) {
         let mut state_bodies = |state: &RepositoryWorkspaceState| {
             for entry in state.entries() {
                 if let RepositoryWorkspaceNode::File(body) = entry.node() {
@@ -647,8 +648,8 @@ impl RepositoryWorkspaceTranscript {
         // checked below. Credits are conservative component bounds, not RSS.
         let scratch = add(
             refs.checked_mul(
-                8 * (std::mem::size_of::<(Arc<[u8]>, ())>()
-                    + std::mem::size_of::<(usize, usize)>()
+                8 * (std::mem::size_of::<(RepositoryWorkspaceBody, ())>()
+                    + std::mem::size_of::<RepositoryWorkspaceBodyAllocation>()
                     + 16),
             )
             .ok_or(RepositoryWorkspaceError::RetentionLimit)?,
@@ -736,14 +737,14 @@ impl RepositoryWorkspaceTranscript {
             usize::try_from(retention.body_bytes)
                 .map_err(|_| RepositoryWorkspaceError::RetentionLimit)?,
         )?;
-        let mut charge = |body: &Arc<[u8]>| {
-            bytes = add(bytes, array_bytes::<u8>(body.len())?)?;
+        let mut charge = |body: &RepositoryWorkspaceBody| {
+            bytes = add(bytes, body.retained_storage_bytes())?;
             Ok(())
         };
         // bodies() is intentionally allocation-free; retain the first checked
         // arithmetic error rather than allocating an auxiliary body set.
         let mut failure = None;
-        let mut visit = |body: &Arc<[u8]>| {
+        let mut visit = |body: &RepositoryWorkspaceBody| {
             if failure.is_none() {
                 failure = charge(body).err();
             }
@@ -822,13 +823,13 @@ impl RepositoryWorkspaceTranscript {
             budget,
             process_body_limit,
         )?;
-        let mut pool: SmallMap<Arc<[u8]>, ()> = SmallMap::with_capacity(refs);
-        let mut seen: SmallSet<(usize, usize)> = SmallSet::with_capacity(refs);
+        let mut pool: SmallMap<RepositoryWorkspaceBody, ()> = SmallMap::with_capacity(refs);
+        let mut seen: SmallSet<RepositoryWorkspaceBodyAllocation> = SmallSet::with_capacity(refs);
         self.visit_bodies(&mut |body| {
-            if seen.insert((body.as_ptr() as usize, body.len())) {
+            if seen.insert(body.allocation_identity()) {
                 #[cfg(test)]
-                body_pool_work::record(body_pool_work::Kind::Seed, body.len());
-                pool.insert(body.clone(), ());
+                body_pool_work::record(body_pool_work::Kind::Seed, 0);
+                pool.insert_hashed(Hashed::new_unchecked(body.routing_hash(), body.clone()), ());
             }
         });
         let actual = add(
@@ -845,38 +846,42 @@ impl RepositoryWorkspaceTranscript {
         // reuse; their strong Arcs prevent address reuse throughout completion.
         seen.clear();
         for body in pool.keys() {
-            seen.insert((body.as_ptr() as usize, body.len()));
+            seen.insert(body.allocation_identity());
         }
-        let mut canonicalize = |body: &mut Arc<[u8]>| -> Result<(), RepositoryWorkspaceError> {
-            if seen.contains(&(body.as_ptr() as usize, body.len())) {
-                return Ok(());
-            }
-            #[cfg(test)]
-            body_pool_work::record(body_pool_work::Kind::Canonical, body.len());
-            if let Some((_, shared, _)) = pool.get_full(body.as_ref()) {
-                *body = shared.clone();
-            } else {
-                retention.body_bytes = retention
-                    .body_bytes
-                    .checked_add(body.len() as u64)
-                    .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
-                let owner = array_bytes::<u8>(body.len())?
-                    .checked_sub(body.len())
-                    .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
-                retention.metadata_bytes = add(retention.metadata_bytes, owner)?;
-                retention.check(budget, mode == RepositoryWorkspaceMode::Process)?;
-                if mode == RepositoryWorkspaceMode::Process
-                    && retention.body_bytes > process_body_limit
-                {
-                    return Err(RepositoryWorkspaceError::RetentionLimit);
+        let mut canonicalize =
+            |body: &mut RepositoryWorkspaceBody| -> Result<(), RepositoryWorkspaceError> {
+                if seen.contains(&body.allocation_identity()) {
+                    return Ok(());
                 }
                 #[cfg(test)]
-                body_pool_work::record(body_pool_work::Kind::Canonical, body.len());
-                pool.insert(body.clone(), ());
-            }
-            seen.insert((body.as_ptr() as usize, body.len()));
-            Ok(())
-        };
+                body_pool_work::record(body_pool_work::Kind::Canonical, 0);
+                if let Some((_, shared, _)) =
+                    pool.get_full_hashed(Hashed::new_unchecked(body.routing_hash(), &*body))
+                {
+                    *body = shared.clone();
+                } else {
+                    retention.body_bytes = retention
+                        .body_bytes
+                        .checked_add(body.len() as u64)
+                        .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
+                    let owner = body.control_storage_bytes();
+                    retention.metadata_bytes = add(retention.metadata_bytes, owner)?;
+                    retention.check(budget, mode == RepositoryWorkspaceMode::Process)?;
+                    if mode == RepositoryWorkspaceMode::Process
+                        && retention.body_bytes > process_body_limit
+                    {
+                        return Err(RepositoryWorkspaceError::RetentionLimit);
+                    }
+                    #[cfg(test)]
+                    body_pool_work::record(body_pool_work::Kind::Canonical, 0);
+                    pool.insert_hashed(
+                        Hashed::new_unchecked(body.routing_hash(), body.clone()),
+                        (),
+                    );
+                }
+                seen.insert(body.allocation_identity());
+                Ok(())
+            };
         request.operation.bodies_mut(&mut canonicalize)?;
         if let Some(body) = result.body_mut() {
             canonicalize(body)?;
@@ -962,7 +967,7 @@ fn validate_result(
                 || request
                     .predecessor
                     .read_expectation(path)?
-                    .validate(body)
+                    .validate_body(body)
                     .is_err()
             {
                 return Err(RepositoryWorkspaceError::InvalidResult);
@@ -1083,6 +1088,23 @@ impl RepositoryWorkspaceRealization {
             return Ok(false);
         }
         transcript.try_eq_with_states(other_transcript, compare)
+    }
+
+    /// Reuses this privately derived content identity only after complete
+    /// structural transcript equality, then retains the selected transcript's
+    /// actual immutable allocations. No digest or external equality witness can
+    /// replace comparison of reservations, initial state, records and retention.
+    pub fn canonicalized_for(
+        &self,
+        transcript: &RepositoryWorkspaceTranscript,
+    ) -> Result<Self, RepositoryWorkspaceError> {
+        if &self.transcript != transcript {
+            return Err(RepositoryWorkspaceError::ForeignPredecessor);
+        }
+        Ok(Self {
+            transcript: transcript.clone(),
+            source_identity: self.source_identity.clone(),
+        })
     }
 
     pub fn source_identity(&self) -> &Arc<str> {

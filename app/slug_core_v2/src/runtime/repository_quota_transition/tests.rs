@@ -93,7 +93,9 @@ fn command_with_first_file(
             reservation,
             RepositoryWorkspaceOperation::File {
                 path: "out".into(),
-                body: Arc::from(super::super::native_fixture::BODIES[0]),
+                body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                    super::super::native_fixture::BODIES[0],
+                )),
                 mode: 0o644,
             },
             scope,
@@ -162,7 +164,7 @@ fn native_archive_process_shrink_is_shared_and_verified_before_fixed_payload() {
         .unwrap();
     let record = completed.transcript().records().last().unwrap();
     assert!(
-        matches!(record.next().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.as_ref()==super::super::native_fixture::BODIES[1])
+        matches!(record.next().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.equals_slice(super::super::native_fixture::BODIES[1]))
     );
     let ProcessQuotaReady {
         pending_mount,
@@ -223,7 +225,7 @@ fn native_archive_process_shrink_is_shared_and_verified_before_fixed_payload() {
         .unwrap();
     let record = final_record.transcript().records().last().unwrap();
     assert!(
-        matches!(record.next().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.as_ref()==super::super::native_fixture::BODIES[2])
+        matches!(record.next().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.equals_slice(super::super::native_fixture::BODIES[2]))
     );
     let lease = pending
         .accept(

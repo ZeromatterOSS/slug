@@ -73,7 +73,9 @@ fn write_one(
             selected,
             RepositoryWorkspaceOperation::File {
                 path: "out".into(),
-                body: Arc::from(b"one".as_slice()),
+                body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                    b"one".as_slice(),
+                )),
                 mode: 0o644,
             },
             scope,
@@ -168,7 +170,9 @@ fn native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged() {
             0,
             RepositoryWorkspaceOperation::File {
                 path: "out".into(),
-                body: Arc::from(b"one".as_slice()),
+                body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                    b"one".as_slice(),
+                )),
                 mode: 0o644,
             },
             &scope,
@@ -195,7 +199,7 @@ fn native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged() {
     // Sealing retires the root's token; the command still owns its namespace.
     assert_eq!(bank.snapshot().native_fds, 2);
     assert!(
-        matches!(sealed.state().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.as_ref()==b"one")
+        matches!(sealed.state().entry("out").unwrap().node(),RepositoryWorkspaceNode::File(body)if body.equals_slice(b"one"))
     );
     assert!(
         command
@@ -207,6 +211,95 @@ fn native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged() {
     drop(epoch);
     drop(producer);
     release(&bank, baseline, fd);
+}
+
+#[test]
+#[ignore = "requires actual archive root/initial seed under trusted Rust bwrap fixture"]
+fn native_command_closed_realization_rehomes_equal_aliases_and_refuses_changed_history() {
+    for extra_history in [false, true] {
+        let fixture = tempfile::Builder::new()
+            .prefix("slug-wp425-rolling-")
+            .tempdir()
+            .unwrap();
+        let display = fixture.path().join("root");
+        std::fs::create_dir(&display).unwrap();
+        let selected = reservation(&display, 1811);
+        let bank = resources();
+        let baseline = bank.snapshot().retained_bytes;
+        let scope = scope();
+        // Includes the independently built Packed comparison graph and codec
+        // workspace; these pure inputs confer no native ownership authority.
+        let producer = bank.reserve(4 * 1024 * 1024, 0, 0).unwrap();
+        let (command, fd) = start(selected.clone(), bank.clone(), scope.clone());
+        let request = command
+            .request(
+                &selected,
+                super::super::tests::packed_file_operation(),
+                &scope,
+                &|| true,
+            )
+            .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let command = command
+            .apply(
+                request,
+                &runtime,
+                &crate::runtime::ArchiveDistdirPolicy::default(),
+                &scope,
+                &|| true,
+            )
+            .unwrap();
+        let native = &command.epoch().transcripts().unwrap()[0];
+        let native_state = native.current().clone();
+        let (foreign, weak) = super::super::tests::foreign_file_realization(native, extra_history);
+        let identity = native.realize(1).unwrap().source_identity().clone();
+        assert_eq!(foreign.source_identity(), &identity);
+        let request = Arc::new(slug_bzlmod_v2::RepositoryMaterializationRequest {
+            id: slug_bzlmod_v2::RepositoryMaterializationRequestId {
+                workspace: selected.workspace().clone(),
+                canonical_repo: selected.repository().clone(),
+            },
+            repo_spec: selected.expected_repo_spec().as_ref().clone(),
+            kind: slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(foreign),
+        });
+        let counters = scope.snapshot();
+        let result = command.seal_for_materialization(request.clone(), &scope, &|| true);
+        if extra_history {
+            assert!(matches!(
+                result,
+                Err(PhysicalRootError::Protocol(
+                    slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor
+                ))
+            ));
+        } else {
+            let (command, sealed) = result.unwrap();
+            command.check_epoch_body_coverage(&scope, &|| true).unwrap();
+            let (canonical, root, history) = sealed.into_parts();
+            let slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(realization) =
+                &canonical.kind
+            else {
+                panic!()
+            };
+            assert_eq!(realization.source_identity(), &identity);
+            assert!(Arc::ptr_eq(realization.final_state(), &native_state));
+            assert!(Arc::ptr_eq(root.state(), &native_state));
+            drop(request);
+            assert!(weak.upgrade().is_none());
+            assert_eq!(scope.snapshot().source_attempts, counters.source_attempts);
+            assert_eq!(scope.snapshot().decoded_bytes, counters.decoded_bytes);
+            drop((command, canonical, root, history, native_state));
+            drop(producer);
+            release(&bank, baseline, fd);
+            continue;
+        }
+        drop((request, native_state));
+        assert!(weak.upgrade().is_none());
+        drop(producer);
+        release(&bank, baseline, fd);
+    }
 }
 
 #[test]
@@ -259,7 +352,7 @@ fn native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_set
                 let req = transcript
                     .request(RepositoryWorkspaceOperation::File {
                         path: "out".into(),
-                        body: Arc::from(bytes),
+                        body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(bytes)),
                         mode: 0o644,
                     })
                     .unwrap();
@@ -278,7 +371,11 @@ fn native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_set
                             slug_bzlmod_v2::RepositoryWorkspaceEntry::new(
                                 "out".into(),
                                 0o644,
-                                RepositoryWorkspaceNode::File(Arc::from(bytes)),
+                                RepositoryWorkspaceNode::File(
+                                    slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                                        bytes,
+                                    )),
+                                ),
                             )
                             .unwrap(),
                         ],
@@ -358,7 +455,7 @@ fn native_command_first_execute_checks_deleted_history_without_lowering_archive_
             &selected,
             RepositoryWorkspaceOperation::File {
                 path: "large".into(),
-                body,
+                body: body.into(),
                 mode: 0o644,
             },
             &scope,

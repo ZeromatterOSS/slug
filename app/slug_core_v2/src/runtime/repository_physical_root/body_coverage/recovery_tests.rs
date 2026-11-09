@@ -15,12 +15,20 @@ fn ledger(bank: &Arc<RepositoryRootResources>) -> Arc<NativeBodyLedger> {
     )
     .unwrap()
 }
-fn retain(candidates: &mut NativeBodyCandidates, byte: u8, length: usize) -> Arc<[u8]> {
-    let body: Arc<[u8]> = vec![byte; length].into();
+fn retain(
+    candidates: &mut NativeBodyCandidates,
+    byte: u8,
+    length: usize,
+) -> RepositoryWorkspaceBody {
+    let body: RepositoryWorkspaceBody = vec![byte; length].into();
     drop(candidates.retain(&body, &|| true).unwrap());
     body
 }
-fn commit(ledger: &NativeBodyLedger, candidates: &mut NativeBodyCandidates, bodies: &[Arc<[u8]>]) {
+fn commit(
+    ledger: &NativeBodyLedger,
+    candidates: &mut NativeBodyCandidates,
+    bodies: &[RepositoryWorkspaceBody],
+) {
     ledger
         .commit_canonical(
             candidates,
@@ -62,20 +70,20 @@ fn recovery_selects_pending_then_committed_with_exact_length_and_full_refunds() 
     let ledger = ledger(&bank);
     let mut committed = ledger.candidates().unwrap();
     let old = retain(&mut committed, 1, 4096);
-    let old_weak = Arc::downgrade(&old);
+    let old_weak = RepositoryWorkspaceBody::downgrade(&old);
     commit(&ledger, &mut committed, &[old.clone()]);
     drop(committed);
     let mut pending = ledger.candidates().unwrap();
     let _wrong_length = retain(&mut pending, 2, 7);
     let new = retain(&mut pending, 3, 4096);
-    let new_weak = Arc::downgrade(&new);
+    let new_weak = RepositoryWorkspaceBody::downgrade(&new);
     let (token, held) = refuse(&mut pending, &bank, 4096, control_bytes().unwrap());
     let unlocked = || ledger.storage.try_lock().is_ok();
     let mut cursor = pending.recovery(token, &unlocked).unwrap().unwrap();
     let first = cursor.next(&unlocked).unwrap().unwrap();
     let second = cursor.next(&unlocked).unwrap().unwrap();
-    assert!(Arc::ptr_eq(first.body(), &new));
-    assert!(Arc::ptr_eq(second.body(), &old));
+    assert!(RepositoryWorkspaceBody::ptr_eq(first.body(), &new));
+    assert!(RepositoryWorkspaceBody::ptr_eq(second.body(), &old));
     assert!(cursor.next(&|| true).unwrap().is_none());
     assert_eq!(cursor.rows, 3);
     assert_eq!(cursor.comparisons, 2);
@@ -123,7 +131,7 @@ fn recovery_total_row_limit_and_fixed_endpoints_ignore_later_appends() {
         let mut later = ledger.candidates().unwrap();
         let appended = retain(&mut later, 2, 4096);
         commit(&ledger, &mut later, &[appended]);
-        assert!(Arc::ptr_eq(
+        assert!(RepositoryWorkspaceBody::ptr_eq(
             cursor.next(&|| true).unwrap().unwrap().body(),
             &first
         ));

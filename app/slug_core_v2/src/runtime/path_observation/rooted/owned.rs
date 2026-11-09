@@ -22,7 +22,7 @@ fn framed(error: io::Error) -> RootedObservationError {
 pub(super) fn verify(
     root: &RootIo<'_>,
     path: &Path,
-    body: &Arc<[u8]>,
+    body: &slug_bzlmod_v2::RepositoryWorkspaceBody,
     mode: u16,
     operation: PathObservationOperation,
     scope: &Arc<SourceServiceScope>,
@@ -35,6 +35,27 @@ pub(super) fn verify(
         return Err(scope
             .poison(SourceServiceError::Limit(SourceCounter::DecodedBytes))
             .into());
+    }
+    let _decode = if body.raw_arc().is_none() {
+        Some(reserve(
+            scope,
+            slug_bzlmod_v2::RepositoryWorkspaceBody::decode_scratch_bytes(),
+        )?)
+    } else {
+        None
+    };
+    struct Materialized {
+        bytes: Option<Arc<[std::mem::MaybeUninit<u8>]>>,
+        _credit: Option<SourceBufferReservation>,
+    }
+    let mut materialized = Materialized {
+        bytes: None,
+        _credit: None,
+    };
+    if operation == PathObservationOperation::FileBytes && body.raw_arc().is_none() {
+        // Encoded history remains live; separately prepay the actual decoded Arc.
+        materialized._credit = Some(reserve(scope, array::<u8>(body.len())?)?);
+        materialized.bytes = Some(Arc::<[u8]>::new_uninit_slice(body.len()));
     }
     root.admit_file_size(body.len() as u64)
         .map_err(RootedObservationError::RootIo)?;
@@ -60,8 +81,14 @@ pub(super) fn verify(
                 .checked_add(chunk.len())
                 .filter(|end| *end <= body.len())
                 .ok_or(RootedObservationError::Unstable)?;
-            if body[offset..end] != *chunk {
+            if !body.range_eq(offset, chunk) {
                 return Err(RootedObservationError::Unstable);
+            }
+            if let Some(output) = materialized.bytes.as_mut() {
+                let slots = Arc::get_mut(output).expect("unpublished returned Arc is unique");
+                for (slot, byte) in slots[offset..end].iter_mut().zip(chunk) {
+                    slot.write(*byte);
+                }
             }
             offset = end;
             Ok(())
@@ -82,7 +109,15 @@ pub(super) fn verify(
     }
     let result = match operation {
         PathObservationOperation::FileBytes => {
-            PathObservationResult::FileBytes(PathOperationResult::Present(body.clone()))
+            let bytes = match body.raw_arc() {
+                Some(raw) => raw.clone(),
+                None => {
+                    // All admitted slots were filled from freshly verified FD
+                    // bytes; RootIo authenticated exact EOF and original frames.
+                    unsafe { materialized.bytes.take().unwrap().assume_init() }
+                }
+            };
+            PathObservationResult::FileBytes(PathOperationResult::Present(bytes))
         }
         PathObservationOperation::FileDigest => {
             PathObservationResult::FileDigest(PathOperationResult::Present(

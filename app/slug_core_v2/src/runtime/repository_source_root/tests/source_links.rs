@@ -152,7 +152,7 @@ fn own_aliases(
             sources,
             Op::File {
                 path: path.into(),
-                body: Arc::from(body),
+                body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(body)),
                 mode: 0o644,
             },
             runtime,
@@ -385,7 +385,7 @@ fn native_source_links_preserve_literal_targets_route_fd_reads_and_keep_only_dat
         &scope,
     );
     assert!(
-        matches!(command.epoch().transcripts().unwrap()[0].records().last().unwrap().result(),ResultValue::Read(body) if body.as_ref()==b"selected source bytes")
+        matches!(command.epoch().transcripts().unwrap()[0].records().last().unwrap().result(),ResultValue::Read(body) if body.equals_slice(b"selected source bytes"))
     );
     command = apply(
         command,
@@ -555,7 +555,7 @@ fn native_source_link_reads_charge_content_only_and_refuse_changed_own_route_bef
         &sources,
         Op::File {
             path: "own".into(),
-            body: Arc::from(&b"own"[..]),
+            body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(&b"own"[..])),
             mode: 0o644,
         },
         &runtime,

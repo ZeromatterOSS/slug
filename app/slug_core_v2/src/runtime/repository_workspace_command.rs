@@ -156,7 +156,17 @@ impl RepositoryWorkspaceCommand {
                 SourceServiceError::ForeignScope,
             ));
         }
-        let control = resources.reserve(std::mem::size_of::<Self>(), 0, 0)?;
+        // Every command entry may compare foreign request/transcript/epoch
+        // bodies before a per-operation IO guard. Keep this bounded working
+        // allowance with the command throughout request/replay/finalization.
+        let control = resources.reserve(
+            add(
+                std::mem::size_of::<Self>(),
+                2 * RepositoryWorkspaceBody::decode_scratch_bytes(),
+            )?,
+            0,
+            0,
+        )?;
         let retirement_credit = resources.reserve(arc_bytes::<RetirementState>()?, 0, 0)?;
         let retirement = RepositoryWorkspaceRetirementGuard {
             state: Arc::new(RetirementState {
@@ -903,9 +913,8 @@ impl RepositoryWorkspaceCommand {
         else {
             unreachable!()
         };
-        if !ViewComparison::new(&resources, scope, active)?
-            .transcript_equal(expected.transcript(), progress.transcript())?
-        {
+        let mut comparison = ViewComparison::new(&resources, scope, active)?;
+        if !comparison.transcript_equal(expected.transcript(), progress.transcript())? {
             return Err(PhysicalRootError::Protocol(
                 slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
             ));
@@ -936,10 +945,13 @@ impl RepositoryWorkspaceCommand {
             )?,
         )?;
         let _construction = resources.reserve(canonical_bytes, 0, 0)?;
-        let canonical = progress
-            .transcript()
-            .realize(progress.transcript().records().len())
+        // The closed incoming realization already owns the exact content SHA.
+        // Rebind only after full history equality, retaining the native graph;
+        // comparison working credit also covers the pure foreign-body fallback.
+        let canonical = expected
+            .canonicalized_for(progress.transcript())
             .map_err(PhysicalRootError::Protocol)?;
+        drop(comparison);
         let request = Arc::new(slug_bzlmod_v2::RepositoryMaterializationRequest {
             id: incoming.request.id.clone(),
             repo_spec: incoming.request.repo_spec.clone(),

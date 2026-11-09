@@ -10596,7 +10596,7 @@ async fn generic_workspace_path_and_source_read_keep_anchor_without_ancestor_dem
     let request = transcript
         .request(RepositoryWorkspaceOperation::File {
             path: "data".into(),
-            body: body.clone(),
+            body: body.clone().into(),
             mode: 0o644,
         })
         .unwrap();
@@ -10611,7 +10611,7 @@ async fn generic_workspace_path_and_source_read_keep_anchor_without_ancestor_dem
                 RepositoryWorkspaceEntry::new(
                     "data".into(),
                     0o644,
-                    RepositoryWorkspaceNode::File(body.clone()),
+                    RepositoryWorkspaceNode::File(body.clone().into()),
                 )
                 .unwrap(),
             ],

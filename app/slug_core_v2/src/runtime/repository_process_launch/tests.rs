@@ -197,7 +197,9 @@ fn native_general_runner_preserves_same_root_nonzero_env_cwd_replay_and_followin
             &selected,
             RepositoryWorkspaceOperation::File {
                 path: "after".into(),
-                body: Arc::from(b"trusted mutation".as_slice()),
+                body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                    b"trusted mutation".as_slice(),
+                )),
                 mode: 0o644,
             },
             &scope,

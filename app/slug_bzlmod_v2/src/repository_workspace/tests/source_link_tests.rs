@@ -140,7 +140,9 @@ fn source_links_resolve_directory_internal_and_dangling_without_changing_logical
     let read = t
         .complete(
             request,
-            RepositoryWorkspaceResult::Read(Arc::from(&b"data"[..])),
+            RepositoryWorkspaceResult::Read(RepositoryWorkspaceBody::from_arc(Arc::from(
+                &b"data"[..],
+            ))),
             t.current().mode(),
             t.current().entries().to_vec(),
         )
@@ -289,12 +291,15 @@ fn source_link_literal_escape_cycles_and_write_through_directory_refuse() {
     let req = t
         .request(RepositoryWorkspaceOperation::File {
             path: "dir/overwrite".into(),
-            body: Arc::from(&b"bad"[..]),
+            body: RepositoryWorkspaceBody::from_arc(Arc::from(&b"bad"[..])),
             mode: 0o644,
         })
         .unwrap();
     let mut entries = t.current().entries().to_vec();
-    entries.push(file("dir/overwrite", Arc::from(&b"bad"[..])));
+    entries.push(file(
+        "dir/overwrite",
+        RepositoryWorkspaceBody::from_arc(Arc::from(&b"bad"[..])),
+    ));
     assert!(
         t.complete(
             req,

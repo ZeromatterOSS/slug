@@ -17,6 +17,7 @@ use slug_workspace_v2::PathObservationInstanceId;
 use crate::HostSelectedExtensionOwner;
 use crate::RepoSpec;
 
+mod body;
 mod demand;
 mod observation;
 mod operation;
@@ -26,6 +27,7 @@ mod state;
 mod state_path;
 mod state_sources;
 
+pub use body::*;
 pub use demand::*;
 pub use observation::*;
 pub use operation::*;

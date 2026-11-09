@@ -485,3 +485,89 @@ fn archive_paths_beyond_delete_depth_remain_rooted_and_bounded() {
     bound.max_depth = 2049;
     assert!(RootIo::new(&descriptor, bound).is_err());
 }
+
+#[test]
+fn chunk_writer_checks_mode_and_size_before_mutation_and_requires_exact_stream() {
+    let fixture = tempfile::tempdir().unwrap();
+    fs::write(fixture.path().join("file"), b"original").unwrap();
+    let fd = File::open(fixture.path()).unwrap();
+    let root = RootIo::new(&fd, limits()).unwrap();
+    let called = Cell::new(false);
+    for (length, mode) in [(3, 0o10000), (limits().max_file_bytes + 1, 0o644)] {
+        assert!(
+            root.write_file_chunks(
+                Path::new("file"),
+                length,
+                mode,
+                WriteMode::ReplaceRegular,
+                &|| true,
+                |_| {
+                    called.set(true);
+                    Ok(())
+                }
+            )
+            .is_err()
+        );
+        assert!(!called.get());
+        assert_eq!(fs::read(fixture.path().join("file")).unwrap(), b"original");
+    }
+    let first = [0x6d; 64 * 1024];
+    root.write_file_chunks(
+        Path::new("file"),
+        (first.len() + 3) as u64,
+        0o755,
+        WriteMode::ReplaceRegular,
+        &|| true,
+        |put| {
+            put(&first)?;
+            put(b"end")
+        },
+    )
+    .unwrap();
+    let actual = read(&root, "file");
+    assert_eq!(&actual[..first.len()], &first);
+    assert_eq!(&actual[first.len()..], b"end");
+    assert_eq!(
+        root.lstat(Path::new("file")).unwrap().st_mode & 0o777,
+        0o755
+    );
+    assert!(
+        root.write_file_chunks(
+            Path::new("short"),
+            3,
+            0o644,
+            WriteMode::CreateNew,
+            &|| true,
+            |put| put(b"x")
+        )
+        .is_err()
+    );
+    assert!(
+        root.write_file_chunks(
+            Path::new("long"),
+            1,
+            0o644,
+            WriteMode::CreateNew,
+            &|| true,
+            |put| put(b"xx")
+        )
+        .is_err()
+    );
+    fs::write(fixture.path().join("outside"), b"must stay").unwrap();
+    symlink("outside", fixture.path().join("link")).unwrap();
+    assert!(
+        root.write_file_chunks(
+            Path::new("link"),
+            1,
+            0o644,
+            WriteMode::ReplaceRegular,
+            &|| true,
+            |put| put(b"x")
+        )
+        .is_err()
+    );
+    assert_eq!(
+        fs::read(fixture.path().join("outside")).unwrap(),
+        b"must stay"
+    );
+}

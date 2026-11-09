@@ -242,7 +242,9 @@ impl SelectedRootLease {
                     return Err("physical source is not a sealed regular file".into());
                 };
                 if source.digest().size_bytes() != bytes.len() as u64
-                    || source.digest().sha256() != &<[u8; 32]>::from(Sha256::digest(bytes))
+                    || root
+                        .verify_direct_body_digest(relative, source.digest())
+                        .is_err()
                 {
                     return Err("physical source digest differs from sealed state".into());
                 }
@@ -1057,7 +1059,7 @@ impl RepositoryMaterializer {
             root.check_origin(original, &|| self.session_is_active(token))
                 .map_err(native_comparison_error)?;
             if !matches!(&row.request.kind,RepositoryMaterializationKind::GeneralWorkspace(realization)
-                if realization.reservation()==root.reservation()&&realization.final_state()==root.state())
+                if realization.reservation()==root.reservation()&&root.matches_state(realization.final_state()).map_err(native_comparison_error)?)
                 || row.observation_instance != root.reservation().instance()
                 || !root
                     .source_claim()

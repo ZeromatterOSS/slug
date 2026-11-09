@@ -58,7 +58,11 @@ pub(super) fn seal(
         .bytes
         .try_grow(add(retained.owned_bytes(), anchor_bound)?)
         .map_err(|_| PhysicalRootError::Resource)?;
-    let _scratch = builder.resources.reserve(IO_SCRATCH, 3, 0)?;
+    let _scratch = builder.resources.reserve(
+        add(IO_SCRATCH, RepositoryWorkspaceBody::decode_scratch_bytes())?,
+        3,
+        0,
+    )?;
     if backing_identity_for_quota(&builder.file, builder.native_quota())? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
     }
@@ -175,7 +179,7 @@ pub(super) fn verify(
                 let mut mismatch = false;
                 let captured = io.read_file(path, &running, |chunk| {
                     let end = offset.checked_add(chunk.len());
-                    if end.is_none_or(|end| end > body.len() || body[offset..end] != *chunk) {
+                    if end.is_none_or(|end| end > body.len() || !body.range_eq(offset, chunk)) {
                         mismatch = true;
                         return Err(io::Error::other(
                             "physical root file differs from final state",

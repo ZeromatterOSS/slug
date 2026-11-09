@@ -2,6 +2,7 @@
 use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
 use slug_bzlmod_v2::RepositoryMaterializationKind;
 use slug_bzlmod_v2::RepositoryWorkspaceArgument;
+use slug_bzlmod_v2::RepositoryWorkspaceBody;
 use slug_bzlmod_v2::RepositoryWorkspaceEnvironmentValue;
 use slug_bzlmod_v2::RepositoryWorkspaceExecute;
 use slug_bzlmod_v2::RepositoryWorkspaceOperation;
@@ -20,6 +21,11 @@ use super::*;
 #[path = "workspace/symlink.rs"]
 mod symlink;
 pub(super) use symlink::create as symlink;
+
+#[path = "workspace/body_text.rs"]
+mod body_text;
+pub(super) use body_text::latin1_text as body_latin1_text;
+pub(super) use body_text::template_input;
 
 #[path = "workspace/bindings.rs"]
 pub(crate) mod bindings;
@@ -393,7 +399,7 @@ pub(super) fn own_relative(
 pub(super) fn read_bytes(
     state: &RepositoryRuleInvocationState,
     value: Value<'_>,
-) -> anyhow::Result<(HostRepositoryLabelPathValue, Arc<[u8]>)> {
+) -> anyhow::Result<(HostRepositoryLabelPathValue, RepositoryWorkspaceBody)> {
     let own = match own_relative(state, value) {
         Ok(relative) => Some(relative),
         Err(
@@ -444,7 +450,7 @@ pub(super) fn read_bytes(
             .ok_or_else(|| state.fail(RepositoryRuleInvocationError::HostReadNeed(path.clone())))?;
         let resolved = HostRepositoryLabelPathValue::new(path, PathObservationNamespace::Host)
             .map_err(|_| state.fail(RepositoryRuleInvocationError::PathArgument))?;
-        return Ok((resolved, bytes.clone()));
+        return Ok((resolved, bytes.clone().into()));
     }
     let address = if let Some(label) = StarlarkLabel::from_value(value) {
         RepositoryLabelPathAddress::from_label(label.canonical())
@@ -460,7 +466,7 @@ pub(super) fn read_bytes(
         .prepared_sources
         .get(&address)
         .ok_or_else(|| state.fail(RepositoryRuleInvocationError::RepositorySourceNeed(address)))?;
-    Ok((resolved, body.clone()))
+    Ok((resolved, body.clone().into()))
 }
 pub(super) fn execute<'v>(
     state: &RepositoryRuleInvocationState,

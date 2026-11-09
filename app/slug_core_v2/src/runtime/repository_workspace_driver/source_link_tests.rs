@@ -271,14 +271,19 @@ fn authentic_cc_autoconf_environment_sequence(warm: bool) {
                 let RepositoryWorkspaceNode::File(body) = entry.node() else {
                     panic!("original template did not produce {path}");
                 };
-                let text = std::str::from_utf8(body).unwrap();
+                let mut logical_bytes = vec![0; body.len()];
+                assert!(body.copy_into(0, &mut logical_bytes));
+                let text = std::str::from_utf8(&logical_bytes).unwrap();
                 let expected =
                     format!("# Set-up the environment\n{env_block}\n\n# Call the C++ compiler");
                 assert!(text.contains(&expected), "{path}: {text:?}");
                 assert!(!text.contains("dot-must-be-filtered"));
                 assert!(!text.contains("underscore-must-be-filtered"));
                 assert!(!text.contains("%{env}"));
-                wrappers.push((entry.mode(), hex::encode(sha2::Sha256::digest(body))));
+                wrappers.push((
+                    entry.mode(),
+                    hex::encode(sha2::Sha256::digest(&logical_bytes)),
+                ));
             }
             wrapper_observations.push((realization.source_identity().clone(), wrappers));
             let bindings = realization.final_state().source_bindings();

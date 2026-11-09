@@ -12,7 +12,7 @@ pub enum RepositoryWorkspaceMode {
 #[derive(Clone, PartialEq, Eq, Allocative)]
 pub enum RepositoryWorkspaceNode {
     Directory,
-    File(Arc<[u8]>),
+    File(RepositoryWorkspaceBody),
     Link(CompactString),
 }
 impl fmt::Debug for RepositoryWorkspaceNode {
@@ -52,7 +52,7 @@ impl RepositoryWorkspaceEntry {
     pub fn node(&self) -> &RepositoryWorkspaceNode {
         &self.node
     }
-    pub(super) fn body_mut(&mut self) -> Option<&mut Arc<[u8]>> {
+    pub(super) fn body_mut(&mut self) -> Option<&mut RepositoryWorkspaceBody> {
         match &mut self.node {
             RepositoryWorkspaceNode::File(body) => Some(body),
             _ => None,
@@ -124,7 +124,7 @@ impl RepositoryWorkspaceState {
         let mut bytes = self.retained_metadata_bytes()?;
         for entry in self.entries.iter() {
             if let RepositoryWorkspaceNode::File(body) = entry.node() {
-                bytes = add(bytes, array_bytes::<u8>(body.len())?)?;
+                bytes = add(bytes, body.retained_storage_bytes())?;
             }
         }
         add(
@@ -139,7 +139,7 @@ impl RepositoryWorkspaceState {
         let mut owned = self.retained_metadata_bytes()?;
         for entry in self.entries.iter() {
             if let RepositoryWorkspaceNode::File(body) = entry.node() {
-                owned = add(owned, array_bytes::<u8>(body.len())?)?;
+                owned = add(owned, body.retained_storage_bytes())?;
             }
         }
         RepositoryWorkspaceStoragePartition::new(

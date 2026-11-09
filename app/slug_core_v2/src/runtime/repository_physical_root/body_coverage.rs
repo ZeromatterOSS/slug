@@ -15,17 +15,17 @@ mod recovery;
 pub(in crate::runtime) use recovery::NativeBodyAdmission;
 pub(in crate::runtime) use recovery::NativeBodyRefusal;
 
-type BodyKey = (usize, usize);
-type Visitor<'a> = dyn FnMut(&Arc<[u8]>) -> Result<(), PhysicalRootError> + 'a;
+type BodyKey = RepositoryWorkspaceBodyAllocation;
+type Visitor<'a> = dyn FnMut(&RepositoryWorkspaceBody) -> Result<(), PhysicalRootError> + 'a;
 
-fn key(body: &Arc<[u8]>) -> BodyKey {
-    (body.as_ptr() as usize, body.len())
+fn key(body: &RepositoryWorkspaceBody) -> BodyKey {
+    body.allocation_identity()
 }
 
 #[derive(Clone)]
-pub(in crate::runtime) struct NativeBodyLease(BudgetedImageBlock<Arc<[u8]>>);
+pub(in crate::runtime) struct NativeBodyLease(BudgetedImageBlock<RepositoryWorkspaceBody>);
 impl NativeBodyLease {
-    pub(in crate::runtime) fn body(&self) -> &Arc<[u8]> {
+    pub(in crate::runtime) fn body(&self) -> &RepositoryWorkspaceBody {
         self.0.get()
     }
 }
@@ -78,6 +78,7 @@ pub(in crate::runtime) struct PendingNativeBody {
     length: usize,
     origin: Arc<Origin>,
     credit: ImageDescriptorReservation,
+    payload_refused: bool,
 }
 
 struct BodyMap {
@@ -243,9 +244,12 @@ impl NativeBodyLedger {
         }
         Ok(())
     }
+    pub(in crate::runtime) fn resources(&self) -> &Arc<RepositoryRootResources> {
+        &self.origin.resources
+    }
     pub(in crate::runtime) fn lookup(
         &self,
-        body: &Arc<[u8]>,
+        body: &RepositoryWorkspaceBody,
         active: &dyn Fn() -> bool,
     ) -> Result<Option<NativeBodyLease>, PhysicalRootError> {
         self.origin.check(active)?;
@@ -349,7 +353,7 @@ impl NativeBodyCandidates {
     }
     pub(in crate::runtime) fn lookup(
         &self,
-        body: &Arc<[u8]>,
+        body: &RepositoryWorkspaceBody,
         active: &dyn Fn() -> bool,
     ) -> Result<Option<NativeBodyLease>, PhysicalRootError> {
         self.ledger.origin.check(active)?;
@@ -360,14 +364,45 @@ impl NativeBodyCandidates {
     }
     pub(in crate::runtime) fn retain(
         &mut self,
-        body: &Arc<[u8]>,
+        body: &RepositoryWorkspaceBody,
         active: &dyn Fn() -> bool,
     ) -> Result<NativeBodyLease, PhysicalRootError> {
         if let Some(lease) = self.lookup(body, active)? {
             return Ok(lease);
         }
-        let pending = self.reserve_new(body.len(), active)?;
+        self.ledger.origin.check(active)?;
+        self.storage.ensure(1)?;
+        let pending = PendingNativeBody {
+            length: body.len(),
+            origin: self.ledger.origin.clone(),
+            credit: self.ledger.origin.resources.reserve_body_bytes(add(
+                body.native_storage_bytes(),
+                std::mem::size_of::<PendingNativeBody>(),
+            )?)?,
+            payload_refused: false,
+        };
         self.finish(pending, body.clone(), active)
+    }
+    /// Prepay all builder/table/final-owner controls before constructing packed data.
+    pub(in crate::runtime) fn reserve_packed(
+        &mut self,
+        length: usize,
+        active: &dyn Fn() -> bool,
+    ) -> Result<PendingNativeBody, PhysicalRootError> {
+        self.ledger.origin.check(active)?;
+        self.storage.ensure(1)?;
+        let controls = RepositoryWorkspaceBodyBuilder::storage_bytes(length)
+            .map_err(|_| PhysicalRootError::Resource)?;
+        Ok(PendingNativeBody {
+            length,
+            origin: self.ledger.origin.clone(),
+            payload_refused: false,
+            credit: self
+                .ledger
+                .origin
+                .resources
+                .reserve_body_bytes(add(controls, std::mem::size_of::<PendingNativeBody>())?)?,
+        })
     }
     pub(in crate::runtime) fn reserve_new(
         &mut self,
@@ -382,18 +417,19 @@ impl NativeBodyCandidates {
     pub(in crate::runtime) fn finish(
         &mut self,
         pending: PendingNativeBody,
-        body: Arc<[u8]>,
+        body: RepositoryWorkspaceBody,
         active: &dyn Fn() -> bool,
     ) -> Result<NativeBodyLease, PhysicalRootError> {
         // Explicit owner order covers all early returns and freeze failures.
         struct Incoming {
-            body: Arc<[u8]>,
+            body: RepositoryWorkspaceBody,
             pending: PendingNativeBody,
         }
         let incoming = Incoming { body, pending };
         self.ledger.origin.check(active)?;
         if !Arc::ptr_eq(&incoming.pending.origin, &self.ledger.origin)
             || incoming.body.len() != incoming.pending.length
+            || incoming.pending.credit.charged_bytes() < incoming.body.native_storage_bytes()
         {
             return Err(PhysicalRootError::Reservation);
         }
@@ -411,13 +447,12 @@ impl NativeBodyCandidates {
     /// Unknown ordinary bodies instead use retain's fully charged admission.
     pub(in crate::runtime) fn retain_claimed(
         &self,
-        body: &Arc<[u8]>,
+        body: &RepositoryWorkspaceBody,
         witness: &NativeBodyLease,
         active: &dyn Fn() -> bool,
     ) -> Result<NativeBodyLease, PhysicalRootError> {
         self.ledger.origin.check(active)?;
-        if !Arc::ptr_eq(body, witness.body())
-            || !self.ledger.origin.resources.owns_body_block(&witness.0)
+        if !body.ptr_eq(witness.body()) || !self.ledger.origin.resources.owns_body_block(&witness.0)
         {
             return Err(PhysicalRootError::Reservation);
         }
@@ -434,7 +469,7 @@ impl NativeBodyCandidates {
 impl NativeBodySet {
     pub(in crate::runtime) fn lookup(
         &self,
-        body: &Arc<[u8]>,
+        body: &RepositoryWorkspaceBody,
         active: &dyn Fn() -> bool,
     ) -> Result<Option<NativeBodyLease>, PhysicalRootError> {
         self.origin.check(active)?;

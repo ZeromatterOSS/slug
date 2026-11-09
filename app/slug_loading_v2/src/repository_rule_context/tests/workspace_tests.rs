@@ -211,7 +211,9 @@ def implementation(ctx):
                             rows.push(entry(
                                 "process",
                                 0o644,
-                                RepositoryWorkspaceNode::File(Arc::from(&b"\xffvalue"[..])),
+                                RepositoryWorkspaceNode::File(
+                                    Arc::<[u8]>::from(&b"\xffvalue"[..]).into(),
+                                ),
                             ));
                             rows.push(entry("work", 0o755, RepositoryWorkspaceNode::Directory));
                         } else {
