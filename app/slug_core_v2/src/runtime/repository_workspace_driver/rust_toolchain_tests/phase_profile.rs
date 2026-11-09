@@ -9,7 +9,9 @@ use std::time::Instant;
 
 use serde_json::Value;
 use serde_json::json;
+use slug_analysis_v2::ToolchainResolutionProbeSnapshot;
 use slug_loading_v2::PathLookaheadProbeSnapshot;
+use slug_loading_v2::RepositoryPackageChildProbeSnapshot;
 use slug_loading_v2::observation_union_probe;
 use slug_loading_v2::observation_union_probe::Snapshot as UnionSnapshot;
 
@@ -29,11 +31,15 @@ pub(super) struct InstalledProfile {
     guard: ProbeGuard,
     union_before: UnionSnapshot,
     path_before: PathLookaheadProbeSnapshot,
+    toolchain_before: ToolchainResolutionProbeSnapshot,
+    package_children_before: RepositoryPackageChildProbeSnapshot,
 }
 impl InstalledProfile {
     pub(super) fn attach(runtime: &mut WorkspaceRuntime) -> io::Result<Self> {
         let union_before = observation_union_probe::snapshot();
         let path_before = slug_loading_v2::path_lookahead_probe_snapshot();
+        let toolchain_before = slug_analysis_v2::toolchain_resolution_probe_snapshot();
+        let package_children_before = slug_loading_v2::repository_package_child_probe_snapshot();
         let raw = unsafe {
             libc::memfd_create(
                 c"slug-rust-phase-profile".as_ptr(),
@@ -61,6 +67,8 @@ impl InstalledProfile {
             guard,
             union_before,
             path_before,
+            toolchain_before,
+            package_children_before,
         })
     }
     /// Called only after the outcome and runtime have dropped and native owners
@@ -71,6 +79,7 @@ impl InstalledProfile {
         let words = std::array::from_fn(|i| observer.words_for_test()[i].load(Ordering::Acquire));
         let counts = observer.family_counts_for_test();
         let mut profile = decode(&words);
+        profile["scalar_counter_scope"] = scalar_counter_scope();
         profile["dice_family_counts"] = family_counts(counts);
         profile["observation_union_helpers"] =
             union_counts(self.union_before, observation_union_probe::snapshot());
@@ -78,8 +87,26 @@ impl InstalledProfile {
             self.path_before,
             slug_loading_v2::path_lookahead_probe_snapshot(),
         );
+        profile["toolchain_resolution_returns"] = toolchain_counts(
+            self.toolchain_before,
+            slug_analysis_v2::toolchain_resolution_probe_snapshot(),
+        );
+        profile["repository_package_child_needs"] = package_child_counts(
+            self.package_children_before,
+            slug_loading_v2::repository_package_child_probe_snapshot(),
+        );
         profile
     }
+}
+
+fn scalar_counter_scope() -> Value {
+    json!({
+        "process_wide":true,"request_isolated":false,"atomic_snapshot":false,
+        "per_cell_before_after":true,"reset_performed":false,
+        "arithmetic_deltas_are_not_request_totals":true,
+        "measures_time":false,"measures_allocation_count":false,
+        "retains_keys_labels_paths_epochs_or_needs":false,
+    })
 }
 
 fn union_counts(before: UnionSnapshot, after: UnionSnapshot) -> Value {
@@ -119,27 +146,25 @@ fn union_counts(before: UnionSnapshot, after: UnionSnapshot) -> Value {
         "metric_columns":observation_union_probe::METRIC_LABELS,"helpers":rows,
         "returned_helper_observations":true,"classes_overlap":true,
         "successful_no_new_keys_uses_union_cardinality":true,
-        "process_wide":true,"request_isolated":false,"atomic_snapshot":false,
-        "per_cell_before_after":true,"reset_performed":false,
-        "arithmetic_deltas_are_not_request_totals":true,
-        "measures_allocation_count":false,"measures_time":false,
-        "retains_keys_paths_or_epochs":false,
+        "scope_qualifications_from":"scalar_counter_scope",
     })
 }
 
-fn lookahead_counts(
-    before: PathLookaheadProbeSnapshot,
-    after: PathLookaheadProbeSnapshot,
-) -> Value {
+fn scalar_deltas<const N: usize>(
+    before: [u64; N],
+    after: [u64; N],
+    before_mask: u64,
+    after_mask: u64,
+) -> ([Option<u64>; N], u64, u64, u64) {
     let mut saturated = 0u64;
     let mut reversed = 0u64;
-    let overflow = before.overflow_mask | after.overflow_mask;
-    let delta: [Option<u64>; 4] = std::array::from_fn(|index| {
+    let overflow = before_mask | after_mask;
+    let delta = std::array::from_fn(|index| {
         let bit = 1 << index;
-        if before.counts[index] == u64::MAX || after.counts[index] == u64::MAX {
+        if before[index] == u64::MAX || after[index] == u64::MAX {
             saturated |= bit;
         }
-        let difference = after.counts[index].checked_sub(before.counts[index]);
+        let difference = after[index].checked_sub(before[index]);
         if difference.is_none() {
             reversed |= bit;
         }
@@ -149,6 +174,19 @@ fn lookahead_counts(
             None
         }
     });
+    (delta, saturated, reversed, overflow)
+}
+
+fn lookahead_counts(
+    before: PathLookaheadProbeSnapshot,
+    after: PathLookaheadProbeSnapshot,
+) -> Value {
+    let (delta, saturated, reversed, overflow) = scalar_deltas(
+        before.counts,
+        after.counts,
+        before.overflow_mask,
+        after.overflow_mask,
+    );
     json!({
         "metric_columns":["eligible_windows_started","window_rows_inspected",
             "path_extensions_accepted","new_unique_demands_added"],
@@ -157,22 +195,74 @@ fn lookahead_counts(
         "preexisting_overflow":before.overflow_mask!=0,"saturated_mask":saturated,
         "reversed_mask":reversed,"unknown_overflow_bits":overflow&!0xf,
         "all_counter_deltas_arithmetically_exact":overflow==0&&saturated==0&&reversed==0,
-        "process_wide":true,"request_isolated":false,"atomic_snapshot":false,
-        "reset_performed":false,"window_rows_include_complete_and_barrier_rows":true,
+        "scope_qualifications_from":"scalar_counter_scope",
+        "window_rows_include_complete_and_barrier_rows":true,
         "accepted_extensions_include_duplicate_only":true,
         "new_unique_demands_are_per_frontier_extension":true,
-        "measures_time_allocation_or_distinct_global_demands":false,
-        "retains_keys_paths_or_epochs":false,
+        "counts_distinct_global_demands":false,
+    })
+}
+
+fn toolchain_counts(
+    before: ToolchainResolutionProbeSnapshot,
+    after: ToolchainResolutionProbeSnapshot,
+) -> Value {
+    let (delta, saturated, reversed, overflow) = scalar_deltas(
+        before.counts,
+        after.counts,
+        before.overflow_mask,
+        after.overflow_mask,
+    );
+    json!({
+        "metric_columns":slug_analysis_v2::TOOLCHAIN_RESOLUTION_PROBE_LABELS,
+        "before_counts":before.counts,"after_counts":after.counts,"checked_delta":delta,
+        "before_overflow_mask":before.overflow_mask,"after_overflow_mask":after.overflow_mask,
+        "preexisting_overflow":before.overflow_mask!=0,"saturated_mask":saturated,
+        "reversed_mask":reversed,"unknown_overflow_bits":overflow&!0x1ffff,
+        "all_counter_deltas_arithmetically_exact":overflow==0&&saturated==0&&reversed==0,
+        "scope_qualifications_from":"scalar_counter_scope",
+        "records_selected_parent_need_return":true,
+        "nested_resolvers_count_independently":true,
+        "candidate_registration_need_coverage_excludes_later_platform_loop":true,
+        "entries_minus_needs_are_not_successes_or_cancellations":true,
+        "abandonment_before_return_is_not_counted_as_need":true,
+        "counts_distinct_keys":false,
+    })
+}
+
+fn package_child_counts(
+    before: RepositoryPackageChildProbeSnapshot,
+    after: RepositoryPackageChildProbeSnapshot,
+) -> Value {
+    let (delta, saturated, reversed, overflow) = scalar_deltas(
+        before.counts,
+        after.counts,
+        before.overflow_mask,
+        after.overflow_mask,
+    );
+    json!({
+        "metric_columns":slug_loading_v2::REPOSITORY_PACKAGE_CHILD_PROBE_LABELS,
+        "before_counts":before.counts,"after_counts":after.counts,"checked_delta":delta,
+        "before_overflow_mask":before.overflow_mask,"after_overflow_mask":after.overflow_mask,
+        "saturated_mask":saturated,"reversed_mask":reversed,
+        "unknown_overflow_bits":overflow&!0x1f,
+        "all_counter_deltas_arithmetically_exact":overflow==0&&saturated==0&&reversed==0,
+        "scope_qualifications_from":"scalar_counter_scope",
+        "entries_minus_needs_are_not_successes_or_cancellations":true,
+        "classifies_whole_singleton_path_need_only":true,
+        "other_includes_mixed_nonpath_and_nonsingleton_needs":true,
+        "new_unique_demands_are_per_frontier_extension":true,
+        "counts_distinct_global_demands":false,
+        "additions_are_not_confirmed_serviced":true,
     })
 }
 
 fn family_counts(snapshot: Snapshot) -> Value {
     json!({
         "event_columns":EVENT_LABELS,
-        "families":FAMILY_LABELS.iter().enumerate().map(|(index,label)|json!({
-            "family":label,"counts":snapshot.counts[index],
-            "overflow_mask":snapshot.overflow_masks[index],
-        })).collect::<Vec<_>>(),
+        "report_encoding":"columnar_families_v1",
+        "family_labels":FAMILY_LABELS,"counts":snapshot.counts,
+        "overflow_masks":snapshot.overflow_masks,
         "observed_per_cell_counts":true,
         "sampled_after_runtime_retirement_and_guard_disable":true,
         "disable_is_atomic_snapshot_barrier":false,
@@ -350,12 +440,17 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
         counts: [[u64::MAX; 6]; FAMILY_COUNT],
         overflow_masks: [u64::MAX; FAMILY_COUNT],
     });
-    let rows = counts["families"].as_array().unwrap();
+    let labels = counts["family_labels"].as_array().unwrap();
+    let rows = counts["counts"].as_array().unwrap();
+    let masks = counts["overflow_masks"].as_array().unwrap();
+    assert_eq!(counts["report_encoding"], "columnar_families_v1");
+    assert_eq!(labels.len(), FAMILY_COUNT);
     assert_eq!(rows.len(), FAMILY_COUNT);
-    for (index, row) in rows.iter().enumerate() {
-        assert_eq!(row["family"], FAMILY_LABELS[index]);
-        assert_eq!(row["counts"], serde_json::to_value([u64::MAX; 6]).unwrap());
-        assert_eq!(row["overflow_mask"], u64::MAX);
+    assert_eq!(masks.len(), FAMILY_COUNT);
+    for index in 0..FAMILY_COUNT {
+        assert_eq!(labels[index], FAMILY_LABELS[index]);
+        assert_eq!(rows[index], serde_json::to_value([u64::MAX; 6]).unwrap());
+        assert_eq!(masks[index], u64::MAX);
     }
     assert_eq!(counts["event_columns"], json!(EVENT_LABELS));
     assert_eq!(counts["disable_is_atomic_snapshot_barrier"], false);
@@ -379,6 +474,7 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
     words[0] = MAGIC;
     words[1] = 2;
     let mut profile = decode(&words);
+    profile["scalar_counter_scope"] = scalar_counter_scope();
     profile["dice_family_counts"] = counts;
     profile["observation_union_helpers"] = union_counts(
         UnionSnapshot {
@@ -400,6 +496,54 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
             overflow_mask: 0,
         },
     );
+    profile["toolchain_resolution_returns"] = toolchain_counts(
+        ToolchainResolutionProbeSnapshot {
+            counts: [10_000_000_000_000_000_000; 17],
+            overflow_mask: 0,
+        },
+        ToolchainResolutionProbeSnapshot {
+            counts: [u64::MAX - 1; 17],
+            overflow_mask: 0,
+        },
+    );
+    profile["repository_package_child_needs"] = package_child_counts(
+        RepositoryPackageChildProbeSnapshot {
+            counts: [10_000_000_000_000_000_000; 5],
+            overflow_mask: 0,
+        },
+        RepositoryPackageChildProbeSnapshot {
+            counts: [u64::MAX - 1; 5],
+            overflow_mask: 0,
+        },
+    );
+    for name in [
+        "observation_union_helpers",
+        "metadata_path_lookahead",
+        "toolchain_resolution_returns",
+        "repository_package_child_needs",
+    ] {
+        assert_eq!(
+            profile[name]["scope_qualifications_from"],
+            "scalar_counter_scope"
+        );
+    }
+    for field in [
+        "process_wide",
+        "per_cell_before_after",
+        "arithmetic_deltas_are_not_request_totals",
+    ] {
+        assert_eq!(profile["scalar_counter_scope"][field], true);
+    }
+    for field in [
+        "request_isolated",
+        "atomic_snapshot",
+        "reset_performed",
+        "measures_time",
+        "measures_allocation_count",
+        "retains_keys_labels_paths_epochs_or_needs",
+    ] {
+        assert_eq!(profile["scalar_counter_scope"][field], false);
+    }
     let timing = ProgressTiming {
         buckets: [Bucket {
             count: u64::MAX,
@@ -415,7 +559,11 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
     let combined = json!({"phase_profile":profile,"progress_wall":timing.summary()});
     // Long before/after cells and long exact deltas, with margin for the
     // mutually exclusive overflow form (which uses null deltas).
-    assert!(combined.to_string().len() + 1024 < REPORT_BYTES);
+    assert!(
+        combined.to_string().len() + 1024 < REPORT_BYTES,
+        "combined report={} bytes; fixed reservation={REPORT_BYTES}",
+        combined.to_string().len()
+    );
     let mut masked_profile = combined["phase_profile"].clone();
     masked_profile["observation_union_helpers"] = union_counts(
         UnionSnapshot {
@@ -437,8 +585,32 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
             overflow_mask: u64::MAX,
         },
     );
+    masked_profile["toolchain_resolution_returns"] = toolchain_counts(
+        ToolchainResolutionProbeSnapshot {
+            counts: [u64::MAX; 17],
+            overflow_mask: u64::MAX,
+        },
+        ToolchainResolutionProbeSnapshot {
+            counts: [u64::MAX; 17],
+            overflow_mask: u64::MAX,
+        },
+    );
+    masked_profile["repository_package_child_needs"] = package_child_counts(
+        RepositoryPackageChildProbeSnapshot {
+            counts: [u64::MAX; 5],
+            overflow_mask: u64::MAX,
+        },
+        RepositoryPackageChildProbeSnapshot {
+            counts: [u64::MAX; 5],
+            overflow_mask: u64::MAX,
+        },
+    );
     let masked = json!({"phase_profile":masked_profile,"progress_wall":timing.summary()});
-    assert!(masked.to_string().len() + 1024 < REPORT_BYTES);
+    assert!(
+        masked.to_string().len() + 1024 < REPORT_BYTES,
+        "masked report={} bytes; fixed reservation={REPORT_BYTES}",
+        masked.to_string().len()
+    );
 }
 
 #[test]
@@ -480,8 +652,9 @@ fn union_helper_deltas_qualify_max_overflow_and_reversal_without_raw_inputs() {
         );
     }
     assert_eq!(report["classes_overlap"], true);
-    assert_eq!(report["request_isolated"], false);
-    assert_eq!(report["atomic_snapshot"], false);
+    assert_eq!(report["scope_qualifications_from"], "scalar_counter_scope");
+    assert_eq!(scalar_counter_scope()["request_isolated"], false);
+    assert_eq!(scalar_counter_scope()["atomic_snapshot"], false);
     let clean = union_counts(
         UnionSnapshot {
             counts: [[0; 10]; 3],
@@ -526,9 +699,7 @@ fn metadata_path_probe_deltas_preserve_overflow_and_process_scope_qualifications
     assert_eq!(report["reversed_mask"], 2);
     assert_eq!(report["preexisting_overflow"], true);
     assert_eq!(report["all_counter_deltas_arithmetically_exact"], false);
-    assert_eq!(report["process_wide"], true);
-    assert_eq!(report["request_isolated"], false);
-    assert_eq!(report["atomic_snapshot"], false);
+    assert_eq!(report["scope_qualifications_from"], "scalar_counter_scope");
     let clean = lookahead_counts(
         PathLookaheadProbeSnapshot {
             counts: [0; 4],
@@ -542,6 +713,106 @@ fn metadata_path_probe_deltas_preserve_overflow_and_process_scope_qualifications
     assert_eq!(
         clean["checked_delta"],
         serde_json::to_value([1u64; 4]).unwrap()
+    );
+    assert_eq!(clean["all_counter_deltas_arithmetically_exact"], true);
+}
+
+#[test]
+fn toolchain_stage_probe_preserves_masks_and_return_only_qualifications() {
+    let mut before = ToolchainResolutionProbeSnapshot {
+        counts: [10; 17],
+        overflow_mask: 8,
+    };
+    let mut after = ToolchainResolutionProbeSnapshot {
+        counts: [15; 17],
+        overflow_mask: 1 << 63,
+    };
+    after.counts[1] = 9;
+    before.counts[2] = u64::MAX;
+    after.counts[2] = u64::MAX;
+    let report = toolchain_counts(before, after);
+    assert_eq!(report["checked_delta"][0], 5);
+    assert!(report["checked_delta"][1].is_null());
+    assert!(report["checked_delta"][2].is_null());
+    assert!(report["checked_delta"][3].is_null());
+    assert_eq!(report["checked_delta"][4], 5);
+    assert_eq!(report["saturated_mask"], 4);
+    assert_eq!(report["reversed_mask"], 2);
+    assert_eq!(report["unknown_overflow_bits"], 1u64 << 63);
+    assert_eq!(report["all_counter_deltas_arithmetically_exact"], false);
+    assert_eq!(report["metric_columns"].as_array().unwrap().len(), 17);
+    assert_eq!(report["scope_qualifications_from"], "scalar_counter_scope");
+    for field in [
+        "records_selected_parent_need_return",
+        "nested_resolvers_count_independently",
+        "candidate_registration_need_coverage_excludes_later_platform_loop",
+        "entries_minus_needs_are_not_successes_or_cancellations",
+        "abandonment_before_return_is_not_counted_as_need",
+    ] {
+        assert_eq!(report[field], true);
+    }
+    for field in ["counts_distinct_keys"] {
+        assert_eq!(report[field], false);
+    }
+    let clean = toolchain_counts(
+        ToolchainResolutionProbeSnapshot {
+            counts: [0; 17],
+            overflow_mask: 0,
+        },
+        ToolchainResolutionProbeSnapshot {
+            counts: [1; 17],
+            overflow_mask: 0,
+        },
+    );
+    assert_eq!(
+        clean["checked_delta"],
+        serde_json::to_value([1u64; 17]).unwrap()
+    );
+    assert_eq!(clean["all_counter_deltas_arithmetically_exact"], true);
+}
+
+#[test]
+fn package_child_probe_report_keeps_masks_and_whole_need_qualification() {
+    let report = package_child_counts(
+        RepositoryPackageChildProbeSnapshot {
+            counts: [10, 12, u64::MAX, 1, 5],
+            overflow_mask: 8,
+        },
+        RepositoryPackageChildProbeSnapshot {
+            counts: [15, 11, u64::MAX, 2, 8],
+            overflow_mask: 1 << 63,
+        },
+    );
+    assert_eq!(report["checked_delta"], json!([5, null, null, null, 3]));
+    assert_eq!(report["saturated_mask"], 4);
+    assert_eq!(report["reversed_mask"], 2);
+    assert_eq!(report["unknown_overflow_bits"], 1u64 << 63);
+    assert_eq!(report["all_counter_deltas_arithmetically_exact"], false);
+    assert_eq!(report["scope_qualifications_from"], "scalar_counter_scope");
+    assert_eq!(report["classifies_whole_singleton_path_need_only"], true);
+    assert_eq!(
+        report["other_includes_mixed_nonpath_and_nonsingleton_needs"],
+        true
+    );
+    assert_eq!(
+        report["new_unique_demands_are_per_frontier_extension"],
+        true
+    );
+    assert_eq!(report["counts_distinct_global_demands"], false);
+    assert_eq!(report["additions_are_not_confirmed_serviced"], true);
+    let clean = package_child_counts(
+        RepositoryPackageChildProbeSnapshot {
+            counts: [0; 5],
+            overflow_mask: 0,
+        },
+        RepositoryPackageChildProbeSnapshot {
+            counts: [1; 5],
+            overflow_mask: 0,
+        },
+    );
+    assert_eq!(
+        clean["checked_delta"],
+        serde_json::to_value([1u64; 5]).unwrap()
     );
     assert_eq!(clean["all_counter_deltas_arithmetically_exact"], true);
 }

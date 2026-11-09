@@ -31,6 +31,28 @@ impl ActivationTracker for ResolutionCompletionTracker {
     }
 }
 
+#[cfg(feature = "native-probe-observer")]
+fn assert_resolution_stage_advanced(
+    before: slug_analysis_v2::ToolchainResolutionProbeSnapshot,
+    stage: usize,
+) {
+    let after = slug_analysis_v2::toolchain_resolution_probe_snapshot();
+    // The collector is process-wide and is never reset. Other tests may add
+    // activity; assert only positive movement of the selected real query cells.
+    for index in [0, stage] {
+        assert!(
+            after.counts[index]
+                .checked_sub(before.counts[index])
+                .is_some_and(|delta| delta >= 1),
+            "resolution stage {index} did not advance"
+        );
+        assert_eq!(
+            (before.overflow_mask | after.overflow_mask) & (1 << index),
+            0
+        );
+    }
+}
+
 #[tokio::test]
 async fn required_toolchain_declaration_need_repairs_with_strict_closure_without_speculative_implementation()
  {
@@ -127,7 +149,11 @@ async fn required_toolchain_declaration_need_repairs_with_strict_closure_without
     let mut cold = builtin_fixture::prepare_generated_registrations(cold, &workspace, entries)
         .await
         .unwrap();
+    #[cfg(feature = "native-probe-observer")]
+    let stages = slug_analysis_v2::toolchain_resolution_probe_snapshot();
     let outcome = cold.compute(&key).await.unwrap();
+    #[cfg(feature = "native-probe-observer")]
+    assert_resolution_stage_advanced(stages, 7);
     assert!(!ConfiguredToolchainResolutionObservationKey::validity(
         &outcome
     ));
@@ -199,5 +225,113 @@ async fn required_toolchain_declaration_need_repairs_with_strict_closure_without
             .any(|node| node.node() == root.node())
     );
     drop(repaired);
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[cfg(feature = "native-probe-observer")]
+#[tokio::test]
+async fn resolution_stage_probe_observes_real_target_platform_need_and_repair() {
+    let workspace = scratch();
+    fs::create_dir(workspace.join("target")).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
+    fs::write(workspace.join("BUILD.bazel"), "").unwrap();
+    fs::write(
+        workspace.join("target/BUILD.bazel"),
+        "platform(name='platform')\n",
+    )
+    .unwrap();
+    let target = CanonicalLabel::parse("@@//target:platform").unwrap();
+    let configuration = ConfigurationKey::from_slug(
+        test_configuration()
+            .slug_configuration()
+            .unwrap()
+            .with_transition_target_platform(Some(&target))
+            .unwrap(),
+    );
+    let key = ConfiguredToolchainResolutionObservationKey::new(
+        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+        configuration,
+        Arc::from([]),
+    )
+    .unwrap();
+    let tracker = Arc::new(ResolutionCompletionTracker::default());
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let request_data = || {
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            cycle_detector: Some(analysis_cycle_detector()),
+            ..Default::default()
+        };
+        let host = builtin_fixture::RepositoryHostInputs::prepare(&workspace, &mut data);
+        (data, host)
+    };
+    let (data, host) = request_data();
+    let omitted = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new(workspace.join("target")).unwrap(),
+        PathObservationOperation::Lstat,
+    );
+    let full = root_epoch(&workspace);
+    assert!(full.get(&omitted).is_some());
+    let cold = PathObservationEpoch::from_shared(
+        full.observations()
+            .iter()
+            .filter(|(d, _)| *d != &omitted)
+            .map(|(d, r)| (d.dupe(), r.dupe())),
+    )
+    .unwrap();
+    let mut updater = dice.updater_with_data(data);
+    host.inject(&mut updater);
+    let entries = inject_root_target_inputs_with_entries(&mut updater, &workspace, cold, &[]);
+    let tx = updater.commit().await;
+    let mut cold = builtin_fixture::prepare_generated_registrations(tx, &workspace, entries)
+        .await
+        .unwrap();
+    let before = slug_analysis_v2::toolchain_resolution_probe_snapshot();
+    let outcome = cold.compute(&key).await.unwrap();
+    assert_resolution_stage_advanced(before, 1);
+    let AnalysisPreparationOutcome::Need(needs) = &outcome else {
+        panic!("missing target platform observation must suspend: {outcome:?}")
+    };
+    assert!(
+        needs
+            .path_observations()
+            .unwrap()
+            .demands()
+            .contains(&omitted)
+    );
+    assert!(!ConfiguredToolchainResolutionObservationKey::validity(
+        &outcome
+    ));
+    drop(cold);
+
+    let (data, host) = request_data();
+    let mut updater = dice.updater_with_data(data);
+    host.inject(&mut updater);
+    let entries = inject_root_target_inputs_with_entries(
+        &mut updater,
+        &workspace,
+        root_epoch(&workspace),
+        &[],
+    );
+    let tx = updater.commit().await;
+    let mut repaired = builtin_fixture::prepare_generated_registrations(tx, &workspace, entries)
+        .await
+        .unwrap();
+    let outcome = repaired.compute(&key).await.unwrap();
+    let AnalysisPreparationOutcome::Complete(Ok(result)) = outcome else {
+        panic!("target platform repair must complete")
+    };
+    let resolution = result.as_ref().as_ref().unwrap();
+    assert_eq!(resolution.target_platform().actual().label(), &target);
+    assert!(resolution.rows().is_empty());
+    let (root, transient) = tracker.completed.lock().unwrap().last().copied().unwrap();
+    assert!(!transient);
+    let closure = repaired.activation_closure([root.node()]).await.unwrap();
+    assert_eq!(closure.version(), repaired.version());
+    assert_eq!(closure.roots(), &[root.node()]);
+    drop(repaired);
+    dice.wait_for_idle().await;
+    drop(dice);
     fs::remove_dir_all(workspace).unwrap();
 }

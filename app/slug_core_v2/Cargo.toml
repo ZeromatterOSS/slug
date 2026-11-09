@@ -8,7 +8,10 @@ version = "0.1.0"
 
 [features]
 default = []
-native-probe-observer = ["slug_loading_v2/native-probe-observer"]
+native-probe-observer = [
+    "slug_analysis_v2/native-probe-observer",
+    "slug_loading_v2/native-probe-observer",
+]
 # Closed callback-counter instrumentation; absent from ordinary builds.
 resource-set-test-support = []
 # Trusted original-repository integration probes; absent from ordinary builds.

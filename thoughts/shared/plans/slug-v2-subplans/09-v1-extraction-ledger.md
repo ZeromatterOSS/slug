@@ -92,6 +92,21 @@ caps and completed-command memory acceptance; the
 [lookahead receipt](wp1225-metadata-lookahead-acceptance-2026-11-08.json) records
 actual row/owner and bounded original-command evidence.
 
+Package BUILD-import discovery shares the existing ordered Lstat collector and
+checked forecast with registration rows. A crate-private outcome adapter moves
+whole Needs and preserves other outcomes; it supplies no admission knobs.
+Existing observation Arcs and frozen child modules stay attempt scratch, with
+pending Need returned before parent evaluation/publication and fresh ordered
+retry. No new semantic key/cache/interner, donor or mutable authority appears.
+Feature-only fixed 144-byte stage and 48-byte package counters record returned
+Needs and per-frontier additions without retaining input values. Report scope
+qualifications are shared once and family data uses aligned columns, keeping
+all values within the existing report ceiling. Extra speculative child work and
+possible earlier resource/time refusal are Slug-native scheduling behavior, not
+completed-command latency/RSS acceptance; see the
+[package-child receipt](wp1225-package-child-lookahead-acceptance-2026-11-08.json)
+for actual owner/closure, bounded resource and original-workload evidence.
+
 Owned-file observation verification borrows a closed carrier from the actual
 sealed native owner and reuses RootIo's nofollow stream, byte comparison and
 actual SHA-256. Only complete direct File bodies may select this class; Source

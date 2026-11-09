@@ -1423,6 +1423,85 @@ retain 51 roots/103 records and reach WorkDeadline. This closes the bounded
 registration-discovery behavior, without a claim of less total work, deeper progress,
 latency or RSS improvement, or command completion.
 
+### Configured toolchain prerequisite attribution
+
+Before selecting another graph change, count the actual parent resolver's
+returned Need by thirteen fixed stages: target platform, execution-only/full
+registrations, candidate platforms, requested constraints, preferred platform,
+initial package closure, required types, declaration targets, actual-declaration
+package closure, declaration types, target settings and declaration constraints.
+The candidate-platform marker follows the existing outer-error/Need/semantic
+fold; three macro-return sites bind the existing outcome once before marking
+and preserve the original return. No child evaluation, Need iteration or union
+is introduced. Abandoned futures are not recorded as returned Needs.
+
+The existing feature-only Core report samples seventeen fixed Analysis counters
+and one overflow mask, totaling 144 bytes. The first fourteen are resolver entry
+and the thirteen selected Need stages. Three appended cells record caller-side
+candidate preparation entry and its full/execution-only registration Need exits.
+That caller-side stage follows the joined resolver outcome fold in the inspected
+node block; it is not a universal pre-resolver stage. Its later platform loop
+may also return Need and is outside the three-cell extension.
+No keys, labels, paths, Need values, clocks or callbacks are retained. Counts are
+process-wide, non-atomic and not request-isolated; nested resolvers count
+independently. Entry minus Need counts is neither success nor cancellation.
+Keep null deltas on overflow, MAX or reversal and preserve the 16 KiB report
+reservation and 512 KiB combined ceiling. Actual owner tests must distinguish
+stages before the original Rust workload chooses the next causal discriminator.
+A reached stage establishes provenance, not cost or an optimization decision.
+Instrumentation remains coupled to the subsequently selected semantic proof.
+
+A separate 48-byte feature-only package BUILD-child collector counts entries
+and the actual returned whole singleton-Lstat, singleton-FileBytes or other
+Need, plus added unique demands per discovery-frontier extension. The added
+demand counter is neither globally distinct nor confirmed serviced. It borrows
+the exhaustive channel classifier and checks length/first
+operation only, with no Need iteration or retained input. Mixed, nonpath and
+nonsingleton Needs remain in Other; this does not select content discovery.
+Actual inventory A/B withheld facts and original-owner reachability must precede
+any sibling-discovery policy change. Parent evaluation/publication is distinct
+from legitimate transient child capture.
+
+Select the same bounded Lstat discovery policy for repository package BUILD
+imports. One shared crate-private collector/forecast owns the existing 32-row,
+32-unique-demand, 4096-path-byte and 64 KiB frontier/control bounds. Its generic
+outcome adapter only extracts/rebuilds a whole Need; every non-Need outcome
+remains unchanged. Callers supply no admission or eligibility knobs. Optional
+feature hooks identify counters only and cannot change scheduling.
+
+Each package import row observes route and child completion once. Retain the
+existing immutable observation carrier for the next row when an earlier Need
+is pending, and update module/observation scratch only on Complete children.
+Finish a pending Need before package evaluation or parent event publication;
+retry starts from the original ordered imports. Load-label prevalidation remains
+immediate. FileBytes and all other non-Lstat/mixed/nonpath Needs are whole
+barriers, as are later semantic/outer/cycle errors. First ineligible Needs are
+returned unchanged; later barriers return only prior pending paths. Preserve
+current registration behavior while extracting its shared policy. Extra child
+DICE work and earlier dynamic bank/time refusal retain the explicit Slug-native
+admission qualification; no native cap, poison handling or source authority
+changes. Acceptance requires actual inventory RED/GREEN, barrier/closure/cycle/
+cancellation/repair proof and nonzero original-workload added demands at this
+owner, followed by protected native and warm-original gates.
+
+The report stores identical global sidecar qualifications once in
+`scalar_counter_scope`, with explicit references from each sidecar. Observer
+callback/lifecycle qualifications remain separate. DICE family labels, six event
+counts and overflow masks use three index-aligned arrays, preserving every
+scalar without repeated per-row field names. Both long exact deltas and full
+MAX/overflow forms must fit the unchanged 16 KiB reservation with the existing
+1024-byte test margin. No report ceiling or native admission cap increases.
+
+The [package-child receipt](wp1225-package-child-lookahead-acceptance-2026-11-08.json)
+records reached full-registration preparation, actual package-owner Lstat Needs,
+A-only/A+B RED→GREEN and one-round returned-facts recovery. All 106 ordinary
+checks, four protected native guards and four warm original compiler commands
+pass. Each original candidate adds six demands across frontiers; all ABBA runs
+stop at WorkDeadline with variable 49/98 versus final control 50/99 epochs. Final
+candidate RootCompute totals include an aborted interval. Neither these counts
+nor operational peaks establish reduced total work, speed, deeper progress,
+completion, activation or equivalent-command memory fit.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

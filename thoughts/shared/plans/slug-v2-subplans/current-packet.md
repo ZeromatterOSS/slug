@@ -3,23 +3,30 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: attribute the remaining prerequisite serialization in original
+Current delta: bounded package BUILD-import prerequisite discovery in original
 `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
-[Ordered Lstat lookahead](wp1225-metadata-lookahead-acceptance-2026-11-08.json)
-now joins bounded whole metadata Needs in actual module/command registration
-rows. The causal A/B regression is RED→GREEN; 66 ordinary tests, four native
-guards and four original warm compiler commands pass. Both bounded candidates
-add 18 demands across frontier extensions, with 235 accepted extensions including
-duplicates. Extra speculative child computations are observed. All ABBA runs
-last record 51 roots/103 records and stop at the unchanged WorkDeadline; no
-reduction in total work, deeper frontier, command-latency or RSS claim is made.
-The [selected scheduling contract](wp1225-general-repository-workspace-design.md#ordered-metadata-prerequisite-discovery)
-is Slug-native: extra bounded metadata may encounter earlier dynamic bank or
-time refusal. Core authority and caps stay unchanged; mixed/non-Lstat/nonpath
-Needs and errors remain whole ordered barriers. Next discriminate remaining
-configured-toolchain registration/declaration prerequisites before selecting
-another discovery family. Archive reservation batching, clock/cap increases,
-Need cacheability and caller pruning remain unselected.
+[Package-child lookahead](wp1225-package-child-lookahead-acceptance-2026-11-08.json)
+now shares the existing bounded Lstat policy with registration rows. The actual
+inventory A-only/A+B discriminator is RED→GREEN and completes after servicing
+only the returned facts in one round. All 106 ordinary tests, four native guards
+and four original warm compiler commands pass. Both original candidates add six
+demands across package frontiers; these are neither globally distinct nor
+confirmed serviced by that counter. All runs stop at the unchanged WorkDeadline
+with variable prefixes (49 roots/98 records, final control 50/99). RootCompute
+counts include final aborted candidate intervals. No reduction in total work,
+speed, deeper progress, completion, RSS or activation is established.
+The [selected contract](wp1225-general-repository-workspace-design.md#configured-toolchain-prerequisite-attribution)
+keeps first ineligible Needs unchanged, later barriers behind pending paths,
+load-label prevalidation immediate and terminal event closure authoritative.
+The shared 32-row/32-demand/4096-path-byte/64 KiB construction bound covers the
+frontier, not all speculative child values. Extra work may cause earlier bank
+or time refusal under unchanged caps. Attribution reached full registration
+preparation, not declaration/type resolution; do not select downstream batching
+on that evidence. Next discriminate remaining registration I/O. Content and
+Archive discovery need their own producer/byte/admission decisions; no clock/cap
+increase, Need cacheability or caller pruning is selected.
+The [prior registration component](wp1225-metadata-lookahead-acceptance-2026-11-08.json)
+retains its behavior and four diagnostic counters after shared-policy extraction.
 The [validated observation union](wp1225-observation-union-acceptance-2026-11-08.json)
 retains full facts and left key/result custody across three Loading helpers;
 its bounded map-reuse evidence remains separate from command performance.

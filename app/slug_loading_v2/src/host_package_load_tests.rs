@@ -416,6 +416,7 @@ fn package_policy_with_deleted(deleted: &[&str]) -> RootPackagePolicyInputs {
 #[derive(Debug, Clone)]
 struct TrackedBatch {
     key: String,
+    node: dice::DiceNodeId,
     kind: ActivationKind,
     batch: Option<EventBatch>,
 }
@@ -526,6 +527,7 @@ impl ActivationTracker for EventTracker {
         }
         self.batches.lock().unwrap().push(TrackedBatch {
             key: name,
+            node: activation.node(),
             kind: activation.kind(),
             batch: activation
                 .evaluation_data()
@@ -37863,17 +37865,34 @@ async fn observed_repository_package_load_child_terminals_keep_prefixes() {
     let package = PackagePath::parse("").unwrap();
     let tracker = Arc::new(EventTracker::default());
     let children = ["first.bzl", "middle.bzl", "last.bzl"];
-    for (case, semantic) in (0..3).flat_map(|position| [(position, false), (position, true)]) {
+    for (case, semantic, missing_bytes) in (0..3).flat_map(|position| {
+        [
+            (position, false, false),
+            (position, true, false),
+            (position, false, true),
+        ]
+    }) {
         let mut files = vec![("BUILD.bazel", BUILD)];
         files.extend(
             children
                 .iter()
                 .enumerate()
-                .filter(|(position, _)| *position != case)
+                .filter(|(position, _)| missing_bytes || *position != case)
                 .map(|(_, name)| (*name, CHILD)),
         );
         let mut epoch =
             EpochBuilder::external_sources(&files, 150 + case as i64 * 2 + semantic as i64);
+        if missing_bytes {
+            assert!(
+                epoch
+                    .entries
+                    .shift_remove(&EpochBuilder::demand(
+                        &format!("/workspace/dep/{}", children[case]),
+                        PathObservationOperation::FileBytes,
+                    ))
+                    .is_some()
+            );
+        }
         if semantic {
             epoch.missing(&format!("/workspace/dep/{}", children[case]));
         }
@@ -37904,7 +37923,9 @@ async fn observed_repository_package_load_child_terminals_keep_prefixes() {
                 batches.iter().any(|entry| {
                     entry.key == format!("observed-external-bzl-module:@@dep+//:{name}")
                 }),
-                position <= case
+                // Eligible Lstat holes may inspect later complete children.
+                // Semantic errors and FileBytes Needs remain serial barriers.
+                (!semantic && !missing_bytes) || position <= case
             );
         }
         assert!(
@@ -38882,6 +38903,8 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
         &invalid_value
     ));
 
+    const TWO_LOADS: &[u8] =
+        b"load(\":first.bzl\", \"FIRST\")\nload(\":second.bzl\", \"SECOND\")\n";
     let sequential_tracker = Arc::new(EventTracker::default());
     let mut sequential_need = transaction(
         &dice,
@@ -38912,8 +38935,55 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
         sequential_need,
         LoadingPreparationOutcome::Need(_)
     ));
+    // A whole Lstat Need admits bounded sibling discovery, including the
+    // legacy projection. The missing first row still prevents evaluation.
     assert!(
         sequential_tracker
+            .take()
+            .iter()
+            .any(|entry| entry.key == "external-bzl-module:@@dep+//:second.bzl")
+    );
+
+    // FileBytes is outside that metadata class and remains a serial barrier.
+    let bytes_tracker = Arc::new(EventTracker::default());
+    let mut bytes_epoch = EpochBuilder::external_sources(
+        &[
+            ("BUILD.bazel", TWO_LOADS),
+            ("first.bzl", b"FIRST = 1\n"),
+            ("second.bzl", b"SECOND = 2\n"),
+        ],
+        712,
+    );
+    let bytes_demand = EpochBuilder::demand(
+        "/workspace/dep/first.bzl",
+        PathObservationOperation::FileBytes,
+    );
+    assert!(bytes_epoch.entries.shift_remove(&bytes_demand).is_some());
+    let mut bytes_tx = transaction(
+        &dice,
+        bytes_epoch.build(),
+        false,
+        Some(bytes_tracker.dupe()),
+    )
+    .await;
+    let route = external_route(&mut bytes_tx).await;
+    let value = bytes_tx
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Need(actual) = &value else {
+        panic!("legacy byte acquisition must suspend: {value:?}")
+    };
+    assert_eq!(
+        actual.path_observations().unwrap().demands(),
+        &[bytes_demand]
+    );
+    assert!(!RepositoryPackageLoadKey::validity(&value));
+    assert!(
+        bytes_tracker
             .take()
             .iter()
             .all(|entry| entry.key != "external-bzl-module:@@dep+//:second.bzl")
@@ -39508,6 +39578,9 @@ mod filegroup_data_tests;
 
 #[path = "host_package_load_tests/external_bzl_frontier_tests.rs"]
 mod external_bzl_frontier_tests;
+
+#[path = "host_package_load_tests/package_load_frontier_tests.rs"]
+mod package_load_frontier_tests;
 
 fn package_relative_materialized_epoch(
     build: &str,

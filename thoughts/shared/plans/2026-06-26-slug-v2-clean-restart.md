@@ -92,9 +92,14 @@ now batches whole bounded Lstat Needs with ordered barriers and complete retry
 proof. Both stopped original candidates add 18 demands across frontier
 extensions, with additional speculative child work; all runs retain the same
 last recorded epoch and deadline. This Slug-native scheduling/admission policy
-establishes neither reduction in total work nor deeper progress. Further
-prerequisite attribution, Rust archive extraction, completion, command latency
-and RSS acceptance remain open.
+establishes neither reduction in total work nor deeper progress. The
+[package-import component](./slug-v2-subplans/wp1225-package-child-lookahead-acceptance-2026-11-08.json)
+now reuses that exact policy beneath registration inventory, with actual A/B
+one-round recovery and six per-frontier additions in each original candidate.
+Attribution reaches registration preparation rather than later declaration
+resolution. Variable stopped prefixes and final aborted candidate intervals
+prove no overall performance or deeper frontier. Remaining registration I/O,
+Rust archive extraction, completion, command latency and RSS gates remain open.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

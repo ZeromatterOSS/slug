@@ -76,6 +76,12 @@ pub use dice::ObservedSourcePath;
 pub use dice::RegistrationAnalysisError;
 #[doc(hidden)]
 pub use dice::SourceFileContent;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use dice::TOOLCHAIN_RESOLUTION_PROBE_LABELS;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use dice::ToolchainResolutionProbeSnapshot;
 pub use dice::prepare_configured_node_analysis;
 #[doc(hidden)]
 pub use dice::prepare_configured_node_analysis_observed;
@@ -85,6 +91,9 @@ pub use dice::resolve_catalog_source_input_observed;
 pub use dice::resolve_source_file_input_observed;
 #[doc(hidden)]
 pub use dice::resolve_source_input_observed;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use dice::toolchain_resolution_probe_snapshot;
 pub use exec_group::ConfiguredExecGroup;
 pub use execution_groups::ConfiguredExecGroupCollection;
 pub use execution_groups::ConfiguredExecGroupRow;

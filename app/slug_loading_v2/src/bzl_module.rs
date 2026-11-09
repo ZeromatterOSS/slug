@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+#[cfg(feature = "native-probe-observer")]
+mod repository_package_child_probe;
 use std::cell::RefCell;
 use std::ffi::OsString;
 use std::fmt;
@@ -30,6 +32,12 @@ use dice::DiceTransaction;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+#[cfg(feature = "native-probe-observer")]
+pub use repository_package_child_probe::REPOSITORY_PACKAGE_CHILD_PROBE_LABELS;
+#[cfg(feature = "native-probe-observer")]
+pub use repository_package_child_probe::RepositoryPackageChildProbeSnapshot;
+#[cfg(feature = "native-probe-observer")]
+pub use repository_package_child_probe::repository_package_child_probe_snapshot;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_build_api_v2::RunfilesRepositoryMapping;
@@ -6789,6 +6797,36 @@ enum RepositoryPackageChildLoad {
     Canonical(String),
 }
 
+struct RepositoryPackageChildBreak(RepositoryPackageInventoryDriverOutcome);
+
+impl crate::path_need_lookahead::PathNeedBreak for RepositoryPackageChildBreak {
+    fn into_need(self) -> Result<SourcePreparationNeeds, Self> {
+        match self.0 {
+            SourcePreparationOutcome::Need(need) => Ok(need),
+            other => Err(Self(other)),
+        }
+    }
+
+    fn from_need(need: SourcePreparationNeeds) -> Self {
+        Self(SourcePreparationOutcome::Need(need))
+    }
+
+    #[cfg(feature = "native-probe-observer")]
+    fn lookahead_extended(added: usize) {
+        repository_package_child_probe::lookahead_extended(added);
+    }
+}
+
+fn repository_package_child_stop(
+    stop: RepositoryPackageChildBreak,
+) -> RepositoryPackageInventoryDriverOutcome {
+    #[cfg(feature = "native-probe-observer")]
+    if let SourcePreparationOutcome::Need(need) = &stop.0 {
+        repository_package_child_probe::returned_need(need);
+    }
+    stop.0
+}
+
 async fn compute_repository_package_children(
     ctx: &mut DiceComputations<'_>,
     key: &RepositoryPackageInventoryKey,
@@ -6801,56 +6839,79 @@ async fn compute_repository_package_children(
     RepositoryPackageInventoryDriverOutcome,
     (Vec<(String, FrozenBzlModule)>, PathObservationEpoch),
 > {
+    #[cfg(feature = "native-probe-observer")]
+    repository_package_child_probe::entered();
     let mut loaded_modules = Vec::with_capacity(loads.len());
+    let mut lookahead = crate::path_need_lookahead::PathLookahead::new();
     for load in loads {
-        let (raw_load, resolved, incoming) = match load {
-            RepositoryPackageChildLoad::Resolved(raw_load, resolved) => {
-                (raw_load, resolved, observations)
-            }
-            RepositoryPackageChildLoad::Canonical(raw_load) => {
-                let external_mode = match mode {
-                    RepositoryPackageInventoryMode::Legacy => ExternalBzlModuleMode::Legacy,
-                    RepositoryPackageInventoryMode::Observed => ExternalBzlModuleMode::Observed,
-                };
-                match resolve_external_bzl_child_route(
-                    ctx,
-                    &key.route,
-                    &key.package,
-                    source_label.clone(),
-                    external_mode,
-                    &raw_load,
-                    observations,
-                )
-                .await
-                {
-                    ControlFlow::Continue((resolved, incoming)) => (raw_load, resolved, incoming),
-                    ControlFlow::Break(outcome) => {
-                        return ControlFlow::Break(project_repository_load_resolution_error(
-                            outcome,
-                            build_origin,
-                            &raw_load,
-                            source_label,
-                        ));
+        if !lookahead.can_inspect_next() {
+            break;
+        }
+        // Each source-order row includes both route resolution and module
+        // loading. Only a complete row updates evaluator scratch; a pending
+        // metadata frontier keeps the prior observation prefix intact.
+        let result = async {
+            let (raw_load, resolved, incoming) = match load {
+                RepositoryPackageChildLoad::Resolved(raw_load, resolved) => {
+                    (raw_load, resolved, observations.dupe())
+                }
+                RepositoryPackageChildLoad::Canonical(raw_load) => {
+                    let external_mode = match mode {
+                        RepositoryPackageInventoryMode::Legacy => ExternalBzlModuleMode::Legacy,
+                        RepositoryPackageInventoryMode::Observed => ExternalBzlModuleMode::Observed,
+                    };
+                    match resolve_external_bzl_child_route(
+                        ctx,
+                        &key.route,
+                        &key.package,
+                        source_label.clone(),
+                        external_mode,
+                        &raw_load,
+                        observations.dupe(),
+                    )
+                    .await
+                    {
+                        ControlFlow::Continue((resolved, incoming)) => {
+                            (raw_load, resolved, incoming)
+                        }
+                        ControlFlow::Break(outcome) => {
+                            return Err(RepositoryPackageChildBreak(
+                                project_repository_load_resolution_error(
+                                    outcome,
+                                    build_origin,
+                                    &raw_load,
+                                    source_label.clone(),
+                                ),
+                            ));
+                        }
                     }
                 }
+            };
+            match compute_repository_package_child(
+                ctx,
+                mode,
+                resolved,
+                &raw_load,
+                build_origin,
+                incoming,
+            )
+            .await
+            {
+                ControlFlow::Continue((module, incoming)) => {
+                    observations = incoming;
+                    loaded_modules.push((raw_load, module));
+                    Ok(())
+                }
+                ControlFlow::Break(outcome) => Err(RepositoryPackageChildBreak(outcome)),
             }
-        };
-        match compute_repository_package_child(
-            ctx,
-            mode,
-            resolved,
-            &raw_load,
-            build_origin,
-            incoming,
-        )
-        .await
-        {
-            ControlFlow::Continue((module, incoming)) => {
-                observations = incoming;
-                loaded_modules.push((raw_load, module));
-            }
-            ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
         }
+        .await;
+        if let ControlFlow::Break(stop) = lookahead.observe(result) {
+            return ControlFlow::Break(repository_package_child_stop(stop));
+        }
+    }
+    if let Err(stop) = lookahead.finish::<RepositoryPackageChildBreak>() {
+        return ControlFlow::Break(repository_package_child_stop(stop));
     }
     ControlFlow::Continue((loaded_modules, observations))
 }

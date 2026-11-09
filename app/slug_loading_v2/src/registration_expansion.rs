@@ -57,7 +57,6 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 mod path_lookahead;
-use path_lookahead::PathLookahead;
 #[cfg(feature = "native-probe-observer")]
 pub use path_lookahead::PathLookaheadProbeSnapshot;
 #[cfg(feature = "native-probe-observer")]
@@ -83,6 +82,7 @@ use crate::RootSubtreePackageSetObservationKey;
 use crate::bzl_module::RepositoryPackageInventoryKey;
 use crate::bzl_module::RepositoryPackageInventoryObservationKey;
 use crate::package::NativeToolchainTarget;
+use crate::path_need_lookahead::PathLookahead;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 pub enum ModuleRegistrationFamily {

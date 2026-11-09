@@ -122,10 +122,18 @@ use crate::subrule::configured_dependency_rows;
 use crate::subrule::validate_configured_dependency;
 
 mod source_file;
+#[cfg(feature = "native-probe-observer")]
+mod toolchain_resolution_probe;
 pub use source_file::ObservedCatalogSourceFile;
 pub use source_file::ObservedSourcePath;
 pub use source_file::resolve_catalog_source_input_observed;
 pub use source_file::resolve_source_input_observed;
+#[cfg(feature = "native-probe-observer")]
+pub use toolchain_resolution_probe::TOOLCHAIN_RESOLUTION_PROBE_LABELS;
+#[cfg(feature = "native-probe-observer")]
+pub use toolchain_resolution_probe::ToolchainResolutionProbeSnapshot;
+#[cfg(feature = "native-probe-observer")]
+pub use toolchain_resolution_probe::toolchain_resolution_probe_snapshot;
 
 mod registration_error;
 pub use registration_error::RegistrationAnalysisError;
@@ -4152,6 +4160,8 @@ async fn configured_candidate_execution_platforms(
     has_requirements: bool,
     has_local_declarations: bool,
 ) -> AnalysisSemanticOutcome<Vec<ConfiguredTargetKey>> {
+    #[cfg(feature = "native-probe-observer")]
+    toolchain_resolution_probe::candidate_preparation_entered();
     let labels = if has_requirements || has_local_declarations {
         match prepare_registrations(
             ctx,
@@ -4163,7 +4173,13 @@ async fn configured_candidate_execution_platforms(
         )
         .await
         {
-            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Need(need) => {
+                #[cfg(feature = "native-probe-observer")]
+                toolchain_resolution_probe::returned_need(
+                    toolchain_resolution_probe::NeedStage::CandidateFullRegistrations,
+                );
+                return LoadingPreparationOutcome::Need(need);
+            }
             LoadingPreparationOutcome::Complete(Err(error)) => {
                 return LoadingPreparationOutcome::Complete(Err(error));
             }
@@ -4175,7 +4191,13 @@ async fn configured_candidate_execution_platforms(
         }
     } else {
         match prepare_execution_platform_registrations(ctx, mode, workspace, configuration).await {
-            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Need(need) => {
+                #[cfg(feature = "native-probe-observer")]
+                toolchain_resolution_probe::returned_need(
+                    toolchain_resolution_probe::NeedStage::CandidateExecutionOnlyRegistrations,
+                );
+                return LoadingPreparationOutcome::Need(need);
+            }
             LoadingPreparationOutcome::Complete(Err(error)) => {
                 return LoadingPreparationOutcome::Complete(Err(error));
             }
@@ -4298,11 +4320,37 @@ async fn compute_configured_toolchain_resolution(
     mode: ConfiguredAnalysisMode,
     key: &ConfiguredToolchainResolutionKey,
 ) -> AnalysisSemanticOutcome<Arc<ConfiguredToolchainResolution>> {
+    #[cfg(feature = "native-probe-observer")]
+    toolchain_resolution_probe::entered();
+    macro_rules! toolchain_value {
+        ($stage:ident, $outcome:expr) => {{
+            #[cfg(feature = "native-probe-observer")]
+            {
+                let outcome = $outcome;
+                if matches!(&outcome, LoadingPreparationOutcome::Need(_)) {
+                    toolchain_resolution_probe::returned_need(
+                        toolchain_resolution_probe::NeedStage::$stage,
+                    );
+                }
+                analysis_value!(outcome)
+            }
+            #[cfg(not(feature = "native-probe-observer"))]
+            {
+                analysis_value!($outcome)
+            }
+        }};
+    }
     let target_platform_key =
         ConfiguredTargetPlatformKey::new(key.workspace.dupe(), key.configuration.clone())
             .expect("resolution key validates a structural analysis configuration");
     let target_platform = match ctx.compute(&target_platform_key).await {
-        Ok(LoadingPreparationOutcome::Need(need)) => return LoadingPreparationOutcome::Need(need),
+        Ok(LoadingPreparationOutcome::Need(need)) => {
+            #[cfg(feature = "native-probe-observer")]
+            toolchain_resolution_probe::returned_need(
+                toolchain_resolution_probe::NeedStage::TargetPlatform,
+            );
+            return LoadingPreparationOutcome::Need(need);
+        }
         Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
             return LoadingPreparationOutcome::Complete(Err(error));
         }
@@ -4326,7 +4374,13 @@ async fn compute_configured_toolchain_resolution(
         )
         .await
         {
-            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Need(need) => {
+                #[cfg(feature = "native-probe-observer")]
+                toolchain_resolution_probe::returned_need(
+                    toolchain_resolution_probe::NeedStage::ExecutionPlatformRegistrations,
+                );
+                return LoadingPreparationOutcome::Need(need);
+            }
             LoadingPreparationOutcome::Complete(Err(error)) => {
                 return LoadingPreparationOutcome::Complete(Err(error));
             }
@@ -4339,7 +4393,13 @@ async fn compute_configured_toolchain_resolution(
         match prepare_registrations(ctx, mode, &key.workspace, &key.configuration, true, false)
             .await
         {
-            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Need(need) => {
+                #[cfg(feature = "native-probe-observer")]
+                toolchain_resolution_probe::returned_need(
+                    toolchain_resolution_probe::NeedStage::FullRegistrations,
+                );
+                return LoadingPreparationOutcome::Need(need);
+            }
             LoadingPreparationOutcome::Complete(Err(error)) => {
                 return LoadingPreparationOutcome::Complete(Err(error));
             }
@@ -4438,6 +4498,10 @@ async fn compute_configured_toolchain_resolution(
         return LoadingPreparationOutcome::Complete(Err(error));
     }
     if let Some(need) = need {
+        #[cfg(feature = "native-probe-observer")]
+        toolchain_resolution_probe::returned_need(
+            toolchain_resolution_probe::NeedStage::CandidatePlatforms,
+        );
         return LoadingPreparationOutcome::Need(need);
     }
     if let Some(error) = semantic {
@@ -4453,7 +4517,13 @@ async fn compute_configured_toolchain_resolution(
     )
     .await
     {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Need(need) => {
+            #[cfg(feature = "native-probe-observer")]
+            toolchain_resolution_probe::returned_need(
+                toolchain_resolution_probe::NeedStage::RequestedConstraints,
+            );
+            return LoadingPreparationOutcome::Need(need);
+        }
         LoadingPreparationOutcome::Complete(Err(error)) => {
             return LoadingPreparationOutcome::Complete(Err(error));
         }
@@ -4495,6 +4565,10 @@ async fn compute_configured_toolchain_resolution(
                 .await
                 {
                     LoadingPreparationOutcome::Need(need) => {
+                        #[cfg(feature = "native-probe-observer")]
+                        toolchain_resolution_probe::returned_need(
+                            toolchain_resolution_probe::NeedStage::PreferredPlatform,
+                        );
                         return LoadingPreparationOutcome::Need(need);
                     }
                     LoadingPreparationOutcome::Complete(Err(error)) => {
@@ -4557,7 +4631,13 @@ async fn compute_configured_toolchain_resolution(
     );
     let _packages =
         match load_configured_native_packages(ctx, mode, &key.workspace, &mut labels).await {
-            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Need(need) => {
+                #[cfg(feature = "native-probe-observer")]
+                toolchain_resolution_probe::returned_need(
+                    toolchain_resolution_probe::NeedStage::InitialPackageClosure,
+                );
+                return LoadingPreparationOutcome::Need(need);
+            }
             LoadingPreparationOutcome::Complete(Err(error)) => {
                 return LoadingPreparationOutcome::Complete(Err(error));
             }
@@ -4570,8 +4650,10 @@ async fn compute_configured_toolchain_resolution(
     for requirement in key.requirements.iter() {
         let requested =
             ConfiguredTargetKey::new(requirement.label().clone(), key.configuration.clone());
-        let (actual, value) =
-            analysis_value!(actual_toolchain_target(ctx, &key.workspace, requested.clone()).await);
+        let (actual, value) = toolchain_value!(
+            RequiredTypes,
+            actual_toolchain_target(ctx, &key.workspace, requested.clone()).await
+        );
         if value.kind() != &ConfiguredNodeKind::ToolchainType {
             return analysis_semantic_complete(Err(AnalysisError::message(format!(
                 "required toolchain type is not toolchain_type: {}",
@@ -4583,8 +4665,10 @@ async fn compute_configured_toolchain_resolution(
     let mut declarations = Vec::with_capacity(registrations.1.len());
     for declaration in registrations.1.iter() {
         let requested = ConfiguredTargetKey::new(declaration.clone(), key.configuration.clone());
-        let (actual, value) =
-            analysis_value!(actual_toolchain_target(ctx, &key.workspace, requested).await);
+        let (actual, value) = toolchain_value!(
+            DeclarationTargets,
+            actual_toolchain_target(ctx, &key.workspace, requested).await
+        );
         if value.kind() != &ConfiguredNodeKind::ToolchainDeclaration {
             return analysis_semantic_complete(Err(AnalysisError::message(format!(
                 "registered toolchain is not toolchain: {declaration}"
@@ -4597,7 +4681,13 @@ async fn compute_configured_toolchain_resolution(
         match load_configured_native_packages(ctx, mode, &key.workspace, &mut declaration_labels)
             .await
         {
-            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Need(need) => {
+                #[cfg(feature = "native-probe-observer")]
+                toolchain_resolution_probe::returned_need(
+                    toolchain_resolution_probe::NeedStage::ActualDeclarationPackageClosure,
+                );
+                return LoadingPreparationOutcome::Need(need);
+            }
             LoadingPreparationOutcome::Complete(Err(error)) => {
                 return LoadingPreparationOutcome::Complete(Err(error));
             }
@@ -4620,8 +4710,10 @@ async fn compute_configured_toolchain_resolution(
             unreachable!("checked declaration remains native toolchain");
         };
         let type_key = ConfiguredTargetKey::new(toolchain_type.clone(), key.configuration.clone());
-        let (actual_type, value) =
-            analysis_value!(actual_toolchain_target(ctx, &key.workspace, type_key).await);
+        let (actual_type, value) = toolchain_value!(
+            DeclarationTypes,
+            actual_toolchain_target(ctx, &key.workspace, type_key).await
+        );
         if value.kind() != &ConfiguredNodeKind::ToolchainType {
             return analysis_semantic_complete(Err(AnalysisError::message(format!(
                 "registered toolchain has non-toolchain type: {declaration}"
@@ -4639,7 +4731,13 @@ async fn compute_configured_toolchain_resolution(
     )
     .await
     {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Need(need) => {
+            #[cfg(feature = "native-probe-observer")]
+            toolchain_resolution_probe::returned_need(
+                toolchain_resolution_probe::NeedStage::TargetSettings,
+            );
+            return LoadingPreparationOutcome::Need(need);
+        }
         LoadingPreparationOutcome::Complete(Err(error)) => {
             return LoadingPreparationOutcome::Complete(Err(error));
         }
@@ -4675,7 +4773,13 @@ async fn compute_configured_toolchain_resolution(
     )
     .await
     {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Need(need) => {
+            #[cfg(feature = "native-probe-observer")]
+            toolchain_resolution_probe::returned_need(
+                toolchain_resolution_probe::NeedStage::DeclarationConstraints,
+            );
+            return LoadingPreparationOutcome::Need(need);
+        }
         LoadingPreparationOutcome::Complete(Err(error)) => {
             return LoadingPreparationOutcome::Complete(Err(error));
         }

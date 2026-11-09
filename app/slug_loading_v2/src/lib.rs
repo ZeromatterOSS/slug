@@ -98,6 +98,7 @@ mod module_extension_repository_validation;
 #[doc(hidden)]
 pub mod observation_union_probe;
 pub mod package;
+mod path_need_lookahead;
 #[doc(hidden)]
 pub mod provider;
 mod py_internal;
@@ -149,6 +150,12 @@ pub use bzl_module::EvaluatedBzlModule;
 pub use bzl_module::ObservedRepositoryPackageLoad;
 #[doc(hidden)]
 pub use bzl_module::ObservedRootPackageLoad;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use bzl_module::REPOSITORY_PACKAGE_CHILD_PROBE_LABELS;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use bzl_module::RepositoryPackageChildProbeSnapshot;
 pub use bzl_module::RepositoryPackageLoadError;
 pub use bzl_module::RepositoryPackageLoadKey;
 #[doc(hidden)]
@@ -158,6 +165,9 @@ pub use bzl_module::RootPackageLoadKey;
 #[doc(hidden)]
 pub use bzl_module::RootPackageLoadObservationKey;
 pub use bzl_module::discover_build_file_companion;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use bzl_module::repository_package_child_probe_snapshot;
 #[doc(hidden)]
 pub use canonical_repository_load_route::HostCanonicalRepositoryLoadRoute;
 #[doc(hidden)]
