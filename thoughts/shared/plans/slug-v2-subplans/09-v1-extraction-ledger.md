@@ -2,6 +2,19 @@
 
 ## WP425 rooted repository consumers
 
+Homogeneous FileBytes discovery reuses the existing full-demand Arc union and
+Buck2-derived compact maps for a bounded attempt-local frontier. Sequential
+tracked metadata lookups retain only an aggregate known-byte scalar. Synchronous
+Lstat/ready dispatch retains the old fixed control ceiling; one byte-only boxed
+job counts its actual frame, stack-to-heap overlap and key/result/window controls
+within the existing frontier bound before allocation. Completion, refusal and
+cancellation retire this attempt-local scratch. No hint table, future vector,
+retained pool, semantic cache, interner, native grant or donor import appears.
+Known-byte hints are not captured-body credits; native fresh-frame and cumulative
+limits remain authoritative under drift. A feature-only monotonic extension bit
+retains no inputs, counter or reset. Complete source values, equality and native
+ownership remain with their existing producers and terminal owners.
+
 Observation demands apply the same Buck2-derived weak-hash reuse pattern to an
 existing immutable value, with one inline scalar and no new allocation or owner.
 The full five-field identity remains authoritative for Eq/Ord and source facts;

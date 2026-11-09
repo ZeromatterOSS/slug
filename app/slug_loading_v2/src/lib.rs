@@ -371,6 +371,9 @@ pub use package::RuleCapability;
 pub use package::TestMetadata;
 pub use package::TestRuleKind;
 pub use package::TestSuiteMembership;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use path_need_lookahead::file_bytes_lookahead_extended;
 pub use provider::AnalysisBuiltinCallableApi;
 pub use provider::alloc_frozen_analysis_builtin_callable;
 pub use provider::alloc_frozen_template_variable_info;

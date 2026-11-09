@@ -3,31 +3,41 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: immutable observation-demand hash reuse in original
-`rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
-The [demand-hash receipt](wp1225-demand-hash-acceptance-2026-11-08.json)
-records actual inventory Demand work RED→GREEN: 64 hashes now emit 64 writes/
-512 bytes instead of 512 writes/3,648 bytes. All four constructors bind the
-original five fields once; full Eq/Ord/Debug, raw Windows input and Image custody
-remain authoritative. Generic normalized-path storage/Hash and the pinned
-workspace spelling SHA bytes remain unchanged. The measured eight-byte Demand
-and row growth flows through existing size-based forecasts without cap changes.
-All 183 ordinary checks, five native guards and four original warm compiler
-commands pass. Bounded codegen caught an intermediate comparison tuple and
-confirms its removal from inspected final copies; it establishes no timing claim.
-Original ABBA cycles are 609/832/853/853. A1 stops at WorkDeadline at 43 roots/
-83 records; B1 at 53/109. B2 and A2 both reach the bounded analysis terminal-error
-category at attempt 853 and 53/109, with reason `reason_format_limit`. These are
-not successful commands or proof of identical full errors. A later CPU capture
-also stops at WorkDeadline. Cleanup returns exactly to baseline throughout.
-The [selected contract](wp1225-general-repository-workspace-design.md#immutable-observation-demand-hash-reuse)
-keeps construction work, full semantic fields, per-value charges, transient Needs
-and shared nonpersistent shard routing explicit. Next identify the actual typed
-analysis failure through a bounded static classifier, then implement its demanded
-general behavior; freeform errors remain private. No latency/RSS, public Rust
-completion or General activation gate closes. Root-route/syntax/global-path
-caching and FileBytes/Archive discovery remain unselected; no caller pruning,
-Need cacheability, clock or native-cap increase is selected.
+Current delta: homogeneous FileBytes prerequisite discovery beneath registration
+rows and repository BUILD imports in original `rules-rust-073-toolchain-owner`
+`cquery //pkg:probe` with its nightly setting. The
+[component receipt](wp1225-file-bytes-lookahead-acceptance-2026-11-09.json)
+records actual Inventory/Module/Command A-only→A+B recovery, 89 ordinary checks,
+five native guards and four warm compiler commands. Independent final review
+accepts this bounded component. The old Lstat module remains byte-exact behind the shared wrapper.
+Current tracked regular-file sizes bound unique declared bytes to 256 KiB;
+actual reads, sticky Source64 and all native limits remain authoritative.
+The [selected contract](wp1225-general-repository-workspace-design.md#bounded-homogeneous-filebytes-prerequisite-discovery)
+keeps 32 rows/demands, 4096-byte paths and 64 KiB construction unchanged.
+Synchronous in-place reduction fits the old 1024-byte semantic control allowance;
+one byte-only boxed job forecasts its actual frame/overlap before allocation.
+This is a Slug-native scheduling/admission revision, not a physical-stack/RSS
+bound, serial-pressure equivalence or speed claim.
+
+Original ABBA cycles are 198/189/189/198. All four reach the static outer category
+`analysis_registration_opaque`; last recorded epochs are 8 roots/15 records,
+with truncated 128-event traces. Both candidates show a process-wide installed
+unique extension from false→true; this alone proves neither servicing nor
+success. Cleanup is exact. Next classify the retained typed Registration leaf
+with a bounded discriminant-only walk, then implement its demanded general
+behavior. Do not parse private messages or presume an API repair. No standalone
+diagnostic integration, clock/cap increase, General activation, successful
+public Rust cquery or equivalent-command latency/RSS gate closes.
+
+The [accepted demand-hash component](wp1225-demand-hash-acceptance-2026-11-08.json)
+preserves full original identities while reusing one immutable weak scalar;
+183 ordinary checks, five native guards and four original warm commands pass.
+Its earlier analysis-error category at attempt 853 did not recur in two bounded
+outer-kind captures, which passed that attempt and stopped at the unchanged work
+deadline at 954/915 with 55 roots. Keep the static discriminant-only classifier
+available if the error recurs; infer no API repair from private opaque messages.
+No diagnostic-only integration, Need cacheability, caller pruning, clock/native
+cap increase, root-route/syntax/global-path cache or Archive batching is selected.
 The [prior canonical-route component](wp1225-canonical-route-hash-acceptance-2026-11-08.json)
 retains full equality and immutable scalar reuse, with its accepted 69 checks
 and protected native/warm proof. The
@@ -48,7 +58,7 @@ in the observed prefixes. Same-input ABBA observes result computes1782/1822 in
 controls and122/119 in candidates, but prefixes vary and all reach the unchanged27-second
 deadline. No command-latency or RSS acceptance is established. Remaining graph
 work needs a causal discriminator; simultaneous Archive reservations remain
-outside the selected Lstat-only scheduling class. No Need-cacheability,
+outside the selected observation scheduling classes. No Need-cacheability,
 clock/cap increase or caller-specific pruning is selected. Rust archive work,
 completion, activation and completed-command latency/RSS gates remain open.
 The [verified Source placement component](wp1225-source-placement-acceptance-2026-11-08.json)

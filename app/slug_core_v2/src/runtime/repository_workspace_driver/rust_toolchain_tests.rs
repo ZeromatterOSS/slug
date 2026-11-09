@@ -548,6 +548,40 @@ fn terminal_error(error: &CqueryCommandError) -> &'static str {
         CqueryCommandError::Infrastructure(_) => "infrastructure",
     }
 }
+
+// Discriminants only. Keep this separate from the existing private, bounded
+// reason formatter; opaque payloads are never inspected by this projection.
+fn analysis_terminal_leaf(kind: &AnalysisErrorKind) -> &'static str {
+    match kind {
+        AnalysisErrorKind::TargetNotFound { .. } => "analysis_target_not_found",
+        AnalysisErrorKind::ExecutableRuleMissingExecutable { .. } => "analysis_executable_missing",
+        AnalysisErrorKind::Message(_) => "analysis_message_opaque",
+        AnalysisErrorKind::Registration(_) => "analysis_registration_opaque",
+    }
+}
+
+fn terminal_leaf(error: &CqueryCommandError) -> &'static str {
+    match error {
+        CqueryCommandError::MissingTarget { .. } => "command_missing_target",
+        CqueryCommandError::Evaluation(_) => "command_evaluation_opaque",
+        CqueryCommandError::ExecutableRuleMissingExecutable(error)
+        | CqueryCommandError::Analysis(error) => analysis_terminal_leaf(error.kind()),
+        CqueryCommandError::Request(_) => "command_request_opaque",
+        CqueryCommandError::Infrastructure(_) => "command_infrastructure_opaque",
+    }
+}
+
+#[cfg(feature = "native-probe-observer")]
+fn file_bytes_discovery_report(before: bool, after: bool) -> Value {
+    json!({
+        "before": before,
+        "after": after,
+        "extended_during_capture": if before { None } else { Some(after) },
+        "process_wide": true,
+        "request_isolated": false,
+        "is_servicing_evidence": false,
+    })
+}
 #[derive(Clone)]
 struct ObservedCquery {
     inner: CqueryCommandRoot,
@@ -781,6 +815,8 @@ fn verify_inputs(config: &Value, workspace: &Path) {
 #[test]
 #[ignore = "one genuine original Rust cquery diagnostic; source-only staged input JSON and finite native supervisor required"]
 fn native_original_rust_toolchain_cquery_frontier() {
+    #[cfg(feature = "native-probe-observer")]
+    let file_bytes_before = slug_loading_v2::file_bytes_lookahead_extended();
     let config_path =
         std::env::var_os("SLUG_NATIVE_RUST_INPUTS").expect("source-only stager config required");
     let config = read_config(Path::new(&config_path)).unwrap();
@@ -854,7 +890,7 @@ fn native_original_rust_toolchain_cquery_frontier() {
         Err(error) => json!({"status":"driver_refusal","error":native_error(error)}),
         Ok(driven) => match driven.accepted.terminal_for_test().result.as_ref() {
             Err(error) => {
-                json!({"status":"accepted_terminal_error","kind":terminal_error(error),"reason":reason(error),"attempts":driven.attempts})
+                json!({"status":"accepted_terminal_error","kind":terminal_error(error),"terminal_leaf":terminal_leaf(error),"reason":reason(error),"attempts":driven.attempts})
             }
             Ok(evaluation) => {
                 json!({"status":"accepted_success","analyses":evaluation.analyses().count(),"attempts":driven.attempts})
@@ -874,6 +910,10 @@ fn native_original_rust_toolchain_cquery_frontier() {
     assert_eq!(final_snapshot.retained_bytes, baseline);
     #[cfg(feature = "native-probe-observer")]
     {
+        report["file_bytes_discovery"] = file_bytes_discovery_report(
+            file_bytes_before,
+            slug_loading_v2::file_bytes_lookahead_extended(),
+        );
         report["phase_profile"] = phase_profile.finish();
         report["progress_wall"] = trace.lock().unwrap().progress_wall.summary();
         assert!(
@@ -895,6 +935,88 @@ fn native_original_rust_toolchain_cquery_frontier() {
     assert!(encoded.len() + overhead <= TRACE_BYTES);
     println!("WP425_RUST_FRONTIER {encoded}");
     println!("WP425_RUST_CLEANUP {cleanup}");
+}
+
+#[test]
+#[cfg(feature = "native-probe-observer")]
+fn file_bytes_discovery_marker_qualifies_preexisting_true_without_counts_or_payloads() {
+    for (before, after, expected) in [
+        (false, false, json!(false)),
+        (false, true, json!(true)),
+        (true, true, Value::Null),
+        (true, false, Value::Null),
+    ] {
+        let report = file_bytes_discovery_report(before, after);
+        assert_eq!(report["extended_during_capture"], expected);
+        assert_eq!(report["process_wide"], true);
+        assert_eq!(report["request_isolated"], false);
+        assert_eq!(report["is_servicing_evidence"], false);
+        assert!(report.to_string().len() <= 256);
+    }
+    assert!(EVENT_TRACE_BYTES + CENSUS_BYTES + PHASE_BYTES + 96 + 256 < TRACE_BYTES);
+}
+
+#[test]
+fn frontier_terminal_discriminants_never_visit_private_payloads() {
+    for payload in [
+        "private-payload".to_owned(),
+        "private-payload\0界".repeat(REASON_BYTES),
+    ] {
+        let label = CanonicalLabel::parse("@@//pkg:probe").unwrap();
+        let build_file = std::path::PathBuf::from(&payload);
+        let cases = [
+            (
+                CqueryCommandError::MissingTarget {
+                    requested: Arc::from(payload.as_str()),
+                    label: label.clone(),
+                    build_file: build_file.clone(),
+                },
+                "command_missing_target",
+            ),
+            (
+                CqueryCommandError::Evaluation(Arc::from(payload.as_str())),
+                "command_evaluation_opaque",
+            ),
+            (
+                CqueryCommandError::ExecutableRuleMissingExecutable(
+                    slug_analysis_v2::AnalysisError::message(&payload),
+                ),
+                "analysis_message_opaque",
+            ),
+            (
+                CqueryCommandError::Analysis(slug_analysis_v2::AnalysisError::message(&payload)),
+                "analysis_message_opaque",
+            ),
+            (
+                CqueryCommandError::Request(Arc::from(payload.as_str())),
+                "command_request_opaque",
+            ),
+            (
+                CqueryCommandError::Infrastructure(Arc::from(payload.as_str())),
+                "command_infrastructure_opaque",
+            ),
+        ];
+        for (error, expected) in cases {
+            let leaf = terminal_leaf(&error);
+            assert_eq!(leaf, expected);
+            let encoded = json!({"terminal_leaf":leaf}).to_string();
+            assert!(encoded.len() <= 96);
+            assert!(!encoded.contains("private-payload"));
+        }
+        assert_eq!(
+            analysis_terminal_leaf(&AnalysisErrorKind::TargetNotFound { label, build_file }),
+            "analysis_target_not_found"
+        );
+        assert_eq!(
+            analysis_terminal_leaf(&AnalysisErrorKind::ExecutableRuleMissingExecutable {
+                rule_class: payload.into()
+            }),
+            "analysis_executable_missing"
+        );
+    }
+    // The existing aggregate reserve remains unchanged. This finite field
+    // consumes at most96 bytes of its fixed metadata allowance.
+    assert!(EVENT_TRACE_BYTES + CENSUS_BYTES + PHASE_BYTES + 96 < TRACE_BYTES);
 }
 
 #[test]

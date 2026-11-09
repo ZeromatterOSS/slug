@@ -1603,6 +1603,81 @@ error and successful completion are unproved. Next typed failure classification
 must remain bounded/static and coupled to the demanded generic semantic fix;
 no freeform data, new report cap or arbitrary error-output escape is selected.
 
+### Bounded homogeneous FileBytes prerequisite discovery
+
+Select a second homogeneous scheduling class for the same shared registration-row
+and repository BUILD-import discovery boundary. First eligible whole Need fixes
+its window class to Lstat or FileBytes. Keep the accepted synchronous Lstat
+algorithm, forecast and four counter meanings unchanged. No caller, source,
+repository, rule or function flag chooses the policy.
+
+A whole FileBytes-only Need is eligible only when each new unique full demand's
+exact terminal namespace/path Lstat key yields a current tracked Present regular
+file with nonnegative size. Query those keys sequentially through DICE; never
+inspect whole mutable epochs, Source credits or native IO, and never manufacture
+a new metadata Need. Missing/revoked/unknown/error/nonregular/negative hints make
+the whole candidate ineligible. Lock the class: mixed/class-mismatched/nonpath
+Needs, semantic/outer/cycle errors and resource overflow are barriers. A first
+ineligible Need returns unchanged; a later barrier returns only earlier pending
+paths. Existing load-label prevalidation and terminal event closure stay exact.
+
+Keep 32 inspected rows from the first hole, 32 unique full demands, 4096 bytes
+per path and the unchanged 64 KiB frontier/control construction bound. The
+FileBytes class additionally bounds the sum of known sizes for unique demands
+to 256 KiB. Its only persistent hint state is that aggregate scalar; same-demand
+duplicates already admitted in the same fixed transaction do not spend it again.
+Before hint polling and before extension allocation, checked arithmetic includes
+the old geometry plus actual wrapper/window/key/result/one-future layouts and
+return storage. Synchronous ready/Lstat dispatch constructs no byte future. A
+separate byte-only helper may allocate one ephemeral boxed future after checking
+twice its actual unboxed frame for stack-to-heap overlap, alignment and box
+controls within the same 64 KiB construction bound. Completion, refusal and
+cancellation drop that job and its full pending/right owners. Use no future
+vector, hint map or retained pool; do not raise or hide bytes in the old Lstat
+1024-byte fixed allowance. Prove that ready/Meta dispatch fits that old allowance
+for both concrete error adapters and all three production call sites; inspect
+bounded final codegen to exclude an unconditional large byte frame in dispatch.
+The fixed allowance measures the maximum of live semantic control phases:
+incoming/returned error-or-ready plus one window, or consumed Need plus the
+in-place window and synchronous candidate/iterator scratch. Those phases do not
+sum after their owners retire. Drop rejected incoming Needs and operation-clone
+temporaries before constructing a ready error. This object-layout forecast does
+not bound compiler ABI stack slots, spills or whole-process RSS.
+
+The 256 KiB total is a declared-hint scheduling envelope, not native permission,
+prepaid data credit or a strict actual-capture/peak bound under drift. Every old
+family-specific fresh FD/object/EOF/final-name/current-association check remains
+authoritative. Generic content still consumes Source attempts before IO, including
+failures; exact owned General verification keeps its existing exemption without
+fallback while charging actual decoded bytes. Decoded history, live scratch,
+body/backing/root/FD/process/stream/time caps and sticky refusal remain unchanged.
+Whole batch authority validation precedes IO; quota admission is sequential and
+an eventual failure publishes no partial epoch while retaining earlier spent
+charges. Extra speculative capture can cause an earlier bank/time refusal than
+serial discovery. This is an explicit Slug-native scheduling/admission revision,
+not a claim of serial-equivalent memory pressure or Bazel restart timing.
+
+Require actual Inventory and registration A-only/A+B withheld-content RED/GREEN
+with truthful size facts, service only returned real facts, and complete in one
+round with ordered targets and full source/certificate/event custody. Protect
+exact/+1 totals, duplicates/zero-size files, current-fact replacement/removal,
+class barriers, later errors/cycles/cancellation and native preflight/Source64/
+drift/refund/General-owned verification. Original configured Rust runs must show
+an installed unique FileBytes extension before acceptance. One feature-only
+monotonic boolean records only a successful union adding a unique demand; first
+holes and duplicate-only windows leave it false. Before/after snapshots remain
+process-wide and nonisolated; preexisting true is unattributable, and an extension
+is not proof of servicing or success. Keep this fixed report outside the unchanged
+16 KiB phase reservation and within the existing aggregate/stream ceiling.
+
+The [component receipt](wp1225-file-bytes-lookahead-acceptance-2026-11-09.json)
+records the actual owner RED/GREEN, control-layout correction, protected native
+proof and installed original-workload extensions. Its static terminal category
+retains an opaque Registration wrapper; private leaf/API identity and successful
+Rust completion remain unproved. Next use retained typed discriminants without
+rendering or parsing payloads. Diagnostic work stays coupled to demanded generic
+behavior, with no separate diagnostic-only integration or cap increase.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

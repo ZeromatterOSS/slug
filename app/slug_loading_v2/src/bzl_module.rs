@@ -6842,7 +6842,7 @@ async fn compute_repository_package_children(
     #[cfg(feature = "native-probe-observer")]
     repository_package_child_probe::entered();
     let mut loaded_modules = Vec::with_capacity(loads.len());
-    let mut lookahead = crate::path_need_lookahead::PathLookahead::new();
+    let mut lookahead = crate::path_need_lookahead::HomogeneousPathLookahead::new();
     for load in loads {
         if !lookahead.can_inspect_next() {
             break;
@@ -6906,7 +6906,10 @@ async fn compute_repository_package_children(
             }
         }
         .await;
-        if let ControlFlow::Break(stop) = lookahead.observe(result) {
+        let observation = lookahead.observe(ctx, result);
+        #[cfg(test)]
+        crate::path_need_lookahead::assert_observer_layout(&observation);
+        if let ControlFlow::Break(stop) = observation.await {
             return ControlFlow::Break(repository_package_child_stop(stop));
         }
     }

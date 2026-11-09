@@ -8,6 +8,13 @@ use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationOperation;
 use starlark_map::small_map::SmallMap;
 
+mod file_bytes;
+pub(crate) use file_bytes::HomogeneousPathLookahead;
+#[cfg(test)]
+pub(crate) use file_bytes::assert_observer_layout;
+#[cfg(feature = "native-probe-observer")]
+pub use file_bytes::file_bytes_lookahead_extended;
+
 const MAX_ROWS: usize = 32;
 const MAX_DEMANDS: usize = 32;
 const MAX_METADATA: usize = 64 * 1024;

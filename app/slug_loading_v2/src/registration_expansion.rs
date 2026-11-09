@@ -82,7 +82,7 @@ use crate::RootSubtreePackageSetObservationKey;
 use crate::bzl_module::RepositoryPackageInventoryKey;
 use crate::bzl_module::RepositoryPackageInventoryObservationKey;
 use crate::package::NativeToolchainTarget;
-use crate::path_need_lookahead::PathLookahead;
+use crate::path_need_lookahead::HomogeneousPathLookahead as PathLookahead;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 pub enum ModuleRegistrationFamily {
@@ -1132,7 +1132,10 @@ async fn expand_module_rows<'a>(
             .await
         }
         .await;
-        if let ControlFlow::Break(stop) = lookahead.observe(result) {
+        let observation = lookahead.observe(ctx, result);
+        #[cfg(test)]
+        crate::path_need_lookahead::assert_observer_layout(&observation);
+        if let ControlFlow::Break(stop) = observation.await {
             return Err(stop);
         }
     }
@@ -1240,7 +1243,10 @@ async fn drive_command_registration_expansion(
                 .await
             }
             .await;
-            if let ControlFlow::Break(stop) = lookahead.observe(result) {
+            let observation = lookahead.observe(ctx, result);
+            #[cfg(test)]
+            crate::path_need_lookahead::assert_observer_layout(&observation);
+            if let ControlFlow::Break(stop) = observation.await {
                 return Err(stop);
             }
         }

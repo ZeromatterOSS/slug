@@ -1,0 +1,1245 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "797f19f792508b93d79dd1e90c1e34b3ac7ff767",
+  "recorded_utc": "2026-11-09T08:15:46.572713+00:00",
+  "classification": {
+    "slug_native": "Bounded homogeneous FileBytes prerequisite scheduling/admission through the same shared registration/package-import boundary. Extra speculative capture may reach a native bank/time refusal earlier than serial discovery.",
+    "exact_preserved": "Whole structural demand/source/history identities, current tracked facts, source/certificate/event custody, existing ordered barriers and native fresh-FD/object/EOF/name/current-association/whole-authority checks. No new Bazel API semantic surface.",
+    "unsupported_deferred": "Production General activation; successful authentic Rust cquery and Archive closure; equivalent completed-command latency/RSS; unrelated caches and Archive batching."
+  },
+  "outcome": "Actual Inventory and Module/Command registration discover A+B FileBytes prerequisites from truthful known metadata and complete in one round when only returned real facts are supplied, while old Lstat behavior and native hard limits remain intact.",
+  "source_pins": [
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests.rs",
+      "sha256": "677ba690de28498435b2ce1a7f0e463eeafc5ce1d9e891faa57d07717245bb04"
+    },
+    {
+      "file": "app/slug_loading_v2/src/bzl_module.rs",
+      "sha256": "6cb5a51bcacb11d178747a4d481418a847612e87b945718e0a280105cfa35167"
+    },
+    {
+      "file": "app/slug_loading_v2/src/host_package_load_tests.rs",
+      "sha256": "a40df5bacf3ec3cbe7a52359ca4ace581c14b0ba97e688b668b3b5089d57e4f5"
+    },
+    {
+      "file": "app/slug_loading_v2/src/host_package_load_tests/package_load_frontier_tests.rs",
+      "sha256": "2e918eda5561451b4784c0eb124256a2d843ff41f2132a2d470f1f48b059c0c2"
+    },
+    {
+      "file": "app/slug_loading_v2/src/lib.rs",
+      "sha256": "faf57fff22ec57b210028989530b596150c30cad8b78b64960fc57d347267310"
+    },
+    {
+      "file": "app/slug_loading_v2/src/path_need_lookahead.rs",
+      "sha256": "86f1c87eed20820e675fa0bd34edecc54214074dacbff920cc63d948fbe60b43"
+    },
+    {
+      "file": "app/slug_loading_v2/src/path_need_lookahead/file_bytes.rs",
+      "sha256": "01b948485d19352b2e25278803cfd5d87d01ef75fb9083c7bdf7170ad7066a49"
+    },
+    {
+      "file": "app/slug_loading_v2/src/path_need_lookahead/file_bytes_tests.rs",
+      "sha256": "97f74af67ab22c7470088862feb66682d927f57ab2ab73005ecc9bc738197a55"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_expansion.rs",
+      "sha256": "ccf3022be313f8637073b3c98fc17a97210638f83c744793d6b26546adb74908"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_expansion_tests.rs",
+      "sha256": "f6844f81b04a59f723a0bf89e371e08af0102fa9b8f080896b53ab464cf7f080"
+    },
+    {
+      "file": "app/slug_loading_v2/src/registration_expansion_tests/file_bytes_prerequisite_tests.rs",
+      "sha256": "6919dde3b04786c53fc6b6526414eb9a475795cef543fd4cae55a1b46608d207"
+    },
+    {
+      "file": "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md",
+      "sha256": "457e271bae25db330f0e421e1246a59f0bc9871eb7ba234f45f3cc1e1fd27d05"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md",
+      "sha256": "cbc636fd046959e5a7964304a588dcc8261b7a26ac8db28457347f46749222e8"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/current-packet.md",
+      "sha256": "ec819a46ee2c48ae5e9c89a4763b0d2d7e35677dbcc1566597e53bab7a821615"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-general-repository-workspace-design.md",
+      "sha256": "7b802ee50cbd6a9cfa37fbee3dd60afc827658d0a9903e7af75079f932d1457f"
+    }
+  ],
+  "unchanged_reference_pins": [
+    {
+      "file": "docs/developers/dice.md",
+      "sha256": "85ccdb5658acfa95e78166c7bcbdd62f51d6dc28d6f6732ed651ef23cf40ceac"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/source_preparation.rs",
+      "sha256": "237a8f773120fca07833121bd36d52300797bedd3797d7627ea3abe9bdcbba91"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_io.rs",
+      "sha256": "b3e86a7f4e8f315e3981ef8210c455d9fd31270ee1d62693694a50925516633c"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_io/source_snapshots.rs",
+      "sha256": "09297e4fa0bc3fa5ee1e75a5c61461892c3cb0ef8cfdb970ada18e388ef5c090"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/path_observation/rooted.rs",
+      "sha256": "796775e274856e0df23fa90da6728d191b85a214111701ade63e5cd3f66582a6"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/path_observation/rooted/owned_tests.rs",
+      "sha256": "014253377f5205a08c0667559074dd68cece40b34d1ea46cd1a9fdd0e1611b4c"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/regular_file.rs",
+      "sha256": "f39efcf3ff32ff37f9cf69e01474c7c869989b0f79c03ef3b03f88501f1b1260"
+    }
+  ],
+  "source_basis": {
+    "bazel_checkout": "/run/media/system/Colossus/dev/bazel-9.2.0",
+    "bazel_revision": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "anchor": "src/main/java/com/google/devtools/build/lib/skyframe/BzlLoadFunction.java:1174-1206,1214-1265",
+    "meaning": "Batched child dependencies, source-order diagnostics and deferred missing/error traversal avoid quadratic restarts. Concept/source regression only; Slug finite windows/admission and restart timing are explicitly Slug-native."
+  },
+  "design": {
+    "boundary": "Three production call sites, two private error adapter types; no repository/rule/caller/source selector. First eligible whole Need fixes class to Lstat or FileBytes.",
+    "hint_owner": "Sequential tracked exact(namespace,path,Lstat) keys for new unique full FileBytes demands only. Complete Present RegularFile and nonnegative known size required. Duplicate demands already admitted in this fixed transaction do not spend size twice. No native IO, whole-epoch/credit inspection or invented metadata frontier.",
+    "barriers": "First ineligible whole Need retains original backing. Later mixed/class/nonpath/error/cycle/unknown-size/count/path/control/known-byte barrier returns only previous pending paths. Needs remain invalid/noncacheable.",
+    "bounds": {
+      "rows": 32,
+      "unique_full_demands": 32,
+      "per_path_bytes": 4096,
+      "construction_peak_bytes": 65536,
+      "declared_known_unique_bytes": 262144,
+      "inherited_fixed_semantic_control_bytes": 1024
+    },
+    "hint_qualification": "Declared sizes are scheduling hints, not actual captured-body/peak bounds, permission or prepaid credit under drift. Source64 sticky pre-IO attempts, actual decode/history/scratch/body/backing/root/FD/process/stream/time limits remain authoritative. General-owned verification remains fresh with no namespace-inferred exemption or fallback. Sequential quota failure publishes no partial epoch and retains spent charges.",
+    "retention": "Only attempt-local pending Need,row count,aggregate known-byte scalar. No hint map, future vector, pool, semantic cache, new native owner or donor import. One Byte-only boxed job is preflighted before construction/allocation/poll using actual unboxed frame,2x stack-to-heap overlap,alignment/box/key/result/window controls plus inherited union geometry within64KiB. Completion/refusal/cancel retires it.",
+    "control_correction": "Initial actual adapter check failed3312>1024. Isolated byte-only boxing removed nested async/E frame from Meta. A1056 summed check then exposed phase accounting/owner overlap; in-place Lstat and Byte reduction, small operation tag and dropping rejected incoming Need make explicit phase-max accounting sound. All measured terms remain, max<=1024. Registration returned observer808 +wrapper136 gives944. Candidate/iterator/consumed-Need phase is separate.",
+    "physical_memory_qualification": "The fixed1024 semantic object/control forecast is not compiler ABI stack/spill or wholeRSS. Bounded final codegen retains large frames (including inherited helpers), confirms separate Byte helper calls, and supports no physical-stack, speed or RSS reduction claim.",
+    "marker": "One feature-only monotonic AtomicBool marks only installed union adding a unique demand. Beforetrue means unknown attribution. False\u2192true is process-wide/nonisolated extension evidence, never servicing or success. No reset/count/payload. Fixed report stays outside unchanged16KiB phase reservation and inside aggregate512KiB."
+  },
+  "causal_red": {
+    "inventory_baseline": {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+        "--exact",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_load_siblings_collect_known_file_bytes_and_finish_one_round",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "selected": 1,
+      "exit_code": 101,
+      "expected_exit_code": 101,
+      "elapsed_seconds": 0.00868330399680417,
+      "executable_sha256": "01cf3e916b1906da1055697efa0374b2494964dacaaeaffd3dfa8cdebf507672",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-actual-inventory-red.json",
+        "sha256": "dbc9b32252dd347c4fa057bb1fe7381b59daedd052fa9aa92a58770b67e2378a"
+      }
+    },
+    "registration_policy_disabled": {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+        "--exact",
+        "registration_expansion_tests::file_bytes_prerequisite_tests::observed_module_registration_known_bytes_discover_both_rows_and_finish_one_round",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "selected": 1,
+      "exit_code": 101,
+      "expected_exit_code": 101,
+      "elapsed_seconds": 0.007664528995519504,
+      "executable_sha256": "6b460e832829559b0c91f8104c4f72f47e0175b8eeeeb3b8a9567321e474b86b",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red.json",
+        "sha256": "6542418fffcee3734406e1ff75439d5477f0e9c2d958c2caea6e920cb1877c5f"
+      }
+    },
+    "registration_mutation": {
+      "method": "Temporarily disable only homogeneous FileBytes first admission, retaining actual registration test and other candidate source; restore exact bytes after build/test even on failure. This is causal policy-disabled RED, not a baseline executable.",
+      "file": "app/slug_loading_v2/src/path_need_lookahead/file_bytes.rs",
+      "candidate_sha256": "01b948485d19352b2e25278803cfd5d87d01ef75fb9083c7bdf7170ad7066a49",
+      "policy_disabled_sha256": "e42b87474cfe6fd5c7328b46b49c801bbcf302862b4dd65c857e0d49abe9fd1d",
+      "build_exit_code": 0,
+      "red_harness_exit_code": 0,
+      "valid_semantic_red": true,
+      "restored_byte_exact": true
+    },
+    "interpretation": "Both fail exact A+B Need equality with A-only; initial3312 and1056 layout failures are preserved separately and explicitly are NOT semantic RED. Registration RED disables only first FileBytes admission in the final source, then restores exact candidate bytes; it is not a baseline executable."
+  },
+  "ordinary_tests": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+        "--exact",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::earlier_semantic_error_does_not_probe_missing_later_sibling",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::external_bzl_child_prefix_retains_original_carriers_until_settlement",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::external_bzl_synopsis_preserves_source_identity_encoding_and_error_order",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::external_bzl_synopsis_reuses_across_child_need_and_current_epoch_changes",
+        "bzl_module::host_package_load_tests::external_bzl_frontier_tests::observed_sibling_need_precedes_later_semantic_error_and_repairs_strict_closure",
+        "bzl_module::host_package_load_tests::external_bzl_module_cycle_releases_and_recovers_with_fresh_detector",
+        "bzl_module::host_package_load_tests::observed_external_bzl_child_positions_collect_needs_and_stop_at_first_semantic",
+        "bzl_module::host_package_load_tests::observed_external_bzl_cycle_retains_all_sources_and_recovers",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_child_terminals_keep_prefixes",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_keeps_terminal_prefixes_and_error_batches",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_recovers_after_cancel",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_replays_a_b_a",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_retains_source_child_arcs_and_local_batch",
+        "bzl_module::host_package_load_tests::observed_repository_package_load_source_terminals_keep_prefixes",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_deferred_error_keeps_selected_event_closure_and_first_error",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_known_bytes_deferred_error_preserves_selected_event_closure",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_known_bytes_defers_later_cycle_and_fresh_retry_recovers",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_load_siblings_collect_independent_lstat_prerequisites",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_load_siblings_collect_known_file_bytes_and_finish_one_round",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_load_siblings_repair_preserves_targets_order_and_certificate",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_lstat_window_stops_at_whole_file_bytes_barrier",
+        "bzl_module::host_package_load_tests::package_load_frontier_tests::observed_inventory_pending_lstat_defers_later_cycle_and_fresh_retry_recovers",
+        "bzl_module::host_package_load_tests::repository_package_load_prevalidates_all_loads_and_gates_loaded_target_kinds",
+        "bzl_module::host_package_load_tests::repository_package_load_renders_missing_and_cycle_and_recovers_on_same_dice",
+        "bzl_module::repository_package_child_probe::tests::local_counter_layout_saturation_and_concurrency_preserve_all_cells",
+        "bzl_module::repository_package_child_probe::tests::whole_need_classification_keeps_mixed_and_nonsingleton_needs_other",
+        "path_need_lookahead::file_bytes::tests::byte_windows_enforce_row_demand_path_and_actual_control_overlap_bounds",
+        "path_need_lookahead::file_bytes::tests::byte_windows_keep_whole_barriers_class_lock_and_first_ineligible_owners",
+        "path_need_lookahead::file_bytes::tests::local_extension_marker_stays_false_for_first_and_duplicate_and_marks_installed_union",
+        "path_need_lookahead::file_bytes::tests::tracked_regular_size_hints_have_exact_byte_boundary_and_current_revoke_semantics",
+        "path_need_lookahead::tests::duplicate_only_extension_keeps_pending_backing_and_unique_count",
+        "path_need_lookahead::tests::first_ineligible_or_large_spare_owner_returns_original_need",
+        "path_need_lookahead::tests::metadata_peak_has_exact_boundary_and_checked_overflow",
+        "path_need_lookahead::tests::unique_bound_and_later_operation_barriers_keep_only_earlier_paths",
+        "path_need_lookahead::tests::window_counts_first_hole_and_every_complete_slot",
+        "registration_expansion::path_lookahead::probe::tests::local_concurrent_counts_preserve_all_scalar_updates",
+        "registration_expansion::path_lookahead::probe::tests::local_counter_saturates_without_a_process_reset",
+        "registration_expansion_tests::ambiguity_facts_participate_in_a_b_a_equality_when_labels_match",
+        "registration_expansion_tests::ambiguity_warning_is_owned_by_requested_family_only",
+        "registration_expansion_tests::canonical_route_error_stops_before_later_package_row",
+        "registration_expansion_tests::command_apparent_external_recursive_rows_reuse_canonical_subtree_walker",
+        "registration_expansion_tests::command_apparent_external_rows_use_final_root_mapping",
+        "registration_expansion_tests::command_configuration_a_b_a_restores_equal_arc_backed_expansion",
+        "registration_expansion_tests::command_key_identity_includes_configuration_and_family",
+        "registration_expansion_tests::command_recursive_negative_removal_and_reinsertion_reuse_package_walker",
+        "registration_expansion_tests::command_rows_apply_signed_order_and_family_specific_reversal",
+        "registration_expansion_tests::empty_command_list_activates_no_mapping_or_package_owner",
+        "registration_expansion_tests::exact_missing_target_is_a_typed_family_and_row_error",
+        "registration_expansion_tests::family_key_identity_is_independent",
+        "registration_expansion_tests::file_bytes_prerequisite_tests::observed_command_registration_known_bytes_keep_signed_order_and_toolchain_reversal",
+        "registration_expansion_tests::file_bytes_prerequisite_tests::observed_module_registration_known_bytes_discover_both_rows_and_finish_one_round",
+        "registration_expansion_tests::mapped_and_canonical_rows_use_selected_nonroot_inventory",
+        "registration_expansion_tests::need_has_no_family_event_batch_and_recovers_with_complete_epoch",
+        "registration_expansion_tests::negative_exact_missing_target_remains_a_typed_row_error",
+        "registration_expansion_tests::observed_cancellation_publishes_no_family_owner_then_recovers_and_reuses",
+        "registration_expansion_tests::observed_canonical_recursion_orders_route_subtree_and_inventories_with_exact_arcs",
+        "registration_expansion_tests::observed_command_cancellation_publishes_nothing_then_recovers_and_reuses",
+        "registration_expansion_tests::observed_command_mapping_route_and_package_frontiers_are_exact_and_ordered",
+        "registration_expansion_tests::observed_expansion_preserves_epoch_identity_dependency_order_and_family_isolation",
+        "registration_expansion_tests::package_error_stops_before_later_row_and_retains_decisive_epoch",
+        "registration_expansion_tests::path_prerequisite_tests::observed_command_pending_rows_preserve_signed_order_and_toolchain_reversal",
+        "registration_expansion_tests::path_prerequisite_tests::observed_independent_literal_rows_union_lstat_prerequisites_and_recover_in_order",
+        "registration_expansion_tests::path_prerequisite_tests::observed_later_error_defers_behind_pending_lstat_and_earlier_error_wins",
+        "registration_expansion_tests::path_prerequisite_tests::observed_non_path_need_defers_behind_pending_lstat_and_stops_before_c",
+        "registration_expansion_tests::path_prerequisite_tests::observed_recursive_partial_row_discards_scratch_before_lstat_window_retry",
+        "registration_expansion_tests::recursive_expansion_uses_descendant_before_prefix_and_lexical_targets",
+        "registration_expansion_tests::recursive_package_order_is_lexical_sibling_postorder",
+        "registration_expansion_tests::registration_diagnostic_natural_canonical_boundaries",
+        "registration_expansion_tests::registration_diagnostic_natural_selection_and_mapping_boundaries",
+        "registration_expansion_tests::root_exact_and_wildcard_expansion_are_family_specific_and_stably_deduped",
+        "registration_expansion_tests::selected_module_and_declaration_order_drive_first_seen_deduplication",
+        "registration_expansion_tests::subtree_error_stops_before_later_package_row_and_retains_prefix",
+        "--test-threads=1"
+      ],
+      "selected": 72,
+      "exit_code": 0,
+      "elapsed_seconds": 0.5137448759924155,
+      "executable_sha256": "be06aae740a89710816ed3143b38827235b3ef7d10bed46c1081686d058139de",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-loading-tests.json",
+        "sha256": "5b09eb6da5e045b7d21ee724ce8d654c4cf3e42d9cdb65684a4147876b794e71"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::file_bytes_discovery_marker_qualifies_preexisting_true_without_counts_or_payloads",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::frontier_diagnostic_reason_and_config_are_bounded_and_never_emit_payload",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::frontier_terminal_discriminants_never_visit_private_payloads",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::metadata_path_probe_deltas_preserve_overflow_and_process_scope_qualifications",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::package_child_probe_report_keeps_masks_and_whole_need_qualification",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_family_report_is_static_and_bounded_at_maximum_counts",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_scalar_v2_qualifiers_and_progress_pairing_are_bounded",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::toolchain_stage_probe_preserves_masks_and_return_only_qualifications",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::union_helper_deltas_qualify_max_overflow_and_reversal_without_raw_inputs",
+        "runtime::dice::source_service::regular_file::tests::scoped_host_conversion_overlap_and_cumulative_history_are_bounded",
+        "runtime::dice::source_service::regular_file::tests::scoped_host_final_storage_refuses_partial_and_cancelled_publication",
+        "runtime::dice::source_service::regular_file::tests::scoped_host_inode_and_current_name_mutation_refuse_without_credit_leaks",
+        "runtime::path_observation::rooted::owned_tests::owned_kernel_does_not_bypass_sticky_acquisition_refusal",
+        "runtime::path_observation::rooted::tests::rooted_content_attempts_share_exact_64_boundary_and_refuse_65_before_lstat",
+        "runtime::path_observation::rooted::tests::rooted_observation_filebytes_exact_object_limit_and_digest_streaming_have_distinct_bounds",
+        "runtime::path_observation::rooted::tests::rooted_observation_rejects_entire_foreign_above_anchor_and_duplicate_batches_before_io",
+        "runtime::path_observation::rooted::tests::rooted_observation_scope_attempt_decoded_and_native_buffer_refusals_release_credits",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "selected": 17,
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "elapsed_seconds": 0.008789244995568879,
+      "executable_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-core-tests.json",
+        "sha256": "95e8ec631877c37809ea51e15a67ad362e143c1d8b7bbed9c09531f949ff0f25"
+      }
+    }
+  ],
+  "protected_native_guards": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+      "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+      "runtime::repository_physical_root::initialize::tests::owned_observation_tests::native_owned_file_observation_reuses_canonical_body_and_preserves_history_after_root_drop",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "selected": 5,
+    "exit_code": 0,
+    "expected_exit_code": 0,
+    "elapsed_seconds": 0.9245554799999809,
+    "core_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920",
+    "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "overflow": false,
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-native-guards.json",
+      "sha256": "48fd90e246682af512a0a9c534a389676328d1896c549e4277f26be1c854d543"
+    }
+  },
+  "protected_warm_originals": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "selected": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 13.752246735006338,
+    "executable_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920",
+    "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+    "deadline_seconds": 60,
+    "timed_out": false,
+    "overflow": false,
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-authentic-warm.json",
+      "sha256": "941545b72ae8e1af52755f0a106acc3e26ce07ce9091d5652bea21f259ecf44a"
+    },
+    "actual_commands": 4,
+    "scope": "One ignored test, four actual original compiler commands on one runtime and unchanged bank."
+  },
+  "compile": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 18.301716654998017,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-red-loading-build-result.json",
+        "sha256": "5e0b0a37e0a894a2efc44ee5d9258cbd843dc4586eaf976fe7beee120ecfb758"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 57.18289127400203,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red-build-result.json",
+        "sha256": "b7bfee23b086e8d346289c93d9ef37750f2bb2d9d0499ba605710c6f27ed0363"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 57.817953778998344,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red2-build-result.json",
+        "sha256": "71d45ebd53007fe62122d3a80f2590110ef11d45e3a00bf3d178286453865139"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 16.328035730999545,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red3-build-result.json",
+        "sha256": "36a87f18c0213a3e309db57ed5a360abaa2198f8868420e3c1c1300057d617e0"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 8.105412781995256,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-loading-build-result.json",
+        "sha256": "368c36be62d75d493ef14ce170b8193084180eb08445e4196b821d9039999abb"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 123.65685884800041,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-core-build-result.json",
+        "sha256": "85646e56f011844ec845cb68d77c15ede07fa62bf1e5b2f24b94d0a63d646cc1"
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 74.26266537500487,
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-cli-build-result.json",
+        "sha256": "0ba03b5648ae0b2fb688169062f1fb0fc594b4e7baf5e3ec687590a09b8391e0"
+      }
+    }
+  ],
+  "lstat_preservation": {
+    "file": "app/slug_loading_v2/src/path_need_lookahead.rs",
+    "baseline_revision": "797f19f792508b93d79dd1e90c1e34b3ac7ff767",
+    "method": "Remove only seven new module/reexport lines; entire inherited Lstat module, algorithm, geometry, hooks and tests must equal HEAD bytes",
+    "base_sha256": "173ba8a76a2f0b5ff49e57cba3a0de571a5c175350cda91240cef10b03a952a4",
+    "byte_exact_after_removing_reexports": true
+  },
+  "artifact_scope": {
+    "candidate": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "preserved_executable": "/tmp/slug-wp425-validation/artifacts/file-bytes-lookahead-candidate-264266c30126ee2c",
+      "executable_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920"
+    },
+    "control": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+      "preserved_executable": "/tmp/slug-wp425-validation/artifacts/file-bytes-lookahead-control-276ba63c07119b65",
+      "executable_sha256": "276ba63c07119b65d904fa8bdc99ad75a5a29075521aef501efa6e56ad4b81d1",
+      "baseline": "797f19f792508b93d79dd1e90c1e34b3ac7ff767",
+      "scope": "Same production as accepted Demand hash; cfg(test) outer diagnostic only. No FileBytes lookahead activation."
+    },
+    "note": "Intermediate shared-target test executables were superseded; raw SHA/receipts preserve their executed scope. Final Core and baseline/control copies are preserved separately."
+  },
+  "rust_abba": [
+    {
+      "side": "a1",
+      "core_sha256": "276ba63c07119b65d904fa8bdc99ad75a5a29075521aef501efa6e56ad4b81d1",
+      "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "status": "accepted_terminal_error",
+        "kind": "analysis",
+        "terminal_leaf": "analysis_registration_opaque",
+        "attempts": 198
+      },
+      "cycles": 198,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_shell++sh_configure+local_config_shell"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "template",
+            "repository": "rules_cc++cc_configure_extension+local_config_cc_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_tools+winsdk_configure+local_config_winsdk"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_rust++rust+rust_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "platforms+host_platform+host_platform"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_cc++compatibility_proxy+cc_compatibility_proxy"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_version"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_globals"
+          }
+        ],
+        "record_count": 15,
+        "roots": 8
+      },
+      "elapsed_seconds": 3.1331201279972447,
+      "file_bytes_discovery": null,
+      "trace_truncated": true,
+      "events_retained": 128,
+      "modeled_retained_bytes": 743303,
+      "peak_modeled_retained_bytes": 24646982,
+      "peak_backing_bytes": 4870639616,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-rust-a1.json",
+        "sha256": "a2b5bcd118878e2d93944f3a1443c4990f114cfe5d49344a28f376d304e412a7"
+      }
+    },
+    {
+      "side": "b1",
+      "core_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920",
+      "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "status": "accepted_terminal_error",
+        "kind": "analysis",
+        "terminal_leaf": "analysis_registration_opaque",
+        "attempts": 189
+      },
+      "cycles": 189,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_shell++sh_configure+local_config_shell"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "template",
+            "repository": "rules_cc++cc_configure_extension+local_config_cc_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_tools+winsdk_configure+local_config_winsdk"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_rust++rust+rust_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "platforms+host_platform+host_platform"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_cc++compatibility_proxy+cc_compatibility_proxy"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_version"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_globals"
+          }
+        ],
+        "record_count": 15,
+        "roots": 8
+      },
+      "elapsed_seconds": 3.092926120007178,
+      "file_bytes_discovery": {
+        "after": true,
+        "before": false,
+        "extended_during_capture": true,
+        "is_servicing_evidence": false,
+        "process_wide": true,
+        "request_isolated": false
+      },
+      "trace_truncated": true,
+      "events_retained": 128,
+      "modeled_retained_bytes": 743303,
+      "peak_modeled_retained_bytes": 24646982,
+      "peak_backing_bytes": 4870639616,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-rust-b1.json",
+        "sha256": "8792b4840012520d06f93d9846c3d48348e7342ec6d2c2f9ad997a66ff7c9333"
+      }
+    },
+    {
+      "side": "b2",
+      "core_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920",
+      "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "status": "accepted_terminal_error",
+        "kind": "analysis",
+        "terminal_leaf": "analysis_registration_opaque",
+        "attempts": 189
+      },
+      "cycles": 189,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_shell++sh_configure+local_config_shell"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "template",
+            "repository": "rules_cc++cc_configure_extension+local_config_cc_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_tools+winsdk_configure+local_config_winsdk"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_rust++rust+rust_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "platforms+host_platform+host_platform"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_cc++compatibility_proxy+cc_compatibility_proxy"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_version"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_globals"
+          }
+        ],
+        "record_count": 15,
+        "roots": 8
+      },
+      "elapsed_seconds": 2.890588583002682,
+      "file_bytes_discovery": {
+        "after": true,
+        "before": false,
+        "extended_during_capture": true,
+        "is_servicing_evidence": false,
+        "process_wide": true,
+        "request_isolated": false
+      },
+      "trace_truncated": true,
+      "events_retained": 128,
+      "modeled_retained_bytes": 743303,
+      "peak_modeled_retained_bytes": 24646982,
+      "peak_backing_bytes": 4870639616,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-rust-b2.json",
+        "sha256": "cbae27e2210c3632db6a14324ed14a384e5f023180c9f8eafa106420c685991d"
+      }
+    },
+    {
+      "side": "a2",
+      "core_sha256": "276ba63c07119b65d904fa8bdc99ad75a5a29075521aef501efa6e56ad4b81d1",
+      "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+      "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "result": {
+        "status": "accepted_terminal_error",
+        "kind": "analysis",
+        "terminal_leaf": "analysis_registration_opaque",
+        "attempts": 198
+      },
+      "cycles": 198,
+      "last_recorded_epoch": {
+        "latest": [
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "file",
+            "repository": "rules_shell++sh_configure+local_config_shell"
+          },
+          {
+            "archive": null,
+            "index": 0,
+            "kind": "template",
+            "repository": "rules_cc++cc_configure_extension+local_config_cc_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_tools+winsdk_configure+local_config_winsdk"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "rules_rust++rust+rust_toolchains"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "platforms+host_platform+host_platform"
+          },
+          {
+            "archive": null,
+            "index": 2,
+            "kind": "file",
+            "repository": "rules_cc++compatibility_proxy+cc_compatibility_proxy"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_version"
+          },
+          {
+            "archive": null,
+            "index": 1,
+            "kind": "file",
+            "repository": "bazel_features++version_extension+bazel_features_globals"
+          }
+        ],
+        "record_count": 15,
+        "roots": 8
+      },
+      "elapsed_seconds": 3.092521497004782,
+      "file_bytes_discovery": null,
+      "trace_truncated": true,
+      "events_retained": 128,
+      "modeled_retained_bytes": 743303,
+      "peak_modeled_retained_bytes": 24646982,
+      "peak_backing_bytes": 4870639616,
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-rust-a2.json",
+        "sha256": "c1018bd5521946ec42908abbccec394733bb1d31393b98edd73900cf2245df7b"
+      }
+    }
+  ],
+  "comparison_qualification": {
+    "result": "All four reach accepted terminal analysis_registration_opaque; this names the retained outer wrapper, not its private leaf or a presumed API failure. Last recorded epochs all8roots/15records; cycles198/189/189/198. Both candidates record false\u2192true extension.",
+    "limits": "Traces truncate at128 events. Same static category/recorded prefix does not prove identical full error, all intermediate work, servicing, successful Rust cquery or speed. Native operational caps are containment, not equivalent-command memory proof.",
+    "memory": "All captures report modeled retained743303, peak modeled retained24646982, peak backing4870639616; these are not RSS. All cleanup returns exactly to FD0/backing0/retained168 baseline.",
+    "prior_diagnostic": "Two earlier outer-kind runs passed attempt853 and stopped at WorkDeadline954/915 with55roots; retain them rather than equating earlier/private errors with this registration wrapper."
+  },
+  "fixture_growth": {
+    "new_fixture_files": 0,
+    "new_inline_tests": "Reuses existing actual Inventory/Module/Command and event/cycle helpers, plus one bounded metadata-key policy harness. Explicit ineligible serial negatives author >256KiB real bodies with matching size facts; no false hints or production exceptions.",
+    "original_inputs": "Original six-file Rust fixture and staged config933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203 unchanged."
+  },
+  "review": {
+    "initial_design": "ACCEPT",
+    "bounded_box_refinement": "ACCEPT",
+    "phase_lifetime_refinement": "ACCEPT",
+    "actual_corrected_source": "ACCEPT",
+    "final": "ACCEPT"
+  },
+  "final_validation": {
+    "ordinary_selected_passed": 89,
+    "native_selected_passed": 5,
+    "warm_ignored_selected_passed": 1,
+    "actual_warm_commands": 4,
+    "original_rust_diagnostics": 4,
+    "mutation_freeze": {
+      "all_changed_sources_unchanged": true,
+      "rust_sources_unchanged": true,
+      "input_config_unchanged": true,
+      "native_sequence": {
+        "steps": [
+          {
+            "label": "native-guards",
+            "command": [
+              "/usr/bin/python3",
+              "/tmp/slug-wp425-validation/run-focused-native.py",
+              "file-bytes-lookahead-native-guards",
+              "file-bytes-lookahead-core-build",
+              "file-bytes-lookahead-cli-build",
+              "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+              "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+              "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+              "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+              "runtime::repository_physical_root::initialize::tests::owned_observation_tests::native_owned_file_observation_reuses_canonical_body_and_preserves_history_after_root_drop"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 2.267474571999628
+          },
+          {
+            "label": "authentic-warm",
+            "command": [
+              "/usr/bin/python3",
+              "/tmp/slug-wp425-validation/run-source-quota-native.py",
+              "file-bytes-lookahead-authentic-warm",
+              "file-bytes-lookahead-core-build",
+              "file-bytes-lookahead-cli-build",
+              "authentic-warm"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 15.095172448010999
+          },
+          {
+            "label": "rust-a1",
+            "command": [
+              "/usr/bin/python3",
+              "/tmp/slug-wp425-validation/run-rust-frontier.py",
+              "file-bytes-lookahead-rust-a1",
+              "terminal-kind-final-core-build",
+              "/tmp/slug-wp425-validation/rust-frontier-preparation-fourth-flat-dirfd.json",
+              "--preserved-core-artifact",
+              "/tmp/slug-wp425-validation/file-bytes-lookahead-control-preservation.json"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 5.244016280004871
+          },
+          {
+            "label": "rust-b1",
+            "command": [
+              "/usr/bin/python3",
+              "/tmp/slug-wp425-validation/run-rust-frontier.py",
+              "file-bytes-lookahead-rust-b1",
+              "file-bytes-lookahead-core-build",
+              "/tmp/slug-wp425-validation/rust-frontier-preparation-fourth-flat-dirfd.json"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 4.433391908998601
+          },
+          {
+            "label": "rust-b2",
+            "command": [
+              "/usr/bin/python3",
+              "/tmp/slug-wp425-validation/run-rust-frontier.py",
+              "file-bytes-lookahead-rust-b2",
+              "file-bytes-lookahead-core-build",
+              "/tmp/slug-wp425-validation/rust-frontier-preparation-fourth-flat-dirfd.json"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 4.195538778993068
+          },
+          {
+            "label": "rust-a2",
+            "command": [
+              "/usr/bin/python3",
+              "/tmp/slug-wp425-validation/run-rust-frontier.py",
+              "file-bytes-lookahead-rust-a2",
+              "terminal-kind-final-core-build",
+              "/tmp/slug-wp425-validation/rust-frontier-preparation-fourth-flat-dirfd.json",
+              "--preserved-core-artifact",
+              "/tmp/slug-wp425-validation/file-bytes-lookahead-control-preservation.json"
+            ],
+            "exit_code": 0,
+            "elapsed_seconds": 5.171228053004597
+          }
+        ],
+        "elapsed_seconds": 36.407194532992435
+      },
+      "rust_captures": [
+        {
+          "side": "a1",
+          "core_sha256": "276ba63c07119b65d904fa8bdc99ad75a5a29075521aef501efa6e56ad4b81d1",
+          "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+          "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+          "cycles": 198,
+          "elapsed_seconds": 3.1331201279972447,
+          "status": "accepted_terminal_error",
+          "kind": "analysis",
+          "terminal_leaf": "analysis_registration_opaque",
+          "roots": 8,
+          "records": 15,
+          "file_bytes_discovery": null,
+          "cleanup": {
+            "backing_bytes": 0,
+            "baseline": 168,
+            "native_fds": 0,
+            "retained_bytes": 168
+          }
+        },
+        {
+          "side": "b1",
+          "core_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920",
+          "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+          "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+          "cycles": 189,
+          "elapsed_seconds": 3.092926120007178,
+          "status": "accepted_terminal_error",
+          "kind": "analysis",
+          "terminal_leaf": "analysis_registration_opaque",
+          "roots": 8,
+          "records": 15,
+          "file_bytes_discovery": {
+            "after": true,
+            "before": false,
+            "extended_during_capture": true,
+            "is_servicing_evidence": false,
+            "process_wide": true,
+            "request_isolated": false
+          },
+          "cleanup": {
+            "backing_bytes": 0,
+            "baseline": 168,
+            "native_fds": 0,
+            "retained_bytes": 168
+          }
+        },
+        {
+          "side": "b2",
+          "core_sha256": "264266c30126ee2cdbdfb0fd1e233fc4d44b26cfba65c7a002ce606ac31cf920",
+          "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+          "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+          "cycles": 189,
+          "elapsed_seconds": 2.890588583002682,
+          "status": "accepted_terminal_error",
+          "kind": "analysis",
+          "terminal_leaf": "analysis_registration_opaque",
+          "roots": 8,
+          "records": 15,
+          "file_bytes_discovery": {
+            "after": true,
+            "before": false,
+            "extended_during_capture": true,
+            "is_servicing_evidence": false,
+            "process_wide": true,
+            "request_isolated": false
+          },
+          "cleanup": {
+            "backing_bytes": 0,
+            "baseline": 168,
+            "native_fds": 0,
+            "retained_bytes": 168
+          }
+        },
+        {
+          "side": "a2",
+          "core_sha256": "276ba63c07119b65d904fa8bdc99ad75a5a29075521aef501efa6e56ad4b81d1",
+          "cli_sha256": "8ff5ded6d519230847c24e7b4de1946083217889483901e102e0db3be7189ff6",
+          "input_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+          "cycles": 198,
+          "elapsed_seconds": 3.092521497004782,
+          "status": "accepted_terminal_error",
+          "kind": "analysis",
+          "terminal_leaf": "analysis_registration_opaque",
+          "roots": 8,
+          "records": 15,
+          "file_bytes_discovery": null,
+          "cleanup": {
+            "backing_bytes": 0,
+            "baseline": 168,
+            "native_fds": 0,
+            "retained_bytes": 168
+          }
+        }
+      ]
+    },
+    "plan_archive_diff_links": {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-final-validation.json",
+      "sha256": "547ec99e57a2afdcff2d0363235eed9620624a789573f1888ab07f9c4b0a9afa"
+    }
+  },
+  "raw_receipts": [
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-actual-inventory-red.json",
+      "sha256": "dbc9b32252dd347c4fa057bb1fe7381b59daedd052fa9aa92a58770b67e2378a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red.json",
+      "sha256": "6542418fffcee3734406e1ff75439d5477f0e9c2d958c2caea6e920cb1877c5f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red-mutation.json",
+      "sha256": "553de753ca66992b6c7930318eb360ac9a3a7288a473760dd911475c045529ae"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-initial-layout-refusal.json",
+      "sha256": "69e867922b2687f4722c17069963b27643c90bce2809b1139d692e7eccd52955"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-initial-layout-refusal-mutation.json",
+      "sha256": "0f4aa48c2b77b506a36276a7c230bec74556ed55c54db97e43f4f2edfa44d18d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-boxed-layout-refusal.json",
+      "sha256": "a51eda71e62bb85a7020a9c23c8a6096b3b1ff46e735ac446b4bf4203828cddd"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-boxed-layout-refusal-mutation.json",
+      "sha256": "e92801be68a09d440a9f667949b78b872e0190ffbbdf364b8e1aeee549e53537"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-initial-layout-audit.json",
+      "sha256": "c075f0896c6bf16ffd92284c7b9915a9fcdf2b1cc7e6ed4b7c8a734f125e56db"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red-first-compile-refusal.json",
+      "sha256": "726fcbdbb187d81e1f64edf82ff9f32cbd1c828c954f6e14ca7b0b30f22009c0"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-boxed-layout-prologue-diagnostic.json",
+      "sha256": "7693aff93f2c39b0179c89070ae0cff430e381025c4543dbb86e38c0a3ea9aca"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-final-codegen.json",
+      "sha256": "ca3bbac3acad8c8b1c7b613bddcb740d6b33a65f200d3e96ed960cdc1bc5b96a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-final-codegen.txt",
+      "sha256": "464634527eeb695df707101394940511f4fa0113c306e4af432a8c56aab1dcec"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-lstat-preservation.json",
+      "sha256": "c31562a4b0cab3b893da60eae2d871efe4a70702fa848b0ee5b75b8fdcd46fc1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-loading-tests.json",
+      "sha256": "5b09eb6da5e045b7d21ee724ce8d654c4cf3e42d9cdb65684a4147876b794e71"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-core-tests.json",
+      "sha256": "95e8ec631877c37809ea51e15a67ad362e143c1d8b7bbed9c09531f949ff0f25"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-native-guards.json",
+      "sha256": "48fd90e246682af512a0a9c534a389676328d1896c549e4277f26be1c854d543"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-authentic-warm.json",
+      "sha256": "941545b72ae8e1af52755f0a106acc3e26ce07ce9091d5652bea21f259ecf44a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-control-preservation.json",
+      "sha256": "3ee8ee86ff51728afe39344e991dd2787b95456fc5f3073d4124208e58fa6585"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-cli-control-preservation.json",
+      "sha256": "f894e5ea102722067e0c01b450e38a00226ca3b32cbd8c4578d0b40a22e0a43f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-candidate-preservation.json",
+      "sha256": "d967a495c3629f43675b1afe9f4b58f4c173075b4f305329844e4dac9704ca3f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-native-freeze.json",
+      "sha256": "b349ee44ef0b25aeb7e7f2b46ad8520f7f4d7ad2fbb396a3a42c84d9b83994d8"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-native-sequence.json",
+      "sha256": "7ec8f516ad3f46db3f40fcf7a7cd0c40379919b456e489308f5607f31551d4ff"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-native-validation.json",
+      "sha256": "ec53d3909e0934e800ab45917b87c7a6e2bbfcc822d5be143beaa6d360b85f4d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-format.json",
+      "sha256": "bc61400887a40511ba50ae75938953cc08fa32edf2fa4daa5dc022edffce7b3e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/terminal-kind-freeze.json",
+      "sha256": "2516278db33d734714b74f4f35b4f0641e64bd0752b88502e3d8aa05dbe862dd"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/terminal-kind-original-rust.json",
+      "sha256": "acea2341835ec38f264a4059e9f56e872a3a22f619c3aac970a2c33ff3e6ff28"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/terminal-kind-original-rust-repeat.json",
+      "sha256": "819e5bc04163ba24d035e3b51d0aa48a42ceb538c63c9ee5b1ff988971e6a1c8"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-red-loading-build-result.json",
+      "sha256": "5e0b0a37e0a894a2efc44ee5d9258cbd843dc4586eaf976fe7beee120ecfb758"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red-build-result.json",
+      "sha256": "b7bfee23b086e8d346289c93d9ef37750f2bb2d9d0499ba605710c6f27ed0363"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red2-build-result.json",
+      "sha256": "71d45ebd53007fe62122d3a80f2590110ef11d45e3a00bf3d178286453865139"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-registration-red3-build-result.json",
+      "sha256": "36a87f18c0213a3e309db57ed5a360abaa2198f8868420e3c1c1300057d617e0"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-loading-build-result.json",
+      "sha256": "368c36be62d75d493ef14ce170b8193084180eb08445e4196b821d9039999abb"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-core-build-result.json",
+      "sha256": "85646e56f011844ec845cb68d77c15ede07fa62bf1e5b2f24b94d0a63d646cc1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/file-bytes-lookahead-cli-build-result.json",
+      "sha256": "0ba03b5648ae0b2fb688169062f1fb0fc594b4e7baf5e3ec687590a09b8391e0"
+    }
+  ],
+  "next": "Classify the actual typed Analysis Registration leaf with a bounded discriminant-only walk through retained errors, then implement the demanded generic behavior. Never parse private messages, infer a caller API, increase caps or integrate diagnostics alone.",
+  "remaining": [
+    "Authentic Rust cquery success and Archive closure",
+    "Derived Source Path/repeated Workspace closure gates",
+    "General production activation",
+    "Equivalent completed-command memory/latency and bootstrap/self-hosting gates"
+  ]
+}

@@ -37883,6 +37883,26 @@ async fn observed_repository_package_load_child_terminals_keep_prefixes() {
         let mut epoch =
             EpochBuilder::external_sources(&files, 150 + case as i64 * 2 + semantic as i64);
         if missing_bytes {
+            // A truthful oversized source is outside known-byte discovery;
+            // withholding its bytes must retain the ordered serial barrier.
+            let body = format!(
+                "#{}\n{}",
+                "x".repeat(256 * 1024),
+                std::str::from_utf8(CHILD).unwrap()
+            );
+            let path = format!("/workspace/dep/{}", children[case]);
+            epoch.file(&path, &body, 150 + case as i64 * 2);
+            epoch.entries.insert(
+                EpochBuilder::demand(&path, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::RegularFile,
+                    body.len() as i64,
+                    150,
+                    150,
+                    150,
+                    0o755,
+                ))),
+            );
             assert!(
                 epoch
                     .entries
@@ -37924,7 +37944,7 @@ async fn observed_repository_package_load_child_terminals_keep_prefixes() {
                     entry.key == format!("observed-external-bzl-module:@@dep+//:{name}")
                 }),
                 // Eligible Lstat holes may inspect later complete children.
-                // Semantic errors and FileBytes Needs remain serial barriers.
+                // Semantic errors and oversized FileBytes Needs remain serial barriers.
                 (!semantic && !missing_bytes) || position <= case
             );
         }
@@ -38944,7 +38964,7 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
             .any(|entry| entry.key == "external-bzl-module:@@dep+//:second.bzl")
     );
 
-    // FileBytes is outside that metadata class and remains a serial barrier.
+    // A truthful oversized FileBytes source is outside both discovery classes.
     let bytes_tracker = Arc::new(EventTracker::default());
     let mut bytes_epoch = EpochBuilder::external_sources(
         &[
@@ -38957,6 +38977,19 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
     let bytes_demand = EpochBuilder::demand(
         "/workspace/dep/first.bzl",
         PathObservationOperation::FileBytes,
+    );
+    let large_body = format!("#{}\nFIRST = 1\n", "x".repeat(256 * 1024));
+    bytes_epoch.file("/workspace/dep/first.bzl", &large_body, 712);
+    bytes_epoch.entries.insert(
+        EpochBuilder::demand("/workspace/dep/first.bzl", PathObservationOperation::Lstat),
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            PathNodeKind::RegularFile,
+            large_body.len() as i64,
+            712,
+            712,
+            712,
+            0o755,
+        ))),
     );
     assert!(bytes_epoch.entries.shift_remove(&bytes_demand).is_some());
     let mut bytes_tx = transaction(

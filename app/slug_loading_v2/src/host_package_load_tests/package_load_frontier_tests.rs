@@ -339,7 +339,13 @@ async fn observed_inventory_lstat_window_stops_at_whole_file_bytes_barrier() {
     .unwrap();
     let mut tx = update(tx, &bytes_pending).await;
     pending(&tx.compute(&key).await.unwrap(), &[b]);
-    no_c_or_parent_batch(&tracker, &key);
+    // The earlier Lstat window ended. A first eligible byte window may now
+    // inspect complete C, while B still prevents the inventory evaluator.
+    let rows = no_inventory_batch(&tracker, &key);
+    assert!(
+        rows.iter()
+            .any(|row| row.key == "observed-external-bzl-module:@@dep+//:c.bzl")
+    );
     let mut tx = update(tx, &full).await;
     let value = tx.compute(&key).await.unwrap();
     let LoadingPreparationOutcome::Complete(Ok(observed)) = &value else {
@@ -364,6 +370,15 @@ async fn observed_inventory_lstat_window_stops_at_whole_file_bytes_barrier() {
 
 #[tokio::test]
 async fn observed_inventory_deferred_error_keeps_selected_event_closure_and_first_error() {
+    inventory_deferred_error(PathObservationOperation::Lstat).await;
+}
+
+#[tokio::test]
+async fn observed_inventory_known_bytes_deferred_error_preserves_selected_event_closure() {
+    inventory_deferred_error(PathObservationOperation::FileBytes).await;
+}
+
+async fn inventory_deferred_error(operation: PathObservationOperation) {
     let full = EpochBuilder::external_sources(
         &[
             ("BUILD.bazel", THREE_LOADS),
@@ -377,7 +392,7 @@ async fn observed_inventory_deferred_error_keeps_selected_event_closure_and_firs
         903,
     )
     .build();
-    let a = file_demand("a", PathObservationOperation::Lstat);
+    let a = file_demand("a", operation.dupe());
     let Fixture {
         mut tx,
         route,
@@ -407,7 +422,15 @@ async fn observed_inventory_deferred_error_keeps_selected_event_closure_and_firs
         (
             d.dupe(),
             if d == &a {
-                Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing))
+                Arc::new(match operation {
+                    PathObservationOperation::Lstat => {
+                        PathObservationResult::Lstat(PathOperationResult::Missing)
+                    }
+                    PathObservationOperation::FileBytes => {
+                        PathObservationResult::FileBytes(PathOperationResult::Missing)
+                    }
+                    _ => unreachable!(),
+                })
             } else {
                 r.dupe()
             },
@@ -493,6 +516,15 @@ async fn observed_inventory_deferred_error_keeps_selected_event_closure_and_firs
 
 #[tokio::test]
 async fn observed_inventory_pending_lstat_defers_later_cycle_and_fresh_retry_recovers() {
+    inventory_deferred_cycle(PathObservationOperation::Lstat).await;
+}
+
+#[tokio::test]
+async fn observed_inventory_known_bytes_defers_later_cycle_and_fresh_retry_recovers() {
+    inventory_deferred_cycle(PathObservationOperation::FileBytes).await;
+}
+
+async fn inventory_deferred_cycle(operation: PathObservationOperation) {
     let cycle = EpochBuilder::external_sources(
         &[
             ("BUILD.bazel", THREE_LOADS),
@@ -503,7 +535,7 @@ async fn observed_inventory_pending_lstat_defers_later_cycle_and_fresh_retry_rec
         904,
     )
     .build();
-    let a = file_demand("a", PathObservationOperation::Lstat);
+    let a = file_demand("a", operation);
     let Fixture {
         mut tx,
         key,
@@ -589,4 +621,98 @@ async fn cycle_retry(
     };
     data.data.set(CaptureEvaluationEvents);
     update.commit_with_data(data).await
+}
+
+#[tokio::test]
+async fn observed_inventory_load_siblings_collect_known_file_bytes_and_finish_one_round() {
+    let bodies: [(&str, &[u8]); 2] = [("a.bzl", b"A='first'\n"), ("b.bzl", b"B='second'\n")];
+    let mut builder =
+        EpochBuilder::external_sources(&[("BUILD.bazel", BUILD), bodies[0], bodies[1]], 906);
+    // This fixture's generic node helper uses the revision marker as size.
+    // Byte-discovery evidence instead records the actual authored body lengths.
+    for (name, body) in bodies {
+        builder.entries.insert(
+            EpochBuilder::demand(
+                &format!("/workspace/dep/{name}"),
+                PathObservationOperation::Lstat,
+            ),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                body.len() as i64,
+                906,
+                906,
+                906,
+                0o755,
+            ))),
+        );
+    }
+    let full = builder.build();
+    let missing = [
+        file_demand("a", PathObservationOperation::FileBytes),
+        file_demand("b", PathObservationOperation::FileBytes),
+    ];
+    let Fixture {
+        mut tx,
+        key,
+        tracker,
+        ..
+    } = fixture_from(full.dupe(), &missing).await;
+    let value = tx.compute(&key).await.unwrap();
+    pending(&value, &missing);
+    let rows = no_inventory_batch(&tracker, &key);
+    for name in ["a.bzl", "b.bzl"] {
+        assert!(
+            rows.iter()
+                .any(|row| row.key == format!("observed-external-bzl-module:@@dep+//:{name}"))
+        );
+    }
+    let LoadingPreparationOutcome::Need(needs) = &value else {
+        unreachable!()
+    };
+    let returned = needs.path_observations().unwrap().demands();
+    let retained = PathObservationEpoch::from_shared(
+        full.observations()
+            .iter()
+            .filter(|(d, _)| !missing.contains(d))
+            .map(|(d, r)| (d.dupe(), r.dupe())),
+    )
+    .unwrap();
+    let supplied = PathObservationEpoch::from_shared(
+        full.observations()
+            .iter()
+            .filter(|(d, _)| returned.contains(d))
+            .map(|(d, r)| (d.dupe(), r.dupe())),
+    )
+    .unwrap();
+    assert_eq!(supplied.observations().len(), returned.len());
+    let fulfilled = retained.try_union(&supplied).unwrap();
+    let mut tx = update(tx, &fulfilled).await;
+    let complete = tx.compute(&key).await.unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(observed)) = &complete else {
+        panic!("one known-byte fulfillment round must finish inventory: {complete:?}")
+    };
+    assert_eq!(
+        observed
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    for (d, r) in observed.observations().observations() {
+        assert!(Arc::ptr_eq(r, full.get(d).unwrap()));
+    }
+    let rows = tracker.take();
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.key == key.to_string())
+            .filter_map(|row| row.batch.as_ref())
+            .flat_map(event_texts)
+            .collect::<Vec<_>>(),
+        ["INVENTORY_EVALUATED"]
+    );
 }

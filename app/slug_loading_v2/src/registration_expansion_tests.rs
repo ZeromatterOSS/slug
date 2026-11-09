@@ -1590,3 +1590,6 @@ async fn observed_cancellation_publishes_no_family_owner_then_recovers_and_reuse
     assert_eq!(parent.kind, ActivationKind::Reused);
     assert!(parent.batch.is_none());
 }
+
+#[path = "registration_expansion_tests/file_bytes_prerequisite_tests.rs"]
+mod file_bytes_prerequisite_tests;

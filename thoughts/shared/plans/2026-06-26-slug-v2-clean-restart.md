@@ -116,8 +116,18 @@ inventory work is RED→GREEN; 183 ordinary checks, five native guards and four
 warm originals pass. The latest control and candidate each reach an analysis
 terminal-error category at attempt 853/epoch 53 roots/109 records; other runs
 retain the unchanged WorkDeadline. The bounded reason formatter withholds the
-full error. Next classify the typed failure without freeform output and implement
-its demanded general behavior. Success, latency/RSS and activation remain open.
+full error. Two later bounded outer-kind captures passed that attempt without
+reproducing the terminal error. The
+[FileBytes component](./slug-v2-subplans/wp1225-file-bytes-lookahead-acceptance-2026-11-09.json)
+now batches bounded known-size prerequisites beneath registration/package imports.
+Actual A-only→A+B recovery, 89 ordinary checks, five native guards and four warm
+originals pass; independent final review accepts the component. Existing controls/native caps remain.
+Both candidate original captures record an installed unique extension. ABBA
+cycles198/189/189/198 all reach `analysis_registration_opaque`, with last recorded
+8 roots/15 records and truncated traces. Next classify that retained typed leaf
+without private text, then implement its demanded general behavior. These
+results prove no identical full error, servicing, successful Rust cquery,
+latency/RSS or activation.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.
