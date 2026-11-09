@@ -1664,3 +1664,5 @@ mod retention_admission_tests;
 mod source_link_tests;
 
 mod optional_checksum_tests;
+
+mod body_coverage_tests;

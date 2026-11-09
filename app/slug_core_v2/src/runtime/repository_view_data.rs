@@ -292,6 +292,7 @@ pub(in crate::runtime::repository_physical_root) struct CoveredWorkspaceRequest 
     request: Arc<RepositoryWorkspaceRequest>,
     dependencies: Arc<NativeReadViewDependencies>,
     owned_bytes: usize,
+    body_candidates: Option<NativeBodyCandidates>,
     _credit: ResourceCredit,
 }
 impl std::ops::Deref for CoveredWorkspaceRequest {
@@ -306,13 +307,42 @@ impl CoveredWorkspaceRequest {
         dependencies: Arc<NativeReadViewDependencies>,
         resources: &Arc<RepositoryRootResources>,
     ) -> Result<Arc<Self>, PhysicalRootError> {
+        Self::from_canonical_inner(request, dependencies, resources, None, None, &|| true)
+    }
+    pub(super) fn from_canonical_with_bodies(
+        request: RepositoryWorkspaceRequest,
+        dependencies: Arc<NativeReadViewDependencies>,
+        resources: &Arc<RepositoryRootResources>,
+        bodies: NativeBodyCandidates,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Arc<Self>, PhysicalRootError> {
+        Self::from_canonical_inner(
+            request,
+            dependencies,
+            resources,
+            Some(bodies),
+            Some(scope),
+            active,
+        )
+    }
+    fn from_canonical_inner(
+        request: RepositoryWorkspaceRequest,
+        dependencies: Arc<NativeReadViewDependencies>,
+        resources: &Arc<RepositoryRootResources>,
+        bodies: Option<NativeBodyCandidates>,
+        scope: Option<&Arc<SourceServiceScope>>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Arc<Self>, PhysicalRootError> {
         struct Incoming {
             request: RepositoryWorkspaceRequest,
             dependencies: Arc<NativeReadViewDependencies>,
+            bodies: Option<NativeBodyCandidates>,
         }
-        let incoming = Incoming {
+        let mut incoming = Incoming {
             request,
             dependencies,
+            bodies,
         };
         if !incoming.dependencies.covers_request(&incoming.request) {
             return Err(PhysicalRootError::Reservation);
@@ -320,11 +350,22 @@ impl CoveredWorkspaceRequest {
         let dependencies = incoming
             .dependencies
             .for_request(&incoming.request, resources)?;
-        let owned_bytes = incoming
-            .request
-            .storage_partition()
-            .map_err(PhysicalRootError::Protocol)?
-            .owned_bytes();
+        let storage = if let Some(bodies) = &mut incoming.bodies {
+            bodies.ledger().check_request_origin(
+                resources,
+                scope.ok_or(PhysicalRootError::Reservation)?,
+                incoming.request.reservation(),
+                active,
+            )?;
+            incoming.request.try_visit_body_allocations(&mut |body| {
+                bodies.retain(body, active)?;
+                Ok::<_, PhysicalRootError>(())
+            })?;
+            incoming.request.body_covered_storage_partition()
+        } else {
+            incoming.request.storage_partition()
+        };
+        let owned_bytes = storage.map_err(PhysicalRootError::Protocol)?.owned_bytes();
         let credit = resources.reserve(
             add(
                 add(
@@ -340,6 +381,7 @@ impl CoveredWorkspaceRequest {
             request: Arc::new(incoming.request),
             dependencies,
             owned_bytes,
+            body_candidates: incoming.bodies,
             _credit: credit,
         }))
     }
@@ -370,6 +412,9 @@ impl CoveredWorkspaceRequest {
     pub(super) fn dependencies(&self) -> &Arc<NativeReadViewDependencies> {
         &self.dependencies
     }
+    pub(super) fn body_candidates(&self) -> Option<&NativeBodyCandidates> {
+        self.body_candidates.as_ref()
+    }
 }
 
 /// Full native terminal request owners share this guard. Its data dependencies
@@ -377,6 +422,7 @@ impl CoveredWorkspaceRequest {
 #[derive(Debug)]
 pub(in crate::runtime) struct NativeWorkspaceHistoryGuard {
     _dependencies: Arc<NativeReadViewDependencies>,
+    _bodies: Option<Arc<NativeBodyLedger>>,
     _credit: ResourceCredit,
 }
 impl NativeWorkspaceHistoryGuard {
@@ -386,6 +432,18 @@ impl NativeWorkspaceHistoryGuard {
     ) -> Arc<Self> {
         Arc::new(Self {
             _dependencies: dependencies,
+            _bodies: None,
+            _credit: credit,
+        })
+    }
+    pub(super) fn new_with_bodies(
+        dependencies: Arc<NativeReadViewDependencies>,
+        bodies: Arc<NativeBodyLedger>,
+        credit: ResourceCredit,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            _dependencies: dependencies,
+            _bodies: Some(bodies),
             _credit: credit,
         })
     }

@@ -686,3 +686,159 @@ fn snapshot_completion_rejects_foreign_owner_and_failed_protocol_without_orphani
     assert!(weak.upgrade().is_none());
     assert_eq!(bank.snapshot().retained_bytes, baseline);
 }
+
+#[test]
+fn covered_snapshot_completion_shares_one_actual_body_allocation_with_history() {
+    // Borrowed ordinary RootIo kernel only, not a native backing/factory proof.
+    // Two full 2MiB payload debits cannot fit this bank, but one payload plus
+    // all temporary/control forecasts can. Pure fallback tests stay unchanged.
+    let fixture = tempfile::tempdir().unwrap();
+    prepare(fixture.path());
+    let length = 2 * 1024 * 1024;
+    fs::write(fixture.path().join("large"), vec![b'x'; length]).unwrap();
+    let selected = reservation(Path::new("/absent/covered-snapshot"), 229);
+    let scope = scope();
+    let bank = RepositoryRootResources::new(
+        RepositoryRootResourceLimits::new(3 * 1024 * 1024, 16, 4 * ARCHIVE_BYTES).unwrap(),
+    )
+    .unwrap();
+    let baseline = bank.snapshot().retained_bytes;
+    let ledger = NativeBodyLedger::new(&bank, &scope, &selected, &|| true).unwrap();
+    let mut candidates = ledger.candidates().unwrap();
+    let initial = RepositoryWorkspaceTranscript::new(selected.clone(), 0o755).unwrap();
+    let file = File::open(fixture.path()).unwrap();
+    let io = RootIo::new(
+        &file,
+        io_limits(RepositoryWorkspaceMode::Archive, &selected),
+    )
+    .unwrap();
+    let scratch = bank.reserve(IO_SCRATCH, 3, 0).unwrap();
+    let captured = capture_at_with_sources(
+        &io,
+        &selected,
+        RepositoryWorkspaceMode::Archive,
+        initial.current(),
+        &bank,
+        &scope,
+        &|| true,
+        Limits::for_mode(RepositoryWorkspaceMode::Archive),
+        None,
+        Some(&mut candidates),
+    )
+    .unwrap();
+    let actual = body(captured.entries(), "large").clone();
+    let weak = Arc::downgrade(&actual);
+    let completed = captured
+        .with_body_candidates(candidates)
+        .complete_active(
+            &initial,
+            initial.request(archive()).unwrap(),
+            RepositoryWorkspaceResult::Archive([0; 32]),
+            None,
+            &|| true,
+        )
+        .unwrap();
+    assert!(Arc::ptr_eq(
+        body(completed.transcript().current().entries(), "large"),
+        &actual
+    ));
+    assert!(Arc::ptr_eq(
+        ledger.lookup(&actual, &|| true).unwrap().unwrap().body(),
+        &actual
+    ));
+    assert!(
+        completed
+            .body_ledger
+            .as_ref()
+            .is_some_and(|held| Arc::ptr_eq(held, &ledger))
+    );
+    drop((actual, completed));
+    assert!(
+        weak.upgrade().is_some(),
+        "history ledger must retain admitted allocation"
+    );
+    drop((ledger, scratch));
+    assert!(weak.upgrade().is_none());
+    assert_eq!(bank.snapshot().retained_bytes, baseline);
+}
+
+#[test]
+fn covered_snapshot_refuses_foreign_bank_scope_or_reservation_before_control_discount() {
+    // Bare RootIo sampling remains a full-credit utility seam. Attaching a
+    // separately valid candidate owner cannot turn it into foreign coverage.
+    for mismatch in 0..3 {
+        let fixture = tempfile::tempdir().unwrap();
+        prepare(fixture.path());
+        fs::write(fixture.path().join("file"), b"actual sampled bytes").unwrap();
+        let selected = reservation(Path::new("/absent/coverage-origin"), 230);
+        let foreign_selected = reservation(Path::new("/absent/foreign-origin"), 231);
+        let original_scope = scope();
+        let foreign_scope = scope();
+        let bank = resources();
+        let foreign_bank = resources();
+        let baseline = bank.snapshot().retained_bytes;
+        let foreign_baseline = foreign_bank.snapshot().retained_bytes;
+        let (ledger_bank, ledger_scope, ledger_reservation) = match mismatch {
+            0 => (&foreign_bank, &original_scope, &selected),
+            1 => (&bank, &foreign_scope, &selected),
+            2 => (&bank, &original_scope, &foreign_selected),
+            _ => unreachable!(),
+        };
+        let ledger =
+            NativeBodyLedger::new(ledger_bank, ledger_scope, ledger_reservation, &|| true).unwrap();
+        let candidates = ledger.candidates().unwrap();
+        let initial = RepositoryWorkspaceTranscript::new(selected.clone(), 0o755).unwrap();
+        let file = File::open(fixture.path()).unwrap();
+        let io = RootIo::new(
+            &file,
+            io_limits(RepositoryWorkspaceMode::Archive, &selected),
+        )
+        .unwrap();
+        let captured = sample(
+            &io,
+            &selected,
+            RepositoryWorkspaceMode::Archive,
+            initial.current(),
+            &bank,
+            &original_scope,
+            &|| true,
+        )
+        .unwrap();
+        let weak = Arc::downgrade(body(captured.entries(), "file"));
+        let before = ledger_bank.snapshot();
+        assert!(
+            matches!(
+                captured.with_body_candidates(candidates).complete_active(
+                    &initial,
+                    initial.request(archive()).unwrap(),
+                    RepositoryWorkspaceResult::Archive([0; 32]),
+                    None,
+                    &|| true,
+                ),
+                Err(PhysicalRootError::Reservation)
+            ),
+            "foreign coverage origin {mismatch} must refuse before the body-covered forecast"
+        );
+        assert!(
+            weak.upgrade().is_none(),
+            "refusal must retire sampled raw bytes"
+        );
+        assert_eq!(
+            ledger_bank.snapshot().peak_retained_bytes,
+            before.peak_retained_bytes,
+            "origin refusal must precede candidate/body/control admission"
+        );
+        drop(ledger);
+        for (bank, expected) in [(&bank, baseline), (&foreign_bank, foreign_baseline)] {
+            let final_usage = bank.snapshot();
+            assert_eq!(
+                (
+                    final_usage.retained_bytes,
+                    final_usage.native_fds,
+                    final_usage.backing_bytes
+                ),
+                (expected, 0, 0)
+            );
+        }
+    }
+}

@@ -76,6 +76,21 @@ impl RepositoryRootResources {
             _control: control,
         }))
     }
+    /// Byte-only data coverage; carries no descriptor/backing/domain owner.
+    pub(super) fn reserve_body_bytes(
+        &self,
+        bytes: usize,
+    ) -> Result<ImageDescriptorReservation, PhysicalRootError> {
+        self.bytes
+            .try_reserve(bytes)
+            .map_err(|_| PhysicalRootError::Resource)
+    }
+    pub(super) fn owns_body_block<T>(
+        &self,
+        block: &slug_workspace_v2::BudgetedImageBlock<T>,
+    ) -> bool {
+        block.same_budget(&self.bytes)
+    }
     pub fn snapshot(&self) -> RepositoryRootResourceSnapshot {
         let usage = self
             .usage

@@ -11,10 +11,24 @@ use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceResult;
 use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
 
+use super::body_coverage::NativeBodyCandidates;
+use super::body_coverage::NativeBodyLedger;
 use super::snapshot::CreditedWorkspaceTranscript;
 use super::*;
 use crate::runtime::repository_filesystem_progress::deletion::DeleteWork;
 use crate::runtime::repository_root_io::WriteMode;
+
+struct IncomingOperation {
+    request: RepositoryWorkspaceRequest,
+    candidates: NativeBodyCandidates,
+}
+impl IncomingOperation {
+    fn cover(&mut self, active: &dyn Fn() -> bool) -> Result<(), PhysicalRootError> {
+        self.request.try_visit_body_allocations(&mut |body| {
+            self.candidates.retain(body, active).map(|_| ())
+        })
+    }
+}
 
 pub(super) struct RepositoryWorkspaceProgress {
     builder: RepositoryPhysicalRootBuilder,
@@ -55,6 +69,8 @@ impl RepositoryWorkspaceProgress {
             0,
             0,
         )?;
+        let body_ledger =
+            NativeBodyLedger::new(&builder.resources, scope, &builder.reservation, active)?;
         let transcript = RepositoryWorkspaceTranscript::new(builder.reservation.clone(), root_mode)
             .map_err(PhysicalRootError::Protocol)?;
         seal::verify(&io, transcript.current(), scope, active)?;
@@ -67,6 +83,7 @@ impl RepositoryWorkspaceProgress {
             transcript: CreditedWorkspaceTranscript {
                 transcript,
                 dependencies: None,
+                body_ledger: Some(body_ledger),
                 credit,
             },
             delete_work: DeleteWork::default(),
@@ -75,6 +92,13 @@ impl RepositoryWorkspaceProgress {
             link_sources: None,
             _control: control,
         })
+    }
+
+    pub(super) fn body_ledger(&self) -> &Arc<NativeBodyLedger> {
+        self.transcript
+            .body_ledger
+            .as_ref()
+            .expect("native progress has body coverage")
     }
 
     pub(super) fn builder(&self) -> &RepositoryPhysicalRootBuilder {
@@ -98,7 +122,7 @@ impl RepositoryWorkspaceProgress {
     /// Existing explicit Host source acquisition policy remains separate from
     /// exclusively rooted workspace mutation.
     pub(super) fn apply_archive(
-        mut self,
+        self,
         request: RepositoryWorkspaceRequest,
         runtime: &tokio::runtime::Runtime,
         distdirs: &crate::runtime::ArchiveDistdirPolicy,
@@ -107,20 +131,47 @@ impl RepositoryWorkspaceProgress {
     ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope)?;
         check(scope, active)?;
+        // Keep the raw request ahead of candidate destruction even if staging
+        // refuses before capture or mutation.
+        let candidates = self.body_ledger().candidates()?;
+        self.apply_archive_with_candidates(request, candidates, runtime, distdirs, scope, active)
+    }
+    pub(super) fn apply_archive_with_candidates(
+        mut self,
+        request: RepositoryWorkspaceRequest,
+        candidates: NativeBodyCandidates,
+        runtime: &tokio::runtime::Runtime,
+        distdirs: &crate::runtime::ArchiveDistdirPolicy,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
+        let mut incoming = IncomingOperation {
+            request,
+            candidates,
+        };
+        self.check_scope(scope)?;
+        check(scope, active)?;
+        incoming.candidates.ledger().check_origin(
+            &self.builder.resources,
+            scope,
+            &self.builder.reservation,
+            active,
+        )?;
+        incoming.cover(active)?;
         if self.link_sources.is_none() {
             let sources = SourceLinkSet::empty(&self.builder.resources, scope, active)?;
             self.admit_link_sources(sources)?;
         }
         if self
             .transcript()
-            .replay(&request)
+            .replay(&incoming.request)
             .map_err(PhysicalRootError::Protocol)?
             .is_some()
         {
             return Ok(self);
         }
         let capture = archive::VerifiedWorkspaceArchiveCapture::capture(
-            &request,
+            &incoming.request,
             &self.builder.resources,
             runtime,
             distdirs,
@@ -128,34 +179,45 @@ impl RepositoryWorkspaceProgress {
             active,
         )?;
         let result = capture.extract(&self.builder, &mut self.decoded, scope, active)?;
-        self.complete_snapshot(request, result, scope, active)
+        self.complete_snapshot(incoming, result, scope, active)
     }
 
     fn complete_snapshot(
         mut self,
-        request: RepositoryWorkspaceRequest,
+        incoming: IncomingOperation,
         result: RepositoryWorkspaceResult,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
+        // Result (which can own a newly captured body) precedes incoming
+        // candidates, including capture refusal before completion is entered.
+        struct CompletionInput {
+            result: RepositoryWorkspaceResult,
+            incoming: IncomingOperation,
+        }
+        let mut input = CompletionInput { result, incoming };
         check(scope, active)?;
         let sources = match &self.link_sources {
             Some(sources) => sources.clone(),
             None => SourceLinkSet::empty(&self.builder.resources, scope, active)?,
         };
-        let snapshot = snapshot::capture_with_sources(
+        let snapshot = snapshot::capture_with_candidates(
             &self.builder,
             self.transcript().current(),
             sources,
+            &mut input.incoming.candidates,
             scope,
             active,
         )?;
-        let next = snapshot.complete_with_dependencies(
-            self.transcript(),
-            request,
-            result,
-            self.transcript.dependencies.clone(),
-        )?;
+        let next = snapshot
+            .with_body_candidates(input.incoming.candidates)
+            .complete_active(
+                self.transcript(),
+                input.incoming.request,
+                input.result,
+                self.transcript.dependencies.clone(),
+                active,
+            )?;
         self.transcript = next;
         self.link_sources = None;
         Ok(self)
@@ -188,7 +250,15 @@ impl RepositoryWorkspaceProgress {
             scope,
             active,
         )?);
-        self.complete_snapshot(request.request().clone(), result, scope, active)
+        let mut incoming = IncomingOperation {
+            request: request.request().clone(),
+            candidates: self.body_ledger().candidates()?,
+        };
+        if let Some(bodies) = request.body_candidates() {
+            incoming.candidates.absorb(bodies, active)?;
+        }
+        incoming.cover(active)?;
+        self.complete_snapshot(incoming, result, scope, active)
     }
     pub(super) fn admit_link_sources(
         &mut self,
@@ -213,20 +283,43 @@ impl RepositoryWorkspaceProgress {
     /// Exact completed requests replay without rewinding the actual current tree.
     /// All refusal, cancellation and partial mutation paths consume this owner.
     pub(super) fn apply(
-        mut self,
+        self,
         request: RepositoryWorkspaceRequest,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope)?;
         check(scope, active)?;
+        let candidates = self.body_ledger().candidates()?;
+        self.apply_with_candidates(request, candidates, scope, active)
+    }
+    pub(super) fn apply_with_candidates(
+        mut self,
+        request: RepositoryWorkspaceRequest,
+        candidates: NativeBodyCandidates,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
+        let mut incoming = IncomingOperation {
+            request,
+            candidates,
+        };
+        self.check_scope(scope)?;
+        check(scope, active)?;
+        incoming.candidates.ledger().check_origin(
+            &self.builder.resources,
+            scope,
+            &self.builder.reservation,
+            active,
+        )?;
+        incoming.cover(active)?;
         if self.link_sources.is_none() {
             let sources = SourceLinkSet::empty(&self.builder.resources, scope, active)?;
             self.admit_link_sources(sources)?;
         }
         if self
             .transcript()
-            .replay(&request)
+            .replay(&incoming.request)
             .map_err(PhysicalRootError::Protocol)?
             .is_some()
         {
@@ -243,7 +336,7 @@ impl RepositoryWorkspaceProgress {
                 io_limits(self.builder.mode, &self.builder.reservation),
             )?;
             let running = || active() && scope.check().is_ok();
-            match request.operation() {
+            match incoming.request.operation() {
                 RepositoryWorkspaceOperation::File { path, body, mode }
                 | RepositoryWorkspaceOperation::Template {
                     path, body, mode, ..
@@ -274,7 +367,7 @@ impl RepositoryWorkspaceProgress {
                         scope,
                         active,
                     )
-                    .read(path)?;
+                    .read_with_body_candidates(path, &mut incoming.candidates)?;
                     let result = read.result();
                     captured_read = Some(read);
                     result
@@ -327,7 +420,7 @@ impl RepositoryWorkspaceProgress {
                 }
             }
         };
-        let completed = self.complete_snapshot(request, result, scope, active);
+        let completed = self.complete_snapshot(incoming, result, scope, active);
         drop(captured_read);
         completed
     }
@@ -362,11 +455,11 @@ impl RepositoryWorkspaceProgress {
         // borrowed clone. Prepay only its additional realization/cache storage.
         let full = self
             .transcript()
-            .realization_storage_partition()
+            .realization_body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
         let existing = self
             .transcript()
-            .storage_partition()
+            .body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
         let (full, existing) = if let Some(deps) = &self.transcript.dependencies {
             if !deps.covers_transcript(self.transcript()) {
@@ -395,8 +488,16 @@ impl RepositoryWorkspaceProgress {
             Some(deps) => deps.clone(),
             None => NativeReadViewDependencies::empty(&self.builder.resources, 0)?,
         };
+        let final_bodies = self.body_ledger().final_set(
+            |visit| {
+                self.transcript()
+                    .current()
+                    .try_visit_body_allocations(&mut |body| visit(body))
+            },
+            active,
+        )?;
         self.builder
-            .seal_with_dependencies(&realization, deps, scope, active)
+            .seal_with_body_coverage(&realization, deps, final_bodies, scope, active)
     }
 }
 

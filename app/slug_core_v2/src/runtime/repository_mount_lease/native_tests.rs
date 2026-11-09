@@ -70,6 +70,7 @@ fn native_three_launch_rolling_lease_handoff_waits_for_real_snapshot_and_record(
     let mut current = CreditedWorkspaceTranscript {
         transcript: RepositoryWorkspaceTranscript::new(reservation.clone(), 0o755).unwrap(),
         dependencies: None,
+        body_ledger: None,
         credit: initial_credit,
     };
     let mut root: Option<RepositoryPhysicalRootBuilder> = None;
@@ -299,6 +300,7 @@ fn native_pending_accept_credit_shortage_retires_successor_and_payload_owners() 
     let initial = CreditedWorkspaceTranscript {
         transcript: RepositoryWorkspaceTranscript::new(reservation.clone(), 0o755).unwrap(),
         dependencies: None,
+        body_ledger: None,
         credit: initial_credit,
     };
     let request = initial.transcript().request(execute(&reservation)).unwrap();

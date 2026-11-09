@@ -1868,6 +1868,125 @@ credit custody across snapshot, transcript, epoch publication and history owners
 preserve full history, construction overlap and fixed limits. No ownership or
 credit-transfer change is accepted by this optional-checksum component.
 
+### Native canonical body allocation coverage
+
+Implementation status: source review ACCEPT; final evidence review recorded in the component receipt.
+
+Observable outcome: advance the authentic Rust archive through the recorded
+snapshot successor refusal, including epoch publication, following operations,
+materialization/finalization and final-data/history custody under the unchanged
+native bank. This is Slug-native physical admission; all existing exact API,
+Bzlmod retention/identity, Source and activation contracts remain authoritative.
+The optional-checksum receipt pins the failure:388,958,838 successor bytes were
+requested with395,655,166 observed credits, including388,968,290 capture bytes,
+under536,870,912. This identifies overlap, not an erroneous accounting proof.
+
+Select native-only leases for actual canonical body allocations. Reuse the
+existing Workspace `BudgetedImageBlock<Arc<[u8]>>` lifetime utility: reserve the
+full actual body Arc layout before a fresh allocation, then freeze its exact
+body owner with positively prepaid shared-control/header storage. Failure drops
+the unpublished payload before its reservation. Existing borrowed bodies need
+positive admission before native retention unless an exact live same-bank lease
+already covers that allocation. No credit split/refund, cap increase, global
+registry, semantic cache, body wrapper in Bzlmod/DICE or native authority is added.
+Body leases contain immutable data and byte-bank coverage only; no FD, controller,
+mount/domain or root/request mutation authority. Native aliases hold leases;
+pure DICE aliases remain resource-free under the existing independent logical
+retention contract. This does not claim last-arbitrary-DICE-Arc native charging.
+
+One flat root-local native ledger may append accepted canonical body leases,
+with scope/reservation/bank association and a prepaid compact allocation index.
+An allocation key is actual pointer+length while the held Arc prevents address
+reuse; it proves storage membership only. Full request/spec/state equality,
+predecessor/current association, source custody, FD/frame/EOF/byte validation and
+scope/revocation checks still authenticate every operation. A pointer or digest
+match cannot replace any semantic or physical check. An equal foreign allocation
+is separately charged until complete comparison/canonical replacement, or the
+operation refuses under the real overlap. A foreign bank/scope/reservation
+coverage witness fails closed; valid inputs retain full-admission/validation fallback.
+No lock spans DICE computation, async work, child execution or filesystem capture.
+Use an existing compact bounded map and prepay growth/old-new table overlap before
+allocation; validate actual capacity/storage against that bound. Avoid recursive
+history chains or copying a body-owner table for every semantic version.
+
+Snapshot fresh-body producers retain temporary leases; unchanged prior bodies
+first undergo full bounded actual FD comparison while their old canonical lease
+stays live, then reuse that allocation without another payload reservation.
+Mismatch still prepays a genuinely new allocation with old history live. Pending
+incoming/capture allocations remain in temporary positively credited collections;
+only allocations surviving exact canonical completion enter the retained ledger.
+Unused/equal-foreign candidates retire promptly with payload-before-credit order.
+Every metadata, state/record array, reference table, path, Vec-to-Arc transfer,
+canonicalization pool and construction scratch retains positive prior admission.
+No blanket subtraction of old/global bank usage is permitted.
+
+Bzlmod supplies additive borrowed/fallible body-allocation visitors and matching
+body-covered control forecasts. They exclude only the exact payload terms that
+are independently leased; conservative Arc headers/padding remain charged. Existing
+full-storage forecasts remain the unmodified foreign/uncovered fallback. Visitors
+cover owned File/Template inputs, Read results, initial/predecessor/next/current
+historical states and their request/transcript/epoch/realization projections.
+Execute stdout/stderr remain fully charged in the existing metadata partition;
+no output payload term is discounted. External read-view/source partitions and
+NativeReadViewDependencies remain separate. Pure Meta16MiB/history1GiB/Process64MiB,
+full-byte canonicalization, Execute counts, Eq/Hash/content encodings and complete
+history are unchanged. New forecast/visitor APIs grant no coverage or IO authority.
+
+Core joins this coverage at snapshot completion, epoch reserve/publication,
+frontier and incoming/expected request validation, covered Execute/process-view
+requests, finalization, materialization and seal. Each new native wrapper prepays
+its control forecast before allocation while retaining the exact body leases.
+Full history guards keep every historical lease; final DataRoot/reader coverage
+is filtered to final-state bodies so deleted/overwritten history need not remain
+when only final data survives. Source dependencies retain their original owners.
+Cancellation, refusal, queued workers, readers, history and retirement keep their
+existing last-native-owner cleanup and payload-before-credit order.
+
+The [component receipt](wp1225-body-coverage-acceptance-2026-11-09.json)
+records460 ordinary checks, twelve native guards and four warm commands. Its
+scaled original48MiB/64MiB native test is RED→GREEN through four actual operations
+and final materialization; peak64,037,235 is admitted credit, not RSS. Native
+AA-then-changed-B proves real overlap refusal; deletion/history/final-reader and
+interleaved append-only/memo/foreign-witness regressions retain exact cleanup.
+The actual Rust capture now records the prior389MB Archive at55roots/110records,
+then stops at Source Allocation before decoding the next TarXz archive. Native
+peak396,202,045 and exact cleanup establish no completed-command memory ratio.
+
+Next owner: `repository_generated_archive.rs198` prepays136MiB through
+`source_service/decoder_reservation.rs32–43` against the same command bank before
+creating the XZ stream. Decoder counters advance only after successful admission;
+local decoder-limit refusal is a distinct typed error. The prior successful
+136MiB decoder has dropped before snapshot; retained canonical archive bodies
+now overlap a new allowance. Investigate actual bounded allocator custody rather
+than lowering the ceiling or assuming two live decoders. Zabel's bounded liblzma
+allocator is concept input for a separately reviewed owner change, not permission
+to import its runtime or default cap. Keep Source/native ceilings and full history.
+
+Implementation owners: Bzlmod body visitors/control forecasts in small workspace
+leaves with thin method wires in state/operation/sequence and materialization
+identity; Core private body_coverage leaf/tests plus narrow resource utility seams;
+root integrates snapshot/progress/command/seal/finalization/process-view/read-data
+joins. New test leaves reuse existing rooted fixtures and authored tiny archives;
+no copied ruleset corpus, caller selector or semantic adapter. The large command
+and source files above2,000 lines receive only thin joins, not new algorithms.
+
+Before acceptance, an actual archive body above half a scaled bank but within it
+must pass capture/completion/publication, a following unchanged operation, final
+materialization/seal and native history/root/reader retention (baseline RED).
+Prove full current/history/actual digest identities and exact refunds. A genuine
+changed/foreign allocation whose real coexistence exceeds the bank must refuse;
+wrong predecessor/bank/scope/reservation, FD drift and cancellation remain closed.
+Delete/history/final-data tests distinguish last history release from live final
+reader data. Repeated tiny updates retain allocation-index metadata by unique
+bodies, without recursive/per-version ownership growth. Pure tests join forecasts
+and visitor occurrences, preserving original full forecasts/limits/byte identity.
+Root serializes Cargo/native gates and freezes source/input/artifacts for the
+original Rust comparison. Passing the old refusal proves only that boundary;
+full completed-command latency/RSS<=1.25xBazel and activation remain open until
+measured. Replan on an unmodeled ownership/coverage boundary; never raise limits
+or drop semantic history to fit the probe. Independent design and final review
+precede integration of this coupled ownership revision.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

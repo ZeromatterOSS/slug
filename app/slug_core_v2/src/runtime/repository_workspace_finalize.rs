@@ -16,6 +16,7 @@ use crate::runtime::repository_process_wire::RunMode;
 pub(in crate::runtime::repository_physical_root) struct NativeViewFinalization {
     request: Arc<RepositoryMaterializationRequest>,
     command: RepositoryWorkspaceCommand,
+    _bodies: NativeBodyCandidates,
     slot: usize,
     // Covers the independent incoming request until full seal has its own
     // retained request guard. It retires after both semantic owners above.
@@ -53,8 +54,9 @@ impl RepositoryWorkspaceCommand {
             .progress
             .as_ref()
             .ok_or(PhysicalRootError::Reservation)?;
+        let bodies = self.materialization_body_candidates(&request, scope, active)?;
         let storage = request
-            .general_workspace_storage_partition()
+            .general_workspace_body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
         let bytes = if self
             .source_dependencies
@@ -72,6 +74,7 @@ impl RepositoryWorkspaceCommand {
         let admission = NativeViewFinalization {
             request,
             command: self,
+            _bodies: bodies,
             slot,
             _credit: credit,
         };

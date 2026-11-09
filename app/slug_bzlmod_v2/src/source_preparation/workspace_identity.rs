@@ -273,6 +273,44 @@ impl RepositoryMaterializationRequest {
     pub fn general_workspace_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
         self.general_workspace_storage_partition()?.total_bytes()
     }
+
+    /// Requires separately retained exact body-allocation coverage. This pure
+    /// forecast grants neither that coverage nor native IO authority.
+    #[doc(hidden)]
+    pub fn general_workspace_body_covered_storage_partition(
+        &self,
+    ) -> Result<crate::RepositoryWorkspaceStoragePartition, RepositoryWorkspaceError> {
+        let full = self.general_workspace_storage_partition()?;
+        let RepositoryMaterializationKind::GeneralWorkspace(realization) = &self.kind else {
+            return Err(RepositoryWorkspaceError::InvalidOperation);
+        };
+        let payload = realization
+            .storage_partition()?
+            .owned_bytes()
+            .checked_sub(realization.body_covered_storage_partition()?.owned_bytes())
+            .ok_or(RepositoryWorkspaceError::RetentionLimit)?;
+        crate::RepositoryWorkspaceStoragePartition::new(
+            full.owned_bytes()
+                .checked_sub(payload)
+                .ok_or(RepositoryWorkspaceError::RetentionLimit)?,
+            full.source_state_bytes(),
+        )
+    }
+
+    #[doc(hidden)]
+    pub fn try_visit_general_workspace_body_allocations<E>(
+        &self,
+        visit: &mut impl FnMut(&Arc<[u8]>) -> Result<(), E>,
+    ) -> Result<Result<(), RepositoryWorkspaceError>, E> {
+        if let Err(error) = self.validate_general_workspace_binding() {
+            return Ok(Err(error));
+        }
+        let RepositoryMaterializationKind::GeneralWorkspace(realization) = &self.kind else {
+            return Ok(Err(RepositoryWorkspaceError::InvalidOperation));
+        };
+        realization.try_visit_body_allocations(visit)?;
+        Ok(Ok(()))
+    }
     pub fn visit_read_views(&self, visit: &mut impl FnMut(&crate::RepositoryWorkspaceReadView)) {
         if let RepositoryMaterializationKind::GeneralWorkspace(realization) = &self.kind {
             realization.visit_read_views(visit)

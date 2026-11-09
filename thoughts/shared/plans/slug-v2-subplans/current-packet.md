@@ -3,7 +3,28 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: General command-fresh archive acquisition now accepts omission of
+Current delta: [native canonical body allocation coverage](wp1225-general-repository-workspace-design.md#native-canonical-body-allocation-coverage)
+now shares actual immutable body leases across capture, completion, epoch,
+request and final-data/history owners, with separately prepaid metadata and
+construction. The [component receipt](wp1225-body-coverage-acceptance-2026-11-09.json)
+records an actual original48MiB archive RED→GREEN under a64MiB bank, full
+publication/following operations/seal, true changed-body overlap refusal and
+history release while a final reader survives. All460 ordinary checks, twelve
+native guards and four warm originals pass. Complete semantic histories, full
+identity/forecasts, Source custody and all limits remain unchanged.
+
+The original Rust run now completes the prior389MB archive: epoch55roots/110records
+at836 attempts, compared with109records and Resource835 before this component.
+The next TarXz archive transfers4,589,980 compressed bytes then stops with Source
+`Allocation` before decoding. Cleanup remains exact; native peak396,202,045.
+Source review identifies the blanket136MiB decoder reservation against the same
+bank as the next owner; its prior high-water is not a new successful allocation.
+Review bounded actual decoder-allocation custody next, preserving that per-decoder
+ceiling, local Source counters and the512MiB native bank. No decoder change is
+accepted here. Full archive fit, Rust/action/REAPI/Slug closure, completed-command
+latency/RSS<=1.25xBazel and production activation remain open.
+
+Accepted prerequisite: General command-fresh archive acquisition now accepts omission of
 both expected-checksum forms. Expected SHA is optional intent; actual compressed
 SHA remains mandatory in closed native results/history and original Starlark
 sha256/SRI. The [optional-checksum receipt](wp1225-optional-archive-checksum-acceptance-2026-11-09.json)

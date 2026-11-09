@@ -26,6 +26,12 @@ type StateValue = (ComparedState, ComparedState, bool);
 type BodyValue = (Arc<[u8]>, Arc<[u8]>, bool);
 type Memo<K, V> = HashMap<K, V, StarlarkHasherBuilder>;
 
+struct NativeComparisonCoverage {
+    _bodies: NativeBodyCandidates,
+    _dependencies: Arc<NativeReadViewDependencies>,
+    _credit: ResourceCredit,
+}
+
 pub(in crate::runtime) struct ViewComparison<'a> {
     states: Memo<StateKey, StateValue>,
     bodies: Memo<BodyKey, BodyValue>,
@@ -35,6 +41,9 @@ pub(in crate::runtime) struct ViewComparison<'a> {
     active: &'a dyn Fn() -> bool,
     #[cfg(test)]
     compared_bytes: usize,
+    // Memo payloads above retire before incoming graph/control coverage. The
+    // caller can retain this memo after a frontier-validation call returns.
+    coverage: Vec<NativeComparisonCoverage>,
     credit: ResourceCredit,
 }
 impl<'a> ViewComparison<'a> {
@@ -54,8 +63,49 @@ impl<'a> ViewComparison<'a> {
             active,
             #[cfg(test)]
             compared_bytes: 0,
+            coverage: Vec::new(),
             credit,
         })
+    }
+    pub(super) fn prepare_workspace_coverage(&mut self) -> Result<(), PhysicalRootError> {
+        self.check()?;
+        if self.coverage.len() == self.coverage.capacity() {
+            let next = self
+                .coverage
+                .capacity()
+                .checked_mul(2)
+                .ok_or(PhysicalRootError::Resource)?
+                .max(4);
+            let bytes = next
+                .checked_mul(std::mem::size_of::<NativeComparisonCoverage>())
+                .ok_or(PhysicalRootError::Resource)?;
+            self.credit
+                .bytes
+                .try_grow(bytes)
+                .map_err(|_| PhysicalRootError::Resource)?;
+            self.coverage
+                .try_reserve_exact(next - self.coverage.len())
+                .map_err(|_| PhysicalRootError::Resource)?;
+            if self.coverage.capacity() > next {
+                return Err(PhysicalRootError::Resource);
+            }
+        }
+        Ok(())
+    }
+    /// Called only after prepare, before any memo retains the incoming graph.
+    /// This handoff cannot fail and retire guards ahead of caller-held payloads.
+    pub(super) fn hold_workspace_coverage(
+        &mut self,
+        bodies: NativeBodyCandidates,
+        dependencies: Arc<NativeReadViewDependencies>,
+        credit: ResourceCredit,
+    ) {
+        assert!(self.coverage.len() < self.coverage.capacity());
+        self.coverage.push(NativeComparisonCoverage {
+            _bodies: bodies,
+            _dependencies: dependencies,
+            _credit: credit,
+        });
     }
     fn check(&self) -> Result<(), PhysicalRootError> {
         check(self.scope, self.active)
@@ -318,6 +368,10 @@ impl<'a> ViewComparison<'a> {
         Ok(equal)
     }
 }
+
+#[cfg(test)]
+#[path = "repository_view_comparison/body_coverage_tests.rs"]
+mod body_coverage_tests;
 
 #[cfg(test)]
 mod tests {

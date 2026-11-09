@@ -12,6 +12,8 @@ use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceResult;
 use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
 
+use super::body_coverage::NativeBodyCandidates;
+use super::body_coverage::NativeBodyLedger;
 use super::*;
 
 /// Entries/bodies precede their credit on destruction. No uncredited owned
@@ -22,6 +24,8 @@ pub(super) struct CapturedWorkspaceSnapshot<'prior> {
     mode: RepositoryWorkspaceMode,
     prior: &'prior RepositoryWorkspaceState,
     resources: Arc<RepositoryRootResources>,
+    scope: Arc<SourceServiceScope>,
+    body_candidates: Option<NativeBodyCandidates>,
     credit: resources::ResourceCredit,
 }
 
@@ -31,6 +35,7 @@ pub(super) struct CapturedWorkspaceSnapshot<'prior> {
 pub(super) struct CreditedWorkspaceTranscript {
     pub(super) transcript: RepositoryWorkspaceTranscript,
     pub(super) dependencies: Option<Arc<NativeReadViewDependencies>>,
+    pub(super) body_ledger: Option<Arc<NativeBodyLedger>>,
     pub(super) credit: resources::ResourceCredit,
 }
 impl CreditedWorkspaceTranscript {
@@ -61,50 +66,116 @@ impl CapturedWorkspaceSnapshot<'_> {
         result: RepositoryWorkspaceResult,
         dependencies: Option<Arc<NativeReadViewDependencies>>,
     ) -> Result<CreditedWorkspaceTranscript, PhysicalRootError> {
-        if transcript.reservation().as_ref() != self.prior.reservation().as_ref()
-            || request.reservation().as_ref() != self.prior.reservation().as_ref()
+        self.complete_active(transcript, request, result, dependencies, &|| true)
+    }
+    pub(super) fn with_body_candidates(mut self, candidates: NativeBodyCandidates) -> Self {
+        self.body_candidates = Some(candidates);
+        self
+    }
+    pub(super) fn complete_active(
+        self,
+        transcript: &RepositoryWorkspaceTranscript,
+        request: RepositoryWorkspaceRequest,
+        result: RepositoryWorkspaceResult,
+        dependencies: Option<Arc<NativeReadViewDependencies>>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<CreditedWorkspaceTranscript, PhysicalRootError> {
+        // Raw incoming/entry owners retire before candidate credits on EVERY
+        // early return. Consumed producer arguments retire before this guard.
+        struct Input<'a> {
+            request: Option<RepositoryWorkspaceRequest>,
+            result: Option<RepositoryWorkspaceResult>,
+            snapshot: CapturedWorkspaceSnapshot<'a>,
+        }
+        let mut input = Input {
+            request: Some(request),
+            result: Some(result),
+            snapshot: self,
+        };
+        let request = input.request.as_ref().unwrap();
+        let result = input.result.as_ref().unwrap();
+        let snapshot = &mut input.snapshot;
+        if transcript.reservation().as_ref() != snapshot.prior.reservation().as_ref()
+            || request.reservation().as_ref() != snapshot.prior.reservation().as_ref()
         {
             return Err(PhysicalRootError::Reservation);
         }
-        if transcript.current().as_ref() != self.prior
-            || request.predecessor().as_ref() != self.prior
+        if transcript.current().as_ref() != snapshot.prior
+            || request.predecessor().as_ref() != snapshot.prior
         {
             return Err(PhysicalRootError::Protocol(
                 slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
             ));
         }
-        let storage = transcript
-            .completion_storage_partition(&request, &result, self.mode, &self.entries)
-            .map_err(PhysicalRootError::Protocol)?;
+        let body_ledger = if let Some(candidates) = snapshot.body_candidates.as_mut() {
+            candidates.ledger().check_request_origin(
+                &snapshot.resources,
+                &snapshot.scope,
+                transcript.reservation(),
+                active,
+            )?;
+            transcript.try_visit_completion_body_allocations(
+                request,
+                result,
+                &snapshot.entries,
+                &mut |body| candidates.retain(body, active).map(|_| ()),
+            )?;
+            Some(candidates.ledger().clone())
+        } else {
+            None
+        };
+        let storage = if body_ledger.is_some() {
+            transcript.completion_body_covered_storage_partition(
+                request,
+                result,
+                snapshot.mode,
+                &snapshot.entries,
+            )
+        } else {
+            transcript.completion_storage_partition(
+                request,
+                result,
+                snapshot.mode,
+                &snapshot.entries,
+            )
+        }
+        .map_err(PhysicalRootError::Protocol)?;
         let forecast = match &dependencies {
             Some(deps) => {
-                if !deps.covers_transcript(transcript) || !deps.covers_request(&request) {
+                if !deps.covers_transcript(transcript) || !deps.covers_request(request) {
                     return Err(PhysicalRootError::Reservation);
                 }
                 storage.owned_bytes()
             }
             None => storage.total_bytes().map_err(PhysicalRootError::Protocol)?,
         };
-        let permanent = self.resources.reserve(
+        let permanent = snapshot.resources.reserve(
             add(forecast, std::mem::size_of::<CreditedWorkspaceTranscript>())?,
             0,
             0,
         )?;
-        let Self {
-            entries,
-            mode,
-            prior: _,
-            resources: _resources,
-            credit: _capture_credit,
-        } = self;
-        // Both old transcript and capture credits stay live across all producer
-        // allocations. On error its consumed entries die before capture credit.
-        let transcript = transcript
-            .complete(request, result, mode, entries)
+        let entries = std::mem::take(&mut input.snapshot.entries);
+        let completed = transcript
+            .complete(
+                input.request.take().unwrap(),
+                input.result.take().unwrap(),
+                input.snapshot.mode,
+                entries,
+            )
             .map_err(PhysicalRootError::Protocol)?;
+        if let Some(ledger) = &body_ledger {
+            // Completed transcript is a local declared AFTER the still-armed
+            // input guard, so refusal drops all canonical raw owners first.
+            ledger.commit_canonical(
+                input.snapshot.body_candidates.as_mut().unwrap(),
+                |visit| completed.try_visit_body_allocations(&mut |body| visit(body)),
+                active,
+            )?;
+        }
         Ok(CreditedWorkspaceTranscript {
-            transcript,
+            transcript: completed,
             dependencies,
+            body_ledger,
             credit: permanent,
         })
     }
@@ -163,6 +234,29 @@ pub(super) fn capture_with_sources<'prior>(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
+    capture_builder(builder, prior, sources, None, scope, active)
+}
+pub(super) fn capture_with_candidates<'prior>(
+    builder: &RepositoryPhysicalRootBuilder,
+    prior: &'prior RepositoryWorkspaceState,
+    sources: Arc<SourceLinkSet>,
+    candidates: &mut NativeBodyCandidates,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
+    candidates
+        .ledger()
+        .check_origin(&builder.resources, scope, &builder.reservation, active)?;
+    capture_builder(builder, prior, sources, Some(candidates), scope, active)
+}
+fn capture_builder<'prior>(
+    builder: &RepositoryPhysicalRootBuilder,
+    prior: &'prior RepositoryWorkspaceState,
+    sources: Arc<SourceLinkSet>,
+    candidates: Option<&mut NativeBodyCandidates>,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != builder.reservation.as_ref() {
         return Err(PhysicalRootError::Reservation);
@@ -187,6 +281,7 @@ pub(super) fn capture_with_sources<'prior>(
         active,
         Limits::for_mode(builder.mode),
         Some(&sources),
+        candidates,
     )?;
     if backing_identity(&builder.file, builder.mode)? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
@@ -219,6 +314,7 @@ fn capture_at<'prior>(
         active,
         limits,
         None,
+        None,
     )
 }
 #[allow(clippy::too_many_arguments)]
@@ -232,6 +328,7 @@ fn capture_at_with_sources<'prior>(
     active: &dyn Fn() -> bool,
     limits: Limits,
     sources: Option<&SourceLinkSet>,
+    mut candidates: Option<&mut NativeBodyCandidates>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != reservation {
@@ -242,6 +339,8 @@ fn capture_at_with_sources<'prior>(
         mode,
         prior,
         resources: resources.clone(),
+        scope: scope.clone(),
+        body_candidates: None,
         credit: resources.reserve(
             std::mem::size_of::<CapturedWorkspaceSnapshot>() + 1024,
             0,
@@ -354,8 +453,16 @@ fn capture_at_with_sources<'prior>(
                     .checked_add(size)
                     .filter(|sum| *sum <= limits.bodies)
                     .ok_or(PhysicalRootError::Snapshot)?;
-                let body =
-                    capture_body(io, path, &framed, prior, &mut capture.credit, scope, active)?;
+                let body = capture_body_covered(
+                    io,
+                    path,
+                    &framed,
+                    prior,
+                    &mut capture.credit,
+                    candidates.as_deref_mut(),
+                    scope,
+                    active,
+                )?;
                 rows[index].node = Node::File(Some(body));
             }
             Node::Link(_) => {
@@ -497,11 +604,26 @@ fn capture_body(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<Arc<[u8]>, PhysicalRootError> {
+    capture_body_covered(io, path, framed, prior, credit, None, scope, active)
+}
+fn capture_body_covered(
+    io: &RootIo<'_>,
+    path: &Path,
+    framed: &libc::stat,
+    prior: &RepositoryWorkspaceState,
+    credit: &mut resources::ResourceCredit,
+    mut candidates: Option<&mut NativeBodyCandidates>,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<Arc<[u8]>, PhysicalRootError> {
     let length = usize::try_from(framed.st_size).map_err(|_| PhysicalRootError::Snapshot)?;
-    credit
-        .bytes
-        .try_grow(body_bytes(length)?)
-        .map_err(|_| PhysicalRootError::Resource)?;
+    // Pure sampler retains its original full, conservative body forecast.
+    if candidates.is_none() {
+        credit
+            .bytes
+            .try_grow(body_bytes(length)?)
+            .map_err(|_| PhysicalRootError::Resource)?;
+    }
     let running = || active() && scope.check().is_ok();
     if let Some(RepositoryWorkspaceNode::File(old)) = prior
         .entry(path.to_str().ok_or(PhysicalRootError::Snapshot)?)
@@ -527,10 +649,17 @@ fn capture_body(
                 return Err(PhysicalRootError::Snapshot);
             }
             if same {
+                if let Some(candidates) = candidates.as_deref_mut() {
+                    candidates.retain(old, active)?;
+                }
                 return Ok(old.clone());
             }
         }
     }
+    let pending = match candidates.as_deref_mut() {
+        Some(candidates) => Some(candidates.reserve_new(length, active)?),
+        None => None,
+    };
     let mut body = Arc::<[u8]>::new_uninit_slice(length);
     let mut offset = 0usize;
     let captured = io.read_file(path, &running, |chunk| {
@@ -554,7 +683,12 @@ fn capture_body(
     }
     // SAFETY: every exact admitted slot was initialized once; actual EOF and
     // FD/name identity were checked by RootIo before this view can escape.
-    Ok(unsafe { body.assume_init() })
+    let body = unsafe { body.assume_init() };
+    if let (Some(candidates), Some(pending)) = (candidates, pending) {
+        Ok(candidates.finish(pending, body, active)?.body().clone())
+    } else {
+        Ok(body)
+    }
 }
 fn valid_link(
     reservation: &RepositoryWorkspaceReservation,

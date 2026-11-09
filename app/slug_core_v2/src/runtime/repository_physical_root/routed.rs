@@ -13,6 +13,8 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::ResolvedPath;
 use slug_workspace_v2::ResolvedPathState;
 
+use super::body_coverage::NativeBodyCandidates;
+use super::body_coverage::NativeBodyLease;
 use super::*;
 use crate::runtime::dice::source_service::SourceBufferReservation;
 use crate::runtime::dice::source_service::SourceCounter;
@@ -155,6 +157,7 @@ pub(super) fn model(
 }
 pub(super) struct CapturedRead {
     body: Arc<[u8]>,
+    _body_lease: Option<NativeBodyLease>,
     _native: ResourceCredit,
     _source: SourceBufferReservation,
 }
@@ -231,6 +234,26 @@ impl<'a> RouteRoots<'a> {
         ))
     }
     pub(super) fn read(&self, relative: &str) -> Result<CapturedRead, PhysicalRootError> {
+        self.read_inner(relative, None)
+    }
+    pub(super) fn read_with_body_candidates(
+        &self,
+        relative: &str,
+        candidates: &mut NativeBodyCandidates,
+    ) -> Result<CapturedRead, PhysicalRootError> {
+        candidates.ledger().check_origin(
+            self.resources,
+            self.scope,
+            self.state.reservation(),
+            self.active,
+        )?;
+        self.read_inner(relative, Some(candidates))
+    }
+    fn read_inner(
+        &self,
+        relative: &str,
+        mut candidates: Option<&mut NativeBodyCandidates>,
+    ) -> Result<CapturedRead, PhysicalRootError> {
         check(self.scope, self.active)?;
         let model = model(
             self.state,
@@ -257,7 +280,7 @@ impl<'a> RouteRoots<'a> {
         let native = self.resources.reserve(
             add(
                 body_bytes
-                    .checked_mul(2)
+                    .checked_mul(if candidates.is_some() { 1 } else { 2 })
                     .ok_or(PhysicalRootError::Resource)?,
                 IO_SCRATCH,
             )?,
@@ -277,6 +300,7 @@ impl<'a> RouteRoots<'a> {
         {
             return Err(PhysicalRootError::Snapshot);
         }
+        let mut body_lease = None;
         let body = match expected {
             RepositoryWorkspaceReadExpectation::Owned(body) => {
                 let relative = route
@@ -312,6 +336,9 @@ impl<'a> RouteRoots<'a> {
                 if offset != body.len() {
                     return Err(PhysicalRootError::Snapshot);
                 }
+                if let Some(candidates) = candidates.as_deref_mut() {
+                    body_lease = Some(candidates.retain(body, self.active)?);
+                }
                 body.clone()
             }
             RepositoryWorkspaceReadExpectation::Source(digest) => {
@@ -332,10 +359,19 @@ impl<'a> RouteRoots<'a> {
                 if size > 2 * 1024 * 1024 {
                     return Err(PhysicalRootError::Snapshot);
                 }
+                // One actual Vec scratch owner plus separately prepaid Arc.
+                // Source live-buffer accounting remains the original 2x bound.
+                let pending = match candidates.as_deref_mut() {
+                    Some(candidates) => Some(candidates.reserve_new(size, self.active)?),
+                    None => None,
+                };
                 let mut bytes = Vec::new();
                 bytes
                     .try_reserve_exact(size)
                     .map_err(|_| PhysicalRootError::Resource)?;
+                if bytes.capacity() > size {
+                    return Err(PhysicalRootError::Resource);
+                }
                 bytes.resize(size, 0);
                 for chunk in bytes.chunks_mut(64 * 1024) {
                     let mut offset = 0;
@@ -357,13 +393,20 @@ impl<'a> RouteRoots<'a> {
                 expected
                     .validate(&bytes)
                     .map_err(PhysicalRootError::Protocol)?;
-                Arc::from(bytes.into_boxed_slice())
+                let body = Arc::from(bytes.into_boxed_slice());
+                if let (Some(candidates), Some(pending)) = (candidates.as_deref_mut(), pending) {
+                    body_lease = Some(candidates.finish(pending, body, self.active)?);
+                    body_lease.as_ref().unwrap().body().clone()
+                } else {
+                    body
+                }
             }
         };
         route.validate(self)?;
         check(self.scope, self.active)?;
         Ok(CapturedRead {
             body,
+            _body_lease: body_lease,
             _native: native,
             _source: source,
         })

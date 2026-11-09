@@ -109,6 +109,8 @@ struct NativeRootSlot {
     lease: Option<RepositoryMountLease>,
     #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
     process_view: Option<selected::RetainedProcessView>,
+    // Survives removal of mutable progress until the semantic epoch retires.
+    body_ledger: Arc<NativeBodyLedger>,
 }
 
 struct NativeSourceSlot {
@@ -121,10 +123,11 @@ struct NativeSourceSlot {
 /// epoch. This is unfinished command state, not a second materialization registry.
 /// No Clone, root FD, generic mutation callback or child result injection exists.
 pub(in crate::runtime) struct RepositoryWorkspaceCommand {
+    // Drop semantic epoch aliases before root-local allocation leases.
+    epoch: CreditedEpoch,
     roots: Vec<NativeRootSlot>,
     source_slots: Vec<NativeSourceSlot>,
     mount_domain: Option<Arc<NativeMountDomain>>,
-    epoch: CreditedEpoch,
     // Semantic epoch payloads retire before the source-data lifetime union.
     source_dependencies: Arc<NativeReadViewDependencies>,
     scope: Arc<SourceServiceScope>,
@@ -205,8 +208,10 @@ impl RepositoryWorkspaceCommand {
         if self.roots[slot].progress.is_none() {
             return Err(PhysicalRootError::Reservation);
         }
+        comparison.prepare_workspace_coverage()?;
+        let mut bodies = self.request_body_candidates(request, scope, active)?;
         let storage = request
-            .storage_partition()
+            .body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
         let bytes = if self.source_dependencies.covers_request(request) {
             storage.owned_bytes()
@@ -215,9 +220,8 @@ impl RepositoryWorkspaceCommand {
         };
         struct ExpectedRequest {
             request: RepositoryWorkspaceRequest,
-            _credit: resources::ResourceCredit,
         }
-        let credit =
+        let mut credit =
             self.resources
                 .reserve(add(bytes, std::mem::size_of::<ExpectedRequest>())?, 0, 0)?;
         let expected = ExpectedRequest {
@@ -229,8 +233,24 @@ impl RepositoryWorkspaceCommand {
                     request.operation().clone(),
                 )
                 .map_err(PhysicalRootError::Protocol)?,
-            _credit: credit,
         };
+        expected
+            .request
+            .try_visit_body_allocations(&mut |body| bodies.retain(body, active).map(|_| ()))?;
+        let expected_storage = expected
+            .request
+            .body_covered_storage_partition()
+            .map_err(PhysicalRootError::Protocol)?;
+        let expected_bytes = body_admission::partition_bytes(
+            expected_storage,
+            self.source_dependencies.covers_request(&expected.request),
+        )?;
+        credit
+            .bytes
+            .try_grow(expected_bytes)
+            .map_err(|_| PhysicalRootError::Resource)?;
+        // The caller's memo can outlive this borrowed request validation.
+        comparison.hold_workspace_coverage(bodies, self.source_dependencies.clone(), credit);
         if !request.try_eq_with_states(&expected.request, &mut |left, right| {
             comparison.state_ref_equal(left, right)
         })? {
@@ -339,8 +359,9 @@ impl RepositoryWorkspaceCommand {
         }
         // Initial root mode changes no storage forecast. Actual root metadata
         // and the same admission are verified again when ownership returns.
+        self.check_epoch_body_coverage(scope, active)?;
         self.epoch()
-            .reserve_storage_partition(reservation, 0o755)
+            .reserve_body_covered_storage_partition(reservation, 0o755)
             .map_err(PhysicalRootError::Protocol)?
             .owned_bytes();
         Ok(())
@@ -449,9 +470,10 @@ impl RepositoryWorkspaceCommand {
             .root_stat()?
             .st_mode
             & 0o7777) as u16;
+        self.check_epoch_body_coverage(scope, active)?;
         let forecast = self
             .epoch()
-            .reserve_storage_partition(&reservation, root_mode)
+            .reserve_body_covered_storage_partition(&reservation, root_mode)
             .map_err(PhysicalRootError::Protocol)?
             .owned_bytes();
         let credit =
@@ -462,6 +484,7 @@ impl RepositoryWorkspaceCommand {
             .reserve(reservation.clone(), root_mode)
             .map_err(PhysicalRootError::Protocol)?;
         let progress = RepositoryWorkspaceProgress::new(builder, scope, active)?;
+        let body_ledger = progress.body_ledger().clone();
         self.grow_roots()?;
         self.roots.push(NativeRootSlot {
             reservation,
@@ -470,6 +493,7 @@ impl RepositoryWorkspaceCommand {
             lease: None,
             #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
             process_view: None,
+            body_ledger,
         });
         self.epoch = CreditedEpoch {
             epoch,
@@ -527,9 +551,11 @@ impl RepositoryWorkspaceCommand {
         {
             return Err(PhysicalRootError::Reservation);
         }
+        self.check_epoch_body_coverage(&self.scope, &|| true)?;
+        self.check_transcript_body_coverage(progress.transcript(), &self.scope, &|| true)?;
         let forecast = self
             .epoch()
-            .publish_storage_partition(progress.transcript())
+            .publish_body_covered_storage_partition(progress.transcript())
             .map_err(PhysicalRootError::Protocol)?
             .owned_bytes();
         let credit =
@@ -568,8 +594,9 @@ impl RepositoryWorkspaceCommand {
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope, active)?;
+        let mut bodies = self.request_body_candidates(&request, scope, active)?;
         let partition = request
-            .storage_partition()
+            .body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
         let bytes = if self.source_dependencies.covers_request(&request) {
             partition.owned_bytes()
@@ -586,6 +613,7 @@ impl RepositoryWorkspaceCommand {
             0,
         )?;
         let incoming = sources.canonicalize_request(request, scope, active)?;
+        incoming.try_visit_body_allocations(&mut |body| bodies.retain(body, active).map(|_| ()))?;
         let _expected_credit = self.resources.reserve(
             add(
                 partition.owned_bytes(),
@@ -608,6 +636,9 @@ impl RepositoryWorkspaceCommand {
                 slug_bzlmod_v2::RepositoryWorkspaceError::ForeignPredecessor,
             ));
         }
+        // The memo's foreign aliases must retire before temporary candidates
+        // can be consumed by snapshot completion and canonical survivor commit.
+        drop(comparison);
         drop(incoming);
         let request = expected;
         if !sources.dependencies().covers_state(request.predecessor()) {
@@ -635,9 +666,10 @@ impl RepositoryWorkspaceCommand {
             request.operation(),
             RepositoryWorkspaceOperation::Archive(_)
         ) {
-            progress.apply_archive(request, runtime, distdirs, scope, active)?
+            progress
+                .apply_archive_with_candidates(request, bodies, runtime, distdirs, scope, active)?
         } else {
-            progress.apply(request, scope, active)?
+            progress.apply_with_candidates(request, bodies, scope, active)?
         };
         if let Some(lease) = self.roots[slot].lease.take() {
             self.roots[slot].lease = Some(
@@ -706,10 +738,14 @@ impl RepositoryWorkspaceCommand {
         active: &dyn Fn() -> bool,
     ) -> Result<NativeProcessAdmission, PhysicalRootError> {
         self.check_scope(scope, active)?;
-        let covered = CoveredWorkspaceRequest::from_canonical(
+        let bodies = self.request_body_candidates(&request, scope, active)?;
+        let covered = CoveredWorkspaceRequest::from_canonical_with_bodies(
             request,
             self.source_dependencies.clone(),
             &self.resources,
+            bodies,
+            scope,
+            active,
         )?;
         self.admit_native_covered(covered, mode, scope, active)
     }
@@ -724,6 +760,20 @@ impl RepositoryWorkspaceCommand {
         self.check_scope(scope, active)?;
         let slot = self.root_slot(request.reservation())?;
         self.compare_transcript(slot)?;
+        if let Some(bodies) = covered.body_candidates() {
+            bodies.ledger().check_request_origin(
+                &self.resources,
+                scope,
+                request.reservation(),
+                active,
+            )?;
+            request.try_visit_body_allocations(&mut |body| {
+                bodies
+                    .lookup(body, active)?
+                    .ok_or(PhysicalRootError::Reservation)?;
+                Ok::<(), PhysicalRootError>(())
+            })?;
+        }
         let root = self.roots[slot].progress.as_ref().unwrap();
         if root.builder.mode != mode
             || root.transcript().current().mode() != mode
@@ -751,10 +801,7 @@ impl RepositoryWorkspaceCommand {
                 arc_bytes::<RepositoryWorkspaceRequest>()?,
                 add(
                     std::mem::size_of::<NativeProcessAdmission>(),
-                    request
-                        .storage_partition()
-                        .map_err(PhysicalRootError::Protocol)?
-                        .owned_bytes(),
+                    covered.owned_bytes(),
                 )?,
             )?,
             0,
@@ -828,8 +875,9 @@ impl RepositoryWorkspaceCommand {
             .as_ref()
             .ok_or(PhysicalRootError::Reservation)?;
         let resources = progress.builder.resources.clone();
+        let bodies = self.materialization_body_candidates(&request, scope, active)?;
         let storage = request
-            .general_workspace_storage_partition()
+            .general_workspace_body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
         // Pointer coverage proves only storage lifetime, not Spec/history equality.
         let incoming_bytes = if self
@@ -842,10 +890,12 @@ impl RepositoryWorkspaceCommand {
         };
         struct CreditedRequest {
             request: Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+            bodies: NativeBodyCandidates,
             credit: ResourceCredit,
         }
         let incoming = CreditedRequest {
             request,
+            bodies,
             credit: resources.reserve(incoming_bytes, 0, 0)?,
         };
         let slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(expected) =
@@ -866,10 +916,11 @@ impl RepositoryWorkspaceCommand {
         {
             return Err(PhysicalRootError::Reservation);
         }
+        self.check_transcript_body_coverage(progress.transcript(), scope, active)?;
         let canonical_bytes = add(
             progress
                 .transcript()
-                .realization_storage_partition()
+                .realization_body_covered_storage_partition()
                 .map_err(PhysicalRootError::Protocol)?
                 .owned_bytes(),
             add(
@@ -895,7 +946,7 @@ impl RepositoryWorkspaceCommand {
             kind: slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(canonical),
         });
         let owned = request
-            .general_workspace_storage_partition()
+            .general_workspace_body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?
             .owned_bytes();
         let credit = resources.reserve(
@@ -909,7 +960,12 @@ impl RepositoryWorkspaceCommand {
             0,
             0,
         )?;
-        let retained = CreditedRequest { request, credit };
+        let bodies = self.materialization_body_candidates(&request, scope, active)?;
+        let retained = CreditedRequest {
+            request,
+            bodies,
+            credit,
+        };
         drop(incoming);
         let slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(expected) =
             &retained.request.kind
@@ -929,7 +985,11 @@ impl RepositoryWorkspaceCommand {
         let sealed = super::super::SealedWorkspaceMaterialization::from_command(
             retained.request,
             root,
-            NativeWorkspaceHistoryGuard::new(dependencies, retained.credit),
+            NativeWorkspaceHistoryGuard::new_with_bodies(
+                dependencies,
+                retained.bodies.ledger().clone(),
+                retained.credit,
+            ),
         );
         Ok((self, sealed))
     }
@@ -954,6 +1014,8 @@ impl RepositoryWorkspaceCommand {
     }
 }
 
+#[path = "repository_workspace_body_admission.rs"]
+mod body_admission;
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 #[path = "repository_workspace_finalize.rs"]
 pub(in crate::runtime::repository_physical_root) mod finalize;

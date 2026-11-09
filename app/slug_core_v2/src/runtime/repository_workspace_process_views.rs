@@ -217,8 +217,9 @@ impl RepositoryWorkspaceCommand {
         }
         // The raw incoming request remains guarded until its foreign projection
         // owners are dropped after canonicalization. No source bytes are copied.
+        let bodies = self.request_body_candidates(&request, scope, active)?;
         let partition = request
-            .storage_partition()
+            .body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?;
         let mut canonical_pointers = true;
         request.visit_read_views(&mut |view| {
@@ -237,10 +238,12 @@ impl RepositoryWorkspaceCommand {
         };
         struct Incoming {
             request: RepositoryWorkspaceRequest,
+            bodies: NativeBodyCandidates,
             _credit: ResourceCredit,
         }
         let incoming = Incoming {
             request,
+            bodies,
             _credit: self.resources.reserve(bytes, 0, 0)?,
         };
         let RepositoryWorkspaceOperation::Execute(execute) = incoming.request.operation() else {
@@ -265,7 +268,7 @@ impl RepositoryWorkspaceCommand {
         let mut indices = Vec::with_capacity(count);
         let mut canonical_bytes = incoming
             .request
-            .storage_partition()
+            .body_covered_storage_partition()
             .map_err(PhysicalRootError::Protocol)?
             .owned_bytes();
         for projection in execute.read_views().views() {
@@ -324,10 +327,13 @@ impl RepositoryWorkspaceCommand {
             .clone()
             .with_read_views(manifest)
             .map_err(PhysicalRootError::Protocol)?;
-        let covered = CoveredWorkspaceRequest::from_canonical(
+        let covered = CoveredWorkspaceRequest::from_canonical_with_bodies(
             request,
             self.source_dependencies.clone(),
             &self.resources,
+            incoming.bodies,
+            scope,
+            active,
         )?;
         if let RepositoryWorkspaceOperation::Execute(execute) = covered.operation() {
             let sources = SourceLinkSet::from_views(

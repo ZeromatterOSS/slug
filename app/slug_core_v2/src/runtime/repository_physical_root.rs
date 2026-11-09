@@ -46,6 +46,8 @@ pub(in crate::runtime) use materialization::SealedWorkspaceMaterialization;
 mod observation;
 mod reader;
 pub(in crate::runtime) use observation::SealedGeneralObservation;
+mod body_coverage;
+pub(in crate::runtime) use body_coverage::*;
 mod resources;
 mod routed;
 mod seal;
@@ -223,6 +225,9 @@ pub(in crate::runtime) struct RepositoryPhysicalRoot {
     origin_scope: Arc<SourceServiceScope>,
     frozen_archive_quota: Option<FrozenArchiveQuota>,
     source_dependencies: Arc<NativeReadViewDependencies>,
+    // Only final-state allocations; complete historical bodies have a separate
+    // native request guard. State payloads retire before these shared leases.
+    _body_coverage: Option<NativeBodySet>,
     credit: resources::ResourceCredit,
 }
 
@@ -344,7 +349,7 @@ impl RepositoryPhysicalRootBuilder {
         active: &dyn Fn() -> bool,
     ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
         let dependencies = NativeReadViewDependencies::empty(&self.resources, 0)?;
-        seal::seal(self, realization, dependencies, scope, active)
+        seal::seal(self, realization, dependencies, None, scope, active)
     }
     fn seal_with_dependencies(
         self,
@@ -353,7 +358,17 @@ impl RepositoryPhysicalRootBuilder {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
-        seal::seal(self, realization, dependencies, scope, active)
+        seal::seal(self, realization, dependencies, None, scope, active)
+    }
+    fn seal_with_body_coverage(
+        self,
+        realization: &RepositoryWorkspaceRealization,
+        dependencies: Arc<NativeReadViewDependencies>,
+        bodies: NativeBodySet,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
+        seal::seal(self, realization, dependencies, Some(bodies), scope, active)
     }
 }
 impl RepositoryPhysicalRoot {

@@ -11,6 +11,7 @@ pub(super) fn seal(
     mut builder: RepositoryPhysicalRootBuilder,
     realization: &RepositoryWorkspaceRealization,
     dependencies: Arc<NativeReadViewDependencies>,
+    bodies: Option<NativeBodySet>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<Arc<RepositoryPhysicalRoot>, PhysicalRootError> {
@@ -34,12 +35,21 @@ pub(super) fn seal(
     if state.mode() != builder.mode {
         return Err(PhysicalRootError::Mode);
     }
-    // The native root prolongs the entire final allocation, including bodies.
-    // This producer bound includes full foreign reservation guards and may
-    // conservatively count shared file bodies repeatedly. No transcript kept.
-    let retained = state
-        .storage_partition()
-        .map_err(|_| PhysicalRootError::Resource)?;
+    // Exact live allocation witnesses cover payloads only. Bare factories keep
+    // the original complete bound; neither route authenticates state by pointer.
+    let retained = if let Some(bodies) = &bodies {
+        bodies.check_origin(&builder.resources, scope, &builder.reservation, active)?;
+        state.try_visit_body_allocations(&mut |body| {
+            bodies
+                .lookup(body, active)?
+                .ok_or(PhysicalRootError::Reservation)?;
+            Ok::<(), PhysicalRootError>(())
+        })?;
+        state.body_covered_storage_partition()
+    } else {
+        state.storage_partition()
+    }
+    .map_err(PhysicalRootError::Protocol)?;
     let anchor_bound = state
         .resolution_anchor_storage_bytes()
         .map_err(PhysicalRootError::Protocol)?;
@@ -78,6 +88,7 @@ pub(super) fn seal(
         origin_scope: builder.origin_scope,
         frozen_archive_quota: builder.frozen_archive_quota,
         source_dependencies,
+        _body_coverage: bodies,
         credit: builder.credit,
     }))
 }

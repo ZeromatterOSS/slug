@@ -1,0 +1,532 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "62ca4bd3ee9f668acddf4d46e2c6c15781674985",
+  "recorded_utc": "2026-11-09T13:57:33.674322+00:00",
+  "outcome": "Share actual canonical immutable body allocation credits across native repository capture, complete history, epochs, requests and filtered final data. The genuine original Rust run completes the previously refused389MB archive under unchanged limits.",
+  "classification": {
+    "slug_native": "Native allocation lifetime and resource admission only; actual scope/bank/body coverage is separate from semantic/IO authority.",
+    "exact_preserved": "All existing operation/results, complete structural identity/Hash/content streams, pure metadata/body/history/Execute limits, FD/frame/EOF/byte verification, Source custody and fresh-command/replay behavior.",
+    "unsupported_deferred": "Further Rust archive/analysis/action/REAPI/Slug closure, XZ decoder allocation owner, completed-command latency and <=1.25xBazel RSS, General activation."
+  },
+  "source_pins": [
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/sequence.rs",
+      "sha256": "912df623b37d2b5da4a475eed1cf7119e75fd24f5d118ef27869fd6507b02ba3"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/sequence/body_coverage.rs",
+      "sha256": "ddcdf08b19f62b3ed60f967aa5ce29da98a0ca2a0e104ae9ddcb0ca4f8d3ca20"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/tests.rs",
+      "sha256": "c2c43e7258ba63743cc34de3c38129511e790881e70be575b7ae3746d4a9d755"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/tests/body_coverage_tests.rs",
+      "sha256": "7ed8681870ca29ed10641ab197e67ccc8a1cd5a42fca6f43dc1d27b088795b7b"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/source_preparation/workspace_identity.rs",
+      "sha256": "08e4574bfb868463890d6fc0d59d9e0325aba519c0611a7249f5965c10923d5f"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_mount_lease/native_tests.rs",
+      "sha256": "beaf1529f84d83ecdea053634c15e9249ab81862f0f42c208cc90fd732781c51"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_physical_root.rs",
+      "sha256": "2ed087d05baf0f0f1c5c67447c21e0a96738a62c278e3624e7bdaa6098406fbf"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_physical_root/body_coverage.rs",
+      "sha256": "04c5006b596deb6ec3fcc6fa4f1f7742f736360cad6e5327772322310b01f2b3"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_physical_root/body_coverage/tests.rs",
+      "sha256": "2e3350a5659a548bc5bceb60e4b6ea257137426b3a190bcd1a30635bc82031c4"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_physical_root/resources.rs",
+      "sha256": "5bbab11f9101878f1d556f11abae5a02d0490f4034f16f78887c7940a9cf678a"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_physical_root/routed.rs",
+      "sha256": "3ed15433f69f187c69a9a898bc82ecb153e26ca961fe8c110d5e1c302e467162"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_physical_root/seal.rs",
+      "sha256": "4bbbe716cedb569a12eb17318b5dc0d0af731b295b097e9742cf53c079583835"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_view_comparison.rs",
+      "sha256": "08d1400d7f5f936b66a608319939469fce720b58a3c46b5b49de2fda0c99c72d"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_view_comparison/body_coverage_tests.rs",
+      "sha256": "9d6b787e0881297c7dbca8367a0d44aa5de2a44886562d20a62fea5ce7fa1854"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_view_data.rs",
+      "sha256": "2ac79d0d5ab0c16ed56969386608d118b129e8c0bf5a18d7fe8ba9a3699e3ebf"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_body_admission.rs",
+      "sha256": "2363957db3b90fe81e417ed158a158bf98039516fbc9309cf5096ac1d08461fb"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_command.rs",
+      "sha256": "6652f1d991467e1f5c2c5eca9cf9b03371edaf58189f5e41209a06b7326d654e"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_command/tests.rs",
+      "sha256": "aeee015b85d06b7991ec012ee8be70fef5bb86f1e5a77deadadc57a0024df865"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_command/tests/body_coverage_tests.rs",
+      "sha256": "462359056898809f5a3e2c8c8c5cb35ed1308242ef27e27aaff772fa7730f55d"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/body_coverage_tests.rs",
+      "sha256": "6b4f4a2437be5deb10b45c4bb9a276274267771d206a5cc2772292f40683975e"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/tests.rs",
+      "sha256": "75ef808fba39c91027e14742e256a13826ba6dd345769aeb14151492a444b934"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_finalize.rs",
+      "sha256": "b0dfde0fe3b3b18251b341a7fe16806de38809e009e038d97ed6fbe3f4578264"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_process_views.rs",
+      "sha256": "5f973e655211057fb5794383430c5351f132c71b35e0bcceecd225e836b261bd"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_progress.rs",
+      "sha256": "67022d525083811799f22c9390a1c4e84974e859b94fb3ba3d5cfcc862737dab"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_snapshot.rs",
+      "sha256": "4c98a0990e8be5118867b5fbe6e5cfc26c6fdf999d5d34d9be5bee0a8d3d7e44"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_workspace_snapshot/tests.rs",
+      "sha256": "d9cc0d23f175bd3a2a16fd73a01c37e8949b28f1e1eb4e7d4339fabf13da3973"
+    },
+    {
+      "file": "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md",
+      "sha256": "6ec480134084de92ba6780069b63f0919356b2f44bfccf7cefa1f7c986e85e7b"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md",
+      "sha256": "73ef295b2c8da1f4b5ffddda9441515a9a91590a61ef2d6c29b31a66d98beff8"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/current-packet.md",
+      "sha256": "6655d12d4a3b6479d414237adfc3a45ff0942818b5d2cdbbe9221014dc3148b7"
+    },
+    {
+      "file": "thoughts/shared/plans/slug-v2-subplans/wp1225-general-repository-workspace-design.md",
+      "sha256": "367bea6f5ed908dd2f04b2e161b878a6daa164928ece69fce2f2ac027ea73a67"
+    }
+  ],
+  "unchanged_reference_pins": [
+    {
+      "file": "app/slug_workspace_v2/src/input_image/budget.rs",
+      "sha256": "3143cf41463a68cc3cbefaf1a626675994d6809488832f07a364d309e4972fcb"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/state.rs",
+      "sha256": "818c98743bf1c52c5fcfe2fbc2ee85211a9e7b22082bbbcf78a5d58b4810c281"
+    },
+    {
+      "file": "app/slug_bzlmod_v2/src/repository_workspace/operation.rs",
+      "sha256": "53dd63cb4250cb0926fedda95a256502e069a29e33c516a2092e84724eda013e"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/repository_generated_archive.rs",
+      "sha256": "6b1f913260b6ad33cc421a9f416796a9ecc9f676f8e7f1c4304e49545e431a4d"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/decoder_reservation.rs",
+      "sha256": "77a330abf99da490b961fed5fadccb37b8ba599258354f9ab01b8da9d4b9fbf3"
+    },
+    {
+      "file": "app/slug_core_v2/src/runtime/source_service/command_scope.rs",
+      "sha256": "6bfdb2c60e77d7fb402dd93171cc0c8f748d5cac8138b9a91d97bccc94a9e99f"
+    },
+    {
+      "file": "Cargo.toml",
+      "sha256": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b"
+    },
+    {
+      "file": "Cargo.lock",
+      "sha256": "26c6c6092f8972ff91c1b728b6296723b383d327af2a22696ec10057bacfe85e"
+    }
+  ],
+  "reuse": {
+    "utility": "Existing V2 Workspace ImageDescriptorReservation::freeze/BudgetedImageBlock<Arc<[u8]>> supplies positive shared-header admission and payload-before-credit cleanup. No utility split/shrink/refund or body schema change.",
+    "compact_index": "Existing Buck2-derived SmallMap routes actual(pointer,length) allocation membership, with source-derived checked geometric old/new table growth prepayment and post-capacity checks. No global pool/interner/semantic cache.",
+    "zabel": "Concept/test only: src/memory/retained.zig419\u2013463,826\u2013873 publishes allocation ownership once. Its runtime/arena/publication registry are not imported.",
+    "donor_pins": [
+      {
+        "file": "/run/media/system/Colossus/dev/zabel/src/memory/retained.zig",
+        "sha256": "8ffada2e24ee29ab880b7bb5123d56dce600d000f2172a7a022e53856ea49ea6"
+      },
+      {
+        "file": "starlark-rust/starlark_map/src/small_map.rs",
+        "sha256": "a8e7622c059bdd94585cbaccd881aa6edd30d3f65f105a76e30b5d60bb32e774"
+      }
+    ]
+  },
+  "contract": {
+    "coverage": "A root-local flat append-only ledger retains cheap budgeted leases for exact actual body allocations; held Arcs prevent address reuse. Same bank/scope/complete reservation association and full semantic/current/physical checks remain distinct. Foreign ordinary allocations receive full positive admission; foreign claimed witnesses fail closed.",
+    "capture": "Fresh full Arc layout is paid before allocation. Unchanged prior bodies first undergo actual complete FD/frame/EOF/byte verification under live coverage, then reuse that canonical allocation. Incoming/capture candidates stay temporary; only accepted canonical survivors enter the ledger.",
+    "control_forecasts": "Additive borrowed/fallible visitors and body-covered forecasts exclude only precisely identified owned payload terms. Original full forecasts remain byte-exact fallbacks; conservative headers/padding, metadata/path/record arrays, transfer/canonicalization scratch, full Execute outputs and external-source partitions remain positively charged.",
+    "joins": "Snapshot completion, epoch reserve/publication, frontier/foreign and expected requests, memo retention, covered Execute/quota helper/reap, materialization/finalization, exact seal and queued/history/root/reader owners retain their witnesses. Body and NativeReadViewDependencies coverage are independent dimensions.",
+    "retirement": "Semantic epoch payloads drop before root ledger handles. Memo-held foreign state/body aliases retain their own control/candidate guards after argument return. Full history retains deleted/overwritten bodies; final root sets retain only final-state allocations and no history-ledger edge. All payloads precede credits on error and last-native-owner drop.",
+    "boundary": "Pure DICE values stay resource-free and retain existing independent logical accounting; no last-arbitrary-DICE-Arc or whole-process RSS claim. Sealed allocation coverage cannot reopen mutation authority.",
+    "limits": "Unchanged native512MiB/FD512/backing8GiB, root128, Meta16MiB, Process64MiB, history1GiB, Source64, Execute128, stream1MiB, work27+cleanup3; Archive compressed128MiB/decoded512MiB percall+1GiB invocation/2GiB+262144inode tmpfs/131072entries+4MiBnames. Default General policy remains Disabled."
+  },
+  "causal_proof": {
+    "baseline_refusal": {
+      "raw": {
+        "file": "/tmp/slug-wp425-validation/body-coverage-native-red.json",
+        "sha256": "ad2b1ed32d0b6ff47074844ff672b5145bf96a85a75ba985e341be46d532497d"
+      },
+      "preserved_artifact": {
+        "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-17c69af5af9f1a36",
+        "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/body-coverage-native-red-core-a99faa6cb4780687",
+        "executable_sha256": "a99faa6cb4780687801735533ecd7d262940204ab402d581387eb8a6411b3c0c"
+      },
+      "exit_code": 101,
+      "selected": 1,
+      "meaning": "New actual authored Starlark command with48MiB archive body under64MiB native bank fails Resource at trusted_operation; peak50574197. This is real capture/completion path, no native effect/result/root injected."
+    },
+    "green": {
+      "raw": {
+        "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-native-guards.json",
+        "sha256": "8f6c064e5bcc9d33b4245f86fea6bb1ac8cd4a33a6d7cc9ceb3705f9723d1eeb"
+      },
+      "actual_body_bytes": 50331648,
+      "native_bank_bytes": 67108864,
+      "peak_retained_credit_bytes": 64037235,
+      "records": 4,
+      "meaning": "Same source completes actual Archive, Read(small), File(out), File(BUILD), epoch publication, following unchanged snapshots and final materialization. Every historical large body remains the canonical actual Arc and actual digest/output bytes match independently."
+    },
+    "true_overlap": "Actual AA then changed B: identical A at a new operation index reacquires/extracts and succeeds with SourceAttempts2 and records2, then changed48MiB B must Resource under64MiB while full A history remains. No size/hash surrogate reuse or decoder/scratch-only proof.",
+    "native_history_reader": "Actual archive/delete/full-history seal: dropping request/command/history releases >=48MiB deleted allocation credit and Weak body while a final kept-file reader remains usable; its last drop restores byte/FD/backing baseline. After-seal cost coverage succeeds while new Exists request still refuses Reservation.",
+    "negative_and_ownership": "Ordinary tests prove exact foreign bank/scope/reservation refusal before discount, fresh/empty/wrong-length/cancel/refunds, same-allocation reuse vs equal-foreign cost, index-threshold growth prepayment, atomic visitor failure, interleaved append-only published-witness validity, deleted/Template/Read body visitors, full forecast preservation, and memo-held body/state Weak lifetimes after argument owners retire."
+  },
+  "validation": {
+    "ordinary": {
+      "passed": true,
+      "selected": 460,
+      "records": [
+        {
+          "label": "body-coverage-sealed-history-slug_bzlmod_v2-tests",
+          "selected": 91,
+          "exit_code": 0,
+          "elapsed_seconds": 0.4172400849929545
+        },
+        {
+          "label": "body-coverage-sealed-history-slug_loading_v2-tests",
+          "selected": 54,
+          "exit_code": 0,
+          "elapsed_seconds": 0.19451860201661475
+        },
+        {
+          "label": "body-coverage-sealed-history-slug_analysis_v2-tests",
+          "selected": 197,
+          "exit_code": 0,
+          "elapsed_seconds": 0.29219402000308037
+        },
+        {
+          "label": "body-coverage-sealed-history-slug_core_v2-tests",
+          "selected": 118,
+          "exit_code": 0,
+          "elapsed_seconds": 2.7919714460149407
+        }
+      ]
+    },
+    "owner_build": {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "-p",
+        "slug_loading_v2",
+        "-p",
+        "slug_analysis_v2",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "slug_core_v2/native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 13.864609217998805,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    "default_cli_build": {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.836119512008736,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    "core_sha256": "5c7d2c40c8709011e3c2a64e268b26aa590e5a6cd26eac8bae0ac7d619dd6bc6",
+    "cli_sha256": "b5b26198ccf7776abbe4000f46fcd86b3a3a8708aed6ce6ef0420d102ecc6fde",
+    "native_guards": {
+      "selected": 12,
+      "exit_code": 0,
+      "elapsed_seconds": 2.0077862450270914,
+      "composition": "3 new full-path/history/true-overlap guards plus2 optional-checksum,2 pinned archive and5 protected lifecycle/source/ownership guards"
+    },
+    "warm_originals": {
+      "selected_test": 1,
+      "actual_commands": 4,
+      "exit_code": 0,
+      "elapsed_seconds": 11.55953021600726
+    },
+    "frozen_inputs": {
+      "input_config": "/tmp/slug-wp425-rust-inputs-fourth-flat-dirfd-aee4a6bf85d3/inventory.json",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "preparation": "/tmp/slug-wp425-validation/rust-frontier-preparation-fourth-flat-dirfd.json",
+      "preparation_sha256": "b2372b3168174c472b7499203b21c48d509d17aa0d9f32bb4721b5f7c55deac0"
+    },
+    "capture_validation": {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-capture-validation.json",
+      "sha256": "3db3e59557f4f08e4b1b81dfbe6ec641d76402382185659e897a66fb07e711c4"
+    }
+  },
+  "original_workload": {
+    "command_success": false,
+    "harness_exit_code": 0,
+    "elapsed_seconds": 25.087004663975677,
+    "computes": 836,
+    "epoch": {
+      "roots": 55,
+      "records": 110
+    },
+    "prior_epoch": {
+      "computes": 835,
+      "roots": 55,
+      "records": 109,
+      "result": "Resource at snapshot successor admission"
+    },
+    "completed_boundary": "The prior checksumless TarXz rustc Archiveindex0 (389042688 decoded) is now the accepted latest record; workspaces success bucket moves163\u2192164 calls and includes its decoded bytes. No original repository source/arguments, staged inventory or limits changed.",
+    "next_result": {
+      "error": {
+        "detail": {
+          "kind": "mutation",
+          "reason": "unclassified",
+          "stage": "Materialization"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "next_operation": {
+      "kind": "Archive",
+      "index": 1,
+      "format": "TarXz",
+      "expected_sha256": null,
+      "compressed_bytes_transferred": 4589980,
+      "decoded_bytes": 0,
+      "scope_first_error": "Allocation"
+    },
+    "peak_retained_bytes": 396202045,
+    "peak_native_fds": 422,
+    "peak_backing_bytes": 8187281408,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "Different incomplete frontiers are not a latency/peak-memory comparison. Native counters are modeled admission, not RSS; no successful Rust command/whole-memory or activation gate closes."
+  },
+  "next_owner": {
+    "source": "repository_generated_archive.rs198 prepays136MiB before creating Stream; source_service/decoder_reservation.rs32\u201343 reserves bytes+guard against same command bank; command_scope.rs44 maps native refusal to Allocation. Counters update only after bank admission; local decoder cap instead reports DecoderLimit.",
+    "lifetime": "First decoder credit drops before first snapshot. Canonical history bodies legitimately remain live before the next decoder allowance; no evidence of two simultaneously live old/new decoder windows.",
+    "attribution_limit": "Exact instantaneous refused current/request scalars are not recorded. Source order, decoded0 and unchanged396MB native high-water with retained389MB bodies identify the fixed decoder allowance as the next owner to audit; do not treat prior136MiB decoder high-water as a successful second claim or a system malloc failure.",
+    "next": "Review bounded actual liblzma allocator ownership, reusing relevant Zabel concept evidence if sound. Preserve136MiB decoder ceiling, Source counters,512MiB native bank, all history and no caller adapters. No decoder-accounting change lands in this component."
+  },
+  "recoveries": [
+    {
+      "kind": "routine compiler/fixture correction",
+      "detail": "Explicit test module path; two bare mount-fixture CreditedTranscript literals keep body_ledger None/full fallback; generic visitor Result error type annotations. No assertion weakened."
+    },
+    {
+      "kind": "native fixture convention",
+      "detail": "Two new direct tests now use the existing trusted rolling path prefix; helper authorization unchanged. Initial native batch9/12 passed, including full original scaled GREEN."
+    },
+    {
+      "kind": "scope error precedence",
+      "detail": "Existing protected test discriminated Reservation vs SourceService::ForeignScope. Restore original identity/activity check before candidate witness/retention, with closed incoming destruction order; all original assertions retained."
+    },
+    {
+      "kind": "sealed-history cost lookup",
+      "detail": "Warm case0 exposed use of mutation-only root_slot for epoch storage coverage. Use a separate full-reservation retained-slot lookup followed by unchanged bank/scope/allocation checks; root_slot still requires live progress. Same native test proves coverage after seal plus mutation refusal. No diagnostic logs or origin-equality relaxation introduced."
+    }
+  ],
+  "fixture_growth": {
+    "new_copied_upstream_fixture_files": 0,
+    "new_test_leaves": 5,
+    "new_production_leaves": 3,
+    "provenance": "Existing actual RootIO/native factory/source/command constructors with tiny authored Starlark and streamed repeated-byte archives; no new copied ruleset corpus or native result injection."
+  },
+  "raw_receipts": [
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-native-red-build-result.json",
+      "sha256": "4f4e6edfc942a98e238197a632a24946e23c2f7c500ebd9e605ef2e2b8a7486f"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-native-red-build-fixed-result.json",
+      "sha256": "3401c92c189eec88a9d4c269395042dc065220e56e18ace362900001630947a2"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-native-red.json",
+      "sha256": "ad2b1ed32d0b6ff47074844ff672b5145bf96a85a75ba985e341be46d532497d"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-native-red-candidate-preservation.json",
+      "sha256": "0392718d630c0227b118725c202e614c2fa27d328344f6703db3fdd8a6e6dda7"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-native-red-native-freeze.json",
+      "sha256": "5a42b1379d1f4389ad40ccfa86399ca089a992c7dbcded49603c3721b0d9edcc"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-native-red-validation.json",
+      "sha256": "94338ab70a21a27ab2e06b9a76afa2b8d19dc67b24b1392600e1557c6cb6bde8"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-worker-import.json",
+      "sha256": "116af112dc24466e39ae742c5417644dd0c420c58a748725ea3c354a74b352e9"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-owner-build-result.json",
+      "sha256": "c6744a2ed64ceec9f8b373d9337b4ed234b4be90e646b0beef74790da17d0ff1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-owner-build-fixed-result.json",
+      "sha256": "291912001f692cf5e743f7ac2797c7ede5b7c42f15623beededbaa7022979e6e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-candidate-owner-build-result.json",
+      "sha256": "160053de9b79ae296cb130191a5882bef19f385078de096f44c2a96277b434a2"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-candidate-ordinary.json",
+      "sha256": "0c94b5df0bb0ea8b2d72da3ca0a79429e4e3c591cd7b641a496bdb650f5ba23e"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-candidate-native-guards.json",
+      "sha256": "90659c0c36c46a127b3cd329efde7c83f67a0d5b6cef051b7398ca94364297b5"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-candidate-initial-native-validation.json",
+      "sha256": "2b8cfe6ebdb85690ebaafb95abce5bc9c3adae7a82b554cb3f35ba01306a5eec"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-scope-fixed-native-guards.json",
+      "sha256": "7703d3b55e5e633bd301f0702b919e511c422b60210abbff59a0a365bb3fcef1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-scope-fixed-authentic-warm.json",
+      "sha256": "db31bbcbb0c77b10ff146e4fa3b79c61cf16226ffa92bcd421dca78d1286b203"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-scope-fixed-initial-native-validation.json",
+      "sha256": "640be0fea36b248a0c1307b6a7b2bac0e6d035601b62ef301d266808b77b9bce"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-owner-build-result.json",
+      "sha256": "90053cf12b765d1daaa216fd5a96a43aa9ba0eaebb66bac8612926d05ad06e5a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-cli-build-result.json",
+      "sha256": "1ee81db57401a6731d2c5c04cb8648f02a9af0d8a6a2fb3545e32103099008a9"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-ordinary.json",
+      "sha256": "4e5e49c2514def5ffed5d447b07566e0df7bf201cd40cc3c318678c5d95c5ca0"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-slug_bzlmod_v2-tests.json",
+      "sha256": "82aa905e0bbc77f1451a1af116923606decfb392ae1e530de8a60fde708a5634"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-slug_loading_v2-tests.json",
+      "sha256": "b5d07075f844e36da9d8a80b83767a9da9278d2d1e23f6761e7b89e69aff8f95"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-slug_analysis_v2-tests.json",
+      "sha256": "6646a513c95d988291ad719c8e41843355b6a3b994b2b7013b5d55bd3d531748"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-slug_core_v2-tests.json",
+      "sha256": "9508172bb1c47e1cb5429d62dac1f6a9d05dcafd4f97eee63b3172a8810cbcf9"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-native-freeze.json",
+      "sha256": "a4c2e9247872f61c6d699c8ab9652b6b277882ea64c6fd4797bb9e58e9393534"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-candidate-preservation.json",
+      "sha256": "99dfa72042a89c1a5a67adf0060dbd06e730e87832afa311a786ef9e2dc0b1c5"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-native-guards.json",
+      "sha256": "8f6c064e5bcc9d33b4245f86fea6bb1ac8cd4a33a6d7cc9ceb3705f9723d1eeb"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-authentic-warm.json",
+      "sha256": "06253dd9f036f437b5e1ad557913c86d8be719e0a2e4fad3fd0aa849305ee2a6"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-rust.json",
+      "sha256": "513e5e60770c0b5289cea8c81dd70b73b76e3a9adfec1e2ea44e93e5b4db2338"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-sealed-history-capture-validation.json",
+      "sha256": "3db3e59557f4f08e4b1b81dfbe6ec641d76402382185659e897a66fb07e711c4"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/body-coverage-format.json",
+      "sha256": "94ec2b820dff993a3d6adac8ebbfc48595cc082d5fad37cfc9eca8c3872329c0"
+    }
+  ],
+  "final_review": {
+    "verdict": "ACCEPT",
+    "record": {
+      "file": "/tmp/slug-wp425-validation/body-coverage-final-review.json",
+      "sha256": "81d763e01d1f56aeffee864db83187b55973c5f0aaaf84b2fb44077b53989192"
+    }
+  },
+  "final_validation": {
+    "status": "PASS",
+    "record": {
+      "file": "/tmp/slug-wp425-validation/body-coverage-final-validation.json",
+      "sha256": "10c72b2abe6914dc31d5127bb412287c75cd92209dbc406d12e3d499efb60eec"
+    }
+  }
+}

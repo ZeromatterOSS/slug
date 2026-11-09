@@ -8,6 +8,8 @@ use starlark_map::small_set::SmallSet;
 
 use super::*;
 
+mod body_coverage;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Allocative)]
 pub struct RepositoryWorkspaceRetention {
     state_versions: usize,

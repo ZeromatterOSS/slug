@@ -1003,3 +1003,6 @@ mod rust_toolchain_tests;
 
 #[path = "optional_archive_tests.rs"]
 mod optional_archive_tests;
+
+#[path = "body_coverage_tests.rs"]
+mod body_coverage_tests;

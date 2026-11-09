@@ -148,7 +148,14 @@ capability; natural Source and legacy behavior remain pinned. Original Rust next
 reaches snapshot successor Resource admission under unchanged limits, with exact
 cleanup. Review native producer/transcript/epoch/history credit custody next;
 modeled reservation overlap is not RSS. Full archive fit, successful Rust cquery,
-command latency/RSS and General activation remain open.
+command latency/RSS and General activation remain open. The
+[native body-coverage component](./slug-v2-subplans/wp1225-body-coverage-acceptance-2026-11-09.json)
+now carries canonical allocation leases across the full native custody path,
+with460 ordinary checks, twelve native guards and four warm originals. The
+actual Rust run completes the previously refused389MB archive (110records), then
+reaches the next XZ decoder's Source Allocation refusal under unchanged limits.
+Review bounded decoder allocation next; full archive/Rust closure and the
+completed-command memory ratio remain open.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

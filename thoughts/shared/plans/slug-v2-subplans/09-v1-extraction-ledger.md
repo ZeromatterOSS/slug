@@ -2,6 +2,27 @@
 
 ## WP425 rooted repository consumers
 
+Native body coverage reuses V2 Workspace
+`BudgetedImageBlock<Arc<[u8]>>` for exact allocation/header credits and
+payload-before-credit last-native-owner cleanup. The byte bank and public pure
+body representation stay unchanged; no transfer/split/refund API is added.
+Root-local credited `SmallMap` indices route only actual allocation membership,
+with separately prepaid old/new capacity and wrapper metadata. No global pool,
+semantic cache, DICE resource or digest authority appears. Complete semantic
+history and logical metadata/body caps remain unchanged. Borrowed body-covered
+control forecasts retain all construction, headers, Execute-output metadata and
+external dependency accounting. Native data/history filtering keeps their
+existing distinct retention boundaries; arbitrary DICE alias RSS is unproved.
+The [coverage contract](wp1225-general-repository-workspace-design.md#native-canonical-body-allocation-coverage)
+and [component receipt](wp1225-body-coverage-acceptance-2026-11-09.json)
+record actual full-pipeline RED/GREEN, preserved true overlap refusal and the
+original Rust archive record advancing109→110. The next decoder allocation
+remains open under unchanged limits; this is no completed-command RSS claim.
+Zabel `src/memory/retained.zig419–463,826–873` is concept/test input only:
+publication transfers one retained owner's lifetime rather than recharging an
+alias. Its arenas/runtime/publication registry are not imported. Existing V2
+freeze and Buck2-derived compact maps supply the implementation primitives.
+
 General archive intents distinguish an optional expected checksum from the
 mandatory actual digest returned by the existing closed capture owner. Full
 structural identity retains absence and every original field; pinned ordinary

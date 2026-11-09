@@ -7,6 +7,9 @@ use slug_bzlmod_v2::RepositoryWorkspaceExecute;
 use starlark_map::small_map::SmallMap;
 
 use super::*;
+
+#[path = "tests/body_coverage_tests.rs"]
+mod body_coverage_tests;
 use crate::runtime::repository_physical_root::mount_lease::quota::initialized_archive_for_test;
 use crate::runtime::repository_physical_root::native_tests::reservation;
 use crate::runtime::repository_physical_root::tests::resources;
