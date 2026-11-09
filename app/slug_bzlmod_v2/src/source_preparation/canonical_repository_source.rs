@@ -241,6 +241,8 @@ pub fn host_canonical_repository_source_input_with_filesystem_realization(
 }
 
 /// Complete repository source identity used by shared package-policy owners.
+/// Hash supplies only operational buckets; full equality retains every field.
+/// It is not a canonical, persisted or content identity.
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum HostRepositorySourceRoute {
@@ -435,7 +437,7 @@ impl HostRepositorySourceRoute {
 impl Hash for HostRepositorySourceRoute {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            Self::Root(route) => route.hash(state),
+            Self::Root(route) => route.hash_for_routing(state),
             Self::Canonical(input) => {
                 1_u8.hash(state);
                 input.hash(state);

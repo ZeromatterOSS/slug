@@ -176,7 +176,14 @@ chain under512MiB/27+3 with full verification and exact cleanup. Its
 [receipt](./slug-v2-subplans/wp1225-cross-path-body-recovery-acceptance-2026-11-09.json)
 keeps this separate from the full original:111 operations then Cargo Archive
 WorkDeadline, versus113 in a prior stopped capture, with no timing attribution.
-Next select reached end-to-end work under the unchanged deadline; full command
+The [root-route component](./slug-v2-subplans/wp1225-root-route-hash-acceptance-2026-11-09.json)
+now passes actual DICE key/cycle work reduction, complete identity/collision and
+shared-owner accounting plus protected native/warm gates; independent final review
+accepts this bounded component.
+The original A/B/B/A keeps839attempts/55roots/113records each, with three outer
+WorkDeadline refusals and one unclassified Materialization mutation alongside a
+sticky scope WorkDeadline. No inner cause, completion or frontier gain is claimed.
+Next inspect reached archive/capture work under unchanged limits. Full command
 latency/RSS, Rust/action/REAPI/Slug closure and activation remain open.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,

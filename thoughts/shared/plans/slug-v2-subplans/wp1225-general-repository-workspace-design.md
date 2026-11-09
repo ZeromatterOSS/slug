@@ -1550,6 +1550,100 @@ first control 49/95 and final control 8/15 after a 30.2-second materialization
 wait. Keep the outlier and stopped-prefix qualification. Next structural work
 requires its own actual owner/discriminator; no source class or cap expands.
 
+### Immutable root-route operational hash reuse
+
+Select repeated operational hashing of `RootRepositoryRoute`, a Slug-native
+lookup optimization with unchanged semantic behavior. A frozen original Rust
+capture observes 1,152,180 complete route Hash guard drops and 1,824,327,957ns
+inclusive synchronous thread CPU; the parallel `BzlModuleIdentity` measurement
+observes 226,903 drops and 109,351,732ns. The intervals include per-call clock
+overhead, callees and signals. They neither assign the shared mapping IP samples
+to a runtime caller nor establish exclusive writer time or removable wall time.
+Temporary probes, feature/dependency edges and reports are preserved outside Git
+and retired before implementation. No public mutable module-identity cache is
+selected.
+
+The root route shares one private immutable `Arc<RootRepositoryRouteData>`
+containing all five original fields and one weak operational hash of their
+complete existing writer. The inline-word candidate is rejected: its measured
+SourceRoute264 exceeds the unchanged256-byte guard. One private constructor initializes all
+successful selected Registry, selected Local, Builtin, Generated and DirectLocal
+routes, including test factories. Construction runs the unchanged generic writer
+once through `DefaultHasher`, including existing specification scratch/sorting,
+then publishes one immutable Arc allocation. Clones share that same data owner.
+Full `RootRepositoryRoute::hash` continues to emit its workspace, apparent
+repository, module name, canonical repository and source writers with identical
+methods, bytes and order through the shared data. Every nested writer remains
+unchanged. Structural equality compares every original field and ignores the
+scalar; equal foreign allocations must remain equal. Debug retains the original
+presentation. No public mutable data accessor or Deref escape is added.
+
+Only `HostRepositorySourceRoute::Root` uses the crate-private operational writer
+to emit one u64. Its Canonical branch stays byte-exact. This shared wrapper routes
+the existing external module/package keys and cycle identities; no DICE graph,
+cacheability, source/freshness, cancellation or cycle lifecycle changes. The
+separate `HostRepositorySourceFileKey` direct root-route writer remains unchanged
+and deferred. A forced weak collision must still compare complete structural
+keys. The scalar is neither a source certificate nor a persisted, SHA, REAPI or
+canonical identity; all such writers keep their existing inputs and bytes.
+
+The declared primary discriminator is a genuine DICE-produced selected root
+route retained through the actual external module key and cycle identity:
+64 repeated shared-root wrapper hashes must emit exactly64 u64 writes/512bytes,
+independent of mapping/specification size. Baseline must fail that assertion.
+Keep ordinary full-route hashing as an unchanged reference and account for the
+new one-time construction work separately; repeated-use savings must exceed
+that construction in the fixed-work fixture. Require independent method/byte
+writer mirrors, all constructor/source variants, full-field changes, foreign
+equal construction and forced-collision lookups. Measure actual route, wrapper
+and enclosing-key layout deltas. Keep the existing SourceRoute256 and key/cycle320
+guards unchanged. Measure a unique route including outer handle, private data
+and actual Arc header; report its overhead even when positive. Compare one
+simultaneously live actual route/source/eval/observed/two-cycle cluster with old
+inline mirrors in one Allocative traversal per whole cluster. Require reduced
+cluster retention without counting shared data repeatedly. Unique, one-clone
+and many-clone cases, foreign equality, data/mapping/specification Weak custody
+and last-owner release remain required.
+
+This adds one shared DICE-retained data allocation per successful producer, no
+global pool, lazy cell, native credit or cap. Existing route/key holders and
+their derived Allocative visitors must account for the complete data/header and
+actual wrapper layouts. Constructor argument/stack-data/Arc overlap and existing
+specification scratch are separate from retained footprint; Allocative is not
+peak-memory proof or native prepayment. Native service inputs still project the unchanged natural
+request metadata. This is not a claim that the native byte bank covers arbitrary
+DICE graph storage or that whole-command RSS fits. It applies the existing Buck2 `Hashed` routing/identity distinction using
+the already selected standard hasher and existing Arc/Allocative ownership;
+donor code is not imported. Production
+edits stay in Bzlmod root-route construction/equality and the shared source-route
+Hash branch. A focused helper/test leaf bounds additions to the large existing
+host module. Loading supplies the actual-owner work regression. Require focused
+owner and named direct-dependent/lifecycle checks, protected native/warm commands
+and a frozen same-input original comparison before final review. Stopped prefixes
+do not prove latency/RSS, Rust completion or activation. General remains Disabled;
+the original27+3 clocks and every native/source/archive limit stay unchanged.
+
+The [component receipt](wp1225-root-route-hash-acceptance-2026-11-09.json) now
+records actual DICE key/cycle RED→GREEN, unchanged generic method/byte streams,
+forced collisions, shared/foreign equality and Data/mapping/spec last release.
+SourceRoute is48bytes; actual eval/observed/cycle holders are96bytes, satisfying
+the unchanged256/320 guards. A unique route costs32additional retained bytes;
+the real six-holder cluster drops92,719→91,446 in one whole-cluster traversal.
+All839 Bzlmod checks pass. The Loading sweep is1188/1195, with six failures on
+the exact matching-feature baseline and one reference-count test demonstrated
+flaky on both pinned binaries. The Core direct-dependent selection is62/79;
+all17failed names reproduce on accepted-main Core. No assertions are weakened.
+All15 native cases pass, including14 guards and one four-command warm original.
+
+Frozen original A/B/B/A has839 attempts/55roots/113records in every run and exact
+cleanup. Three outer refusals are typed WorkDeadline; B2 is unclassified
+Materialization mutation with sticky scope WorkDeadline. The unchanged extractor
+can wrap a deadline this way, but the inner cause is not proved. Root-compute wall
+intervals14.249/12.339/12.309/14.334sec are phase observations, not completed-command
+latency/RSS or archive completion. Keep the raw classification distinction and
+all unclosed bootstrap/activation gates. Independent final review accepts this
+bounded component.
+
 ### Immutable observation-demand hash reuse
 
 Select one private weak routing word on immutable `PathObservationDemand`.

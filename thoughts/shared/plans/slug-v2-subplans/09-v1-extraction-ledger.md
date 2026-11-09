@@ -2,6 +2,20 @@
 
 ## WP425 rooted repository consumers
 
+The selected [root-route operational hash reuse](wp1225-general-repository-workspace-design.md#immutable-root-route-operational-hash-reuse)
+applies the existing Buck2 `Hashed` distinction between weak lookup routing and
+complete identity. One private immutable Arc data owner retains every original
+route field and a scalar computed once from the old full writer; generic route
+Hash, canonical/source identities and complete collision equality remain
+unchanged. No donor code, global collection or pool is imported. The inline-word
+candidate failed the unchanged256-byte compactness guard. The shared version
+passes it at48bytes, with32bytes positive unique-owner overhead and actual
+six-holder retention92,719→91,446. The [component receipt](wp1225-root-route-hash-acceptance-2026-11-09.json)
+records complete writer/collision/custody and last-owner tests, actual DICE
+key/cycle RED→GREEN and native/warm proof. Independent final review accepts the
+component; native-bank,
+completed-command RSS, Rust closure and activation claims remain open.
+
 The selected [cross-path native recovery](wp1225-general-repository-workspace-design.md#bounded-cross-path-native-body-recovery)
 uses indexed traversal of the existing Buck2-derived SmallMap and the existing
 same-bank body leases. A prepaid bounded cursor routes only candidate discovery

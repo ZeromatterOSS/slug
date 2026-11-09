@@ -1,0 +1,297 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "component": "Immutable shared root-route data and bounded operational hashing",
+  "status": "accepted_component",
+  "baseline_revision": "66239214c24b35032e13af13e903787c0053762b",
+  "compatibility": "Slug-native operational representation only; existing exact surfaces and full semantic identity remain unchanged.",
+  "production": "Disabled",
+  "contract": "wp1225-general-repository-workspace-design.md#immutable-root-route-operational-hash-reuse",
+  "selection": {
+    "root_route_hash_guard_drops": 1152180,
+    "inclusive_thread_cpu_ns": 1824327957,
+    "module_identity_hash_guard_drops": 226903,
+    "module_identity_inclusive_thread_cpu_ns": 109351732,
+    "qualification": "Temporary fixed scalar probe included per-call clock overhead/callees/signals across all Hash domains; not exclusive/removable time or runtime-caller/IP attribution. Probe/features/dependency edges retired before implementation."
+  },
+  "implementation": {
+    "owner": "One private immutable Arc<RootRepositoryRouteData> per successful existing producer retains all five original fields and one weak word; Clone shares that owner.",
+    "constructor": "One private initializer; complete old five-field writer once through DefaultHasher before exactly one Arc publication. Generic Hash calls the same full field writer. Existing spec scratch remains, separate from retained footprint.",
+    "identity": "Full structural Data Eq ignores auxiliary word; normal Arc Eq permits shared immutable pointer witness and compares foreign allocations fully. Original Hash methods/bytes and Debug projection preserved. Forced weak collisions still compare full keys.",
+    "routing": "Only HostRepositorySourceRoute::Root emits cached u64. Canonical branch byte-exact; direct HostRepositorySourceFileKey still uses full generic Root Hash. No persisted/SHA/StrongHash consumer found for changed wrapper; exact module fingerprints use separate field writers.",
+    "scope": "No DICE cacheability/freshness/cycle-policy/native producer/history/cap/activation changes; no global pool, lazy cell or mutable data escape.",
+    "rejected_inline_candidate": "An inline word produced SourceRoute264 and failed the unchanged256 guard. Source/binaries/failure receipt preserved; no original native capture claimed for rejected candidate."
+  },
+  "primary_actual_owner": {
+    "producer": "Genuine DICE selected Registry Root route; real external module Eval/Observation keys compute successfully, real cycle identities retained. Same RED leaf unchanged.",
+    "repetitions": 64,
+    "source_wrapper": {
+      "baseline_writes": 2304,
+      "baseline_bytes": 21120,
+      "candidate_writes": 64,
+      "candidate_bytes": 512
+    },
+    "each_eval_observation_cycle_owner": {
+      "baseline_writes": 2624,
+      "baseline_bytes": 22848,
+      "candidate_writes": 384,
+      "candidate_bytes": 2240
+    },
+    "one_time_full_writer_bytes": 330,
+    "fixed_metric_including_construction_bytes": 842,
+    "reference_full_64_bytes": 21120,
+    "qualification": "Writer-call/byte work and constructor charge are component metrics, not cycles/wall/RSS."
+  },
+  "retention": {
+    "old_root_inline_bytes": 256,
+    "new_root_handle_bytes": 8,
+    "private_data_bytes": 264,
+    "arc_allocation_including_header_bytes": 280,
+    "unique_root_retained_extra_bytes": 32,
+    "source_route_inline_bytes": [
+      256,
+      48
+    ],
+    "eval_observation_cycle_inline_bytes_each": [
+      304,
+      96
+    ],
+    "actual_six_holder_cluster_inline_bytes": [
+      1728,
+      440
+    ],
+    "actual_six_holder_cluster_retained_bytes": [
+      92719,
+      91446
+    ],
+    "measured_local_one_clone_retained_bytes": [
+      14069,
+      13843
+    ],
+    "measured_local_many_clone_retained_bytes": [
+      30851,
+      14371
+    ],
+    "proof": "One Allocative traversal per whole simultaneously live cluster, real nested mapping/spec sharing, actual Arc Layout/header. Independent old five-field mirrors retain all old payloads. Data/mapping/spec Weak survive intermediate owners and expire after last holder. Existing256/320 compactness tests pass unchanged.",
+    "qualification": "Unique-owner overhead is positive. Constructor stack/data/Arc overlap is separate; derived accounting is not native prepayment, arbitrary DICE-bank coverage, peak memory or completed-command RSS proof."
+  },
+  "validation": {
+    "owner_focused": {
+      "selected": 5,
+      "passed": 5
+    },
+    "actual_owner_layout_and_unchanged_compactness": {
+      "selected": 3,
+      "passed": 3
+    },
+    "bzlmod_ordinary": {
+      "selected": 839,
+      "passed": 839
+    },
+    "loading_ordinary": {
+      "selected": 1195,
+      "passed": 1188,
+      "failed": 7,
+      "baseline_qualification": "Six same failures on exact662 matching-feature full sweep; seventh reference-count test both passes and fails on immutable baseline/candidate in three paired isolated runs. No assertions changed or failures omitted. See pinned qualification receipt."
+    },
+    "core_direct_dependents": {
+      "selected": 79,
+      "passed": 62,
+      "failed": 17,
+      "baseline_qualification": "All17failednames/assertion sites reproduce on pinned accepted-main observerCorea920 under exact79selectors. No assertion changed or omitted."
+    },
+    "native": {
+      "selected_cases": 15,
+      "passed": 15,
+      "native_guards": 14,
+      "warm_case": 1,
+      "warm_original_commands": 4,
+      "elapsed_seconds": 14.248255835991586,
+      "supervision": "Exact ignored preflight;60sec/8GiBAS/1MiBstreams; final-after-wait overflow/deadline checks; all pass. Unchanged five-archive-only fit proof deliberately not repeated."
+    },
+    "builds": "Pinned nightly2025-09-14 offline/locked observer libraries and default CLI pass; archive boundary and diff/plan status checks pass.",
+    "not_all_green": "Broader Loading/Core sweeps are explicitly baseline-qualified; they are not all-green."
+  },
+  "original_comparison": {
+    "order": [
+      "a1",
+      "b1",
+      "b2",
+      "a2"
+    ],
+    "computes_each": 839,
+    "last_explicit_roots_each": 55,
+    "last_explicit_records_each": 113,
+    "root_compute_wall_ns": [
+      14249123959,
+      12339118881,
+      12309098959,
+      14333795158
+    ],
+    "root_compute_parent_cpu_ns": [
+      14785589008,
+      12855983882,
+      12828531167,
+      14889883359
+    ],
+    "outer_results": [
+      {
+        "error": {
+          "detail": {
+            "code": "WorkDeadline",
+            "kind": "source_service"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      {
+        "error": {
+          "detail": {
+            "code": "WorkDeadline",
+            "kind": "source_service"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      {
+        "error": {
+          "detail": {
+            "kind": "mutation",
+            "reason": "unclassified",
+            "stage": "Materialization"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      {
+        "error": {
+          "detail": {
+            "code": "WorkDeadline",
+            "kind": "source_service"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      }
+    ],
+    "sticky_scope_error_each": "WorkDeadline",
+    "cleanup_each": {
+      "baseline": 168,
+      "retained_bytes": 168,
+      "native_fds": 0,
+      "backing_bytes": 0
+    },
+    "qualification": "Three outer typed WorkDeadline refusals; B2 outer unclassified Materialization mutation with sticky WorkDeadline. Unchanged extractor error mapping permits this combination but inner cause is unproved. No archiveEOF/record completion or completed-command latency/RSS/frontier gain is inferred. All sources/staged inputs/preparation frozen and checked unchanged; distinct pinned Core/CLI paths intentionally used."
+  },
+  "artifacts": {
+    "baseline_core_sha256": "a920261bdb1810855237ef3ae9e0d3bdd51d314e15a3316823675f3316acec8b",
+    "baseline_cli_sha256": "02de7050b3d98acc971741484cea771397821665a9e87c72ccab178e7dc7a57e",
+    "candidate_core_sha256": "a70ace06350167a1b0d6569893271c63274a2a70e1981bcf3f118258792e9669",
+    "candidate_cli_sha256": "a528c15110e269cf313764cd98c86bb9435a48edfba5037e2a21549263843b9b",
+    "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+    "preparation_sha256": "b2372b3168174c472b7499203b21c48d509d17aa0d9f32bb4721b5f7c55deac0"
+  },
+  "reuse_and_growth": {
+    "donor": "Existing Buck2 Hashed routing/full-identity distinction and Arc/Allocative implementation; concept only, no donor code imported.",
+    "new_fixture_corpus": false,
+    "tests": "Three new focused Rust test leaves reuse existing selected Registry/local helpers and authentic native fixtures; one focused production helper. No external payload/corpus/staging changes.",
+    "source_growth": "Root helper bounds ownership/hash/equality additions; thin wiring in large existing modules. Existing private mutation fixture reconstructs an immutable value and preserves its assertions."
+  },
+  "residuals": [
+    "Full authentic Rust cquery, action comparison/REAPI execution and complete Slug bootstrap remain open.",
+    "Completed-command latency/RSS<=1.25xBazel and production activation remain unproved.",
+    "B2 inner mutation cause is unclassified despite observed sticky WorkDeadline.",
+    "Six Loading baseline failures, one demonstrated reference-count flake and17Core baseline failures remain recorded.",
+    "Direct RootRoute SourceFile operational hashing remains full and deferred."
+  ],
+  "evidence": [
+    {
+      "path": "/tmp/slug-wp425-validation/mapping-owner-attribution-rust.json",
+      "sha256": "bb4cbdf9dfb9b419f514728b24954e8d00387616f4a2abdea9e5bb7c2cf4c29d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/mapping-owner-attribution-rust-validation.json",
+      "sha256": "6c66d60f24e7194776a6decb1e97a4f571646a8d529562d60b60b7895c09eacf"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/mapping-owner-attribution-retirement.json",
+      "sha256": "5d69eb5ebd664b01bf64e0d084ff3b1c5c90ab75a7d7d6d6f14d86518edb633b"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-key-baseline-red.json",
+      "sha256": "9617879bd0e88a10e060f8e686d2129a49c656ee562210dc27f8ab31efc59c02"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-key-baseline-loading-preservation.json",
+      "sha256": "c72fc11b21fbb7472109925856d8c33eb980af189d7e2ad1f49b4b25e60bf6fb"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-inline-rejected-preservation.json",
+      "sha256": "afbb488407f03d633c8439288d2010791511ab244c58944154b301e28284263a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-key-compactness-gate.json",
+      "sha256": "a2b59861447ee3f0d4cf60066b3ad0bb8c4490ff6a86a0c3c18664f01b741dbd"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-domain-accounting-audit.json",
+      "sha256": "7693417e89eee6e766a4bc5f2625874e3ba003a1eefdfffa458a317665afe21f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-owner-tests.json",
+      "sha256": "df28b2ed6b69569e556e95a887be2418ab03cbe4e683cd1c69d9ab58cb8805f1"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-loading-green.json",
+      "sha256": "e289c1d8893a30fd1a0628aa382a0b315f160895ed744f9fcbb8d75a64fb81e4"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-bzlmod-integration.json",
+      "sha256": "e42645fb59e977f80d42b8cebab05871a5618608e3347e2c78555b25966422a4"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-loading-integration.json",
+      "sha256": "4f40b1a17865b784c7ac29ab4af62cce6175e5f6e1828b14c85c3c23149fd32e"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-loading-baseline-qualification.json",
+      "sha256": "46f95ae189067523f0616ad4140e14bcf81b032f603ebe631af2100e283062f8"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-core-dependent-tests.json",
+      "sha256": "e2035bea442b9411a0ad6c5085a9710e6740ed1dd4ddec15630c64c443de778d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-core-baseline-qualification.json",
+      "sha256": "2742ecc6b1e38a72e40dd49758b2cd9057d9fb737d3a0757ecd2d431058d0e11"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-native-guards.json",
+      "sha256": "13545ab6d391ab6ecae84583122ccf97c43b592e158ec9d9df5e4a952b8a0306"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-original-comparison.json",
+      "sha256": "b9dd424638b05b58d83ae66e51f112134f4018dc382e945124cadd6f413f3b35"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-native-native-freeze.json",
+      "sha256": "c1d9c33f0b91d5d282e0c009bef73f009a7dd5e2f11d531fdc5af65102f13867"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-core-preservation.json",
+      "sha256": "e130b00a9ab618e54bfe061f081babfb33b5b6cd0c39d651df46e094f33f2e6f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/root-route-shared-cli-preservation.json",
+      "sha256": "00f56c98ee1dccf2125f58884f32d18adf5147460b11bf59ac854e90d3ef88a0"
+    }
+  ],
+  "independent_final_review": {
+    "verdict": "ACCEPT",
+    "reviewer": "/root/reviewer",
+    "scope": "Scoped shared root-route ownership and operational hash reuse only; all recorded baseline/opaque-error and unclosed bootstrap/RSS/activation qualifications retained.",
+    "verified": "Staged12file implementation/claim join,20evidencepins,nestedABBAraws,finalsourcefreeze,actualowner/cluster/compactness,nativeandbaseline-qualifiedordinarygates."
+  }
+}

@@ -40254,3 +40254,9 @@ async fn native_package_name_rejects_direct_build_calls_and_invalid_contexts() {
 
 #[path = "host_package_load_tests/root_package_syntax_tests.rs"]
 mod root_package_syntax_tests;
+
+#[path = "host_package_load_tests/root_route_hash_tests.rs"]
+mod root_route_hash_tests;
+
+#[path = "host_package_load_tests/root_route_hash_layout_tests.rs"]
+mod root_route_hash_layout_tests;

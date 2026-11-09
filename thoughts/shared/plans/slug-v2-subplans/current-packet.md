@@ -3,7 +3,18 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [bounded cross-path native body recovery](wp1225-general-repository-workspace-design.md#bounded-cross-path-native-body-recovery)
+Current delta: [immutable root-route operational hash reuse](wp1225-general-repository-workspace-design.md#immutable-root-route-operational-hash-reuse)
+now passes genuine DICE key/cycle RED→GREEN:64 shared wrapper hashes emit512bytes,
+previously21,120. Full generic Hash and structural identity remain unchanged.
+Private immutable Arc data keeps SourceRoute48bytes under the unchanged256 guard;
+unique-owner cost grows32bytes, while the actual six-holder cluster falls
+92,719→91,446 retained bytes. The [component receipt](wp1225-root-route-hash-acceptance-2026-11-09.json)
+records839 passing Bzlmod checks, baseline-qualified Loading/Core sweeps and15
+native cases including four warm original commands. Independent final review
+accepts this bounded component.
+All clocks, limits and production gating remain unchanged.
+
+Accepted [bounded cross-path native body recovery](wp1225-general-repository-workspace-design.md#bounded-cross-path-native-body-recovery)
 now passes actual48MiB/64MiB RED→GREEN while changed bytes still refuse. It recovers
 only an exact payload-bank limit refusal, with finite same-origin discovery and
 full fresh FD/frame/EOF/byte comparison; histories, identities and caps remain.
@@ -17,8 +28,12 @@ not reconstruct the original omitted-checksum Starlark command.
 
 The same-input full original still refuses at sticky WorkDeadline:837 attempts,
 55roots/111records, Cargo Archive pending (index2), exact cleanup. Prior stopped
-captures reached113; no timing/frontier gain or regression is attributed. Next
-select reached end-to-end work under the existing deadline; do not repeat the
+captures reached113. The new A/B/B/A records839attempts/55roots/113records each:
+three outer WorkDeadline refusals and one candidate unclassified Materialization
+mutation with sticky scope WorkDeadline. Cleanup is exact; inner mutation cause
+is unproved. Root-compute wall intervals are14.249/12.339/12.309/14.334sec, separate
+from completed-command latency/RSS. Next inspect reached archive/capture work
+under the existing deadline; do not repeat the
 now-passing archive-only fit proof or raise limits. Full Rust/action/REAPI/Slug
 closure, completed-command latency/RSS<=1.25xBazel and activation remain open.
 
