@@ -53,6 +53,17 @@ observer and adds fixed progress counters, without a production hook or donor
 import. This component does not establish completed-command memory fit; its
 validation belongs to the selected observation-cutoff acceptance receipt.
 
+The ordinary materialization result producer uses the same opaque projection
+mechanism for its full-request-bound optional current entry. Existing Arc and
+Allocative ownership retain the actual selected request/result, without the
+whole epoch or retained generated inventory. Complete request/history/source
+and result equality remain authoritative; no new collection, interner, global
+cache, donor import or native admission appears. The existing probe observer
+adds a fixed 1400-byte test-only atomic family counter array; the production
+observer layout and total report ceiling remain unchanged. This is dependency
+cutoff and bounded attribution evidence, not completed-command memory fit; see
+the [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json).
+
 Owned-file observation verification borrows a closed carrier from the actual
 sealed native owner and reuses RootIo's nofollow stream, byte comparison and
 actual SHA-256. Only complete direct File bodies may select this class; Source

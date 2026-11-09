@@ -77,9 +77,15 @@ The [owned-verification component](./slug-v2-subplans/wp1225-owned-observation-a
 now keeps full actual byte charges while sharing canonical General bodies.
 The [verified Source-placement component](./slug-v2-subplans/wp1225-source-placement-acceptance-2026-11-08.json)
 now also replaces read-only MODULE/overlay members safely. Rust passes the
-permission refusal, retains52 roots/104 records and reaches the unchanged work
-deadline after806 graph cycles. Further graph attribution precedes Rust archive
-extraction. Completion, latency and RSS acceptance remain unproved.
+permission refusal. The
+[materialization-result cutoff](./slug-v2-subplans/wp1225-materialization-cutoff-acceptance-2026-11-08.json)
+now preserves completed results across unrelated publications, with actual-key
+RED/GREEN and native admission proof. Bounded family counts leave the Analysis
+CapturedSourceSnapshotKey unreached in observed prefixes; its cutoff remains
+deferred. Alternating same-input probes reduce result recomputes but
+retain variable prefixes and the unchanged work deadline. Remaining module/
+dependency attribution precedes Rust archive extraction; completion, command
+latency and RSS acceptance remain unproved.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

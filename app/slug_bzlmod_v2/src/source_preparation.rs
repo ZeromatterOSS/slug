@@ -8,6 +8,7 @@
  */
 
 mod materialization_projection;
+mod materialization_result_entry_projection;
 pub(crate) mod workspace_identity;
 use std::fmt;
 use std::hash::Hash;
@@ -29,6 +30,7 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 pub use materialization_projection::*;
+use materialization_result_entry_projection::RepositoryMaterializationResultEntryProjection;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_events_v2::CaptureEvaluationEvents;
@@ -6035,7 +6037,7 @@ impl Key for RepositoryMaterializationResultKey {
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let epoch = match ctx
-            .compute(&RepositoryMaterializationResultEpochKey {
+            .compute_opaque(&RepositoryMaterializationResultEpochKey {
                 workspace: self.request.id.workspace.dupe(),
             })
             .await
@@ -6047,16 +6049,17 @@ impl Key for RepositoryMaterializationResultKey {
                 ));
             }
         };
-        let Some(entry) = epoch.get(&self.request) else {
-            return SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
-                (*self.request).clone(),
-            ));
+        let entry = match ctx.projection(
+            &epoch,
+            &RepositoryMaterializationResultEntryProjection::new(self.request.dupe()),
+        ) {
+            Ok(Some(entry)) => entry,
+            Ok(None) | Err(_) => {
+                return SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
+                    (*self.request).clone(),
+                ));
+            }
         };
-        if entry.request != self.request {
-            return SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
-                (*self.request).clone(),
-            ));
-        }
         let result = match &entry.result {
             RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local) => {
                 let RepositoryMaterializationKind::Local { logical_root } = &self.request.kind
@@ -19126,3 +19129,6 @@ impl HostNonregistryPackagePreflightObservationError {
 
 #[cfg(test)]
 mod repository_archive_needs_tests;
+
+#[cfg(test)]
+mod materialization_result_cutoff_tests;

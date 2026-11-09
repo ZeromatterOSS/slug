@@ -12,8 +12,13 @@ use serde_json::json;
 
 use crate::runtime::WorkspaceRuntime;
 use crate::runtime::probe_observer::ProbeGuard;
+use crate::runtime::probe_observer::family_counts::EVENT_LABELS;
+use crate::runtime::probe_observer::family_counts::FAMILY_LABELS;
+use crate::runtime::probe_observer::family_counts::Snapshot;
 
-pub(super) const REPORT_BYTES: usize = 4096;
+// The parent subtracts this reservation from its event trace allowance. The
+// combined frontier and cleanup report still has the same 512 KiB ceiling.
+pub(super) const REPORT_BYTES: usize = 16 * 1024;
 const WORDS: usize = 64;
 const MAGIC: u64 = u64::from_le_bytes(*b"SLGOBS01");
 
@@ -53,8 +58,30 @@ impl InstalledProfile {
         let observer = self.guard.observer();
         drop(self.guard);
         let words = std::array::from_fn(|i| observer.words_for_test()[i].load(Ordering::Acquire));
-        decode(&words)
+        let counts = observer.family_counts_for_test();
+        let mut profile = decode(&words);
+        profile["dice_family_counts"] = family_counts(counts);
+        profile
     }
+}
+
+fn family_counts(snapshot: Snapshot) -> Value {
+    json!({
+        "event_columns":EVENT_LABELS,
+        "families":FAMILY_LABELS.iter().enumerate().map(|(index,label)|json!({
+            "family":label,"counts":snapshot.counts[index],
+            "overflow_mask":snapshot.overflow_masks[index],
+        })).collect::<Vec<_>>(),
+        "observed_per_cell_counts":true,
+        "sampled_after_runtime_retirement_and_guard_disable":true,
+        "disable_is_atomic_snapshot_barrier":false,
+        "already_entered_callbacks_may_finish_after_disable":true,
+        "event_pairs_may_be_imbalanced":true,
+        "finished_includes_cancellation":true,
+        "synchronous_projections_emit_started_finished_only":true,
+        "measures_self_time":false,"measures_success":false,
+        "retains_full_key_identity":false,
+    })
 }
 
 fn decode(words: &[u64; WORDS]) -> Value {
@@ -212,4 +239,58 @@ fn phase_profile_scalar_v2_qualifiers_and_progress_pairing_are_bounded() {
     timing.begin_at(5, start);
     assert_eq!(timing.summary()["incomplete"], true);
     assert!(decoded.to_string().len() + timing.summary().to_string().len() < REPORT_BYTES);
+}
+
+#[test]
+fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
+    use crate::runtime::probe_observer::family_counts::FAMILY_COUNT;
+
+    let counts = family_counts(Snapshot {
+        counts: [[u64::MAX; 6]; FAMILY_COUNT],
+        overflow_masks: [u64::MAX; FAMILY_COUNT],
+    });
+    let rows = counts["families"].as_array().unwrap();
+    assert_eq!(rows.len(), FAMILY_COUNT);
+    for (index, row) in rows.iter().enumerate() {
+        assert_eq!(row["family"], FAMILY_LABELS[index]);
+        assert_eq!(row["counts"], serde_json::to_value([u64::MAX; 6]).unwrap());
+        assert_eq!(row["overflow_mask"], u64::MAX);
+    }
+    assert_eq!(counts["event_columns"], json!(EVENT_LABELS));
+    assert_eq!(counts["disable_is_atomic_snapshot_barrier"], false);
+    assert_eq!(counts["event_pairs_may_be_imbalanced"], true);
+    assert_eq!(counts["finished_includes_cancellation"], true);
+    assert_eq!(counts["measures_self_time"], false);
+    assert_eq!(counts["measures_success"], false);
+    assert_eq!(counts["retains_full_key_identity"], false);
+
+    // Only compile-time labels and scalar cells enter the encoder. There is no
+    // observed key/tag, source path, argument or environment payload field.
+    let encoded_counts = counts.to_string();
+    for payload in [
+        "arbitrary-key-payload",
+        "/private/source",
+        "secret-like-argv",
+    ] {
+        assert!(!encoded_counts.contains(payload));
+    }
+    let mut words = [u64::MAX; WORDS];
+    words[0] = MAGIC;
+    words[1] = 2;
+    let mut profile = decode(&words);
+    profile["dice_family_counts"] = counts;
+    let timing = ProgressTiming {
+        buckets: [Bucket {
+            count: u64::MAX,
+            wall_ns: u64::MAX,
+            max_wall_ns: u64::MAX,
+        }; 7],
+        pairing_mismatch: true,
+        incomplete: true,
+        clock_reversed: true,
+        overflow: true,
+        ..Default::default()
+    };
+    let combined = json!({"phase_profile":profile,"progress_wall":timing.summary()});
+    assert!(combined.to_string().len() < REPORT_BYTES);
 }

@@ -1,0 +1,2562 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "1902c4798bdb68ad1d0049750081691cb22d500e",
+  "classification": "Slug-native DICE dependency cutoff and fixed test-only attribution; repository/Starlark behavior preserved; General production remains Disabled",
+  "outcome": "An actual completed materialization ResultKey stays cached across unrelated current-row and retained-generated inventory publication. Full own-entry changes still invalidate; absence/conflict keeps noncacheable Need. Authentic Rust remains deadline-refused.",
+  "contract": {
+    "projection": "Private full-request Eq/coarse request-id Hash projection derives opaquely from the actual result epoch, selects only current matching workspace/full request and retains an Arc of the actual complete entry. No whole/reduced epoch, retained-inventory resurrection, Workspace context/policy dependency, native owner or admission change.",
+    "parent": "Only selection changes. Local/Immutable conversion, complete Spec/General history/Source bindings/result identity/path policy/instance, provide(request), equality and Need invalidity remain. Existing generation-error dependencies remain.",
+    "inherited_missing_generation": "MissingGeneration remains the original Complete error when no generation is injected. The retry control uses a separate fresh fixture with generation7 installed before the first query, then8\u21927. It does not claim later injection repairs a previously untracked missing-key lookup.",
+    "observer": "Existing native-probe-observer listener receives fixed25x6 checked saturating AtomicU64 counters plus25 overflow masks under cfg(test) only. Exact static type classification; unknown tags become other and are never retained.1400-byte array explicitly accounted; production Observer base layout8bytes and mapped ABI512bytes remain. Fixed16KiB report reservation reduces event-trace room within unchanged512KiB total output.",
+    "observer_qualification": "Post-retirement and guard-disable per-cell observations; disable is not an atomic snapshot/drain barrier. Already-entered callbacks may finish afterward, pairs may be imbalanced, ComputeFinished includes cancellation, and synchronous projections can emit only Started/Finished. No full-key identity, family self-time or success claim.",
+    "unchanged": [
+      "SourceAttempts64",
+      "Execute128",
+      "root capacity128 and metadata16MiB complete history",
+      "work27s/cleanup3s",
+      "Process64MiB and stream1MiB",
+      "native retained512MiB/FD512/backing8GiB",
+      "original Source/archive/body/decoder limits",
+      "full current native association/admission and original source scope"
+    ]
+  },
+  "source_pins": {
+    "app/slug_bzlmod_v2/src/source_preparation.rs": "290a84aad3632cd973df3f68f8f7e851ce8492d2c0df01563893e4d008c8c807",
+    "app/slug_bzlmod_v2/src/source_preparation/materialization_result_entry_projection.rs": "e7511f3499cef607b329c29b7a4c5c577711b80b770ffd3a2782d6c330514237",
+    "app/slug_bzlmod_v2/src/source_preparation/materialization_result_cutoff_tests.rs": "c8eadd7cc34187f1d0aa290aee3ff71ab6a7b120e6051631f1bd8e10a59ca747",
+    "app/slug_core_v2/src/runtime/probe_observer.rs": "5b6cfbf37404cd962962dfd3faf0cb3cb08bb61cc7896009b4741bd2454db630",
+    "app/slug_core_v2/src/runtime/probe_observer/family_counts.rs": "540304144dd41845e208e2b38722d5865af921245bec4739db5e9b6e1fc16c0a",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests/phase_profile.rs": "4df6547519d6dba5be5d8b189e7fa82de94024ba1170e787352db3b726ee6d54",
+    "app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs": "8111614bd8bf43765481dd612be5a13b419180ede530ead3e1f1905097f6b8b4"
+  },
+  "unchanged_reference_pins": {
+    "app/slug_core_v2/src/runtime/repository_workspace_driver.rs": "7c4aac41469e8221f2507f1eaa82b399607ba74008e9327486aa9457aac79e07",
+    "app/slug_core_v2/src/runtime/repository_workspace_command.rs": "5e32ab89ca3f9b01c6c8a3a2e96aff73cdb6b5647a353affca661b3f5a51c5d4",
+    "app/slug_bzlmod_v2/src/source_preparation/materialization_projection.rs": "afd492f6f5a7d9d85d8c4914f478fb07fc4d26a05a0c4284fe372e9ed4d7971d",
+    "app/slug_bzlmod_v2/src/repository_workspace/observation.rs": "6dc17a0f5ecf19b286dd3dde8c5a99da794e65beb659534d8a9448a7c747343a",
+    "dice/dice/src/api/events.rs": "1991eddf643041be922e12517b6b9a55efb650f885073deb09af7ef133c6c035",
+    "dice/dice/src/impls/worker.rs": "bb9fdbbc231e8b2e6ea8389679af94dcde374e09e67d4e8733db1a4249e5c04e"
+  },
+  "compile": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 18.643246945997817,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--features",
+        "slug_core_v2/native-probe-observer",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 45.14648780800053,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.880890018001082,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "slug_core_v2/native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 112.80987284699222,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 72.58983775299566,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "corrections": [
+    "Initial observer test found the inherited8-byte layout assertion; corrected test explicitly accounts for1400-byte test-only state while preserving base and combined-control bounds. Corrected16 pass.",
+    "Initial generation-control fixture accidentally expected an uninjected dependency to invalidate an already-cached MissingGeneration. Corrected fixture preserves baseline behavior; corrected production-unchanged RED has exactly one intended failure."
+  ],
+  "causal_red": {
+    "target": "slug_bzlmod_v2",
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-29a3d0aab08beaab",
+      "--exact",
+      "source_preparation::materialization_result_cutoff_tests::completed_result_a_stays_cached_across_unrelated_b_and_retained_publication",
+      "source_preparation::materialization_result_cutoff_tests::result_selection_absence_foreign_workspace_and_full_request_conflict_preserve_need",
+      "source_preparation::materialization_result_cutoff_tests::selected_immutable_result_fields_and_error_changes_invalidate",
+      "source_preparation::materialization_result_cutoff_tests::selected_transport_and_materialization_errors_keep_generation_retry_dependency",
+      "--test-threads=1"
+    ],
+    "preflight_command": [
+      "python3",
+      "scripts/v2_test_preflight.py",
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-29a3d0aab08beaab",
+      "--exact",
+      "source_preparation::materialization_result_cutoff_tests::completed_result_a_stays_cached_across_unrelated_b_and_retained_publication",
+      "source_preparation::materialization_result_cutoff_tests::result_selection_absence_foreign_workspace_and_full_request_conflict_preserve_need",
+      "source_preparation::materialization_result_cutoff_tests::selected_immutable_result_fields_and_error_changes_invalidate",
+      "source_preparation::materialization_result_cutoff_tests::selected_transport_and_materialization_errors_keep_generation_retry_dependency"
+    ],
+    "preflight": "Verified 4 exact nonignored test(s); no tests executed.\n",
+    "selected": 4,
+    "exit_code": 101,
+    "elapsed_seconds": 0.20195930200861767,
+    "executable_sha256": "1d4a5b90c9f3b838405cfd975cb729e4781829daf57da5208d9ba22223f4a5a8",
+    "passed": 3,
+    "raw_receipt_sha256": "e6c16d4a9071ab0d785bddf045ce696bf8b5f048790b2fc1797bb856be19a353",
+    "expected_failed": 1,
+    "expected_failure": "actual RepositoryMaterializationResultKey ComputeStarted count2 vs1 after unrelated B publication",
+    "qualification": "Same four frozen actual-key tests run against unchanged production before implementation; only causal cutoff fails."
+  },
+  "ordinary_tests": [
+    {
+      "target": "slug_bzlmod_v2",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-6ed4b973def1affc",
+        "--exact",
+        "repository_source_snapshot::observation::tests::source_projection_uses_exact_request_state_and_context_without_absence_fallback",
+        "repository_source_snapshot::tests::complete_tree_rejects_missing_parents_aliases_and_escaping_literal_links",
+        "repository_source_snapshot::tests::digest_state_enforces_exact_file_and_total_limits_without_body_retention",
+        "repository_source_snapshot::tests::genuine_builtin_subject_keeps_catalog_mapping_and_has_no_invented_spec",
+        "repository_source_snapshot::tests::needs_tests::source_need_same_slot_compares_full_lease_kind_mapping_and_spec",
+        "repository_source_snapshot::tests::needs_tests::source_need_union_admits_128_distinct_slots_and_refuses_the_next",
+        "repository_source_snapshot::tests::needs_tests::source_only_need_keeps_other_channels_empty_and_unions_without_loss",
+        "repository_source_snapshot::tests::snapshot_epoch_is_command_bound_and_rejects_replay_and_revocation",
+        "repository_workspace::observation::tests::observation_factories_reject_foreign_spec_and_keep_full_context_identity",
+        "repository_workspace::observation::tests::opaque_transcript_cutoff_preserves_presence_own_append_and_freshness",
+        "repository_workspace::sequence::retention_floor_tests::intrinsic_state_floor_checks_exact_plus_one_and_overflow",
+        "repository_workspace::tests::all_position_arguments_environment_removal_empty_and_requested_timeout_are_literal",
+        "repository_workspace::tests::archive_deeper_than_256_preserves_lane_while_delete_and_process_keep_own_limits",
+        "repository_workspace::tests::argument_environment_archive_metadata_charge_actual_spare_storage_and_owner_arrays",
+        "repository_workspace::tests::demand_tests::operation_demand_authenticates_independent_source_declarations_against_execute_manifest",
+        "repository_workspace::tests::demand_tests::reservation_demand_requires_current_full_binding_and_conflicting_needs_refuse",
+        "repository_workspace::tests::demand_tests::source_declarations_keep_nonexecute_prefixes_and_refuse_alias_foreign_limit_and_need_conflicts",
+        "repository_workspace::tests::demand_tests::workspace_operation_need_preserves_independent_unsupported_rows_and_full_conflicts",
+        "repository_workspace::tests::demand_tests::workspace_policy_default_and_cached_switches_are_dice_observed",
+        "repository_workspace::tests::dice_observes_completed_state_fresh_commands_revocation_and_workspace_isolation",
+        "repository_workspace::tests::equal_argv_new_index_is_a_new_sample_not_replay",
+        "repository_workspace::tests::equal_foreign_bodies_are_compared_then_replaced_without_double_retention",
+        "repository_workspace::tests::equal_foreign_predecessor_and_reservation_are_released_before_retention",
+        "repository_workspace::tests::execute_count_exact_limit_replays_prior_indices_and_refuses_new_plus_one",
+        "repository_workspace::tests::execute_cwd_requires_selected_instance_and_repository_subtree_before_need",
+        "repository_workspace::tests::fresh_empty_revoked_epochs_reject_stale_reservations",
+        "repository_workspace::tests::incorrect_read_write_delete_results_and_reverse_mode_are_not_certificates",
+        "repository_workspace::tests::native_epoch_forecasts_cover_fresh_reservation_and_exact_completed_append",
+        "repository_workspace::tests::native_epoch_publication_cannot_bypass_other_process_root_history_admission",
+        "repository_workspace::tests::native_epoch_publication_rejects_equal_final_state_with_rewritten_or_skipped_history",
+        "repository_workspace::tests::native_storage_forecast_covers_initial_unique_and_reused_completion",
+        "repository_workspace::tests::native_storage_forecast_refuses_foreign_replay_and_invalid_effects",
+        "repository_workspace::tests::nonzero_exit_keeps_writes_deletions_modes_and_later_read",
+        "repository_workspace::tests::normal_exit_and_each_output_stream_have_independent_exact_plus_one_limits",
+        "repository_workspace::tests::owner_layout_rounds_byte_tails_and_refuses_impossible_array_layouts",
+        "repository_workspace::tests::process_body_exact_limit_and_new_version_plus_one_count_complete_history",
+        "repository_workspace::tests::process_entry_and_depth_exact_plus_one_do_not_lower_archive_admission",
+        "repository_workspace::tests::process_names_and_absolute_path_have_exact_plus_one_limits",
+        "repository_workspace::tests::protocol_debug_redacts_body_argv_environment_and_captured_bytes",
+        "repository_workspace::tests::read_view_tests::archive_source_storage_stays_outside_mutable_history_and_forecasts_remain_complete",
+        "repository_workspace::tests::read_view_tests::bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_fields",
+        "repository_workspace::tests::read_view_tests::exact_prefix_replay_keeps_old_views_and_rehomes_equal_foreign_state_without_copying",
+        "repository_workspace::tests::read_view_tests::manifest_canonicalizes_exact_bound_and_refuses_aliases_and_foreign_command_facts",
+        "repository_workspace::tests::read_view_tests::repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies",
+        "repository_workspace::tests::read_view_tests::source_digest_view_is_exact_bounded_and_not_mutable_process_body_history",
+        "repository_workspace::tests::read_view_tests::view_identity_uses_full_spec_state_mode_literal_link_and_instance",
+        "repository_workspace::tests::replay_requires_full_operation_index_predecessor_and_generation",
+        "repository_workspace::tests::reservation_binds_full_spec_without_changing_slot_or_coarse_hash",
+        "repository_workspace::tests::reservation_rejects_zero_and_retains_full_generation_policy_identity",
+        "repository_workspace::tests::retention_admission_tests::command_execute_128_is_independent_of_history_and_authenticates_old_replay",
+        "repository_workspace::tests::retention_admission_tests::history_beyond_128_versions_preserves_noops_and_exact_replay",
+        "repository_workspace::tests::retention_admission_tests::root_capacity_is_independent_and_refuses_forecast_before_new_state",
+        "repository_workspace::tests::source_link_tests::payload_links_use_only_exact_execute_prefix_not_future_source_discovery",
+        "repository_workspace::tests::source_link_tests::source_link_content_identity_hashes_full_image_and_prunes_deleted_source_images",
+        "repository_workspace::tests::source_link_tests::source_link_content_identity_ignores_fresh_incarnations_at_same_literal_display",
+        "repository_workspace::tests::source_link_tests::source_link_delete_filters_final_data_but_retains_historical_projection",
+        "repository_workspace::tests::source_link_tests::source_link_identity_and_callback_include_full_projection_not_just_target_text",
+        "repository_workspace::tests::source_link_tests::source_link_literal_escape_cycles_and_write_through_directory_refuse",
+        "repository_workspace::tests::source_link_tests::source_link_modeled_resolution_guard_stops_before_fact_and_reuses_bounded_read_route",
+        "repository_workspace::tests::source_link_tests::source_links_resolve_directory_internal_and_dangling_without_changing_logical_owner",
+        "repository_workspace::tests::source_link_tests::typed_symlink_source_requires_independent_declaration_and_full_binding",
+        "repository_workspace::tests::state_rejects_missing_parent_duplicate_special_modes_and_escaping_link",
+        "repository_workspace::tests::state_versions_metadata_and_retained_bodies_have_exact_plus_one_policies",
+        "repository_workspace::tests::template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equal",
+        "source_preparation::materialization_namespace_tests::materialization_namespace_lookup_is_bounded_unique_and_borrowed",
+        "source_preparation::materialization_namespace_tests::materialization_namespace_lookup_tracks_same_dice_epoch",
+        "source_preparation::materialization_projection::tests::materialization_projection_refuses_foreign_full_request_spec_and_general_lease",
+        "source_preparation::materialization_projection::tests::materialization_projection_returns_actual_bound_row_and_preserves_absence_and_errors",
+        "source_preparation::materialization_projection::tests::ordinary_materialization_projection_refuses_same_id_changed_spec_and_kind",
+        "source_preparation::materialization_result_cutoff_tests::completed_result_a_stays_cached_across_unrelated_b_and_retained_publication",
+        "source_preparation::materialization_result_cutoff_tests::result_selection_absence_foreign_workspace_and_full_request_conflict_preserve_need",
+        "source_preparation::materialization_result_cutoff_tests::selected_immutable_result_fields_and_error_changes_invalidate",
+        "source_preparation::materialization_result_cutoff_tests::selected_transport_and_materialization_errors_keep_generation_retry_dependency",
+        "source_preparation::materialization_result_entry_projection::tests::selection_preserves_actual_request_arc_and_redacts_full_spec",
+        "--test-threads=1"
+      ],
+      "preflight_command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-6ed4b973def1affc",
+        "--exact",
+        "repository_source_snapshot::observation::tests::source_projection_uses_exact_request_state_and_context_without_absence_fallback",
+        "repository_source_snapshot::tests::complete_tree_rejects_missing_parents_aliases_and_escaping_literal_links",
+        "repository_source_snapshot::tests::digest_state_enforces_exact_file_and_total_limits_without_body_retention",
+        "repository_source_snapshot::tests::genuine_builtin_subject_keeps_catalog_mapping_and_has_no_invented_spec",
+        "repository_source_snapshot::tests::needs_tests::source_need_same_slot_compares_full_lease_kind_mapping_and_spec",
+        "repository_source_snapshot::tests::needs_tests::source_need_union_admits_128_distinct_slots_and_refuses_the_next",
+        "repository_source_snapshot::tests::needs_tests::source_only_need_keeps_other_channels_empty_and_unions_without_loss",
+        "repository_source_snapshot::tests::snapshot_epoch_is_command_bound_and_rejects_replay_and_revocation",
+        "repository_workspace::observation::tests::observation_factories_reject_foreign_spec_and_keep_full_context_identity",
+        "repository_workspace::observation::tests::opaque_transcript_cutoff_preserves_presence_own_append_and_freshness",
+        "repository_workspace::sequence::retention_floor_tests::intrinsic_state_floor_checks_exact_plus_one_and_overflow",
+        "repository_workspace::tests::all_position_arguments_environment_removal_empty_and_requested_timeout_are_literal",
+        "repository_workspace::tests::archive_deeper_than_256_preserves_lane_while_delete_and_process_keep_own_limits",
+        "repository_workspace::tests::argument_environment_archive_metadata_charge_actual_spare_storage_and_owner_arrays",
+        "repository_workspace::tests::demand_tests::operation_demand_authenticates_independent_source_declarations_against_execute_manifest",
+        "repository_workspace::tests::demand_tests::reservation_demand_requires_current_full_binding_and_conflicting_needs_refuse",
+        "repository_workspace::tests::demand_tests::source_declarations_keep_nonexecute_prefixes_and_refuse_alias_foreign_limit_and_need_conflicts",
+        "repository_workspace::tests::demand_tests::workspace_operation_need_preserves_independent_unsupported_rows_and_full_conflicts",
+        "repository_workspace::tests::demand_tests::workspace_policy_default_and_cached_switches_are_dice_observed",
+        "repository_workspace::tests::dice_observes_completed_state_fresh_commands_revocation_and_workspace_isolation",
+        "repository_workspace::tests::equal_argv_new_index_is_a_new_sample_not_replay",
+        "repository_workspace::tests::equal_foreign_bodies_are_compared_then_replaced_without_double_retention",
+        "repository_workspace::tests::equal_foreign_predecessor_and_reservation_are_released_before_retention",
+        "repository_workspace::tests::execute_count_exact_limit_replays_prior_indices_and_refuses_new_plus_one",
+        "repository_workspace::tests::execute_cwd_requires_selected_instance_and_repository_subtree_before_need",
+        "repository_workspace::tests::fresh_empty_revoked_epochs_reject_stale_reservations",
+        "repository_workspace::tests::incorrect_read_write_delete_results_and_reverse_mode_are_not_certificates",
+        "repository_workspace::tests::native_epoch_forecasts_cover_fresh_reservation_and_exact_completed_append",
+        "repository_workspace::tests::native_epoch_publication_cannot_bypass_other_process_root_history_admission",
+        "repository_workspace::tests::native_epoch_publication_rejects_equal_final_state_with_rewritten_or_skipped_history",
+        "repository_workspace::tests::native_storage_forecast_covers_initial_unique_and_reused_completion",
+        "repository_workspace::tests::native_storage_forecast_refuses_foreign_replay_and_invalid_effects",
+        "repository_workspace::tests::nonzero_exit_keeps_writes_deletions_modes_and_later_read",
+        "repository_workspace::tests::normal_exit_and_each_output_stream_have_independent_exact_plus_one_limits",
+        "repository_workspace::tests::owner_layout_rounds_byte_tails_and_refuses_impossible_array_layouts",
+        "repository_workspace::tests::process_body_exact_limit_and_new_version_plus_one_count_complete_history",
+        "repository_workspace::tests::process_entry_and_depth_exact_plus_one_do_not_lower_archive_admission",
+        "repository_workspace::tests::process_names_and_absolute_path_have_exact_plus_one_limits",
+        "repository_workspace::tests::protocol_debug_redacts_body_argv_environment_and_captured_bytes",
+        "repository_workspace::tests::read_view_tests::archive_source_storage_stays_outside_mutable_history_and_forecasts_remain_complete",
+        "repository_workspace::tests::read_view_tests::bounded_structural_comparison_delegates_every_state_edge_and_preserves_other_fields",
+        "repository_workspace::tests::read_view_tests::exact_prefix_replay_keeps_old_views_and_rehomes_equal_foreign_state_without_copying",
+        "repository_workspace::tests::read_view_tests::manifest_canonicalizes_exact_bound_and_refuses_aliases_and_foreign_command_facts",
+        "repository_workspace::tests::read_view_tests::repeated_view_refs_charge_specs_and_refs_but_never_repeat_mutable_bodies",
+        "repository_workspace::tests::read_view_tests::source_digest_view_is_exact_bounded_and_not_mutable_process_body_history",
+        "repository_workspace::tests::read_view_tests::view_identity_uses_full_spec_state_mode_literal_link_and_instance",
+        "repository_workspace::tests::replay_requires_full_operation_index_predecessor_and_generation",
+        "repository_workspace::tests::reservation_binds_full_spec_without_changing_slot_or_coarse_hash",
+        "repository_workspace::tests::reservation_rejects_zero_and_retains_full_generation_policy_identity",
+        "repository_workspace::tests::retention_admission_tests::command_execute_128_is_independent_of_history_and_authenticates_old_replay",
+        "repository_workspace::tests::retention_admission_tests::history_beyond_128_versions_preserves_noops_and_exact_replay",
+        "repository_workspace::tests::retention_admission_tests::root_capacity_is_independent_and_refuses_forecast_before_new_state",
+        "repository_workspace::tests::source_link_tests::payload_links_use_only_exact_execute_prefix_not_future_source_discovery",
+        "repository_workspace::tests::source_link_tests::source_link_content_identity_hashes_full_image_and_prunes_deleted_source_images",
+        "repository_workspace::tests::source_link_tests::source_link_content_identity_ignores_fresh_incarnations_at_same_literal_display",
+        "repository_workspace::tests::source_link_tests::source_link_delete_filters_final_data_but_retains_historical_projection",
+        "repository_workspace::tests::source_link_tests::source_link_identity_and_callback_include_full_projection_not_just_target_text",
+        "repository_workspace::tests::source_link_tests::source_link_literal_escape_cycles_and_write_through_directory_refuse",
+        "repository_workspace::tests::source_link_tests::source_link_modeled_resolution_guard_stops_before_fact_and_reuses_bounded_read_route",
+        "repository_workspace::tests::source_link_tests::source_links_resolve_directory_internal_and_dangling_without_changing_logical_owner",
+        "repository_workspace::tests::source_link_tests::typed_symlink_source_requires_independent_declaration_and_full_binding",
+        "repository_workspace::tests::state_rejects_missing_parent_duplicate_special_modes_and_escaping_link",
+        "repository_workspace::tests::state_versions_metadata_and_retained_bodies_have_exact_plus_one_policies",
+        "repository_workspace::tests::template_replay_preserves_ordered_substitutions_even_when_rendered_bytes_equal",
+        "source_preparation::materialization_namespace_tests::materialization_namespace_lookup_is_bounded_unique_and_borrowed",
+        "source_preparation::materialization_namespace_tests::materialization_namespace_lookup_tracks_same_dice_epoch",
+        "source_preparation::materialization_projection::tests::materialization_projection_refuses_foreign_full_request_spec_and_general_lease",
+        "source_preparation::materialization_projection::tests::materialization_projection_returns_actual_bound_row_and_preserves_absence_and_errors",
+        "source_preparation::materialization_projection::tests::ordinary_materialization_projection_refuses_same_id_changed_spec_and_kind",
+        "source_preparation::materialization_result_cutoff_tests::completed_result_a_stays_cached_across_unrelated_b_and_retained_publication",
+        "source_preparation::materialization_result_cutoff_tests::result_selection_absence_foreign_workspace_and_full_request_conflict_preserve_need",
+        "source_preparation::materialization_result_cutoff_tests::selected_immutable_result_fields_and_error_changes_invalidate",
+        "source_preparation::materialization_result_cutoff_tests::selected_transport_and_materialization_errors_keep_generation_retry_dependency",
+        "source_preparation::materialization_result_entry_projection::tests::selection_preserves_actual_request_arc_and_redacts_full_spec"
+      ],
+      "preflight": "Verified 74 exact nonignored test(s); no tests executed.\n",
+      "selected": 74,
+      "exit_code": 0,
+      "elapsed_seconds": 0.6140910349931801,
+      "executable_sha256": "fe120c46530041bcb1db3eaef3b4bdf4b7fbff872230ea1abe0942b7b0dba8c8",
+      "passed": 74,
+      "raw_receipt_sha256": "15c2e37ae1455ff6e6d0514e5a5ef8348aa0c9241fe1a96a5e0c55a810f54b7f"
+    },
+    {
+      "target": "slug_core_v2",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_family_report_is_static_and_bounded_at_maximum_counts",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_scalar_v2_qualifiers_and_progress_pairing_are_bounded",
+        "runtime::dice::tests::probe_observer_tests::concurrent_callbacks_and_invalid_clock_and_tag_truncation_are_visible",
+        "runtime::dice::tests::probe_observer_tests::counters_overflow_and_contended_sampling_are_explicit",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_disabled_closures_preserve_totals_and_last_drop",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_qualify_clocks_overflow_and_concurrent_updates",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_route_repeat_abort_and_preserve_frames",
+        "runtime::dice::tests::probe_observer_tests::fixed_mapping_counts_events_commits_frames_and_releases_last_arc",
+        "runtime::dice::tests::probe_observer_tests::guard_drop_during_callback_preserves_listener_mapping_until_final_release",
+        "runtime::dice::tests::probe_observer_tests::inactive_partial_frame_is_ignored_and_unfinished_phase_commits_aborted",
+        "runtime::dice::tests::probe_observer_tests::invalid_owned_descriptor_is_closed_and_nested_install_is_rejected",
+        "runtime::dice::tests::probe_observer_tests::one_shot_api_teardown_precedes_api_exit_on_success_error_and_unwind",
+        "runtime::dice::tests::probe_observer_tests::thread_local_installations_are_isolated_and_preserve_activation_tracker",
+        "runtime::probe_observer::family_counts::tests::concurrent_counts_include_every_event_without_sampling",
+        "runtime::probe_observer::family_counts::tests::saturation_is_per_event_and_never_wraps_or_changes_other_cells",
+        "runtime::probe_observer::family_counts::tests::static_families_and_all_six_events_keep_unknown_tags_out_of_snapshot",
+        "--test-threads=1"
+      ],
+      "preflight_command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_family_report_is_static_and_bounded_at_maximum_counts",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_scalar_v2_qualifiers_and_progress_pairing_are_bounded",
+        "runtime::dice::tests::probe_observer_tests::concurrent_callbacks_and_invalid_clock_and_tag_truncation_are_visible",
+        "runtime::dice::tests::probe_observer_tests::counters_overflow_and_contended_sampling_are_explicit",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_disabled_closures_preserve_totals_and_last_drop",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_qualify_clocks_overflow_and_concurrent_updates",
+        "runtime::dice::tests::probe_observer_tests::cumulative_phase_intervals_route_repeat_abort_and_preserve_frames",
+        "runtime::dice::tests::probe_observer_tests::fixed_mapping_counts_events_commits_frames_and_releases_last_arc",
+        "runtime::dice::tests::probe_observer_tests::guard_drop_during_callback_preserves_listener_mapping_until_final_release",
+        "runtime::dice::tests::probe_observer_tests::inactive_partial_frame_is_ignored_and_unfinished_phase_commits_aborted",
+        "runtime::dice::tests::probe_observer_tests::invalid_owned_descriptor_is_closed_and_nested_install_is_rejected",
+        "runtime::dice::tests::probe_observer_tests::one_shot_api_teardown_precedes_api_exit_on_success_error_and_unwind",
+        "runtime::dice::tests::probe_observer_tests::thread_local_installations_are_isolated_and_preserve_activation_tracker",
+        "runtime::probe_observer::family_counts::tests::concurrent_counts_include_every_event_without_sampling",
+        "runtime::probe_observer::family_counts::tests::saturation_is_per_event_and_never_wraps_or_changes_other_cells",
+        "runtime::probe_observer::family_counts::tests::static_families_and_all_six_events_keep_unknown_tags_out_of_snapshot"
+      ],
+      "preflight": "Verified 16 exact nonignored test(s); no tests executed.\n",
+      "selected": 16,
+      "exit_code": 0,
+      "elapsed_seconds": 3.4995560419920366,
+      "executable_sha256": "3057ea751ca0f4c7d11d55cb5ce28dfe6506e6e7c34866921cdd5bcfd6d45a50",
+      "passed": 16,
+      "raw_receipt_sha256": "ca62760ae85cda4ac80120dc22ebff792ef7a4e142e0f7dbaf828854b8f0495c"
+    }
+  ],
+  "ordinary_passed": 90,
+  "protected_native_guards": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+      "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+      "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+      "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "selected": 4,
+    "expected_exit_code": 0,
+    "exit_code": 0,
+    "elapsed_seconds": 0.9254801339993719,
+    "deadline_seconds": 60,
+    "output_limit_bytes_per_stream": 1048576,
+    "address_space_limit_bytes": 8589934592,
+    "timed_out": false,
+    "overflow": false,
+    "core_sha256": "3057ea751ca0f4c7d11d55cb5ce28dfe6506e6e7c34866921cdd5bcfd6d45a50",
+    "cli_sha256": "51904f70fd32341ae9b15655d01a33efc3b76f804fbe624ffcd851914980b7c6",
+    "passed": 4,
+    "raw_receipt_sha256": "acad2d6ef92eb05bb032069232aa37642bf8ed197e7f7811d421242b3d85b7d0"
+  },
+  "protected_original_compiler": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources",
+      "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "selected": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 14.321383813992725,
+    "timed_out": false,
+    "overflow": false,
+    "deadline_seconds": 60,
+    "stream_limit_bytes": 1048576,
+    "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+    "umask": "0002",
+    "executable_sha256": "3057ea751ca0f4c7d11d55cb5ce28dfe6506e6e7c34866921cdd5bcfd6d45a50",
+    "cli": "/run/media/system/Colossus/dev/slug/target/debug/slug",
+    "cli_sha256": "51904f70fd32341ae9b15655d01a33efc3b76f804fbe624ffcd851914980b7c6",
+    "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+    "passed": 1,
+    "raw_receipt_sha256": "98bc5021c1c634a04e7e011aa55a60cb0cfa085f1b44925a72647ca1aa70d769",
+    "actual_original_commands": 4,
+    "one_runtime": true,
+    "qualification": "Actual original absent-Homebrew then environment A/B/A commands on persistent native bank; exact native retirement, no activation claim."
+  },
+  "attribution_before_selection": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+    ],
+    "selected": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 27.088673277990893,
+    "timed_out": false,
+    "output_overflow": false,
+    "deadline_seconds": 60,
+    "address_space_limit_bytes": 8589934592,
+    "output_limit_bytes_per_stream": 1048576,
+    "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+    "umask": "0002",
+    "executable_sha256": "d8b94b9563cf347b8fbf4886ddf3b28048960737a0246e8816b6be8a99871ff9",
+    "cli_sha256": "0df7aeb55632a83eaddb3d22f8f6b6b434092944a90f28ebc60a97ac0a5d1adf",
+    "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "raw_receipt_sha256": "ec9b890eb0976d1e84bb15afcffedb5b0dc65e93f31ac437f8573492120d29a8",
+    "result": {
+      "error": {
+        "code": "WorkDeadline",
+        "kind": "source_service"
+      },
+      "status": "driver_refusal"
+    },
+    "completed_graph_cycles": 795,
+    "retained_trace_truncated": true,
+    "last_recorded_epoch": {
+      "roots": 51,
+      "record_count": 103
+    },
+    "peak_native_backing_bytes": 7957647360,
+    "peak_native_retained_bytes": 28323621,
+    "phase_profile": {
+      "categories_are_exclusive": false,
+      "closed_count_includes_aborted": true,
+      "cpu_includes_helpers": false,
+      "disabled": 1,
+      "event_overflow": 0,
+      "intervals": [
+        {
+          "aborted": false,
+          "closed_count": 796,
+          "count_overflow": false,
+          "cpu_overflow": false,
+          "kind": "injection_revision",
+          "missing_cpu": false,
+          "missing_wall": false,
+          "process_cpu_ns": 487206099,
+          "reversed_cpu": false,
+          "reversed_wall": false,
+          "status": 0,
+          "suppressed": false,
+          "unknown_status_bits": 0,
+          "wall_ns": 489691282,
+          "wall_overflow": false
+        },
+        {
+          "aborted": true,
+          "closed_count": 796,
+          "count_overflow": false,
+          "cpu_overflow": false,
+          "kind": "root_compute",
+          "missing_cpu": false,
+          "missing_wall": false,
+          "process_cpu_ns": 21505980810,
+          "reversed_cpu": false,
+          "reversed_wall": false,
+          "status": 128,
+          "suppressed": false,
+          "unknown_status_bits": 0,
+          "wall_ns": 21140722455,
+          "wall_overflow": false
+        },
+        {
+          "aborted": false,
+          "closed_count": 641,
+          "count_overflow": false,
+          "cpu_overflow": false,
+          "kind": "legacy_need",
+          "missing_cpu": false,
+          "missing_wall": false,
+          "process_cpu_ns": 881478252,
+          "reversed_cpu": false,
+          "reversed_wall": false,
+          "status": 0,
+          "suppressed": false,
+          "unknown_status_bits": 0,
+          "wall_ns": 2846253131,
+          "wall_overflow": false
+        },
+        {
+          "aborted": false,
+          "closed_count": 796,
+          "count_overflow": false,
+          "cpu_overflow": false,
+          "kind": "idle_drain",
+          "missing_cpu": false,
+          "missing_wall": false,
+          "process_cpu_ns": 136456793,
+          "reversed_cpu": false,
+          "reversed_wall": false,
+          "status": 0,
+          "suppressed": false,
+          "unknown_status_bits": 0,
+          "wall_ns": 123868186,
+          "wall_overflow": false
+        }
+      ],
+      "runtime_construction_measured": false,
+      "sampled_event_dropped": 0,
+      "unknown_interval_status_bits": 0,
+      "valid_abi": true,
+      "version": 2,
+      "dice_family_counts": {
+        "already_entered_callbacks_may_finish_after_disable": true,
+        "disable_is_atomic_snapshot_barrier": false,
+        "event_columns": [
+          "started",
+          "finished",
+          "check_deps_started",
+          "check_deps_finished",
+          "compute_started",
+          "compute_finished"
+        ],
+        "event_pairs_may_be_imbalanced": true,
+        "finished_includes_cancellation": true,
+        "measures_self_time": false,
+        "measures_success": false,
+        "observed_per_cell_counts": true,
+        "retains_full_key_identity": false,
+        "sampled_after_runtime_retirement_and_guard_disable": true,
+        "synchronous_projections_emit_started_finished_only": true,
+        "counts_by_family": {
+          "command_configuration": [
+            80,
+            80,
+            60,
+            60,
+            20,
+            20
+          ],
+          "selected_effect": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "selected_effect_observed": [
+            5678,
+            5678,
+            5423,
+            5423,
+            255,
+            255
+          ],
+          "canonical_route": [
+            5796,
+            5796,
+            5423,
+            5423,
+            373,
+            373
+          ],
+          "bzl_module": [
+            46251,
+            46251,
+            43598,
+            43598,
+            2653,
+            2653
+          ],
+          "package_load": [
+            257,
+            257,
+            200,
+            200,
+            57,
+            57
+          ],
+          "package_inventory": [
+            3445,
+            3445,
+            2884,
+            2884,
+            561,
+            561
+          ],
+          "configured_analysis": [
+            1375,
+            1375,
+            606,
+            606,
+            769,
+            769
+          ],
+          "captured_source_snapshot": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "materialization_result": [
+            2072,
+            2072,
+            1946,
+            1946,
+            2072,
+            2072
+          ],
+          "materialization_request": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "workspace_context_projection": [
+            249,
+            249,
+            148,
+            148,
+            148,
+            148
+          ],
+          "workspace_transcript_projection": [
+            4167,
+            4167,
+            3912,
+            3912,
+            3912,
+            3912
+          ],
+          "source_snapshot_projection": [
+            40,
+            40,
+            3,
+            3,
+            3,
+            3
+          ],
+          "materialization_projection": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "path_observation": [
+            1946,
+            1946,
+            0,
+            0,
+            1946,
+            1946
+          ],
+          "path_input": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "resolved_path": [
+            35,
+            35,
+            0,
+            0,
+            35,
+            35
+          ],
+          "anchored_resolved_path": [
+            1126,
+            1126,
+            0,
+            0,
+            1126,
+            1126
+          ],
+          "file_digest": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "source_artifact_input": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "root_repository_mapping": [
+            8,
+            8,
+            0,
+            0,
+            8,
+            8
+          ],
+          "selected_owner_certificate": [
+            1593,
+            1593,
+            1479,
+            1479,
+            114,
+            114
+          ],
+          "repository_package_source": [
+            2052,
+            2052,
+            1650,
+            1650,
+            402,
+            402
+          ],
+          "other": [
+            69064,
+            69064,
+            62536,
+            62536,
+            6516,
+            6516
+          ]
+        },
+        "nonzero_overflow_masks": {}
+      }
+    },
+    "progress_wall": {
+      "buckets": [
+        {
+          "closed_count": 572,
+          "kind": "paths",
+          "max_wall_ns": 2361725,
+          "wall_ns": 137168849
+        },
+        {
+          "closed_count": 61,
+          "kind": "repositories",
+          "max_wall_ns": 491427858,
+          "wall_ns": 2710996656
+        },
+        {
+          "closed_count": 8,
+          "kind": "environment",
+          "max_wall_ns": 23570,
+          "wall_ns": 80130
+        },
+        {
+          "closed_count": 0,
+          "kind": "downloads",
+          "max_wall_ns": 0,
+          "wall_ns": 0
+        },
+        {
+          "closed_count": 0,
+          "kind": "archives",
+          "max_wall_ns": 0,
+          "wall_ns": 0
+        },
+        {
+          "closed_count": 154,
+          "kind": "workspaces",
+          "max_wall_ns": 303434892,
+          "wall_ns": 2358608586
+        },
+        {
+          "closed_count": 0,
+          "kind": "refused",
+          "max_wall_ns": 0,
+          "wall_ns": 0
+        }
+      ],
+      "clock_reversed": false,
+      "includes_fixed_callback_dispatch_overhead": true,
+      "incomplete": false,
+      "overflow": false,
+      "overlaps_legacy_need": true,
+      "pairing_mismatch": false
+    }
+  },
+  "control_preservation": {
+    "base": "1902c4798bdb68ad1d0049750081691cb22d500e",
+    "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+    "preserved_executable": "/tmp/slug-wp425-validation/artifacts/materialization-cutoff-control-d8b94b9563cf347b",
+    "executable_sha256": "d8b94b9563cf347b8fbf4886ddf3b28048960737a0246e8816b6be8a99871ff9",
+    "bytes": 1126715768,
+    "feature": "native-probe-observer",
+    "source_pins": {
+      "app/slug_core_v2/src/runtime/probe_observer.rs": "5b6cfbf37404cd962962dfd3faf0cb3cb08bb61cc7896009b4741bd2454db630",
+      "app/slug_core_v2/src/runtime/probe_observer/family_counts.rs": "03eefe1a6c8adf85466b913f160b5444f8dc68e87e671605a955e3c4400f772e",
+      "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests/phase_profile.rs": "4df6547519d6dba5be5d8b189e7fa82de94024ba1170e787352db3b726ee6d54",
+      "app/slug_bzlmod_v2/src/source_preparation.rs": "a7c7e5468b9de6354c42fa3e5906faedc523e34b35965a5bcd220c33444d0bd7"
+    },
+    "run_record": "dice-family-rust-attribution.json",
+    "cli_sha256": "0df7aeb55632a83eaddb3d22f8f6b6b434092944a90f28ebc60a97ac0a5d1adf",
+    "config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203"
+  },
+  "rust_abba": [
+    {
+      "variant": "a1",
+      "command": [
+        "/tmp/slug-wp425-validation/artifacts/materialization-cutoff-control-d8b94b9563cf347b",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/tmp/slug-wp425-validation/artifacts/materialization-cutoff-control-d8b94b9563cf347b",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.09214897500351,
+      "timed_out": false,
+      "output_overflow": false,
+      "deadline_seconds": 60,
+      "address_space_limit_bytes": 8589934592,
+      "output_limit_bytes_per_stream": 1048576,
+      "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+      "umask": "0002",
+      "executable_sha256": "d8b94b9563cf347b8fbf4886ddf3b28048960737a0246e8816b6be8a99871ff9",
+      "cli_sha256": "51904f70fd32341ae9b15655d01a33efc3b76f804fbe624ffcd851914980b7c6",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "raw_receipt_sha256": "ea42d66f75478c8a253df0707075ff61273e4967738001a94853fdf31c314bd2",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "completed_graph_cycles": 705,
+      "retained_trace_truncated": true,
+      "last_recorded_epoch": {
+        "roots": 49,
+        "record_count": 98
+      },
+      "peak_native_backing_bytes": 5532291072,
+      "peak_native_retained_bytes": 24822529,
+      "phase_profile": {
+        "categories_are_exclusive": false,
+        "closed_count_includes_aborted": true,
+        "cpu_includes_helpers": false,
+        "disabled": 1,
+        "event_overflow": 0,
+        "intervals": [
+          {
+            "aborted": false,
+            "closed_count": 706,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "injection_revision",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 603555612,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 610717348,
+            "wall_overflow": false
+          },
+          {
+            "aborted": true,
+            "closed_count": 706,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "root_compute",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 21292992626,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 128,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 21177193023,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 559,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "legacy_need",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 870948177,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 2859177651,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 706,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "idle_drain",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 216329438,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 200692842,
+            "wall_overflow": false
+          }
+        ],
+        "runtime_construction_measured": false,
+        "sampled_event_dropped": 0,
+        "unknown_interval_status_bits": 0,
+        "valid_abi": true,
+        "version": 2,
+        "dice_family_counts": {
+          "already_entered_callbacks_may_finish_after_disable": true,
+          "disable_is_atomic_snapshot_barrier": false,
+          "event_columns": [
+            "started",
+            "finished",
+            "check_deps_started",
+            "check_deps_finished",
+            "compute_started",
+            "compute_finished"
+          ],
+          "event_pairs_may_be_imbalanced": true,
+          "finished_includes_cancellation": true,
+          "measures_self_time": false,
+          "measures_success": false,
+          "observed_per_cell_counts": true,
+          "retains_full_key_identity": false,
+          "sampled_after_runtime_retirement_and_guard_disable": true,
+          "synchronous_projections_emit_started_finished_only": true,
+          "counts_by_family": {
+            "command_configuration": [
+              76,
+              76,
+              56,
+              56,
+              20,
+              20
+            ],
+            "selected_effect": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "selected_effect_observed": [
+              5060,
+              5060,
+              4832,
+              4832,
+              228,
+              228
+            ],
+            "canonical_route": [
+              5156,
+              5156,
+              4833,
+              4833,
+              323,
+              323
+            ],
+            "bzl_module": [
+              42708,
+              42708,
+              40383,
+              40383,
+              2325,
+              2325
+            ],
+            "package_load": [
+              246,
+              246,
+              189,
+              189,
+              57,
+              57
+            ],
+            "package_inventory": [
+              3040,
+              3040,
+              2555,
+              2555,
+              485,
+              485
+            ],
+            "configured_analysis": [
+              1247,
+              1247,
+              568,
+              568,
+              679,
+              679
+            ],
+            "captured_source_snapshot": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "materialization_result": [
+              1782,
+              1782,
+              1665,
+              1665,
+              1782,
+              1782
+            ],
+            "materialization_request": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "workspace_context_projection": [
+              223,
+              223,
+              141,
+              141,
+              141,
+              141
+            ],
+            "workspace_transcript_projection": [
+              3792,
+              3792,
+              3564,
+              3564,
+              3564,
+              3564
+            ],
+            "source_snapshot_projection": [
+              17,
+              17,
+              1,
+              1,
+              1,
+              1
+            ],
+            "materialization_projection": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "path_observation": [
+              1681,
+              1681,
+              0,
+              0,
+              1681,
+              1681
+            ],
+            "path_input": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "resolved_path": [
+              32,
+              32,
+              0,
+              0,
+              32,
+              32
+            ],
+            "anchored_resolved_path": [
+              977,
+              977,
+              0,
+              0,
+              977,
+              977
+            ],
+            "file_digest": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "source_artifact_input": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "root_repository_mapping": [
+              8,
+              8,
+              0,
+              0,
+              8,
+              8
+            ],
+            "selected_owner_certificate": [
+              1462,
+              1462,
+              1372,
+              1372,
+              90,
+              90
+            ],
+            "repository_package_source": [
+              1775,
+              1775,
+              1395,
+              1395,
+              380,
+              380
+            ],
+            "other": [
+              61714,
+              61714,
+              55839,
+              55839,
+              5863,
+              5863
+            ]
+          },
+          "nonzero_overflow_masks": {}
+        }
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 494,
+            "kind": "paths",
+            "max_wall_ns": 2480153,
+            "wall_ns": 137435904
+          },
+          {
+            "closed_count": 57,
+            "kind": "repositories",
+            "max_wall_ns": 537719322,
+            "wall_ns": 2724192980
+          },
+          {
+            "closed_count": 8,
+            "kind": "environment",
+            "max_wall_ns": 31700,
+            "wall_ns": 126851
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 146,
+            "kind": "workspaces",
+            "max_wall_ns": 252106423,
+            "wall_ns": 2099742372
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      }
+    },
+    {
+      "variant": "b1",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.11153739198926,
+      "timed_out": false,
+      "output_overflow": false,
+      "deadline_seconds": 60,
+      "address_space_limit_bytes": 8589934592,
+      "output_limit_bytes_per_stream": 1048576,
+      "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+      "umask": "0002",
+      "executable_sha256": "3057ea751ca0f4c7d11d55cb5ce28dfe6506e6e7c34866921cdd5bcfd6d45a50",
+      "cli_sha256": "51904f70fd32341ae9b15655d01a33efc3b76f804fbe624ffcd851914980b7c6",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "raw_receipt_sha256": "bbe6625b08293ed9efd3f6c7e97ca1d50d3c88309e46963b3b7737226706a910",
+      "result": {
+        "error": {
+          "detail": {
+            "code": "WorkDeadline",
+            "kind": "source_service"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      "completed_graph_cycles": 762,
+      "retained_trace_truncated": true,
+      "last_recorded_epoch": {
+        "roots": 51,
+        "record_count": 100
+      },
+      "peak_native_backing_bytes": 7957647360,
+      "peak_native_retained_bytes": 28313785,
+      "phase_profile": {
+        "categories_are_exclusive": false,
+        "closed_count_includes_aborted": true,
+        "cpu_includes_helpers": false,
+        "disabled": 1,
+        "event_overflow": 0,
+        "intervals": [
+          {
+            "aborted": false,
+            "closed_count": 762,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "injection_revision",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 575993826,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 579215802,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 762,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "root_compute",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 21647217212,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 21367166685,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 611,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "legacy_need",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 924913556,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 2748917688,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 762,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "idle_drain",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 178307760,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 163572186,
+            "wall_overflow": false
+          }
+        ],
+        "runtime_construction_measured": false,
+        "sampled_event_dropped": 0,
+        "unknown_interval_status_bits": 0,
+        "valid_abi": true,
+        "version": 2,
+        "dice_family_counts": {
+          "already_entered_callbacks_may_finish_after_disable": true,
+          "disable_is_atomic_snapshot_barrier": false,
+          "event_columns": [
+            "started",
+            "finished",
+            "check_deps_started",
+            "check_deps_finished",
+            "compute_started",
+            "compute_finished"
+          ],
+          "event_pairs_may_be_imbalanced": true,
+          "finished_includes_cancellation": true,
+          "measures_self_time": false,
+          "measures_success": false,
+          "observed_per_cell_counts": true,
+          "retains_full_key_identity": false,
+          "sampled_after_runtime_retirement_and_guard_disable": true,
+          "synchronous_projections_emit_started_finished_only": true,
+          "counts_by_family": {
+            "command_configuration": [
+              78,
+              78,
+              58,
+              58,
+              20,
+              20
+            ],
+            "selected_effect": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "selected_effect_observed": [
+              5404,
+              5404,
+              5169,
+              5169,
+              235,
+              235
+            ],
+            "canonical_route": [
+              5515,
+              5515,
+              5169,
+              5169,
+              346,
+              346
+            ],
+            "bzl_module": [
+              44652,
+              44652,
+              42085,
+              42085,
+              2567,
+              2567
+            ],
+            "package_load": [
+              252,
+              252,
+              195,
+              195,
+              57,
+              57
+            ],
+            "package_inventory": [
+              3276,
+              3276,
+              2742,
+              2742,
+              534,
+              534
+            ],
+            "configured_analysis": [
+              1323,
+              1323,
+              588,
+              588,
+              735,
+              735
+            ],
+            "captured_source_snapshot": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "materialization_result": [
+              1945,
+              1945,
+              1823,
+              1823,
+              122,
+              122
+            ],
+            "materialization_request": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "workspace_context_projection": [
+              230,
+              230,
+              145,
+              145,
+              145,
+              145
+            ],
+            "workspace_transcript_projection": [
+              3997,
+              3997,
+              3762,
+              3762,
+              3762,
+              3762
+            ],
+            "source_snapshot_projection": [
+              18,
+              18,
+              1,
+              1,
+              1,
+              1
+            ],
+            "materialization_projection": [
+              1945,
+              1945,
+              1823,
+              1823,
+              1823,
+              1823
+            ],
+            "path_observation": [
+              1891,
+              1891,
+              0,
+              0,
+              1891,
+              1891
+            ],
+            "path_input": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "resolved_path": [
+              32,
+              32,
+              0,
+              0,
+              32,
+              32
+            ],
+            "anchored_resolved_path": [
+              1098,
+              1098,
+              0,
+              0,
+              1098,
+              1098
+            ],
+            "file_digest": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "source_artifact_input": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "root_repository_mapping": [
+              8,
+              8,
+              0,
+              0,
+              8,
+              8
+            ],
+            "selected_owner_certificate": [
+              1536,
+              1536,
+              1429,
+              1429,
+              107,
+              107
+            ],
+            "repository_package_source": [
+              1942,
+              1942,
+              1540,
+              1540,
+              402,
+              402
+            ],
+            "other": [
+              65771,
+              65771,
+              59388,
+              59388,
+              6371,
+              6371
+            ]
+          },
+          "nonzero_overflow_masks": {}
+        }
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 544,
+            "kind": "paths",
+            "max_wall_ns": 2199762,
+            "wall_ns": 145785951
+          },
+          {
+            "closed_count": 59,
+            "kind": "repositories",
+            "max_wall_ns": 514626296,
+            "wall_ns": 2605457635
+          },
+          {
+            "closed_count": 8,
+            "kind": "environment",
+            "max_wall_ns": 18670,
+            "wall_ns": 112560
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 150,
+            "kind": "workspaces",
+            "max_wall_ns": 258046732,
+            "wall_ns": 2057907720
+          },
+          {
+            "closed_count": 1,
+            "kind": "refused",
+            "max_wall_ns": 39366748,
+            "wall_ns": 39366748
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      }
+    },
+    {
+      "variant": "b2",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-14ac31e9f5a0fc20",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.101141410006676,
+      "timed_out": false,
+      "output_overflow": false,
+      "deadline_seconds": 60,
+      "address_space_limit_bytes": 8589934592,
+      "output_limit_bytes_per_stream": 1048576,
+      "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+      "umask": "0002",
+      "executable_sha256": "3057ea751ca0f4c7d11d55cb5ce28dfe6506e6e7c34866921cdd5bcfd6d45a50",
+      "cli_sha256": "51904f70fd32341ae9b15655d01a33efc3b76f804fbe624ffcd851914980b7c6",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "raw_receipt_sha256": "f272b40a07d7f4dcac65543a89fc6a596815df4d87bfa9556985bfe69c56ed6b",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "completed_graph_cycles": 725,
+      "retained_trace_truncated": true,
+      "last_recorded_epoch": {
+        "roots": 50,
+        "record_count": 99
+      },
+      "peak_native_backing_bytes": 5599399936,
+      "peak_native_retained_bytes": 24822529,
+      "phase_profile": {
+        "categories_are_exclusive": false,
+        "closed_count_includes_aborted": true,
+        "cpu_includes_helpers": false,
+        "disabled": 1,
+        "event_overflow": 0,
+        "intervals": [
+          {
+            "aborted": false,
+            "closed_count": 726,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "injection_revision",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 598230232,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 603448632,
+            "wall_overflow": false
+          },
+          {
+            "aborted": true,
+            "closed_count": 726,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "root_compute",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 21427155671,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 128,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 21178310987,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 577,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "legacy_need",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 856475978,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 2782302936,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 726,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "idle_drain",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 211533104,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 196106102,
+            "wall_overflow": false
+          }
+        ],
+        "runtime_construction_measured": false,
+        "sampled_event_dropped": 0,
+        "unknown_interval_status_bits": 0,
+        "valid_abi": true,
+        "version": 2,
+        "dice_family_counts": {
+          "already_entered_callbacks_may_finish_after_disable": true,
+          "disable_is_atomic_snapshot_barrier": false,
+          "event_columns": [
+            "started",
+            "finished",
+            "check_deps_started",
+            "check_deps_finished",
+            "compute_started",
+            "compute_finished"
+          ],
+          "event_pairs_may_be_imbalanced": true,
+          "finished_includes_cancellation": true,
+          "measures_self_time": false,
+          "measures_success": false,
+          "observed_per_cell_counts": true,
+          "retains_full_key_identity": false,
+          "sampled_after_runtime_retirement_and_guard_disable": true,
+          "synchronous_projections_emit_started_finished_only": true,
+          "counts_by_family": {
+            "command_configuration": [
+              77,
+              77,
+              57,
+              57,
+              20,
+              20
+            ],
+            "selected_effect": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "selected_effect_observed": [
+              5210,
+              5210,
+              4979,
+              4979,
+              231,
+              231
+            ],
+            "canonical_route": [
+              5313,
+              5313,
+              4979,
+              4979,
+              334,
+              334
+            ],
+            "bzl_module": [
+              43509,
+              43509,
+              41144,
+              41144,
+              2365,
+              2365
+            ],
+            "package_load": [
+              249,
+              249,
+              192,
+              192,
+              57,
+              57
+            ],
+            "package_inventory": [
+              3124,
+              3124,
+              2628,
+              2628,
+              496,
+              496
+            ],
+            "configured_analysis": [
+              1277,
+              1277,
+              578,
+              578,
+              699,
+              699
+            ],
+            "captured_source_snapshot": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "materialization_result": [
+              1842,
+              1842,
+              1723,
+              1723,
+              119,
+              119
+            ],
+            "materialization_request": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "workspace_context_projection": [
+              226,
+              226,
+              143,
+              143,
+              143,
+              143
+            ],
+            "workspace_transcript_projection": [
+              3893,
+              3893,
+              3662,
+              3662,
+              3662,
+              3662
+            ],
+            "source_snapshot_projection": [
+              17,
+              17,
+              1,
+              1,
+              1,
+              1
+            ],
+            "materialization_projection": [
+              1842,
+              1842,
+              1723,
+              1723,
+              1723,
+              1723
+            ],
+            "path_observation": [
+              1731,
+              1731,
+              0,
+              0,
+              1731,
+              1731
+            ],
+            "path_input": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "resolved_path": [
+              32,
+              32,
+              0,
+              0,
+              32,
+              32
+            ],
+            "anchored_resolved_path": [
+              1004,
+              1004,
+              0,
+              0,
+              1004,
+              1004
+            ],
+            "file_digest": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "source_artifact_input": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "root_repository_mapping": [
+              8,
+              8,
+              0,
+              0,
+              8,
+              8
+            ],
+            "selected_owner_certificate": [
+              1497,
+              1497,
+              1398,
+              1398,
+              99,
+              99
+            ],
+            "repository_package_source": [
+              1834,
+              1834,
+              1447,
+              1447,
+              387,
+              387
+            ],
+            "other": [
+              63315,
+              63315,
+              57280,
+              57280,
+              6023,
+              6023
+            ]
+          },
+          "nonzero_overflow_masks": {}
+        }
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 511,
+            "kind": "paths",
+            "max_wall_ns": 2933895,
+            "wall_ns": 138680447
+          },
+          {
+            "closed_count": 58,
+            "kind": "repositories",
+            "max_wall_ns": 532408826,
+            "wall_ns": 2645931680
+          },
+          {
+            "closed_count": 8,
+            "kind": "environment",
+            "max_wall_ns": 22631,
+            "wall_ns": 110361
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 148,
+            "kind": "workspaces",
+            "max_wall_ns": 257651130,
+            "wall_ns": 2189247011
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      }
+    },
+    {
+      "variant": "a2",
+      "command": [
+        "/tmp/slug-wp425-validation/artifacts/materialization-cutoff-control-d8b94b9563cf347b",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/tmp/slug-wp425-validation/artifacts/materialization-cutoff-control-d8b94b9563cf347b",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.08593511399522,
+      "timed_out": false,
+      "output_overflow": false,
+      "deadline_seconds": 60,
+      "address_space_limit_bytes": 8589934592,
+      "output_limit_bytes_per_stream": 1048576,
+      "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+      "umask": "0002",
+      "executable_sha256": "d8b94b9563cf347b8fbf4886ddf3b28048960737a0246e8816b6be8a99871ff9",
+      "cli_sha256": "51904f70fd32341ae9b15655d01a33efc3b76f804fbe624ffcd851914980b7c6",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "raw_receipt_sha256": "042366991b79f7e4e049292ecd4fc316a2fe4201d75901a1d64cc4a659a3e253",
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "completed_graph_cycles": 717,
+      "retained_trace_truncated": true,
+      "last_recorded_epoch": {
+        "roots": 49,
+        "record_count": 98
+      },
+      "peak_native_backing_bytes": 5532291072,
+      "peak_native_retained_bytes": 24822529,
+      "phase_profile": {
+        "categories_are_exclusive": false,
+        "closed_count_includes_aborted": true,
+        "cpu_includes_helpers": false,
+        "disabled": 1,
+        "event_overflow": 0,
+        "intervals": [
+          {
+            "aborted": false,
+            "closed_count": 718,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "injection_revision",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 607593039,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 610974479,
+            "wall_overflow": false
+          },
+          {
+            "aborted": true,
+            "closed_count": 718,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "root_compute",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 21317303790,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 128,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 21133121278,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 571,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "legacy_need",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 851897030,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 2844091820,
+            "wall_overflow": false
+          },
+          {
+            "aborted": false,
+            "closed_count": 718,
+            "count_overflow": false,
+            "cpu_overflow": false,
+            "kind": "idle_drain",
+            "missing_cpu": false,
+            "missing_wall": false,
+            "process_cpu_ns": 219028377,
+            "reversed_cpu": false,
+            "reversed_wall": false,
+            "status": 0,
+            "suppressed": false,
+            "unknown_status_bits": 0,
+            "wall_ns": 204007146,
+            "wall_overflow": false
+          }
+        ],
+        "runtime_construction_measured": false,
+        "sampled_event_dropped": 0,
+        "unknown_interval_status_bits": 0,
+        "valid_abi": true,
+        "version": 2,
+        "dice_family_counts": {
+          "already_entered_callbacks_may_finish_after_disable": true,
+          "disable_is_atomic_snapshot_barrier": false,
+          "event_columns": [
+            "started",
+            "finished",
+            "check_deps_started",
+            "check_deps_finished",
+            "compute_started",
+            "compute_finished"
+          ],
+          "event_pairs_may_be_imbalanced": true,
+          "finished_includes_cancellation": true,
+          "measures_self_time": false,
+          "measures_success": false,
+          "observed_per_cell_counts": true,
+          "retains_full_key_identity": false,
+          "sampled_after_runtime_retirement_and_guard_disable": true,
+          "synchronous_projections_emit_started_finished_only": true,
+          "counts_by_family": {
+            "command_configuration": [
+              76,
+              76,
+              56,
+              56,
+              20,
+              20
+            ],
+            "selected_effect": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "selected_effect_observed": [
+              5099,
+              5099,
+              4871,
+              4871,
+              228,
+              228
+            ],
+            "canonical_route": [
+              5197,
+              5197,
+              4871,
+              4871,
+              326,
+              326
+            ],
+            "bzl_module": [
+              42813,
+              42813,
+              40473,
+              40473,
+              2340,
+              2340
+            ],
+            "package_load": [
+              246,
+              246,
+              189,
+              189,
+              57,
+              57
+            ],
+            "package_inventory": [
+              3088,
+              3088,
+              2593,
+              2593,
+              495,
+              495
+            ],
+            "configured_analysis": [
+              1259,
+              1259,
+              568,
+              568,
+              691,
+              691
+            ],
+            "captured_source_snapshot": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "materialization_result": [
+              1822,
+              1822,
+              1704,
+              1704,
+              1822,
+              1822
+            ],
+            "materialization_request": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "workspace_context_projection": [
+              223,
+              223,
+              141,
+              141,
+              141,
+              141
+            ],
+            "workspace_transcript_projection": [
+              3792,
+              3792,
+              3564,
+              3564,
+              3564,
+              3564
+            ],
+            "source_snapshot_projection": [
+              17,
+              17,
+              1,
+              1,
+              1,
+              1
+            ],
+            "materialization_projection": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "path_observation": [
+              1708,
+              1708,
+              0,
+              0,
+              1708,
+              1708
+            ],
+            "path_input": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "resolved_path": [
+              32,
+              32,
+              0,
+              0,
+              32,
+              32
+            ],
+            "anchored_resolved_path": [
+              993,
+              993,
+              0,
+              0,
+              993,
+              993
+            ],
+            "file_digest": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "source_artifact_input": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "root_repository_mapping": [
+              8,
+              8,
+              0,
+              0,
+              8,
+              8
+            ],
+            "selected_owner_certificate": [
+              1466,
+              1466,
+              1373,
+              1373,
+              93,
+              93
+            ],
+            "repository_package_source": [
+              1819,
+              1819,
+              1433,
+              1433,
+              386,
+              386
+            ],
+            "other": [
+              62290,
+              62290,
+              56335,
+              56335,
+              5943,
+              5943
+            ]
+          },
+          "nonzero_overflow_masks": {}
+        }
+      },
+      "progress_wall": {
+        "buckets": [
+          {
+            "closed_count": 506,
+            "kind": "paths",
+            "max_wall_ns": 2449892,
+            "wall_ns": 137481840
+          },
+          {
+            "closed_count": 57,
+            "kind": "repositories",
+            "max_wall_ns": 516020084,
+            "wall_ns": 2709121015
+          },
+          {
+            "closed_count": 8,
+            "kind": "environment",
+            "max_wall_ns": 20390,
+            "wall_ns": 111640
+          },
+          {
+            "closed_count": 0,
+            "kind": "downloads",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 0,
+            "kind": "archives",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          },
+          {
+            "closed_count": 146,
+            "kind": "workspaces",
+            "max_wall_ns": 290698266,
+            "wall_ns": 2156105564
+          },
+          {
+            "closed_count": 0,
+            "kind": "refused",
+            "max_wall_ns": 0,
+            "wall_ns": 0
+          }
+        ],
+        "clock_reversed": false,
+        "includes_fixed_callback_dispatch_overhead": true,
+        "incomplete": false,
+        "overflow": false,
+        "overlaps_legacy_need": true,
+        "pairing_mismatch": false
+      }
+    }
+  ],
+  "comparison_qualification": "ABBA uses the same CLI51904f70fd32341ae9b15655d01a33efc3b76f804fbe624ffcd851914980b7c6, frozen inventory933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203, original Starlark and unchanged caps. Preserved instrumented control and candidate differ only by selected implementation plus its diagnostic classification. Controls705/717 and candidates762/725 completed graph cycles reach different prefixes and all the unchanged WorkDeadline (candidateB1 inside Source placement). Result computes1782/1822 vs122/119 demonstrate cutoff activity, not whole-command speed. Root wall remains about21.1\u201321.4s. No accepted latency, throughput, RSS ratio, backing saving or public completion claim. All probes refund0FD/0backing and retained168 at baseline168.",
+  "review": {
+    "design": "ACCEPT private request-entry contract preserving standalone/Disabled acquisition; do not reuse stricter context-bound public projection",
+    "source": "ACCEPT actual diff, generation-control correction and frozen observer/layout/report source",
+    "executed_correctness": "ACCEPT74 owner+16 observer,4 native guards and4 original compiler commands",
+    "final": "ACCEPT: actual source/correctness gates, all13 source/reference pins and10 raw receipt hashes checked. ABBA outcomes and observed-prefix qualifications match; no completion/latency/RSS/backing-saving claim. Same packet remains active for causal remaining-work attribution."
+  },
+  "next": "Attribute remaining module/dependency cost with a causal discriminator before another generic change. CapturedSourceSnapshot remains unobserved only in measured prefixes. Independent registration-row batching is a source candidate, but needs ordered/error semantics and a generic live-backing resource decision because reservations are initialized before operations; no caller pruning or batch implementation selected.",
+  "remaining": [
+    "Authentic Rust cquery completion",
+    "General Archive callback/exhaustion envelope and remaining demanded API breadth",
+    "Default production activation",
+    "Equivalent completed-command latency/RSS<=1.25x Bazel",
+    "Rust action comparison/RBE and full Slug bootstrap"
+  ],
+  "final_validation": {
+    "architecture": "PASS: v2_plan_status.py matched one current packet; v2_archive_status.sh passed all architecture/archive checks; source pins unchanged through validation and reference pins match baseline.",
+    "format_and_diff": "PASS: pinned nightly-2025-09-14 rustfmt --edition2024 --config skip_children=true --check on all7 changed Rust files; git diff --check."
+  }
+}

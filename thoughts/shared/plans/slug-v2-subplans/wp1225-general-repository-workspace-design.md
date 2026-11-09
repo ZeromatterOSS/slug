@@ -1195,6 +1195,98 @@ archive-envelope or equivalent-RSS proof. Attribute graph cost before the next
 generic optimization; Analysis's adjacent broad Source projections are a
 candidate to investigate, not an accepted cause or implementation selection.
 
+### Bounded DICE family attribution
+
+The existing bounded Rust frontier spends most of its work scope in RootCompute.
+The accepted family attribution proves reachability in a stopped prefix, without
+assigning time to any key family. CapturedSourceSnapshotKey remains unobserved
+in these prefixes and is deferred as a candidate for this frontier.
+
+Add fixed scalar counters only to the existing `probe_observer::Observer` under
+`cfg(test)` in the existing native-probe-observer feature. Its current listener
+already receives DICE events; do not add a runtime hook, replace/combine userdata,
+change the listener selection, mapping ABI, semantic key/value or scheduler.
+The existing install/disable/Arc lifetime and mapped counter/activity behavior
+remain. Classify the static short key-type tag into a fixed table of at most24
+named families plus `other`, using only scalar atomics and checked saturating
+counts with overflow masks. Do not retain or report observed tags, concrete
+keys, IDs, paths, source values, environment, addresses or arbitrary frames.
+The fixed test-only state follows the existing Observer and its Allocative
+self-size; no semantic cache/global store or unbounded collector is added.
+
+Count all six existing DICE event variants: Started/Finished, CheckDepsStarted/
+Finished and ComputeStarted/Finished. DICE `api/events.rs` supplies only static
+type names; `impls/worker.rs:345–347` closes ComputeFinished by RAII even on
+cancellation. Its synchronous projection path emits Started/Finished without a
+Compute pair. Counts therefore indicate reachability and dependency/compute
+activity, not per-key self-time, CPU, successful evaluations or exclusive spans.
+No per-family timing is selected. Preserve imbalance/overflow qualifications;
+finish events cannot certify semantic completion. Events beginning after
+observer disable do not count; already-entered callback behavior stays aligned
+with the existing counter semantics. Disable is not an atomic snapshot barrier
+for callbacks already past that gate. Report observed per-cell post-disable
+counts and possible imbalance, not transactional completeness or a new drain
+guarantee; retirement remains a prerequisite rather than a counter barrier.
+
+Read the fixed snapshot through the already-held profile Observer only after
+outcome/runtime retirement, native refunds and guard disable. Emit static family
+labels and six count columns with overflow/coverage qualifiers inside the same
+512KiB total frontier+cleanup report ceiling. Reserve a fixed larger diagnostic
+slice by reducing existing event-trace allowance; do not grow the report ceiling
+or dump sampled activity frames. This adds no production result/credit/scope or
+claim of complete key identity. Ordinary tests cover all phases, known/other
+classification without payload output, concurrency, saturation, disable/last-drop
+and preservation of existing mapped counters. The existing ignored original
+frontier supplies bounded attribution under unchanged inputs/caps/clocks; a
+stopped probe remains no public-command or memory-ratio proof.
+
+The [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json)
+joins attribution, the selected causal regression and the semantic cutoff below.
+Use observed reachability plus a causal regression before subsequent graph
+changes. Preserve full identity/source custody and Need validity; family counts
+are neither self-time nor successful-command evidence.
+
+### Per-request materialization result cutoff
+
+The bounded original Rust attribution records no CapturedSourceSnapshotKey
+activity, so that Analysis candidate is deferred. It reaches the ordinary
+RepositoryMaterializationResultKey (2072 compute starts in this stopped prefix).
+These counts establish reachability only. The producer previously read the
+whole result epoch while selecting one exact request association. The accepted
+actual-key causal regression is RED on unrelated B publication and GREEN with
+the request-bound cutoff, including retained-only inventory refusal.
+
+Use a private result-entry ProjectionKey derived through compute_opaque from the
+actual RepositoryMaterializationResultEpochKey. Its identity retains the full
+request; hashing may reuse workspace/repository identity as the existing result
+key does. Select only the actual current entry when the epoch workspace and
+full request match. Missing injection, foreign workspace, absent association or
+same-id/full-request conflict retain the existing parent Need behavior. Never
+resurrect a retained generated entry or construct a reduced epoch. The selected
+value retains the actual request Arc and complete result; structural equality,
+General history, Source bindings, path policy and observation instance remain.
+Debug/Display expose only the existing static/repository identity metadata.
+
+This is a Slug-native DICE dependency cutoff with unchanged repository behavior.
+Keep the existing context-bound public materialization projection separate:
+this producer also serves Disabled and standalone acquisition without a fresh
+Workspace context. Add no policy/context/native owner or admission edge. The
+parent result key keeps Need invalidity and its existing Local/Immutable/error
+conversion. Generation-bound transport/materialization errors still observe the
+current generation and retry when it changes. Core retains full current-epoch
+association and native authority checks before effects.
+
+The [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json)
+records actual-key RED/GREEN, owner/dependent compilation, protected native
+admission and original compiler checks. Same-input ABBA stopped probes show
+fewer result computations but variable prefixes and unchanged work-deadline
+refusal; command latency and equivalent RSS remain unproved. Preserve all
+clocks, caps, original fixtures and default Disabled policy. Attribute remaining
+module/dependency work before further generic changes. Registration batching
+would additionally need an explicit resource decision because Core initializes
+new reservations before later operations; more simultaneous Archive backings
+must not bypass the existing bank or choose caller-specific pruning.
+
 ### Current captured Source transport (accepted inactive component)
 
 The [captured-source transport receipt](wp1225-captured-source-transport-acceptance-2026-11-08.json)

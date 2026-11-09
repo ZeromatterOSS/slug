@@ -3,20 +3,24 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: attribute remaining DICE root-compute cost in original
+Current delta: attribute remaining module/dependency work in original
 `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
-The [verified Source placement component](wp1225-source-placement-acceptance-2026-11-08.json)
-now replaces read-only regular archive MODULE/overlay members through bounded
-same-root staging, without global write-policy, privilege or quota changes.
-The genuine original readonly fixture is RED→GREEN;70 ordinary tests, Source
-lifetime and four warm compiler commands pass. Rust passes PermissionDenied13,
-completes806 graph cycles and retains52 roots/104 records, then reaches the
-unchanged27-second deadline. Root-compute wall21.255s/parentCPU21.627s dominate;
-807 closed intervals include one explicitly aborted final interval. Exact native
-refunds pass. Inspect existing bounded key-family attribution and causal source
-projection cutoffs before selecting a generic graph change. No Need-cacheability,
+The [materialization-result cutoff](wp1225-materialization-cutoff-acceptance-2026-11-08.json)
+now tracks only the full-request-bound actual current entry. Actual-key
+completed-A/unrelated-B is RED→GREEN;74 owner and16 observer tests, four native
+admission/archive guards and four original warm compiler commands pass. Fixed
+bounded family counts defer Analysis CapturedSourceSnapshot, which is unreached
+in the observed prefixes. Same-input ABBA observes result computes1782/1822 in
+controls and122/119 in candidates, but prefixes vary and all reach the unchanged27-second
+deadline. No command-latency or RSS acceptance is established. Remaining graph
+work needs a causal discriminator; registration batching also needs a generic
+resource decision for simultaneous Archive reservations. No Need-cacheability,
 clock/cap increase or caller-specific pruning is selected. Rust archive work,
 completion, activation and completed-command latency/RSS gates remain open.
+The [verified Source placement component](wp1225-source-placement-acceptance-2026-11-08.json)
+already passes the original readonly MODULE/overlay refusal without global
+write-policy, privilege or quota changes; its earlier stopped Rust prefix reaches
+52 roots/104 records. Native owners still refund exactly.
 
 The [owned-verification component](wp1225-owned-observation-acceptance-2026-11-08.json)
 now shares canonical General bodies after complete fresh FD verification.

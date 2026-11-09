@@ -6,6 +6,8 @@
 )))]
 compile_error!("native-probe-observer requires little-endian Linux x86_64 with 64-bit atomics");
 
+#[cfg(test)]
+pub(crate) mod family_counts;
 pub(crate) mod mapping;
 
 use std::cell::RefCell;
@@ -80,7 +82,11 @@ impl ProbeGuard {
             ));
         }
         let mapping = Mapping::from_fd(fd)?;
-        let observer = Arc::new(Observer { mapping });
+        let observer = Arc::new(Observer {
+            mapping,
+            #[cfg(test)]
+            family_counts: family_counts::FamilyCounts::default(),
+        });
         observer.words()[0].store(MAGIC, Ordering::Relaxed);
         observer.words()[1].store(VERSION, Ordering::Relaxed);
         observer.words()[2].store(std::process::id() as u64, Ordering::Relaxed);
@@ -127,6 +133,8 @@ pub fn capture() -> Option<Arc<Observer>> {
 
 pub struct Observer {
     mapping: Mapping,
+    #[cfg(test)]
+    family_counts: family_counts::FamilyCounts,
 }
 
 impl Observer {
@@ -307,6 +315,8 @@ impl Observer {
         }
         #[cfg(test)]
         mapping::callback_test_hook(tag);
+        #[cfg(test)]
+        self.family_counts.record(kind, tag);
         let old = self.words()[COUNTERS + kind].fetch_add(1, Ordering::Relaxed);
         if old == u64::MAX {
             self.words()[OVERFLOW].fetch_or(1 << kind, Ordering::Relaxed);
@@ -334,6 +344,12 @@ impl Observer {
     #[cfg(test)]
     pub(crate) fn words_for_test(&self) -> &[std::sync::atomic::AtomicU64; mapping::WORDS] {
         self.words()
+    }
+
+    /// Per-cell observations, not an atomic snapshot or callback-drain barrier.
+    #[cfg(test)]
+    pub(crate) fn family_counts_for_test(&self) -> family_counts::Snapshot {
+        self.family_counts.snapshot()
     }
 
     #[cfg(test)]

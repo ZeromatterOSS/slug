@@ -148,9 +148,17 @@ fn fixed_mapping_counts_events_commits_frames_and_releases_last_arc() {
     let observer = guard.observer();
     let weak = Arc::downgrade(&observer);
     assert_eq!(std::mem::size_of_val(observer.words_for_test()), BYTES);
-    assert_eq!(std::mem::size_of_val(&*observer), 8);
+    let family_bytes = crate::runtime::probe_observer::family_counts::STORAGE_BYTES;
+    assert_eq!(
+        family_bytes,
+        25 * 7 * std::mem::size_of::<std::sync::atomic::AtomicU64>()
+    );
+    assert_eq!(family_bytes, 1400);
+    // The fixed collector exists only in this test artifact. Keep the original
+    // base/control layout checks separate from its explicit retained storage.
+    assert_eq!(std::mem::size_of_val(&*observer) - family_bytes, 8);
     let arc_allocation = std::mem::size_of::<Observer>() + 2 * std::mem::size_of::<usize>();
-    assert_eq!(arc_allocation, 24);
+    assert_eq!(arc_allocation - family_bytes, 24);
     assert_eq!(std::mem::size_of::<Arc<Observer>>(), 8);
     assert_eq!(std::mem::size_of::<ProbeGuard>(), 8);
     assert_eq!(std::mem::size_of::<Option<Arc<Observer>>>(), 8);
@@ -162,7 +170,7 @@ fn fixed_mapping_counts_events_commits_frames_and_releases_last_arc() {
         + std::mem::size_of::<PhaseGuard>()
         + 3 * std::mem::size_of::<DeferredPhase>()
         + 64;
-    assert!(control <= 512);
+    assert!(control - family_bytes <= 512);
     assert!(BYTES + control <= 4096);
     #[allow(dead_code)]
     struct BeforePhaseGuard {
@@ -209,10 +217,15 @@ fn fixed_mapping_counts_events_commits_frames_and_releases_last_arc() {
     );
     assert_ne!(observer.words_for_test()[7].load(Ordering::Acquire), 0);
     assert_ne!(observer.words_for_test()[22].load(Ordering::Acquire), 0);
+    let families = observer.family_counts_for_test();
+    let other = crate::runtime::probe_observer::family_counts::FAMILY_COUNT - 1;
+    assert_eq!(families.counts[other], [1; 6]);
+    assert_eq!(families.overflow_masks[other], 0);
 
     drop(guard);
     observer.event(DiceEvent::Started { key_type: "Late" });
     assert_eq!(observer.words_for_test()[8].load(Ordering::Relaxed), 1);
+    assert_eq!(observer.family_counts_for_test(), families);
     let words = read_words(&reader);
     assert_eq!(words[0], u64::from_le_bytes(*b"SLGOBS01"));
     assert_eq!(words[1], 2);
@@ -464,6 +477,10 @@ fn concurrent_callbacks_and_invalid_clock_and_tag_truncation_are_visible() {
         thread.join().unwrap();
     }
     assert_eq!(observer.words_for_test()[13].load(Ordering::Relaxed), 4000);
+    let families = observer.family_counts_for_test();
+    let other = crate::runtime::probe_observer::family_counts::FAMILY_COUNT - 1;
+    assert_eq!(families.counts[other], [0, 0, 0, 0, 0, 4000]);
+    assert_eq!(families.overflow_masks[other], 0);
 
     const LONG_TAG: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789--tail";
     observer.record_activity_for_test(5, LONG_TAG, (0, 0, 0));
@@ -496,6 +513,10 @@ fn guard_drop_during_callback_preserves_listener_mapping_until_final_release() {
         listener.event(DiceEvent::Started {
             key_type: "BlockForDisable",
         });
+        let before = listener.family_counts_for_test();
+        listener.event(DiceEvent::Started { key_type: "Late" });
+        assert_eq!(listener.family_counts_for_test(), before);
+        before
     });
     for _ in 0..100_000 {
         if crate::runtime::probe_observer::mapping::CALLBACK_GATE.load(Ordering::Acquire) == 2 {
@@ -507,11 +528,20 @@ fn guard_drop_during_callback_preserves_listener_mapping_until_final_release() {
         crate::runtime::probe_observer::mapping::CALLBACK_GATE.load(Ordering::Acquire),
         2
     );
+    // The paused callback has passed the gate, but neither colocated counter
+    // update has run yet. Disable is deliberately not a drain barrier.
+    assert_eq!(
+        observer.family_counts_for_test().counts,
+        [[0; 6]; crate::runtime::probe_observer::family_counts::FAMILY_COUNT]
+    );
     drop(guard);
     drop(observer);
     assert!(weak.upgrade().is_some());
     crate::runtime::probe_observer::mapping::CALLBACK_GATE.store(3, Ordering::Release);
-    callback.join().unwrap();
+    let families = callback.join().unwrap();
+    let other = crate::runtime::probe_observer::family_counts::FAMILY_COUNT - 1;
+    assert_eq!(families.counts[other], [1, 0, 0, 0, 0, 0]);
+    assert_eq!(families.overflow_masks[other], 0);
     assert!(weak.upgrade().is_none());
     let words = read_words(&reader);
     assert_eq!(words[3], 1);
