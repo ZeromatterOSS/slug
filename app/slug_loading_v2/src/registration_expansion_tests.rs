@@ -89,6 +89,9 @@ use crate::ModuleRegistrationFamily;
 use crate::cycle_detector::bzl_load_cycle_detector;
 use crate::registration_expansion::package_postorder;
 
+#[path = "registration_expansion_tests/path_prerequisite_tests.rs"]
+mod path_prerequisite_tests;
+
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
 }
@@ -235,6 +238,7 @@ pub(crate) async fn registration_diagnostic_bzl_errors() -> Vec<(crate::module_e
 #[derive(Debug)]
 struct TrackedActivation {
     key: String,
+    node: dice::DiceNodeId,
     kind: ActivationKind,
     batch: Option<EventBatch>,
 }
@@ -281,6 +285,7 @@ impl ActivationTracker for ExpansionTracker {
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
         self.activations.lock().unwrap().push(TrackedActivation {
             key: key.to_string(),
+            node: activation.node(),
             kind: activation.kind(),
             batch: activation
                 .evaluation_data()

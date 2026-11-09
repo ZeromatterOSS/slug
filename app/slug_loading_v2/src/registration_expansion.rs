@@ -12,6 +12,7 @@
 
 use std::cmp::Ordering;
 use std::fmt;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -54,6 +55,13 @@ use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
+
+mod path_lookahead;
+use path_lookahead::PathLookahead;
+#[cfg(feature = "native-probe-observer")]
+pub use path_lookahead::PathLookaheadProbeSnapshot;
+#[cfg(feature = "native-probe-observer")]
+pub use path_lookahead::path_lookahead_probe_snapshot;
 
 use crate::ExternalSubtreePackageSetError;
 use crate::ExternalSubtreePackageSetKey;
@@ -1102,22 +1110,33 @@ async fn expand_module_rows<'a>(
     scratch: &mut ExpansionScratch,
     rows: impl Iterator<Item = HostSelectedRegistrationPatternView<'a>>,
 ) -> Step<()> {
+    let mut lookahead = PathLookahead::new();
     for (ordinal, view) in rows.enumerate() {
-        let row = u32::try_from(ordinal)
-            .map_err(|_| scratch.error(None, ModuleRegistrationExpansionErrorKind::RowOverflow))?;
-        expand_contextual_row(
-            ctx,
-            scratch,
-            view.raw_pattern(),
-            view.raw_pattern(),
-            view.canonical_repo(),
-            |apparent| view.mapping_target(apparent),
-            row,
-            RegistrationSign::Positive,
-        )
-        .await?;
+        if !lookahead.can_inspect_next() {
+            break;
+        }
+        let result = async {
+            let row = u32::try_from(ordinal).map_err(|_| {
+                scratch.error(None, ModuleRegistrationExpansionErrorKind::RowOverflow)
+            })?;
+            expand_contextual_row(
+                ctx,
+                scratch,
+                view.raw_pattern(),
+                view.raw_pattern(),
+                view.canonical_repo(),
+                |apparent| view.mapping_target(apparent),
+                row,
+                RegistrationSign::Positive,
+            )
+            .await
+        }
+        .await;
+        if let ControlFlow::Break(stop) = lookahead.observe(result) {
+            return Err(stop);
+        }
     }
-    Ok(())
+    lookahead.finish()
 }
 
 fn finish_driver(scratch: ExpansionScratch, result: Step<()>) -> DriverOutcome {
@@ -1191,31 +1210,41 @@ async fn drive_command_registration_expansion(
                 ModuleRegistrationExpansionErrorKind::RootMappingUnavailable,
             )
         })?;
+        let mut lookahead = PathLookahead::new();
         for (ordinal, raw) in rows.into_iter().enumerate() {
-            let row = u32::try_from(ordinal).map_err(|_| {
-                scratch.error(None, ModuleRegistrationExpansionErrorKind::RowOverflow)
-            })?;
-            let (sign, parse_text) = raw
-                .strip_prefix('-')
-                .map_or((RegistrationSign::Positive, raw), |pattern| {
-                    (RegistrationSign::Negative, pattern)
-                });
-            expand_contextual_row(
-                ctx,
-                &mut scratch,
-                parse_text,
-                raw,
-                view.canonical_repo(),
-                |apparent| {
-                    view.mapping()
-                        .find_map(|(name, target)| (name == apparent).then_some(target))
-                },
-                row,
-                sign,
-            )
-            .await?;
+            if !lookahead.can_inspect_next() {
+                break;
+            }
+            let result = async {
+                let row = u32::try_from(ordinal).map_err(|_| {
+                    scratch.error(None, ModuleRegistrationExpansionErrorKind::RowOverflow)
+                })?;
+                let (sign, parse_text) = raw
+                    .strip_prefix('-')
+                    .map_or((RegistrationSign::Positive, raw), |pattern| {
+                        (RegistrationSign::Negative, pattern)
+                    });
+                expand_contextual_row(
+                    ctx,
+                    &mut scratch,
+                    parse_text,
+                    raw,
+                    view.canonical_repo(),
+                    |apparent| {
+                        view.mapping()
+                            .find_map(|(name, target)| (name == apparent).then_some(target))
+                    },
+                    row,
+                    sign,
+                )
+                .await
+            }
+            .await;
+            if let ControlFlow::Break(stop) = lookahead.observe(result) {
+                return Err(stop);
+            }
         }
-        Ok(())
+        lookahead.finish()
     }
     .await;
     finish_driver(scratch, result)

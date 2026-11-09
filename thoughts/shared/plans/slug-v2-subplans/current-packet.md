@@ -3,18 +3,26 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: discriminate prerequisite serialization in original
+Current delta: attribute the remaining prerequisite serialization in original
 `rules-rust-073-toolchain-owner` `cquery //pkg:probe` with its nightly setting.
+[Ordered Lstat lookahead](wp1225-metadata-lookahead-acceptance-2026-11-08.json)
+now joins bounded whole metadata Needs in actual module/command registration
+rows. The causal A/B regression is RED→GREEN; 66 ordinary tests, four native
+guards and four original warm compiler commands pass. Both bounded candidates
+add 18 demands across frontier extensions, with 235 accepted extensions including
+duplicates. Extra speculative child computations are observed. All ABBA runs
+last record 51 roots/103 records and stop at the unchanged WorkDeadline; no
+reduction in total work, deeper frontier, command-latency or RSS claim is made.
+The [selected scheduling contract](wp1225-general-repository-workspace-design.md#ordered-metadata-prerequisite-discovery)
+is Slug-native: extra bounded metadata may encounter earlier dynamic bank or
+time refusal. Core authority and caps stay unchanged; mixed/non-Lstat/nonpath
+Needs and errors remain whole ordered barriers. Next discriminate remaining
+configured-toolchain registration/declaration prerequisites before selecting
+another discovery family. Archive reservation batching, clock/cap increases,
+Need cacheability and caller pruning remain unselected.
 The [validated observation union](wp1225-observation-union-acceptance-2026-11-08.json)
-now preserves full facts, left key/result custody and existing constructor
-validation across three measured Loading helpers. Actual original ownership is
-RED→GREEN;216 ordinary tests, four native guards and four original warm compiler
-commands pass. Both bounded candidates reuse612 route/effect maps that controls
-reconstruct, but every ABBA run last records51 roots/103 records before
-WorkDeadline.
-No deeper frontier, command-latency or RSS acceptance is established. Investigate
-bounded prerequisite discovery with ordered barriers/errors and independent
-resource bounds; no batching, clock/cap increase or caller pruning is selected.
+retains full facts and left key/result custody across three Loading helpers;
+its bounded map-reuse evidence remains separate from command performance.
 The [materialization-result cutoff](wp1225-materialization-cutoff-acceptance-2026-11-08.json)
 now tracks only the full-request-bound actual current entry. Actual-key
 completed-A/unrelated-B is RED→GREEN;74 owner and16 observer tests, four native
@@ -23,8 +31,8 @@ bounded family counts defer Analysis CapturedSourceSnapshot, which is unreached
 in the observed prefixes. Same-input ABBA observes result computes1782/1822 in
 controls and122/119 in candidates, but prefixes vary and all reach the unchanged27-second
 deadline. No command-latency or RSS acceptance is established. Remaining graph
-work needs a causal discriminator; registration batching also needs a generic
-resource decision for simultaneous Archive reservations. No Need-cacheability,
+work needs a causal discriminator; simultaneous Archive reservations remain
+outside the selected Lstat-only scheduling class. No Need-cacheability,
 clock/cap increase or caller-specific pruning is selected. Rust archive work,
 completion, activation and completed-command latency/RSS gates remain open.
 The [verified Source placement component](wp1225-source-placement-acceptance-2026-11-08.json)

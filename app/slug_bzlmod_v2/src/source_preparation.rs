@@ -496,6 +496,39 @@ impl SourcePreparationNeeds {
         self.path_observations.as_ref()
     }
 
+    /// Borrow the complete path channel only when every other Need family is
+    /// empty. Mixed Needs remain indivisible scheduling barriers.
+    pub fn only_path_observations(&self) -> Option<&NeedPathObservations> {
+        let Self {
+            scratch_elf_metadata,
+            root_module_bootstrap,
+            repository_environment,
+            path_observations,
+            repository_materializations,
+            selected_extension_downloads,
+            repository_executes,
+            repository_filesystem_operations,
+            source_snapshots,
+            workspace_reservations,
+            workspace_operations,
+        } = self;
+        if scratch_elf_metadata.is_none()
+            && root_module_bootstrap.is_none()
+            && repository_environment.is_none()
+            && repository_materializations.is_empty()
+            && selected_extension_downloads.is_empty()
+            && repository_executes.is_empty()
+            && repository_filesystem_operations.is_empty()
+            && source_snapshots.is_empty()
+            && workspace_reservations.is_empty()
+            && workspace_operations.is_empty()
+        {
+            path_observations.as_ref()
+        } else {
+            None
+        }
+    }
+
     pub fn repository_materializations(
         &self,
     ) -> &SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>> {
@@ -19132,3 +19165,6 @@ mod repository_archive_needs_tests;
 
 #[cfg(test)]
 mod materialization_result_cutoff_tests;
+
+#[cfg(test)]
+mod path_only_tests;

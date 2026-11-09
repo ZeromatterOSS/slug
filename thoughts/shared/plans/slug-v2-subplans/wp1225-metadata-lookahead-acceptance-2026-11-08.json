@@ -1,0 +1,955 @@
+{
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "f84009d079692b82315b6c5e9c615ec26a085811",
+  "classification": "Slug-native bounded ordered Lstat discovery and operational admission revision; no Bazel restart/error-timing or old-serial-admission equivalence claim.",
+  "outcome": "Actual module and command registration rows collect bounded whole Lstat-only Needs; causal A/B RED becomes GREEN with ordered recovery, unchanged barriers and terminal event custody. Both original Rust candidates exercise genuine frontier extension. Rust completion and command-performance gates remain open.",
+  "contract": {
+    "eligible": "Entire SourcePreparationNeeds must contain only nonempty path channel, every operation Lstat; exhaustive11-field classifier rejects all10other channels. No filtering mixed Needs.",
+    "limits": {
+      "inspected_row_slots_including_first_hole_and_complete_or_barrier_rows": 32,
+      "unique_full_demands": 32,
+      "path_bytes_per_demand": 4096,
+      "frontier_control_construction_peak_bytes": 65536
+    },
+    "forecast": "Checked1024 +3*max(Cleft,Cright)+size_of<Vec<Demand>>+3H+(2*(L+R)+U)*size_of<Demand>+Pleft+Pright. P includes actual PathBuf spare/Arc ownership and counts duplicates again; C includes SourcePreparationNeeds and7map-owner inline/retained controls; H=2usize+alignment-1. Count and forecast before union allocation; duplicate-only keeps pending backing.",
+    "barriers": "First ineligible/oversized Need returns original. Later ineligible/oversized/mixed/nonpath/semantic/outer error stops and returns earlier pending paths only; no truncating a row Need. Selected-pattern/root-mapping prerequisites remain serial.",
+    "retry": "No Complete family result/ambiguity batch while pending; attempt scratch discarded and ordered expansion restarts. Full Need invalidity, signs/toolchain reversal, facts and exact certificate ownership preserved.",
+    "events": "Child capture is legal; final actual transitive closure selects publication. No print-free cached result, changed capture userdata, fresh-owner replay claim or Core event bridge.",
+    "admission": "64KiB bounds frontier/control construction, NOT speculative child DICE values, recursive-row work or all expansion scratch. Extra metadata may cause earlier dynamic bank/time refusal. Core whole-batch authority unchanged; no poison reset/split/fallback/retry.",
+    "unchanged": "Default General Disabled, Source64, Execute128, roots128, metadata16MiB, Process64MiB, streams1MiB, work27s+cleanup3s, native512MiB/FD512/backing8GiB and all source/archive/body/decoder caps."
+  },
+  "source_pins": {
+    "app/slug_bzlmod_v2/src/source_preparation.rs": "237a8f773120fca07833121bd36d52300797bedd3797d7627ea3abe9bdcbba91",
+    "app/slug_bzlmod_v2/src/source_preparation/path_only_tests.rs": "853f8cbd92d04e821b75e9be3dcd5ee649ebc5ed109c218ebe4a5afd0ab1a846",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver/rust_toolchain_tests/phase_profile.rs": "ed0d0fe0ad6fc0f663668a8369cba89a3a85f5880807fbbbe4bfa7a0db3091bf",
+    "app/slug_loading_v2/src/lib.rs": "f8f5447f93be5f8d46b2bfc2b4c684d58526fe56d00a801f7c2e4213f8d61326",
+    "app/slug_loading_v2/src/registration_expansion.rs": "de5203f7f96e7f13029ea0c66dc1179bc3292abc32829d1f0c83633c9a237012",
+    "app/slug_loading_v2/src/registration_expansion/path_lookahead.rs": "0303aa6bd04a6266500e5dcb776f6cf5e229df6534a0dfef23637839b1e040f3",
+    "app/slug_loading_v2/src/registration_expansion_tests.rs": "3640f1e8c683d98a33182491b30b193ee2e8558c968761679a7f27175ad264ce",
+    "app/slug_loading_v2/src/registration_expansion_tests/path_prerequisite_tests.rs": "478e3564b5336f92aabe6cfd32b1681d3fd34e33be4068f9cfe9d63a9899f9d8",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "0be84eb5ddbd4965a34e845979cb9f185cbbb3ff4b99d8d37264522b7cdf009a",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "79c50351866637968fd7b50cd4f09d9a818476c169b767e6fe5c0e5057102d7a",
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "e67c41013778582eb9d522775994fd8ec840b6ffb86a706228117dcca1c3eda8",
+    "thoughts/shared/plans/slug-v2-subplans/wp1225-general-repository-workspace-design.md": "27058bf6156a4c3482e96c76bbbcfd623ffcdca9f238594f29abe45afdb9d888"
+  },
+  "unchanged_reference_pins": {
+    "starlark-rust/starlark_map/src/ordered_map.rs": "2cc3952bf084101e0380233c59c6fe8b16aedc05c10ad2a7994ce64f98b5aeba",
+    "starlark-rust/starlark_map/src/sorted_map.rs": "f3714d8320512ba7c02975d5f5fa0278717711abc862ccc2950c3ad15a75a904",
+    "starlark-rust/starlark_map/src/small_map.rs": "a8e7622c059bdd94585cbaccd881aa6edd30d3f65f105a76e30b5d60bb32e774",
+    "app/slug_core_v2/src/runtime/repository_workspace_driver.rs": "7c4aac41469e8221f2507f1eaa82b399607ba74008e9327486aa9457aac79e07",
+    "app/slug_core_v2/src/runtime/repository_workspace_command.rs": "5e32ab89ca3f9b01c6c8a3a2e96aff73cdb6b5647a353affca661b3f5a51c5d4",
+    "app/slug_core_v2/src/runtime/repository_io/source_service.rs": "1d367f3b687c091372bcccc344fec2f8c865ef65fd5a257da735d07a9e3603eb"
+  },
+  "pinned_source": {
+    "bazel_revision": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "anchors": {
+      "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/RegisteredToolchainsFunction.java": "82-123: reversed command toolchains, Bzlmod rows, whole expansion and missing-value restart.",
+      "src/main/java/com/google/devtools/build/lib/skyframe/TargetPatternUtil.java": "51-86: request all patterns, ordered signed reduction; later ready parse exceptions can precede earlier missing values. Slug deferred barrier timing is native."
+    },
+    "source_sha256": {
+      "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/RegisteredToolchainsFunction.java": "9051a88a992d48be6d0afcfdf3edb147cf6d3d634325e7512a3e8eef2abcec3d",
+      "src/main/java/com/google/devtools/build/lib/skyframe/TargetPatternUtil.java": "839fcd06224ba23e6933af13694493cb2229b731c8661eba5ba0078ce95e8b55"
+    }
+  },
+  "representation": "No donor import/cache/interner/new semantic DICE key. Existing Arc/Dupe/SmallMap and sorted demand union; attempt-local frontier, full structural equality, existing child DICE custody. Getter remains on existing large protocol owner, focused tests/helper in separate leaves.",
+  "compile": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "-p",
+        "slug_loading_v2",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--features",
+        "slug_core_v2/native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 146.092064010998,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 50.004554195998935,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--features",
+        "native-probe-observer",
+        "--no-run",
+        "--offline",
+        "--locked",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 14.878581619996112,
+      "cwd": "/run/media/system/Colossus/dev/slug-wp425-integration"
+    }
+  ],
+  "artifact_scope": "Joint Core6f792d and defaultCLI6132c7 were built before the final Loading cfg(test)-only recursive fixture corrections. All production Rust and Core profile bytes stayed frozen; finalLoading30f098 includes corrected test leaf. No stale production executable used.",
+  "causal_red": {
+    "file": "/tmp/slug-wp425-validation/metadata-lookahead-red-final.json",
+    "sha256": "f335373d72d7c886aecd4c828141d71b7ea594a8577664eed9fefb04c3b3ddba",
+    "executable_sha256": "cea9bd8a9f1625babd4e97587f2ff22102b11c9c7126e3e5a799a72ecc57a5c0",
+    "exit_code": 101,
+    "selected": 3,
+    "causal_test": "observed_independent_literal_rows_union_lstat_prerequisites_and_recover_in_order",
+    "observation": "Before production loop wiring, actual row family returned only A Lstat instead of exact A+B. Event control passed. The separate generated barrier fixture still had incomplete metadata and is not a production failure."
+  },
+  "fixture_corrections": [
+    "Generated-row barrier initially stopped in selection due missing registry URLs; seed ordinary registry inputs before any query. Then actual error named missing selected-extension download inputs; install established empty Host/download/platform/revoked-Execute inputs. Real GeneratedFileEffects Need now proven at B, with prerequisites Complete and no C.",
+    "Recursive module fixture satisfied its own restored paths but continued into unrelated implicit builtin platforms materialization. Narrow to actual command rows (toolchain reversal makes tree first); same deep-package completion, imported-bzl hole, later Lstat, full pending Need/no family batch, exact retry labels/Arcs. No production weakening/fake materialization."
+  ],
+  "ordinary_tests": [
+    {
+      "target": "slug_bzlmod_v2",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-6ed4b973def1affc",
+        "--exact",
+        "source_preparation::path_only_tests::mixed_and_nonpath_needs_never_expose_a_partial_path_channel",
+        "source_preparation::path_only_tests::only_path_accessor_borrows_whole_channel_without_filtering_operations",
+        "--test-threads=1"
+      ],
+      "preflight_command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-6ed4b973def1affc",
+        "--exact",
+        "source_preparation::path_only_tests::mixed_and_nonpath_needs_never_expose_a_partial_path_channel",
+        "source_preparation::path_only_tests::only_path_accessor_borrows_whole_channel_without_filtering_operations"
+      ],
+      "preflight": "Verified 2 exact nonignored test(s); no tests executed.\n",
+      "selected": 2,
+      "exit_code": 0,
+      "elapsed_seconds": 0.006715304989484139,
+      "executable_sha256": "634b29f94eafc41eebfb38afb20e8e84f35e581608c3925782363c3c4b736912"
+    },
+    {
+      "target": "slug_loading_v2",
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+        "--exact",
+        "registration_expansion::path_lookahead::probe::tests::local_concurrent_counts_preserve_all_scalar_updates",
+        "registration_expansion::path_lookahead::probe::tests::local_counter_saturates_without_a_process_reset",
+        "registration_expansion::path_lookahead::tests::duplicate_only_extension_keeps_pending_backing_and_unique_count",
+        "registration_expansion::path_lookahead::tests::first_ineligible_or_large_spare_owner_returns_original_need",
+        "registration_expansion::path_lookahead::tests::metadata_peak_has_exact_boundary_and_checked_overflow",
+        "registration_expansion::path_lookahead::tests::unique_bound_and_later_operation_barriers_keep_only_earlier_paths",
+        "registration_expansion::path_lookahead::tests::window_counts_first_hole_and_every_complete_slot",
+        "registration_expansion_tests::ambiguity_facts_participate_in_a_b_a_equality_when_labels_match",
+        "registration_expansion_tests::ambiguity_warning_is_owned_by_requested_family_only",
+        "registration_expansion_tests::canonical_route_error_stops_before_later_package_row",
+        "registration_expansion_tests::command_apparent_external_recursive_rows_reuse_canonical_subtree_walker",
+        "registration_expansion_tests::command_apparent_external_rows_use_final_root_mapping",
+        "registration_expansion_tests::command_configuration_a_b_a_restores_equal_arc_backed_expansion",
+        "registration_expansion_tests::command_key_identity_includes_configuration_and_family",
+        "registration_expansion_tests::command_recursive_negative_removal_and_reinsertion_reuse_package_walker",
+        "registration_expansion_tests::command_rows_apply_signed_order_and_family_specific_reversal",
+        "registration_expansion_tests::empty_command_list_activates_no_mapping_or_package_owner",
+        "registration_expansion_tests::exact_missing_target_is_a_typed_family_and_row_error",
+        "registration_expansion_tests::family_key_identity_is_independent",
+        "registration_expansion_tests::mapped_and_canonical_rows_use_selected_nonroot_inventory",
+        "registration_expansion_tests::need_has_no_family_event_batch_and_recovers_with_complete_epoch",
+        "registration_expansion_tests::negative_exact_missing_target_remains_a_typed_row_error",
+        "registration_expansion_tests::observed_cancellation_publishes_no_family_owner_then_recovers_and_reuses",
+        "registration_expansion_tests::observed_canonical_recursion_orders_route_subtree_and_inventories_with_exact_arcs",
+        "registration_expansion_tests::observed_command_cancellation_publishes_nothing_then_recovers_and_reuses",
+        "registration_expansion_tests::observed_command_mapping_route_and_package_frontiers_are_exact_and_ordered",
+        "registration_expansion_tests::observed_expansion_preserves_epoch_identity_dependency_order_and_family_isolation",
+        "registration_expansion_tests::package_error_stops_before_later_row_and_retains_decisive_epoch",
+        "registration_expansion_tests::path_prerequisite_tests::observed_command_pending_rows_preserve_signed_order_and_toolchain_reversal",
+        "registration_expansion_tests::path_prerequisite_tests::observed_independent_literal_rows_union_lstat_prerequisites_and_recover_in_order",
+        "registration_expansion_tests::path_prerequisite_tests::observed_later_error_defers_behind_pending_lstat_and_earlier_error_wins",
+        "registration_expansion_tests::path_prerequisite_tests::observed_non_path_need_defers_behind_pending_lstat_and_stops_before_c",
+        "registration_expansion_tests::path_prerequisite_tests::observed_recursive_partial_row_discards_scratch_before_lstat_window_retry",
+        "registration_expansion_tests::recursive_expansion_uses_descendant_before_prefix_and_lexical_targets",
+        "registration_expansion_tests::recursive_package_order_is_lexical_sibling_postorder",
+        "registration_expansion_tests::registration_diagnostic_natural_canonical_boundaries",
+        "registration_expansion_tests::registration_diagnostic_natural_selection_and_mapping_boundaries",
+        "registration_expansion_tests::root_exact_and_wildcard_expansion_are_family_specific_and_stably_deduped",
+        "registration_expansion_tests::selected_module_and_declaration_order_drive_first_seen_deduplication",
+        "registration_expansion_tests::subtree_error_stops_before_later_package_row_and_retains_prefix",
+        "--test-threads=1"
+      ],
+      "preflight_command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-eb751a29bd1e37d7",
+        "--exact",
+        "registration_expansion::path_lookahead::probe::tests::local_concurrent_counts_preserve_all_scalar_updates",
+        "registration_expansion::path_lookahead::probe::tests::local_counter_saturates_without_a_process_reset",
+        "registration_expansion::path_lookahead::tests::duplicate_only_extension_keeps_pending_backing_and_unique_count",
+        "registration_expansion::path_lookahead::tests::first_ineligible_or_large_spare_owner_returns_original_need",
+        "registration_expansion::path_lookahead::tests::metadata_peak_has_exact_boundary_and_checked_overflow",
+        "registration_expansion::path_lookahead::tests::unique_bound_and_later_operation_barriers_keep_only_earlier_paths",
+        "registration_expansion::path_lookahead::tests::window_counts_first_hole_and_every_complete_slot",
+        "registration_expansion_tests::ambiguity_facts_participate_in_a_b_a_equality_when_labels_match",
+        "registration_expansion_tests::ambiguity_warning_is_owned_by_requested_family_only",
+        "registration_expansion_tests::canonical_route_error_stops_before_later_package_row",
+        "registration_expansion_tests::command_apparent_external_recursive_rows_reuse_canonical_subtree_walker",
+        "registration_expansion_tests::command_apparent_external_rows_use_final_root_mapping",
+        "registration_expansion_tests::command_configuration_a_b_a_restores_equal_arc_backed_expansion",
+        "registration_expansion_tests::command_key_identity_includes_configuration_and_family",
+        "registration_expansion_tests::command_recursive_negative_removal_and_reinsertion_reuse_package_walker",
+        "registration_expansion_tests::command_rows_apply_signed_order_and_family_specific_reversal",
+        "registration_expansion_tests::empty_command_list_activates_no_mapping_or_package_owner",
+        "registration_expansion_tests::exact_missing_target_is_a_typed_family_and_row_error",
+        "registration_expansion_tests::family_key_identity_is_independent",
+        "registration_expansion_tests::mapped_and_canonical_rows_use_selected_nonroot_inventory",
+        "registration_expansion_tests::need_has_no_family_event_batch_and_recovers_with_complete_epoch",
+        "registration_expansion_tests::negative_exact_missing_target_remains_a_typed_row_error",
+        "registration_expansion_tests::observed_cancellation_publishes_no_family_owner_then_recovers_and_reuses",
+        "registration_expansion_tests::observed_canonical_recursion_orders_route_subtree_and_inventories_with_exact_arcs",
+        "registration_expansion_tests::observed_command_cancellation_publishes_nothing_then_recovers_and_reuses",
+        "registration_expansion_tests::observed_command_mapping_route_and_package_frontiers_are_exact_and_ordered",
+        "registration_expansion_tests::observed_expansion_preserves_epoch_identity_dependency_order_and_family_isolation",
+        "registration_expansion_tests::package_error_stops_before_later_row_and_retains_decisive_epoch",
+        "registration_expansion_tests::path_prerequisite_tests::observed_command_pending_rows_preserve_signed_order_and_toolchain_reversal",
+        "registration_expansion_tests::path_prerequisite_tests::observed_independent_literal_rows_union_lstat_prerequisites_and_recover_in_order",
+        "registration_expansion_tests::path_prerequisite_tests::observed_later_error_defers_behind_pending_lstat_and_earlier_error_wins",
+        "registration_expansion_tests::path_prerequisite_tests::observed_non_path_need_defers_behind_pending_lstat_and_stops_before_c",
+        "registration_expansion_tests::path_prerequisite_tests::observed_recursive_partial_row_discards_scratch_before_lstat_window_retry",
+        "registration_expansion_tests::recursive_expansion_uses_descendant_before_prefix_and_lexical_targets",
+        "registration_expansion_tests::recursive_package_order_is_lexical_sibling_postorder",
+        "registration_expansion_tests::registration_diagnostic_natural_canonical_boundaries",
+        "registration_expansion_tests::registration_diagnostic_natural_selection_and_mapping_boundaries",
+        "registration_expansion_tests::root_exact_and_wildcard_expansion_are_family_specific_and_stably_deduped",
+        "registration_expansion_tests::selected_module_and_declaration_order_drive_first_seen_deduplication",
+        "registration_expansion_tests::subtree_error_stops_before_later_package_row_and_retains_prefix"
+      ],
+      "preflight": "Verified 40 exact nonignored test(s); no tests executed.\n",
+      "selected": 40,
+      "exit_code": 0,
+      "elapsed_seconds": 0.09177377801097464,
+      "executable_sha256": "30f0986ee704aefa2a06a8fcef21f769adddda33d2e1edf4a499b15155e383e9"
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::metadata_path_probe_deltas_preserve_overflow_and_process_scope_qualifications",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_family_report_is_static_and_bounded_at_maximum_counts",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::phase_profile_scalar_v2_qualifiers_and_progress_pairing_are_bounded",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::phase_profile::union_helper_deltas_qualify_max_overflow_and_reversal_without_raw_inputs",
+        "runtime::events::tests::accepted_epoch_distinguishes_reuse_none_and_empty",
+        "runtime::events::tests::accepted_terminal_mapping_moves_value_and_preserves_events",
+        "runtime::events::tests::closure_order_roots_shared_dedup_and_in_flight_post_seal_quarantine_are_exact",
+        "runtime::events::tests::evaluated_empty_clears_prior_batch_and_abandoned_branch_is_excluded",
+        "runtime::events::tests::lifecycle_and_closure_failures_are_typed_and_select_nothing",
+        "runtime::events::tests::opaque_projection_borrows_once_and_retains_exact_terminal_identity",
+        "runtime::events::tests::publication_consumes_events_in_order_before_terminal_stderr",
+        "runtime::events::tests::publication_preserves_binary_output_between_prints_without_newlines",
+        "runtime::events::tests::publication_preserves_empty_events_and_typed_error_terminal",
+        "runtime::events::tests::sealed_terminal_drop_cleans_up_cancelled_selection",
+        "runtime::events::tests::selected_terminal_accept_disarms_without_reopening_command",
+        "runtime::events::tests::selected_terminal_drop_performs_cancellation_cleanup",
+        "runtime::events::tests::selected_terminal_reset_rejects_nonmatching_attempt",
+        "runtime::events::tests::selected_terminal_reset_suppresses_and_permits_fresh_attempt",
+        "runtime::events::tests::serial_attempts_retain_reachable_child_and_fresh_owner_does_not_replay",
+        "runtime::events::tests::source_certified_policy_carries_known_none_only_for_matching_roots",
+        "runtime::events::tests::source_certified_retries_fold_mixed_nodes_in_current_closure_order",
+        "runtime::events::transient_root_tests::all_transient_roots_still_check_strict_foreign_stale_and_unverified",
+        "runtime::events::transient_root_tests::allowed_transient_root_does_not_hide_an_uncompleted_dirty_root",
+        "runtime::events::transient_root_tests::current_transient_completion_can_omit_dirty_root_and_recover",
+        "--test-threads=1"
+      ],
+      "selected": 24,
+      "exit_code": 0,
+      "elapsed_seconds": 0.00775813999644015,
+      "preflight": "Verified 24 exact nonignored test(s); no tests executed.\n",
+      "executable_sha256": "6f792d328d93cb88f95973dced6ace845b921d91706e1fc297255668e944e95d"
+    }
+  ],
+  "protected_native_guards": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+      "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission",
+      "runtime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup",
+      "runtime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged",
+      "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands",
+      "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "preflight_listing": "runtime::dice::repository_workspace_driver::tests::source_snapshot_tests::native_original_immutable_archive_source_is_verified_and_fresh_across_commands: test\nruntime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper: test\nruntime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper: test\nruntime::repository_physical_root::progress::command::tests::native_command_first_execute_checks_deleted_history_without_lowering_archive_admission: test\nruntime::repository_physical_root::progress::command::tests::native_command_refuses_rewritten_epoch_and_actual_tree_drift_before_quota_setup: test\nruntime::repository_physical_root::progress::command::tests::native_command_seal_retires_seed_and_exact_replay_keeps_epoch_unchanged: test\n\n6 tests, 0 benchmarks\n",
+    "selected": 4,
+    "expected_exit_code": 0,
+    "exit_code": 0,
+    "elapsed_seconds": 0.8240708360099234,
+    "deadline_seconds": 60,
+    "output_limit_bytes_per_stream": 1048576,
+    "address_space_limit_bytes": 8589934592,
+    "timed_out": false,
+    "overflow": false,
+    "core_sha256": "6f792d328d93cb88f95973dced6ace845b921d91706e1fc297255668e944e95d",
+    "cli_sha256": "6132c7be51323e4369dd5184d52300413cdd1d864bdac6f65d066fb7773d4144",
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-native-guards.json",
+      "sha256": "e767b5991aa222557d4c866fb36ca7195f3642220c6a8768a08c30a947ae0cd1"
+    }
+  },
+  "protected_original_compiler": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources",
+      "--test-threads=1",
+      "--show-output"
+    ],
+    "preflight_command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+      "--list",
+      "--ignored",
+      "--exact",
+      "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources",
+      "runtime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper",
+      "runtime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper"
+    ],
+    "selected": 1,
+    "exit_code": 0,
+    "elapsed_seconds": 13.284494583000196,
+    "timed_out": false,
+    "overflow": false,
+    "deadline_seconds": 60,
+    "stream_limit_bytes": 1048576,
+    "preflight_listing": "runtime::dice::repository_workspace_driver::tests::source_link_tests::native_authentic_cc_autoconf_warm_runtime_observes_environment_a_b_a_with_compacted_sources: test\nruntime::repository_physical_root::mount_lease::native_fixture::trusted_rolling_mount_helper: test\nruntime::repository_physical_root::native_fixture::trusted_tmpfs_fixture_helper: test\n\n3 tests, 0 benchmarks\n",
+    "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+    "umask": "0002",
+    "executable_sha256": "6f792d328d93cb88f95973dced6ace845b921d91706e1fc297255668e944e95d",
+    "cli": "/run/media/system/Colossus/dev/slug/target/debug/slug",
+    "cli_sha256": "6132c7be51323e4369dd5184d52300413cdd1d864bdac6f65d066fb7773d4144",
+    "launcher_sha256": "c85eff5831e0e4a74f6d2ac9a0c47ee49d4e7bfdb70b9d0732472c09e44e0425",
+    "actual_original_commands": 4,
+    "same_runtime_and_bank": true,
+    "case_lines": [
+      "SourceQuotaOriginal warm=true case=0 backing=335544320 peak_backing=4467986432 retained=2613871 peak_retained=22190735 fds=5 peak_fds=265",
+      "SourceQuotaOriginal warm=true case=1 backing=335544320 peak_backing=4803530752 retained=2619471 peak_retained=24803366 fds=5 peak_fds=270",
+      "SourceQuotaOriginal warm=true case=2 backing=335544320 peak_backing=4803530752 retained=2619757 peak_retained=24807438 fds=5 peak_fds=270",
+      "SourceQuotaOriginal warm=true case=3 backing=335544320 peak_backing=4803530752 retained=2619471 peak_retained=24807724 fds=5 peak_fds=270"
+    ],
+    "raw_receipt": {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-authentic-warm.json",
+      "sha256": "88c5a92d3bf29bcf0288cb5617c35e5bc18311a5d7dd1bfcb413f31e98d7d258"
+    }
+  },
+  "diagnostic": "Feature-only4AtomicU64+mask=40B, no reset/paths/keys/epochs retained. Ordered counters windows/inspected rows/extensions/additions per frontier. Null on mask/MAX/reversal, rawbefore/after and unknownbits reported. Process-wide, not atomic/request-isolated/allocation/time/distinct-global counter. Same16KiB report reservation+512KiB combined ceiling; worst-width/overflow controls pass.",
+  "control_preservation": {
+    "source_executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+    "preserved_executable": "/tmp/slug-wp425-validation/artifacts/metadata-lookahead-control-83c6683a2ef2a857",
+    "executable_sha256": "83c6683a2ef2a857abbf42ee828a196735bdf9f19368f2ac0bede83d3db4ba7f",
+    "source_build_jsonl": "/tmp/slug-wp425-validation/observation-union-green-build.jsonl",
+    "production_base": "f84009d079692b82315b6c5e9c615ec26a085811",
+    "cli_sha256": "12ca81c75aa6e28eca9e343cfa1f45b7a3b49dbd4b4110c0746e9e73ecdab487",
+    "qualification": "Prior accepted f840 production executable; does not contain the new lookahead diagnostic. No command completion or equivalent RSS claim."
+  },
+  "acceptance_threshold": "Before measurement, required actual original Rust genuine added frontier demands, causal RED/GREEN and protected gates under unchanged caps; no completed-command speed/RSS threshold or claim. Zero/duplicate-only actual use would not accept this component.",
+  "rust_abba": [
+    {
+      "command": [
+        "/tmp/slug-wp425-validation/artifacts/metadata-lookahead-control-83c6683a2ef2a857",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/tmp/slug-wp425-validation/artifacts/metadata-lookahead-control-83c6683a2ef2a857",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.071008148996043,
+      "timed_out": false,
+      "output_overflow": false,
+      "deadline_seconds": 60,
+      "address_space_limit_bytes": 8589934592,
+      "output_limit_bytes_per_stream": 1048576,
+      "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+      "umask": "0002",
+      "executable_sha256": "83c6683a2ef2a857abbf42ee828a196735bdf9f19368f2ac0bede83d3db4ba7f",
+      "cli": "/run/media/system/Colossus/dev/slug/target/debug/slug",
+      "cli_sha256": "6132c7be51323e4369dd5184d52300413cdd1d864bdac6f65d066fb7773d4144",
+      "input_config": "/tmp/slug-wp425-rust-inputs-fourth-flat-dirfd-aee4a6bf85d3/inventory.json",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "preserved_core_artifact_record": "/tmp/slug-wp425-validation/metadata-lookahead-control-preservation.json",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "variant": "a1",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/metadata-lookahead-rust-a1.json",
+        "sha256": "5e93a77afe46ae4565124d481c0362cd0588ef9a9908776a1d1cfb26c969fab8"
+      },
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "completed_graph_cycles": 785,
+      "last_recorded_epoch": {
+        "record_count": 103,
+        "roots": 51
+      },
+      "trace_truncated": true,
+      "peak_native_backing_bytes": 7957647360,
+      "peak_native_retained_bytes": 28323621,
+      "root_compute": {
+        "aborted": true,
+        "closed_count": 786,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 21579699947,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 128,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 21255345001,
+        "wall_overflow": false
+      },
+      "metadata_path_lookahead": null,
+      "dice_family_compute_started": {
+        "command_configuration": 20,
+        "selected_effect": 0,
+        "selected_effect_observed": 255,
+        "canonical_route": 366,
+        "bzl_module": 2644,
+        "package_load": 57,
+        "package_inventory": 558,
+        "configured_analysis": 759,
+        "captured_source_snapshot": 0,
+        "materialization_result": 124,
+        "materialization_request": 0,
+        "workspace_context_projection": 148,
+        "workspace_transcript_projection": 3912,
+        "source_snapshot_projection": 3,
+        "materialization_projection": 1884,
+        "path_observation": 1929,
+        "path_input": 0,
+        "resolved_path": 32,
+        "anchored_resolved_path": 1119,
+        "file_digest": 0,
+        "source_artifact_input": 0,
+        "root_repository_mapping": 8,
+        "selected_owner_certificate": 107,
+        "repository_package_source": 402,
+        "other": 6441
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.090035307002836,
+      "timed_out": false,
+      "output_overflow": false,
+      "deadline_seconds": 60,
+      "address_space_limit_bytes": 8589934592,
+      "output_limit_bytes_per_stream": 1048576,
+      "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+      "umask": "0002",
+      "executable_sha256": "6f792d328d93cb88f95973dced6ace845b921d91706e1fc297255668e944e95d",
+      "cli": "/run/media/system/Colossus/dev/slug/target/debug/slug",
+      "cli_sha256": "6132c7be51323e4369dd5184d52300413cdd1d864bdac6f65d066fb7773d4144",
+      "input_config": "/tmp/slug-wp425-rust-inputs-fourth-flat-dirfd-aee4a6bf85d3/inventory.json",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "variant": "b1",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/metadata-lookahead-rust-b1.json",
+        "sha256": "57a0a125305d2b5176e1e65d05b51610b0ca95259799305f4802be381c73532c"
+      },
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "completed_graph_cycles": 783,
+      "last_recorded_epoch": {
+        "record_count": 103,
+        "roots": 51
+      },
+      "trace_truncated": true,
+      "peak_native_backing_bytes": 7957647360,
+      "peak_native_retained_bytes": 28323621,
+      "root_compute": {
+        "aborted": true,
+        "closed_count": 784,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 21719798565,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 128,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 21348858934,
+        "wall_overflow": false
+      },
+      "metadata_path_lookahead": {
+        "accepted_extensions_include_duplicate_only": true,
+        "after_counts": [
+          329,
+          894,
+          235,
+          18
+        ],
+        "after_overflow_mask": 0,
+        "all_counter_deltas_arithmetically_exact": true,
+        "atomic_snapshot": false,
+        "before_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "before_overflow_mask": 0,
+        "checked_delta": [
+          329,
+          894,
+          235,
+          18
+        ],
+        "measures_time_allocation_or_distinct_global_demands": false,
+        "metric_columns": [
+          "eligible_windows_started",
+          "window_rows_inspected",
+          "path_extensions_accepted",
+          "new_unique_demands_added"
+        ],
+        "new_unique_demands_are_per_frontier_extension": true,
+        "preexisting_overflow": false,
+        "process_wide": true,
+        "request_isolated": false,
+        "reset_performed": false,
+        "retains_keys_paths_or_epochs": false,
+        "reversed_mask": 0,
+        "saturated_mask": 0,
+        "unknown_overflow_bits": 0,
+        "window_rows_include_complete_and_barrier_rows": true
+      },
+      "dice_family_compute_started": {
+        "command_configuration": 20,
+        "selected_effect": 0,
+        "selected_effect_observed": 416,
+        "canonical_route": 813,
+        "bzl_module": 2791,
+        "package_load": 57,
+        "package_inventory": 631,
+        "configured_analysis": 757,
+        "captured_source_snapshot": 0,
+        "materialization_result": 223,
+        "materialization_request": 0,
+        "workspace_context_projection": 149,
+        "workspace_transcript_projection": 3922,
+        "source_snapshot_projection": 3,
+        "materialization_projection": 1946,
+        "path_observation": 2020,
+        "path_input": 0,
+        "resolved_path": 35,
+        "anchored_resolved_path": 1139,
+        "file_digest": 0,
+        "source_artifact_input": 0,
+        "root_repository_mapping": 8,
+        "selected_owner_certificate": 217,
+        "repository_package_source": 466,
+        "other": 7528
+      }
+    },
+    {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-82c0c6426fb5f270",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.089575106001575,
+      "timed_out": false,
+      "output_overflow": false,
+      "deadline_seconds": 60,
+      "address_space_limit_bytes": 8589934592,
+      "output_limit_bytes_per_stream": 1048576,
+      "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+      "umask": "0002",
+      "executable_sha256": "6f792d328d93cb88f95973dced6ace845b921d91706e1fc297255668e944e95d",
+      "cli": "/run/media/system/Colossus/dev/slug/target/debug/slug",
+      "cli_sha256": "6132c7be51323e4369dd5184d52300413cdd1d864bdac6f65d066fb7773d4144",
+      "input_config": "/tmp/slug-wp425-rust-inputs-fourth-flat-dirfd-aee4a6bf85d3/inventory.json",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "variant": "b2",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/metadata-lookahead-rust-b2.json",
+        "sha256": "3fcac645690a5d44e8f6e402482b46d06a37242ec9c35c1835083917b420779a"
+      },
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "completed_graph_cycles": 775,
+      "last_recorded_epoch": {
+        "record_count": 103,
+        "roots": 51
+      },
+      "trace_truncated": true,
+      "peak_native_backing_bytes": 7957647360,
+      "peak_native_retained_bytes": 28323621,
+      "root_compute": {
+        "aborted": false,
+        "closed_count": 775,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 21675974612,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 0,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 21331708149,
+        "wall_overflow": false
+      },
+      "metadata_path_lookahead": {
+        "accepted_extensions_include_duplicate_only": true,
+        "after_counts": [
+          325,
+          890,
+          235,
+          18
+        ],
+        "after_overflow_mask": 0,
+        "all_counter_deltas_arithmetically_exact": true,
+        "atomic_snapshot": false,
+        "before_counts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "before_overflow_mask": 0,
+        "checked_delta": [
+          325,
+          890,
+          235,
+          18
+        ],
+        "measures_time_allocation_or_distinct_global_demands": false,
+        "metric_columns": [
+          "eligible_windows_started",
+          "window_rows_inspected",
+          "path_extensions_accepted",
+          "new_unique_demands_added"
+        ],
+        "new_unique_demands_are_per_frontier_extension": true,
+        "preexisting_overflow": false,
+        "process_wide": true,
+        "request_isolated": false,
+        "reset_performed": false,
+        "retains_keys_paths_or_epochs": false,
+        "reversed_mask": 0,
+        "saturated_mask": 0,
+        "unknown_overflow_bits": 0,
+        "window_rows_include_complete_and_barrier_rows": true
+      },
+      "dice_family_compute_started": {
+        "command_configuration": 20,
+        "selected_effect": 0,
+        "selected_effect_observed": 415,
+        "canonical_route": 805,
+        "bzl_module": 2763,
+        "package_load": 57,
+        "package_inventory": 631,
+        "configured_analysis": 748,
+        "captured_source_snapshot": 0,
+        "materialization_result": 223,
+        "materialization_request": 0,
+        "workspace_context_projection": 148,
+        "workspace_transcript_projection": 3912,
+        "source_snapshot_projection": 3,
+        "materialization_projection": 1946,
+        "path_observation": 2001,
+        "path_input": 0,
+        "resolved_path": 35,
+        "anchored_resolved_path": 1130,
+        "file_digest": 0,
+        "source_artifact_input": 0,
+        "root_repository_mapping": 8,
+        "selected_owner_certificate": 209,
+        "repository_package_source": 466,
+        "other": 7453
+      }
+    },
+    {
+      "command": [
+        "/tmp/slug-wp425-validation/artifacts/metadata-lookahead-control-83c6683a2ef2a857",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier",
+        "--test-threads=1",
+        "--show-output"
+      ],
+      "preflight_command": [
+        "/tmp/slug-wp425-validation/artifacts/metadata-lookahead-control-83c6683a2ef2a857",
+        "--list",
+        "--ignored",
+        "--exact",
+        "runtime::dice::repository_workspace_driver::tests::rust_toolchain_tests::native_original_rust_toolchain_cquery_frontier"
+      ],
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 27.089261463988805,
+      "timed_out": false,
+      "output_overflow": false,
+      "deadline_seconds": 60,
+      "address_space_limit_bytes": 8589934592,
+      "output_limit_bytes_per_stream": 1048576,
+      "socket_capability": "AF_UNIX SOCK_SEQPACKET succeeded",
+      "umask": "0002",
+      "executable_sha256": "83c6683a2ef2a857abbf42ee828a196735bdf9f19368f2ac0bede83d3db4ba7f",
+      "cli": "/run/media/system/Colossus/dev/slug/target/debug/slug",
+      "cli_sha256": "6132c7be51323e4369dd5184d52300413cdd1d864bdac6f65d066fb7773d4144",
+      "input_config": "/tmp/slug-wp425-rust-inputs-fourth-flat-dirfd-aee4a6bf85d3/inventory.json",
+      "input_config_sha256": "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203",
+      "preserved_core_artifact_record": "/tmp/slug-wp425-validation/metadata-lookahead-control-preservation.json",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      },
+      "variant": "a2",
+      "raw_receipt": {
+        "file": "/tmp/slug-wp425-validation/metadata-lookahead-rust-a2.json",
+        "sha256": "8d028f417fe38d39096b91fbd05b1513dc077250e52187ebe780b234f5f40586"
+      },
+      "result": {
+        "error": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "status": "driver_refusal"
+      },
+      "completed_graph_cycles": 789,
+      "last_recorded_epoch": {
+        "record_count": 103,
+        "roots": 51
+      },
+      "trace_truncated": true,
+      "peak_native_backing_bytes": 7957647360,
+      "peak_native_retained_bytes": 28323621,
+      "root_compute": {
+        "aborted": true,
+        "closed_count": 790,
+        "count_overflow": false,
+        "cpu_overflow": false,
+        "kind": "root_compute",
+        "missing_cpu": false,
+        "missing_wall": false,
+        "process_cpu_ns": 21679955086,
+        "reversed_cpu": false,
+        "reversed_wall": false,
+        "status": 128,
+        "suppressed": false,
+        "unknown_status_bits": 0,
+        "wall_ns": 21350130679,
+        "wall_overflow": false
+      },
+      "metadata_path_lookahead": null,
+      "dice_family_compute_started": {
+        "command_configuration": 20,
+        "selected_effect": 0,
+        "selected_effect_observed": 255,
+        "canonical_route": 367,
+        "bzl_module": 2645,
+        "package_load": 57,
+        "package_inventory": 561,
+        "configured_analysis": 763,
+        "captured_source_snapshot": 0,
+        "materialization_result": 125,
+        "materialization_request": 0,
+        "workspace_context_projection": 148,
+        "workspace_transcript_projection": 3912,
+        "source_snapshot_projection": 3,
+        "materialization_projection": 1893,
+        "path_observation": 1935,
+        "path_input": 0,
+        "resolved_path": 35,
+        "anchored_resolved_path": 1120,
+        "file_digest": 0,
+        "source_artifact_input": 0,
+        "root_repository_mapping": 8,
+        "selected_owner_certificate": 108,
+        "repository_package_source": 402,
+        "other": 6472
+      }
+    }
+  ],
+  "comparison_qualification": "Both candidates add18 demands PER FRONTIER EXTENSION, not18 distinct global demands;235 accepted extensions include duplicates. Extra speculative selected-effect/canonical/bzl/inventory computations are explicit in per-run counts. Same last51/103epoch/peaks and WorkDeadline; variable stopped prefixes, fixed caps and probes prove no whole-work saving, speedup, deeper frontier, completion, native activation, allocation saving or equivalent-command <=1.25x Bazel RSS.",
+  "review": {
+    "design": "ACCEPT: bounded class/formula/whole barriers/operational admission revision before implementation.",
+    "source": "ACCEPT: both loops, ordinal placement, no pending Complete, exhaustive classifier, bounds, duplicates, scalar diagnostics and actual closure/row tests.",
+    "capability_evidence": "ACCEPT: real exercised frontier extension with extra speculative work and no overall optimization claim.",
+    "final_integration": "ACCEPT: independent final review verified12changed source/doc pins,6baseline references,9raw receipt hashes,4ABBA hashes and2Bazel pins;66ordinary,4native guards,4warm originals join. Exercised Lstat-only capability and extra speculative work; no speed/deeper/completion/RSS/activation claim."
+  },
+  "format_evidence": {
+    "file": "/tmp/slug-wp425-validation/metadata-lookahead-format.json",
+    "sha256": "786e9a89198e1f92fb27bb3b0458f0153412ae6e2d3c289b6f8d3ac734d34f0a",
+    "result": "8Rust sources pass with no new deviations; inherited lib.rs module-order deviation preserved."
+  },
+  "final_validation": {
+    "plan_status": "PASS: matching Packet WP-7-425-m7a-general-repository-process",
+    "archive_status": "PASS: both V1 refs e218054d4c796655939b968d90208b185decb352, no physical/semantic V1 restoration",
+    "diff_check": "PASS",
+    "ordinary_selected_passed": 66,
+    "native_guards_selected_passed": 4,
+    "warm_ignored_selected_passed": 1,
+    "warm_actual_commands": 4,
+    "rust_abba_diagnostics": 4,
+    "native_mutation_freeze": "All source/staging/temp directory preparation mutations frozen throughout native sequence. Cargo serialized; compile separate from workload measurement.",
+    "source_pin_join": "PASS: all12changed,6unchanged,9raw,4ABBA and2Bazel pins verified by root and independent reviewer; relative plan links pass, no remaining Cargo/rustc/slugd/slug processes."
+  },
+  "next": "Attribute remaining original configured-toolchain registration/declaration prerequisites using actual owner stages before selecting another bounded family. Do not infer hot cost solely from these counts or broaden current Lstat class into Archive reservations.",
+  "remaining": [
+    "Authentic Rust cquery completion/General archive callback and public production activation",
+    "Equivalent completed-command Bazel RSS<=1.25x, latency, deeper frontier and whole-work reduction",
+    "Analysis CapturedSourceSnapshot cutoff remains deferred: not reached in these prefixes.",
+    "Inherited unrelated5source_service diagnostic baseline failures and Windows repository_ignore InputImage match error remain unmodified."
+  ],
+  "raw_receipts": [
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-red-final.json",
+      "sha256": "f335373d72d7c886aecd4c828141d71b7ea594a8577664eed9fefb04c3b3ddba"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-focused.json",
+      "sha256": "2f0aea38fea2fba1af917c99c5aa1de0508eef8519a3f2e1b6837494d4dfa2a5"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-core-focused.json",
+      "sha256": "fc51d774170a4b91407fac5b27f474f2d1e389ce9dd60748e94ddaa55376acfb"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-loading-final.json",
+      "sha256": "36202a1effd389fd52671bd073b73add8dc32b3765c37502830cd65709eba790"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-barrier-diagnostic.json",
+      "sha256": "4b365f7edd42e86ca43bf4b3fd1f668e96ea50c74543586a82c95815704e424a"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-recursive-diagnostic.json",
+      "sha256": "08592b422242fe652d11341e71460db5c31fb613846904b44bab97a61e037f43"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-native-guards.json",
+      "sha256": "e767b5991aa222557d4c866fb36ca7195f3642220c6a8768a08c30a947ae0cd1"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-authentic-warm.json",
+      "sha256": "88c5a92d3bf29bcf0288cb5617c35e5bc18311a5d7dd1bfcb413f31e98d7d258"
+    },
+    {
+      "file": "/tmp/slug-wp425-validation/metadata-lookahead-format.json",
+      "sha256": "786e9a89198e1f92fb27bb3b0458f0153412ae6e2d3c289b6f8d3ac734d34f0a"
+    }
+  ]
+}

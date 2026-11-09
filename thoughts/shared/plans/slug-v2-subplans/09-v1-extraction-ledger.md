@@ -77,6 +77,21 @@ semantic cache or request-isolated allocation/time meter. The
 map-identity, full equality/key/result custody and bounded original-command proof;
 completed-command latency/RSS remain independent gates.
 
+Ordered Lstat prerequisite discovery keeps one attempt-local pending Source
+Need and reuses existing immutable Arc-backed demands and sorted union. A checked
+64 KiB frontier/control construction forecast precedes union allocation, including
+actual path spare capacity and duplicate owners; this is not a bound on all
+speculative child DICE values or recursive expansion scratch. Need discards the
+family scratch, while ordinary child DICE ownership and terminal event closure
+remain authoritative. No new cache, interner, donor import or native reservation
+authority is introduced. A feature-only fixed 40-byte process scalar collector
+measures reachability and frontier extensions without retaining paths or keys;
+its samples are not atomic or request-isolated. The selected owner contract keeps
+this Slug-native scheduling/admission policy separate from unchanged native
+caps and completed-command memory acceptance; the
+[lookahead receipt](wp1225-metadata-lookahead-acceptance-2026-11-08.json) records
+actual row/owner and bounded original-command evidence.
+
 Owned-file observation verification borrows a closed carrier from the actual
 sealed native owner and reuses RootIo's nofollow stream, byte comparison and
 actual SHA-256. Only complete direct File bodies may select this class; Source

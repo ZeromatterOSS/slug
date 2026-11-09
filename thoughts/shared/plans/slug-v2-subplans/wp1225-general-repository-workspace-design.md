@@ -1015,7 +1015,7 @@ guards and four warm original compiler commands. The held-request test is a
 no-child protocol counter proof; only B's first operation is original. Existing
 Core source and actual history/replay tests establish the pre-launch/quota join.
 
-The same-input ABBA diagnostics retain51 roots/100 completed records and762
+The same-input ABBA diagnostics retain 51 roots/100 completed records and762
 root-compute intervals per run. Candidate wall intervals are19.627/19.650s;
 controls21.548/21.561s. Candidates refuse at Source-attempt64 around25s; one
 control reaches the unchanged work deadline and the other the same64 refusal
@@ -1356,9 +1356,72 @@ reconstruct them. Every ABBA run retains the same recorded 51 roots/103 records
 and reaches WorkDeadline. This closes the local representation/ownership gap,
 without demonstrating deeper Rust progress, command latency or RSS fit. Further
 work must discriminate prerequisite serialization rather than infer time from
-map counts. Bounded path-only lookahead is only a source candidate: ordered
-barriers/errors and independent demand/path/producer resource bounds need review
-before any batching is selected.
+map counts. The following bounded Lstat-only scheduling contract selects the
+first discovery class; other Need families retain their own resource decisions.
+
+### Ordered metadata prerequisite discovery
+
+Select bounded serial lookahead in module and command registration rows, through
+their existing DICE keys. After the first incomplete row, collect only whole
+path-only Needs containing Lstat operations. An exhaustive Bzlmod classifier
+requires the path channel and excludes all ten other channels; it neither
+extracts a path subset from a mixed Need nor grants source authority. Other path
+operations, mixed/non-path Needs, semantic/outer errors and oversized groups are
+whole barriers. Selected-pattern/root-mapping prerequisites remain immediate.
+
+At most 32 inspected row slots, including the first hole and later Complete
+rows, may contribute. Bound the pending frontier to 32 unique full demands,
+4096 path bytes per demand and a checked 64 KiB frontier/control construction
+peak. The forecast includes actual retained PathBuf spare capacity, both input
+arrays, duplicate path owners, union Vec/result Arc overlap and Source Need/map
+controls. Check it before merging or cloning a large frontier. An ineligible or
+oversized first Need is returned unmodified before any lookahead. A later
+barrier or window stop returns only already pending earlier paths, without a
+new limit error or truncating a row's Need.
+
+Partial labels, seen sets, ambiguities, routes, packages and observations remain
+ephemeral discovery scratch. Never finish or publish a Complete family result
+while paths are pending; discard the scratch and restart the original ordered
+expansion on retry. Preserve module order, signed command order after toolchain
+reversal, full facts, first decisive semantic error and Need invalidity. Child
+DICE computations retain their existing values and event custody; command event
+publication must use the selected terminal closure rather than all speculative
+activations. Do not change event-capture userdata or cache a print-free result.
+
+This is a Slug-native operational scheduling/admission revision. The 64 KiB
+forecast bounds frontier construction, not all speculative child DICE values,
+recursive-row work or expansion scratch. Extra bounded metadata work can still
+encounter an earlier dynamic bank/timeout refusal than serial discovery. Exact
+old-Slug admission and Bazel restart/error timing are not claimed. All existing
+caps and Core whole-batch authority checks remain; no poisoned reservation is
+caught, cleared or retried. Content, digest, directory, image and Windows-path
+Needs continue serially outside this first lookahead class. No label pruning,
+new native reservation/effect batching or caller-specific policy is selected.
+
+The existing feature-only phase report samples a fixed 40-byte process-wide
+collector: eligible windows, inspected window rows, accepted extensions and
+new unique demands per extension. Saturation, masks and reversed samples make
+deltas unavailable. Samples are neither atomic nor request-isolated; no keys,
+paths or epochs are retained, and no allocation/time or distinct-global-demand
+measurement is claimed. Keep the existing 16 KiB report reservation and 512 KiB
+combined ceiling. Original Rust evidence must show genuine frontier extension
+before accepting this candidate as bootstrap progress.
+
+Pinned Bazel 9.2 RegisteredToolchainsFunction and TargetPatternUtil establish
+all-pattern expansion, ordered signs and reversed command-toolchain precedence.
+The stricter deferred barrier policy is Slug-native. Use actual registration-row
+RED/GREEN, complete-input recovery, ordered barrier/error/event tests and exact
+first/extension boundary controls, then protected lifecycle/native/original
+workloads under unchanged clocks and resources. Root serializes Cargo and native
+execution; independent source and final evidence review apply.
+
+The [lookahead receipt](wp1225-metadata-lookahead-acceptance-2026-11-08.json)
+records actual row RED/GREEN, 66 ordinary tests, protected native/original
+commands and unchanged-input ABBA. Both candidates add 18 demands across frontier
+extensions and perform additional speculative child computations. All runs
+retain 51 roots/103 records and reach WorkDeadline. This closes the bounded
+registration-discovery behavior, without a claim of less total work, deeper progress,
+latency or RSS improvement, or command completion.
 
 ### Current captured Source transport (accepted inactive component)
 

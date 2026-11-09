@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use serde_json::Value;
 use serde_json::json;
+use slug_loading_v2::PathLookaheadProbeSnapshot;
 use slug_loading_v2::observation_union_probe;
 use slug_loading_v2::observation_union_probe::Snapshot as UnionSnapshot;
 
@@ -27,10 +28,12 @@ const MAGIC: u64 = u64::from_le_bytes(*b"SLGOBS01");
 pub(super) struct InstalledProfile {
     guard: ProbeGuard,
     union_before: UnionSnapshot,
+    path_before: PathLookaheadProbeSnapshot,
 }
 impl InstalledProfile {
     pub(super) fn attach(runtime: &mut WorkspaceRuntime) -> io::Result<Self> {
         let union_before = observation_union_probe::snapshot();
+        let path_before = slug_loading_v2::path_lookahead_probe_snapshot();
         let raw = unsafe {
             libc::memfd_create(
                 c"slug-rust-phase-profile".as_ptr(),
@@ -57,6 +60,7 @@ impl InstalledProfile {
         Ok(Self {
             guard,
             union_before,
+            path_before,
         })
     }
     /// Called only after the outcome and runtime have dropped and native owners
@@ -70,6 +74,10 @@ impl InstalledProfile {
         profile["dice_family_counts"] = family_counts(counts);
         profile["observation_union_helpers"] =
             union_counts(self.union_before, observation_union_probe::snapshot());
+        profile["metadata_path_lookahead"] = lookahead_counts(
+            self.path_before,
+            slug_loading_v2::path_lookahead_probe_snapshot(),
+        );
         profile
     }
 }
@@ -115,6 +123,45 @@ fn union_counts(before: UnionSnapshot, after: UnionSnapshot) -> Value {
         "per_cell_before_after":true,"reset_performed":false,
         "arithmetic_deltas_are_not_request_totals":true,
         "measures_allocation_count":false,"measures_time":false,
+        "retains_keys_paths_or_epochs":false,
+    })
+}
+
+fn lookahead_counts(
+    before: PathLookaheadProbeSnapshot,
+    after: PathLookaheadProbeSnapshot,
+) -> Value {
+    let mut saturated = 0u64;
+    let mut reversed = 0u64;
+    let overflow = before.overflow_mask | after.overflow_mask;
+    let delta: [Option<u64>; 4] = std::array::from_fn(|index| {
+        let bit = 1 << index;
+        if before.counts[index] == u64::MAX || after.counts[index] == u64::MAX {
+            saturated |= bit;
+        }
+        let difference = after.counts[index].checked_sub(before.counts[index]);
+        if difference.is_none() {
+            reversed |= bit;
+        }
+        if (overflow | saturated) & bit == 0 {
+            difference
+        } else {
+            None
+        }
+    });
+    json!({
+        "metric_columns":["eligible_windows_started","window_rows_inspected",
+            "path_extensions_accepted","new_unique_demands_added"],
+        "before_counts":before.counts,"after_counts":after.counts,"checked_delta":delta,
+        "before_overflow_mask":before.overflow_mask,"after_overflow_mask":after.overflow_mask,
+        "preexisting_overflow":before.overflow_mask!=0,"saturated_mask":saturated,
+        "reversed_mask":reversed,"unknown_overflow_bits":overflow&!0xf,
+        "all_counter_deltas_arithmetically_exact":overflow==0&&saturated==0&&reversed==0,
+        "process_wide":true,"request_isolated":false,"atomic_snapshot":false,
+        "reset_performed":false,"window_rows_include_complete_and_barrier_rows":true,
+        "accepted_extensions_include_duplicate_only":true,
+        "new_unique_demands_are_per_frontier_extension":true,
+        "measures_time_allocation_or_distinct_global_demands":false,
         "retains_keys_paths_or_epochs":false,
     })
 }
@@ -343,6 +390,16 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
             overflow_masks: [0; 3],
         },
     );
+    profile["metadata_path_lookahead"] = lookahead_counts(
+        PathLookaheadProbeSnapshot {
+            counts: [10_000_000_000_000_000_000; 4],
+            overflow_mask: 0,
+        },
+        PathLookaheadProbeSnapshot {
+            counts: [u64::MAX - 1; 4],
+            overflow_mask: 0,
+        },
+    );
     let timing = ProgressTiming {
         buckets: [Bucket {
             count: u64::MAX,
@@ -368,6 +425,16 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
         UnionSnapshot {
             counts: [[u64::MAX; 10]; 3],
             overflow_masks: [u64::MAX; 3],
+        },
+    );
+    masked_profile["metadata_path_lookahead"] = lookahead_counts(
+        PathLookaheadProbeSnapshot {
+            counts: [u64::MAX; 4],
+            overflow_mask: u64::MAX,
+        },
+        PathLookaheadProbeSnapshot {
+            counts: [u64::MAX; 4],
+            overflow_mask: u64::MAX,
         },
     );
     let masked = json!({"phase_profile":masked_profile,"progress_wall":timing.summary()});
@@ -440,4 +507,41 @@ fn union_helper_deltas_qualify_max_overflow_and_reversal_without_raw_inputs() {
     ] {
         assert!(!report.to_string().contains(payload));
     }
+}
+
+#[test]
+fn metadata_path_probe_deltas_preserve_overflow_and_process_scope_qualifications() {
+    let report = lookahead_counts(
+        PathLookaheadProbeSnapshot {
+            counts: [10, 12, u64::MAX, 1],
+            overflow_mask: 8,
+        },
+        PathLookaheadProbeSnapshot {
+            counts: [15, 11, u64::MAX, 2],
+            overflow_mask: 0,
+        },
+    );
+    assert_eq!(report["checked_delta"], json!([5, null, null, null]));
+    assert_eq!(report["saturated_mask"], 4);
+    assert_eq!(report["reversed_mask"], 2);
+    assert_eq!(report["preexisting_overflow"], true);
+    assert_eq!(report["all_counter_deltas_arithmetically_exact"], false);
+    assert_eq!(report["process_wide"], true);
+    assert_eq!(report["request_isolated"], false);
+    assert_eq!(report["atomic_snapshot"], false);
+    let clean = lookahead_counts(
+        PathLookaheadProbeSnapshot {
+            counts: [0; 4],
+            overflow_mask: 0,
+        },
+        PathLookaheadProbeSnapshot {
+            counts: [1; 4],
+            overflow_mask: 0,
+        },
+    );
+    assert_eq!(
+        clean["checked_delta"],
+        serde_json::to_value([1u64; 4]).unwrap()
+    );
+    assert_eq!(clean["all_counter_deltas_arithmetically_exact"], true);
 }

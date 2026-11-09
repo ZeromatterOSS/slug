@@ -87,9 +87,14 @@ retain variable prefixes and the unchanged work deadline. The
 [validated observation union](./slug-v2-subplans/wp1225-observation-union-acceptance-2026-11-08.json)
 now reuses no-op maps and full left key/result owners with original RED/GREEN
 and native proof. Bounded candidates reuse612 measured maps, but retain the same
-recorded epoch and work deadline. Prerequisite serialization is the next
-candidate to discriminate; Rust archive extraction, completion, command latency
-and RSS acceptance remain unproved.
+recorded epoch and work deadline. [Ordered metadata lookahead](./slug-v2-subplans/wp1225-metadata-lookahead-acceptance-2026-11-08.json)
+now batches whole bounded Lstat Needs with ordered barriers and complete retry
+proof. Both stopped original candidates add 18 demands across frontier
+extensions, with additional speculative child work; all runs retain the same
+last recorded epoch and deadline. This Slug-native scheduling/admission policy
+establishes neither reduction in total work nor deeper progress. Further
+prerequisite attribution, Rust archive extraction, completion, command latency
+and RSS acceptance remain open.
 
 Authentic Rust analysis, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

@@ -384,6 +384,12 @@ pub use registration_expansion::ModuleRegistrationFamily;
 pub use registration_expansion::ObservedCommandRegistrationExpansion;
 #[doc(hidden)]
 pub use registration_expansion::ObservedModuleRegistrationExpansion;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use registration_expansion::PathLookaheadProbeSnapshot;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use registration_expansion::path_lookahead_probe_snapshot;
 #[doc(hidden)]
 pub use root_repository_load_route::HostRootRepositoryLoadRoute;
 #[doc(hidden)]
