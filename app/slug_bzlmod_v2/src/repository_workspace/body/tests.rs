@@ -174,23 +174,54 @@ fn builder_rejects_bad_framing_and_admission_before_retained_block_allocation() 
     ));
 }
 #[test]
-fn codec_is_pinned_level_one_and_rejects_truncation_trailing_corruption_or_wrong_length() {
-    for bytes in [vec![3; 1], vec![3; CHUNK], noise(CHUNK), noise(CHUNK - 1)] {
-        let encoded = codec::encode(&bytes).unwrap();
-        assert_eq!(encoded, miniz_oxide::deflate::compress_to_vec(&bytes, 1));
-        let mut output = vec![0; bytes.len()];
-        codec::decode(&encoded, &mut output).unwrap();
-        assert_eq!(output, bytes);
-        assert!(codec::decode(&encoded[..encoded.len() - 1], &mut output).is_err());
-        let mut trailing = encoded.clone();
-        trailing.push(0);
-        assert!(codec::decode(&trailing, &mut output).is_err());
-        let mut wrong = vec![0; bytes.len() + 1];
-        assert!(codec::decode(&encoded, &mut wrong).is_err());
-        let mut corrupt = encoded;
-        corrupt[0] = 0x07;
-        assert!(codec::decode(&corrupt, &mut output).is_err());
+fn codec_checks_lz4_grammar_full_bytes_and_bounded_lengths() {
+    for length in [0, 1, 12, 13, CHUNK - 2, CHUNK - 1, CHUNK] {
+        for bytes in [vec![3; length], noise(length)] {
+            let encoded = codec::encode(&bytes).unwrap();
+            assert!(encoded.len() <= 72_109);
+            let mut output = vec![0; bytes.len()];
+            codec::decode(&encoded, &mut output).unwrap();
+            assert_eq!(output, bytes);
+            // A truncated/extended stream can sometimes be a legal equivalent
+            // encoding. Every successful decode must still match ALL bytes.
+            let mut trailing = encoded.clone();
+            trailing.push(0);
+            for candidate in [&encoded[..encoded.len() - 1], trailing.as_slice()] {
+                if codec::decode(candidate, &mut output).is_ok() {
+                    assert_eq!(output, bytes);
+                }
+            }
+            let mut wrong = vec![0; bytes.len() + 1];
+            assert!(codec::decode(&encoded, &mut wrong).is_err());
+        }
     }
+    // Literal token and equivalent ignored final low nibble, independent of
+    // the encoder. Legal byte-different streams do not define content identity.
+    for encoded in [&[0x10, b'a'][..], &[0x11, b'a'][..]] {
+        let mut output = [0];
+        codec::decode(encoded, &mut output).unwrap();
+        assert_eq!(output, *b"a");
+    }
+    let mut changed = [0];
+    codec::decode(&[0x10, b'b'], &mut changed).unwrap();
+    assert_ne!(changed, *b"a");
+    assert!(codec::decode(&[0x20, b'a'], &mut [0; 2]).is_err()); // truncated literal
+    assert!(codec::decode(&[0xf0, 0xff], &mut [0]).is_err()); // missing extended length
+    assert!(codec::decode(&[0x10, b'a', 0, 0, 0], &mut [0; 5]).is_err()); // zero offset
+    assert!(codec::decode(&[0x00, 1, 0, 0], &mut [0; 4]).is_err()); // before output
+    assert!(codec::decode(&[0x20, b'a', b'b'], &mut [0]).is_err()); // output short
+    assert!(matches!(
+        codec::encode(&vec![0; CHUNK + 1]),
+        Err(Error::Length)
+    ));
+    assert!(matches!(
+        codec::decode(&vec![0; 72_110], &mut []),
+        Err(Error::Length)
+    ));
+    assert!(matches!(
+        codec::decode(&[0], &mut vec![0; CHUNK + 1]),
+        Err(Error::Length)
+    ));
 }
 #[test]
 fn cached_routing_collisions_keep_full_equality_and_physical_storage_positive() {
@@ -230,15 +261,10 @@ fn cached_routing_collisions_keep_full_equality_and_physical_storage_positive() 
     );
 }
 #[test]
-fn codec_workspace_bounds_include_all_five_heap_boxes_and_decode_overlap() {
-    // Pinned0.8.9 core::{HuffmanOxide,ParamsOxide,DictOxide} and buffer::{LocalBuf,HashBuffers}:
-    // Huffman3x288x(2+2+1), local floor(65536*13/10), dictionary32768+258,
-    // and TWO 32768-entry u16 chains. Constructor/transfer allowance duplicates
-    // their complete payloads and inline compressor, rather than sizeof alone.
-    assert_eq!(
-        3 * 288 * (2 + 2 + 1) + (CHUNK * 13 / 10) + (32768 + 258) + 2 * 32768 * 2,
-        253_614
-    );
+fn codec_workspace_bounds_preserve_admission_and_cover_lz4_tables() {
+    // Pinned0.14.0 compress.rs chooses a 4096-entry u16 table for <65535
+    // bytes and a 4096-entry u32 table otherwise; both fit the old allowance.
+    assert_eq!(lz4_flex::block::get_maximum_output_size(CHUNK), 72_109);
     assert!(
         codec::scratch_components() <= RepositoryWorkspaceBodyBuilder::encoding_scratch_bytes()
     );
@@ -246,10 +272,10 @@ fn codec_workspace_bounds_include_all_five_heap_boxes_and_decode_overlap() {
         RepositoryWorkspaceBodyBuilder::encoding_scratch_bytes(),
         2 * 1024 * 1024
     );
-    assert!(
-        RepositoryWorkspaceBody::decode_scratch_bytes()
-            >= 4 * CHUNK + 2 * size_of::<miniz_oxide::inflate::core::DecompressorOxide>() + 8192
-    );
+    assert_eq!(RepositoryWorkspaceBody::decode_scratch_bytes(), 291_344);
+    // Four nested logical block buffers plus conservative scalar/slice decoder
+    // controls still fit; no dictionary, decoder allocation or decoded cache.
+    assert!(4 * CHUNK + 8192 <= RepositoryWorkspaceBody::decode_scratch_bytes());
 }
 
 #[test]
@@ -265,7 +291,7 @@ fn independent_valid_block_storage_flags_do_not_enter_content_equality_or_hash()
     // block, not a public encoded factory or a corruption fallback.
     data.blocks[0] = Block {
         bytes: Arc::from(bytes.as_slice()),
-        deflated: false,
+        compressed: false,
     };
     data.routing = compressed.routing_hash();
     data.control = arc_layout(Layout::new::<PackedData>()).unwrap()
@@ -285,26 +311,36 @@ fn native_like_stack_caller_exercises_body_content() {
     // FD callback. This is a fixed-stack content regression, not native custody.
     let mut read_buffer = [0xa5u8; CHUNK];
     std::hint::black_box(&mut read_buffer);
-    for bytes in [vec![0x6a; 2 * CHUNK + 17], noise(2 * CHUNK + 17)] {
-        let first = packed(&bytes); // encode, roundtrip validation and finish
-        let second = packed(&bytes);
-        let raw = RepositoryWorkspaceBody::from_arc(Arc::from(bytes.as_slice()));
-        assert!(!first.ptr_eq(&second));
-        assert_eq!(first, second);
-        assert_eq!(raw, first);
-        assert_eq!(first, raw);
-        let mut hash = StarlarkHasher::new();
-        first.hash(&mut hash);
-        assert_eq!(hash.finish_small(), raw.routing_hash());
-        assert!(first.range_eq(CHUNK - 7, &bytes[CHUNK - 7..2 * CHUNK + 6]));
-        let mut output = vec![0u8; CHUNK + 13];
-        assert!(first.copy_into(CHUNK - 7, &mut output));
-        assert_eq!(output, bytes[CHUNK - 7..2 * CHUNK + 6]);
-        let mut changed = bytes.clone();
-        changed[CHUNK + 1] ^= 1;
-        assert_ne!(first, packed(&changed));
-        assert!(!first.range_eq(0, &changed));
-        std::hint::black_box(&read_buffer);
+    // Exercise both fresh table regimes (<65535 and >=65535), full blocks
+    // and nested multi-block operations with the caller buffer live throughout.
+    for length in [CHUNK - 2, CHUNK - 1, CHUNK, 2 * CHUNK + 17] {
+        for bytes in [vec![0x6a; length], noise(length)] {
+            let first = packed(&bytes); // encode, roundtrip validation and finish
+            let second = packed(&bytes);
+            let raw = RepositoryWorkspaceBody::from_arc(Arc::from(bytes.as_slice()));
+            assert!(!first.ptr_eq(&second));
+            assert_eq!(first, second);
+            assert_eq!(raw, first);
+            assert_eq!(first, raw);
+            let mut hash = StarlarkHasher::new();
+            first.hash(&mut hash);
+            assert_eq!(hash.finish_small(), raw.routing_hash());
+            let start = if length > CHUNK {
+                CHUNK - 7
+            } else {
+                length / 2
+            };
+            let end = (start + CHUNK + 13).min(length);
+            assert!(first.range_eq(start, &bytes[start..end]));
+            let mut output = vec![0u8; end - start];
+            assert!(first.copy_into(start, &mut output));
+            assert_eq!(output, bytes[start..end]);
+            let mut changed = bytes.clone();
+            changed[length / 2] ^= 1;
+            assert_ne!(first, packed(&changed));
+            assert!(!first.range_eq(0, &changed));
+            std::hint::black_box(&read_buffer);
+        }
     }
     assert_eq!(
         read_buffer

@@ -359,7 +359,7 @@ fn native_packed_metadata_helpers_keep_full_foreign_equality_and_ignore_poisoned
         assert!(actual.raw_arc().is_none());
         assert!(
             actual.native_storage_bytes() < PAYLOAD.len(),
-            "the metadata helpers must exercise actual Deflate decoding"
+            "the metadata helpers must exercise actual compressed-block decoding"
         );
 
         // Independently construct pure comparison inputs only after paying for

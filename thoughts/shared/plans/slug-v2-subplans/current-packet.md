@@ -3,22 +3,22 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [compact immutable workspace bodies](wp1225-general-repository-workspace-design.md#compact-immutable-workspace-bodies)
-now pass the generic six-archive/File/Read/seal/last-reader gate under the fixed
-bank and27+3 clock; the [bounded component receipt](wp1225-compact-body-acceptance-2026-11-09.json)
-records independent final ACCEPT for this capacity prerequisite. The chain
-retains631,202,064 logical archive body bytes
-with277,843,042 peak native credit. Its one qualified pass leaves339ms observed
-work headroom. Closed-realization reuse preserves native allocations and full
-transcript equality while avoiding repeated canonical SHA derivation. Warm
-originals,15 protected guards, two native alias/history cases and two genuine
-fresh-backend REAPI transport/restoration checks pass; broader dependent sweeps
-remain explicitly baseline-qualified.
-Compaction adds codec CPU work: the exact original still stops at rustfmt3 with
-WorkDeadline and exact cleanup, earlier than main695's std5 allocation refusal.
-Next diagnose codec/capture CPU work toward the complete original command under
-unchanged limits. Single stopped prefixes and native credit establish no
-completed-command latency or RSS result; original-command advance is unproved.
+Current delta: the [private fast body codec](wp1225-general-repository-workspace-design.md#private-fast-body-codec-trial)
+passes the generic six-archive/File/Read/seal/last-reader gate under the fixed bank
+and27+3 clock. The [bounded component receipt](wp1225-fast-body-codec-acceptance-2026-11-10.json)
+records631,202,064 retained logical archive body bytes,335,539,406 peak native
+credit and sealing at12,405ms. This one qualified pass leaves14,595ms observed
+work headroom; it establishes no repeatability, causal completed latency or RSS.
+Full histories, identities, native allocation/release and fresh-byte checks stay
+unchanged. All854 Bzlmod and60 focused Core checks,18 protected native cases
+including four warm commands, and two genuine fresh-backend REAPI checks pass.
+Loading remains1190/1196 with the same six independently verified baseline failures.
+The exact original advances from be6's rustfmt3 stop through LLVM4 into std5
+decoding:840 computes,55roots/114records. It remains unfinished with sticky
+WorkDeadline and an unclassified Materialization mutation; the precise inner
+cause is unproved. Cleanup is168 baseline bytes, zero native FDs and zero backing.
+Next attribute remaining root-compute/workspace work toward the complete original
+under unchanged limits. Reachability counters alone select no new reuse.
 Production remains Disabled; full Rust/action/REAPI/Slug and memory gates remain.
 
 Accepted [immutable root-route operational hash reuse](wp1225-general-repository-workspace-design.md#immutable-root-route-operational-hash-reuse)

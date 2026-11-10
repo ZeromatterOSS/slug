@@ -1,0 +1,305 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "be6b6ee2fd08d0b42f3ac5f8b3225aea6fed3644",
+  "classification": "Slug-native private immutable storage; logical identity and exact content/integrity contracts unchanged",
+  "outcome": "Private independent-block LZ4 replaces Raw Deflate to advance generic repository acquisition within the existing clock and native bank. Actual six-archive closure passes; original advances to partial std archive but is unfinished.",
+  "implementation": {
+    "crate": "lz4_flex",
+    "version": "=0.14.0",
+    "features": [
+      "safe-encode",
+      "safe-decode",
+      "checked-decode"
+    ],
+    "default_features": false,
+    "absent_features": [
+      "alloc",
+      "std",
+      "frame"
+    ],
+    "license": "MIT",
+    "crate_checksum": "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226",
+    "source_tag": "https://github.com/PSeitz/lz4_flex/tree/0.14.0",
+    "source_audit": {
+      "path": "/tmp/slug-wp425-validation/fast-block-codec-source-audit.json",
+      "sha256": "981f250af68ac6c04c335b4f614c469608d7a8db6a03aba3bbd413ac79d1c4a6"
+    },
+    "codec_api": "compress_into/decompress_into, no frames/prepended lengths/dictionaries/decoder fork",
+    "input_bound": 72109,
+    "decoded_block_bound": 65536,
+    "consumption": "LZ4 safe API returns written length only. Pinned audited safe decoder succeeds only on input exhaustion; exact returned output and full original-byte validation close blocks before publication. No invented consumed-input count.",
+    "storage": "raw-if-not-smaller; private whole-owner Arcs with no inter-owner block sharing or decoded cache; private bool renamed compressed, field types retained"
+  },
+  "invariants": [
+    "Full logical Eq across Raw/Packed and independent values, ordinary full Hash writer, cached routing with full collision equality and canonical SHA/StableKey bytes unchanged",
+    "Builder strict full/final-short framing and prepublication full-byte comparison preserved",
+    "Native actual selected Arc/control/overlap charging, origin validation, fresh FD/name/frame/EOF/mode/cancellation and full histories/release ordering preserved",
+    "No public encoded factory, serialization/import format, mutable native authority in DICE, semantic adapter, new cache or production activation"
+  ],
+  "limits": {
+    "native_bank": 536870912,
+    "fd": 512,
+    "backing": 8589934592,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack": 262144,
+    "encoding_scratch": 2097152,
+    "decode_scratch": 291344
+  },
+  "decode_credit_provenance": {
+    "path": "/tmp/slug-wp425-validation/compact-body-prior-decode-layout.json",
+    "sha256": "a4286bfb116f7d9a619b6c77386c23f996a83f4a034bd18e0b439ed3bd4558bc"
+  },
+  "validation": {
+    "bzlmod": {
+      "selected": 854,
+      "passed": 854,
+      "elapsed_seconds": 1.0746470049780328,
+      "includes": "LZ4 grammar/bounds/equivalent encodings; actual256KiB thread/live64KiB caller across65534/65535/65536/multiblock repeated/noise; full Eq/Hash/routing/canonical SHA/retention controls"
+    },
+    "core": {
+      "selected": 60,
+      "passed": 60,
+      "elapsed_seconds": 0.6026716499764007
+    },
+    "native_protected": {
+      "selected": 18,
+      "passed": 18,
+      "elapsed_seconds": 15.834085702023003,
+      "includes": "15 prior guards plus warm four-command case and2 closed-realization alias/history cases; incompressible pressure/refusal/refund, old/new overlap, last-reader/history, foreign metadata/poisoned Scope, freshness and original warm process behavior"
+    },
+    "six_archive_closure": {
+      "passed": true,
+      "elapsed_seconds": 12.582837169989944,
+      "seal_work_elapsed_ms": 12405,
+      "remaining_observed_work_ms": 14595,
+      "peak_native_credit_bytes": 335539406,
+      "decoded_tar_bytes": 820514816,
+      "retained_unique_logical_archive_body_bytes": 631202064,
+      "realization_ms": 559,
+      "seal_ms": 628,
+      "qualification": "One qualified generic six-pinned-effect Archive/File/Read/seal/last-reader pass. Explicit pinned effects do not reconstruct original omitted-checksum Starlark. Native credit is not RSS; no repeatability or causal completed-latency claim."
+    },
+    "loading": {
+      "selected": 1196,
+      "passed": 1190,
+      "matching_failed_names": [
+        "bzl_module::bzl_source_memory_tests::host_load_keys_preserve_raw_alias_order_and_retained_exports",
+        "bzl_module::host_package_load_tests::repository_package_rejects_provider_or_aspect_dependency_before_recording",
+        "bzl_module::module_extension_definition_loading_tests::selected_external_dispatch_uses_each_resolved_child_route",
+        "bzl_visibility::tests::every_live_composition_site_calls_the_shared_checker",
+        "package::module_extension_definition_tests::exec_group_declarations_retain_constraints_and_named_transitions",
+        "provider::tests::config_feature_flag_info_rejects_invalid_constructor_arguments"
+      ],
+      "inherited_qualification": {
+        "file": "/tmp/slug-wp425-validation/compact-body-rebind-baseline-qualification.json",
+        "sha256": "725ba18a85168e1ed08ac2ba55ce3e7b9bd78a3f39c4794acd892064165fef61"
+      },
+      "qualification": "Same six failures as accepted be6 component, independently reproduced against actual main695 with matching opt3/debug/overflow profile in inherited receipt. No selector or assertion omitted. Candidate private codec introduces no new failed name in this sweep."
+    },
+    "reapi": {
+      "fast-body-reapi-execute.json": {
+        "selector": "action_chain::original_repository_tests::nativelink_original_repository_execute_physical_sources_cache_and_runfiles_survive_shutdown",
+        "exit_code": 0,
+        "elapsed_seconds": 3.7288063209853135,
+        "backend_fresh_per_selector": true,
+        "all_artifacts_unchanged": true,
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "cli_sha256": "fdd0d3a921f4f878dfa3277a84db3f7a93fe9e1dd72510b570bda38462ba9b0e",
+        "executable_sha256": "3225b371de2f5daf8c39b5ffe094e41e8527cd60395d456336ce4280d3aea29e"
+      },
+      "fast-body-reapi-corruption.json": {
+        "selector": "action_chain::original_repository_tests::nativelink_original_repository_corrupt_cas_refuses_publication_and_restores",
+        "exit_code": 0,
+        "elapsed_seconds": 2.5327371900202706,
+        "backend_fresh_per_selector": true,
+        "all_artifacts_unchanged": true,
+        "backend_sha256": "8e55c324b45920a0732c08527b4ca9e31ddcf34969d990e75ea4dcaac1a443a2",
+        "cli_sha256": "fdd0d3a921f4f878dfa3277a84db3f7a93fe9e1dd72510b570bda38462ba9b0e",
+        "executable_sha256": "3225b371de2f5daf8c39b5ffe094e41e8527cd60395d456336ce4280d3aea29e"
+      }
+    },
+    "execution_postcheck": {
+      "path": "/tmp/slug-wp425-validation/fast-body-execution-postcheck.json",
+      "sha256": "d73d3571b0cf5cfb390fa739d68c9a34912300633068f9f21ab1ded58122223d"
+    },
+    "static_checks": {
+      "path": "/tmp/slug-wp425-validation/fast-body-static-checks-1.json",
+      "sha256": "bf6e7136e505a4a633273c6b0f1e0128a6f7cc97ce843f9f97a6e6843f113771"
+    }
+  },
+  "original": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/fast-body-original-1.json",
+      "sha256": "ba7713057e055f6b076ae6abd0a80ebf72be294fa9185fb9457982140d4bd2af"
+    },
+    "supervisor_exit_code": 0,
+    "elapsed_seconds": 27.119069138978375,
+    "functional_result": {
+      "error": {
+        "detail": {
+          "kind": "mutation",
+          "reason": "unclassified",
+          "stage": "Materialization"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 840,
+    "roots": 55,
+    "records": 114,
+    "last_accepted": "LLVM archive index4; rustfmt index3 also completes",
+    "pending": "std archive index5,43089112 partial decoded bytes observed in refused progress",
+    "sticky_scope_error": "WorkDeadline",
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "peak_native_credit_bytes": 342612884,
+    "qualification": "Full original is unfinished. Outer Materialization mutation remains unclassified; sticky WorkDeadline does not establish the precise inner mutation cause. This stopped prefix advances beyond be6 rustfmt3 but proves no completed-command latency/RSS or full-command fit."
+  },
+  "offline_corpus": {
+    "assessment": {
+      "path": "/tmp/slug-wp425-validation/fast-block-codec-census-assessment.json",
+      "sha256": "7a532163df1ff5ad50342d6411661b29f023a97347a0f1727cb7dfe41bb26987"
+    },
+    "cpu_ns": {
+      "miniz": {
+        "setup_plus_encode": 3075040441,
+        "validation_setup": 7090805,
+        "validation_decode": 1682903238,
+        "full_compare": 9054360,
+        "extra_selected_decode": {
+          "ns": 1524129797,
+          "logical_bytes": 817479661,
+          "blocks": 12583
+        }
+      },
+      "lz4": {
+        "setup_plus_encode": 978457540,
+        "validation_setup": 6248557,
+        "validation_decode": 244519376,
+        "full_compare": 7578340,
+        "extra_selected_decode": {
+          "ns": 192156449,
+          "logical_bytes": 809680877,
+          "blocks": 12464
+        }
+      }
+    },
+    "payload_bytes": {
+      "miniz": {
+        "all_occurrences": 332690155,
+        "candidate_unique": 257270816,
+        "candidate_unique_full_body_model": 257704200
+      },
+      "lz4": {
+        "all_occurrences": 403860109,
+        "candidate_unique": 310813298,
+        "candidate_unique_full_body_model": 311246584
+      }
+    },
+    "qualification": "All occurrence storage requires no dedup assumption. Unique/history/incoming models use length/SHA candidates, never native equality or a permission to omit FD verification. Body allocation model includes aligned block Arcs, Block table and Packed owner; excludes ledger/history/descriptor metadata, allocator overhead, encoder/XZ workspace and current old/new construction overlap beyond the stated candidates. Clones share whole allocations; no inter-body block sharing. CPU includes synchronous clock/setup/codec-call overhead and excludes teardown/modeling. Miniz output/compressor setup is separate; LZ4 internal table setup stays in encode. The extra historical reference runs outside all timed lanes after both codecs and affects overall elapsed/cache context. CPU is not native FD/SHA/copy/command latency or RSS. Selected compressed decode is an additional warm decode, never sum with construction as disjoint native time.",
+    "historical_reference": "Exact old size pins reproduced outside measured lanes.35 selected lengths differ:47 production-larger bytes,30 reference-larger bytes, no store-choice changes. Net17B is not a proved precise internal cause."
+  },
+  "reviews": {
+    "design": "ACCEPT",
+    "source": "ACCEPT",
+    "final": "ACCEPT",
+    "final_scope": "Independent final review accepted the staged component, verified receipt pins and preserved explicit Loading qualification and full-original/RSS/activation residuals."
+  },
+  "preserved_executables": {
+    "bzlmod": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/fast-body-bzlmod-1-slug_bzlmod_v2-7e81c0ff82485c6e",
+      "sha256": "7e81c0ff82485c6ed1895aece0eeffeef293b381c4dc9f535af65e6b57c9d594"
+    },
+    "core": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/fast-body-core-1-slug_core_v2-803c2c8bbd6c66fd",
+      "sha256": "803c2c8bbd6c66fda0903a3c3220f2b599863c2ab9f4d8da7827ebb3a289cac4"
+    },
+    "cli": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/fast-body-cli-1-slug-fdd0d3a921f4f878",
+      "sha256": "fdd0d3a921f4f878dfa3277a84db3f7a93fe9e1dd72510b570bda38462ba9b0e"
+    },
+    "loading": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/fast-body-loading-1-slug_loading_v2-9bc509534b96dfb7",
+      "sha256": "9bc509534b96dfb7bba9a8294bf443e75031ba6feb7b6babf8328f603b8dd5b4"
+    },
+    "reapi": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/fast-body-reapi-1-slug_reapi_v2-3225b371de2f5daf",
+      "sha256": "3225b371de2f5daf8c39b5ffe094e41e8527cd60395d456336ce4280d3aea29e"
+    }
+  },
+  "source_freeze": {
+    "path": "/tmp/slug-wp425-validation/fast-body-source-1-freeze.json",
+    "sha256": "a5221c05eae0fa9bd5095af0e761218222029811d3cec37f94f9eea74c886cc8"
+  },
+  "raw_evidence": [
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-bzlmod-full.json",
+      "sha256": "11f026d1f5da6fe7cc5b8fcf48669d11c7833472608ce402746be4fa5ee8bb30"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-core-focused.json",
+      "sha256": "88119242a2a122a1348c02223e78da8db1370d50fecde3896374996d3ae2f16a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-native-protected.json",
+      "sha256": "1d4fb2ce78d64a0fa395dd993c9f795b1d2f138ab115a0ba37004408a15f45c0"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-native-six.json",
+      "sha256": "aa1c8604bbc8364e184e3a20ef0c31ecc4935671dd6a7ffb8c08edd51fb8764c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-native-six-2.json",
+      "sha256": "d207cdfd18eea1945b66d8ed2ede3d40f7e50ada7e5f69531ec67f714da651cb"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-loading-full.json",
+      "sha256": "303fbda6d49aad9714ff8fd18c0eef0e7a1baea93bdd022359c031e065b35d5d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-loading-qualification.json",
+      "sha256": "281b8e270cfeef79c5b26f8a48b61f15d642a0298a66dcb4abef9e48d62164ab"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-reapi-execute.json",
+      "sha256": "f883ba1703e063e4c87ead157b73c4bec74529f7e179869c9b0f7046dfc75cf8"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-reapi-corruption.json",
+      "sha256": "6de2d95d62f4b82e4280a0862768fbefd3fd4774b5d660d248c2e4cfc84e262d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-panic-1.json",
+      "sha256": "2567c4ed537aaa0a590c3fc78caf6a1af9a705eccb261697a722cd87633554dc"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-body-native-freeze-1.json",
+      "sha256": "a0eb419aa246ee3044e247773bcf05115bd2ef5effc634c53020908e7c30d2ad"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-block-codecs-six-corpus-1.json",
+      "sha256": "e6c75eef044fcc9d07af5d6a0fda664319779ffdaf8846cc5a0793f3bd54513e"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/fast-block-codecs-v2-six-corpus-2.json",
+      "sha256": "61fd7e106c27d093dc7a7541789694ddd3c5894f6afa090b636d9a1d976a403e"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/workspace-cpu-probe-validation.json",
+      "sha256": "32e53278efc0c03a6557256102412c25cfe3a0dc738688dc217c86a71651b1da"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/workspace-cpu-probe-retirement.json",
+      "sha256": "ce3d10a74f6c9f8b198dca1ead31ca622282eed7b4a19cfd5910bdd9edacbf71"
+    }
+  ],
+  "correction": "First six invocation omitted required SLUG_NATIVE_RUST_INPUTS and failed before work. Corrected invocation used the pinned inventory; source/limits unchanged, failed receipt preserved. First offline reference size mismatch also preserved and resolved with an independently validated untimed historical lane, without changing old pins.",
+  "remaining": "Full original Rust/action/REAPI/Slug bootstrap closure, completed-command RSS<=1.25xBazel and production activation remain open. Next attribute remaining root-compute/workspace time under the same full-history/fresh-byte limits; no new reuse selected by counters alone."
+}

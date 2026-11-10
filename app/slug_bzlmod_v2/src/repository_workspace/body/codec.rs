@@ -1,17 +1,11 @@
-use miniz_oxide::deflate::core::CompressorOxide;
-use miniz_oxide::deflate::core::TDEFLFlush;
-use miniz_oxide::deflate::core::TDEFLStatus;
-use miniz_oxide::deflate::core::compress;
-use miniz_oxide::deflate::core::create_comp_flags_from_zip_params;
-use miniz_oxide::inflate::TINFLStatus;
-use miniz_oxide::inflate::core::DecompressorOxide;
-use miniz_oxide::inflate::core::decompress;
-use miniz_oxide::inflate::core::inflate_flags;
-
 use super::*;
 
-const OUTPUT_BOUND: usize = 2 * CHUNK + 1024;
+// lz4_flex 0.14.0 block::get_maximum_output_size(65536): 20 + 110*n/100.
+const OUTPUT_BOUND: usize = 72_109;
 pub(super) fn encode(raw: &[u8]) -> Result<Vec<u8>, Error> {
+    if raw.len() > CHUNK {
+        return Err(Error::Length);
+    }
     let mut output = Vec::new();
     output
         .try_reserve_exact(OUTPUT_BOUND)
@@ -20,43 +14,41 @@ pub(super) fn encode(raw: &[u8]) -> Result<Vec<u8>, Error> {
         return Err(Error::Storage);
     }
     output.resize(OUTPUT_BOUND, 0);
-    let mut compressor = CompressorOxide::new(create_comp_flags_from_zip_params(1, 0, 0));
-    let (status, consumed, written) =
-        compress(&mut compressor, raw, &mut output, TDEFLFlush::Finish);
-    if status != TDEFLStatus::Done || consumed != raw.len() {
+    let written = lz4_flex::block::compress_into(raw, &mut output).map_err(|_| Error::Codec)?;
+    if written > output.len() {
         return Err(Error::Codec);
     }
     output.truncate(written);
     Ok(output)
 }
 pub(super) fn decode(encoded: &[u8], out: &mut [u8]) -> Result<(), Error> {
+    if encoded.len() > OUTPUT_BOUND || out.len() > CHUNK {
+        return Err(Error::Length);
+    }
     #[cfg(test)]
     super::record_work(false, out.len());
-    let mut decoder = DecompressorOxide::new();
-    let (status, consumed, written) = decompress(
-        &mut decoder,
-        encoded,
-        out,
-        0,
-        inflate_flags::TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF,
-    );
-    if status != TINFLStatus::Done || consumed != encoded.len() || written != out.len() {
+    // Pinned 0.14.0 block/decompress_safe.rs has one successful loop exit:
+    // input_pos >= input.len(), after checked literal consumption. Its safe
+    // public API returns only bytes written, NOT a consumed-input counter.
+    // Closed publication additionally requires the builder's full-byte check.
+    let written = lz4_flex::block::decompress_into(encoded, out).map_err(|_| Error::Codec)?;
+    if written != out.len() {
         return Err(Error::Codec);
     }
     Ok(())
 }
-/// 2MiB prepays the codec's five boxed payloads (253614 bytes in pinned0.8.9),
-/// overlapping construction copies, bounded output Vec/resize alternatives,
-/// two raw/decode blocks, decompressor and compressor inline controls.
+/// Preserve the admitted 2MiB construction workspace. The pinned safe encoder
+/// has a fresh 4096-entry u16 table below 65535 input bytes, otherwise u32;
+/// no alloc/std/frame features are enabled. Output and validation Vecs are
+/// fallible, bounded and discarded before Body publication. No headroom refund.
 pub(super) fn scratch_bound() -> usize {
     2 * 1024 * 1024
 }
 #[cfg(test)]
 pub(super) fn scratch_components() -> usize {
-    2 * 253_614
-        + 2 * size_of::<CompressorOxide>()
-        + 2 * OUTPUT_BOUND
-        + 4 * CHUNK
-        + 2 * size_of::<DecompressorOxide>()
-        + 4096
+    // Conservatively include both table regimes and construction/transfer
+    // copies, output Vec overlap, validation/raw/selected blocks and controls.
+    // hashtable.rs: 4096 entries; u16 table repr(align(64)), size 8192;
+    // u32 table size 16384. Decoder is scalar/slice-only (no table or heap).
+    2 * (4096 * size_of::<u16>() + 4096 * size_of::<u32>()) + 2 * OUTPUT_BOUND + 4 * CHUNK + 8192
 }

@@ -677,8 +677,10 @@ cache or new semantic identity is introduced.
 
 Design/source/final review accepted; executed bounded component proof is in the
 [compact-body receipt](wp1225-compact-body-acceptance-2026-11-09.json). The WP425 body owner reuses
-existing Arc/Dupe/Allocative, SmallMap hashed lookup and the already locked
-miniz_oxide0.8.9 codec. This is dependency/API reuse, with no copied donor code,
+existing Arc/Dupe/Allocative and SmallMap hashed lookup. Its private codec now
+uses pinned safe `lz4_flex0.14.0` block APIs, superseding the predecessor's miniz
+storage as recorded in the [fast-codec receipt](wp1225-fast-body-codec-acceptance-2026-11-10.json).
+This is dependency/API reuse, with no copied donor code,
 global pool, native authority in DICE or decoded cache. Raw Arc ownership remains
 available; private Packed owners hold validated independent64KiB blocks. Full
 logical Eq, canonical SHA and decoded history limits stay authoritative. The
@@ -692,10 +694,13 @@ codec payload sums and modeled credits establish no whole-command RSS result.
 Closed-realization reuse carries the privately derived canonical identity only
 after full transcript equality, replacing aliases with native canonical owners.
 It adds no cache or digest authority and preserves fresh FD verification; the
-actual six-archive seal/reader gate now passes once under the original limits,
-with339ms observed work headroom. Compaction adds codec CPU work and the original
-command still stops at WorkDeadline earlier than the main695 allocation-refusal
-prefix; original advance, completed-command latency and RSS remain unproved.
+actual six-archive seal/reader gate passes once at12,405ms with335,539,406 peak
+native credit under the original limits. Construction/decode credits and the
+actual256KiB worker stack remain unchanged. The bounded corpus shows lower helper
+CPU and larger storage; actual native closure, protected cases and fresh-backend
+REAPI pass. The original advances through LLVM4 into partial std5 decoding but
+still stops with sticky WorkDeadline and exact cleanup; completed-command
+latency/RSS, full original closure and production activation remain unproved.
 
 ## Goal
 

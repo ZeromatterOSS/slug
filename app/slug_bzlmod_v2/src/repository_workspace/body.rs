@@ -58,7 +58,7 @@ enum Repr {
 #[derive(Allocative)]
 struct Block {
     bytes: Arc<[u8]>,
-    deflated: bool,
+    compressed: bool,
 }
 #[derive(Allocative)]
 struct PackedData {
@@ -143,9 +143,10 @@ impl RepositoryWorkspaceBody {
             Repr::Packed(data) => data.logical,
         }
     }
-    /// Fixed decoded block plus decompressor controls and bounded call temporaries.
+    /// Preserve the admitted decoded-block/control workspace across codec changes.
+    /// The old bound was 4*65536 + 2*10504 + 8192; no headroom is reclaimed.
     pub fn decode_scratch_bytes() -> usize {
-        4 * CHUNK + 2 * size_of::<miniz_oxide::inflate::core::DecompressorOxide>() + 8192
+        291_344
     }
     pub fn is_empty(&self) -> bool {
         self.len() == 0
@@ -232,7 +233,7 @@ impl RepositoryWorkspaceBody {
                 let mut output = [0u8; CHUNK];
                 for (index, block) in data.blocks.iter().enumerate() {
                     let length = (data.logical - index * CHUNK).min(CHUNK);
-                    if block.deflated {
+                    if block.compressed {
                         codec::decode(&block.bytes, &mut output[..length])
                             .expect("closed workspace body invariant");
                         visit(&output[..length])?;
@@ -269,7 +270,7 @@ impl RepositoryWorkspaceBody {
                     let within = position % CHUNK;
                     let block = &data.blocks[block_index];
                     let length = (data.logical - block_index * CHUNK).min(CHUNK);
-                    let bytes = if block.deflated {
+                    let bytes = if block.compressed {
                         codec::decode(&block.bytes, &mut scratch[..length])
                             .expect("closed workspace body invariant");
                         &scratch[..length]
@@ -306,7 +307,7 @@ impl RepositoryWorkspaceBody {
                     let within = position % CHUNK;
                     let block = &data.blocks[index];
                     let length = (data.logical - index * CHUNK).min(CHUNK);
-                    let decoded = if block.deflated {
+                    let decoded = if block.compressed {
                         codec::decode(&block.bytes, &mut scratch[..length])
                             .expect("closed workspace body invariant");
                         &scratch[..length]

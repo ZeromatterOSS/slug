@@ -72,13 +72,13 @@ impl RepositoryWorkspaceBodyBuilder {
         if decoded != raw {
             return Err(B::Body(Error::Codec));
         }
-        let deflated = encoded.len() < raw.len();
-        let selected = if deflated { encoded.as_slice() } else { raw };
+        let compressed = encoded.len() < raw.len();
+        let selected = if compressed { encoded.as_slice() } else { raw };
         admit(arc_bytes(selected.len()).map_err(B::Body)?).map_err(B::Admission)?;
         // Table was prepaid/reserved exactly before any block allocation.
         self.blocks.push(Block {
             bytes: Arc::from(selected),
-            deflated,
+            compressed,
         });
         self.routing.write(raw);
         self.appended += raw.len();

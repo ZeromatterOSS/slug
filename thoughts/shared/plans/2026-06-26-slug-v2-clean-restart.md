@@ -36,13 +36,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 Packet: WP-7-425-m7a-general-repository-process
 
-The selected compact-body implementation now addresses an actual XZ byte-bank
-refusal after LLVM, preserving full logical history and identity under the fixed
-caps. The compact six-archive chain now passes seal/reader closure; its
-[bounded component proof](./slug-v2-subplans/wp1225-compact-body-acceptance-2026-11-09.json)
-has final ACCEPT. Compaction adds codec CPU work, and the full original
-still stops at rustfmt3/WorkDeadline. Next diagnose that work under unchanged
-limits; original completion, completed-command latency/RSS and activation remain open.
+The [private fast body codec](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#private-fast-body-codec-trial)
+now passes six-archive seal/reader closure at12,405ms with335,539,406 peak native
+credit under the unchanged bank and27+3 clock. Its
+[bounded component proof](./slug-v2-subplans/wp1225-fast-body-codec-acceptance-2026-11-10.json)
+preserves full logical history and identity. The exact original advances through
+LLVM4 into std5 decoding, but remains unfinished with sticky WorkDeadline and
+exact cleanup. Next attribute remaining root-compute/workspace work within the
+same limits; counters alone select no new reuse. Original completion,
+completed-command latency/RSS and activation remain open.
 
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.

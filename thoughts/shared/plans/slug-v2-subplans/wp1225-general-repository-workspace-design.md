@@ -1982,14 +1982,15 @@ deduplication. This selects a representation experiment, not native fit or RSS.
 
 Bzlmod owns a closed immutable `RepositoryWorkspaceBody`: Raw transfers an
 existing Arc plus an inline routing word; Packed shares private data owning
-independent64KiB blocks. Reuse locked miniz_oxide0.8.9 Raw Deflate at level1;
-store a raw block when compression is not smaller. No blocks are shared between
+independent64KiB blocks. The private safe block codec below supersedes the
+predecessor's miniz Raw Deflate storage; store a raw block when compression is
+not smaller. No blocks are shared between
 distinct Packed owners. Only whole-body clones share the private allocations.
 No FD, IO, Scope, resource bank, mutable root, global pool or decoded cache enters
 pure DICE. Existing Source digest states and Execute output types stay unchanged.
 
 Packed construction knows the complete logical length. Require exact full blocks
-and one final short block, strict codec Done/input consumption/output length and
+and one final short block, strict complete codec input/output validation and
 full comparison with original bytes before any immutable block publication.
 All count, storage and extent arithmetic is checked; no malformed public factory
 or fallible decode appears in pure Eq/Hash. Independent values compare every
@@ -2012,8 +2013,9 @@ from semantic identity.
 Core's covered snapshot producer encodes directly from verified FD chunks; it
 never allocates a complete raw file first. Prepay builder tables, final controls
 and transfer overlap before construction, plus a conservatively justified2MiB
-encoder/raw/decode workspace. The pinned encoder has five boxed buffers and a
-growing Vec; sizeof alone cannot prove this bound. After encoding/validation,
+encoder/raw/decode workspace, retained across the codec substitution. The safe
+encoder's bounded tables, fixed output/validation buffers and transfer overlap
+must fit together; sizeof alone cannot prove this bound. After encoding/validation,
 admit the selected block's actual Arc Layout before its retained copy. Every XZ,
 capture, metadata and prior-body credit remains concurrent. Failure/cancel/frame/
 EOF refusal drops partial payloads before their credits. The existing uncovered
@@ -2063,20 +2065,13 @@ Direct `realize(consumed)` and `seal(consumed)` keep their unused-record checks.
 Fresh physical verification still reads and compares the complete actual tree.
 Independent design review accepts this reuse; execution must prove unchanged SHA,
 native alias ownership, mismatch refusal and zero additional SHA derivations.
-The completed six-chain retains631,202,064 logical archive body bytes with
-277,843,042 peak native credit, all820,514,816 decoded tar bytes and eight complete
+The predecessor's receipt preserves its qualified six-chain and stopped original
+evidence. The current private-codec proof below retains the same631,202,064
+logical archive body bytes, full820,514,816 decoded tar bytes and eight complete
 records. Final scope, reader, full-refund and unchanged input-frame assertions
 pass. Native credit is not RSS; explicit pinned effects do not reconstruct
-omitted-checksum intent from original Starlark.
-
-The original end-to-end outcome remains unproved. Compaction adds codec CPU work;
-the qualified original stops at838 computes/55roots/112records with Cargo2
-accepted and rustfmt3 pending at WorkDeadline, with exact cleanup. This observed
-prefix is earlier than the main695 std5 allocation refusal. Single stopped
-runs do not quantify causal slowdown or completed latency. The accepted scope
-is the necessary bounded capacity/ownership prerequisite, not original-command
-advance. Next diagnose codec/capture CPU work within the same limits and full
-fresh-byte/history contract; original completion and RSS remain required.
+omitted-checksum intent from original Starlark. The original end-to-end outcome
+remains unproved; its current stopped prefix and remaining work are below.
 
 Before acceptance, prove cross-form full Eq/arbitrary-Hasher method streams,
 cached routing equality, exact canonical SHA and unchanged logical limits.
@@ -2090,6 +2085,73 @@ to pass. Validate named dependents, fresh default CLI and protected originals,
 then the actual six-archive chain/File/Read/seal/last-reader closure under512MiB,
 FD512, backing8GiB and27+3sec, plus the exact original separately. Whole-command
 RSS<=1.25xBazel, public Rust and General activation remain independent open gates.
+
+### Private fast body codec trial
+
+Status: independent design/source/final review ACCEPT; executed bounded component
+proof is in the [component receipt](wp1225-fast-body-codec-acceptance-2026-11-10.json).
+Production activation remains Disabled. The bounded offline comparison is at
+`/tmp/slug-wp425-validation/fast-block-codec-census-assessment.json`
+(SHA256 `7a532163df1ff5ad50342d6411661b29f023a97347a0f1727cb7dfe41bb26987`).
+The same819,839,043 logical bytes across12,621 blocks require3.075s miniz versus
+0.978s LZ4 setup-plus-encode thread CPU, and1.683s versus0.245s validation-decode
+CPU. Synchronous measurements include clock overhead; an untimed historical
+reference affects cache context. Selected-compressed decode is an extra pass on
+different populations. These are helper observations, not native verifier or
+completed-command latency claims.
+LZ4 stores403,860,109 all-occurrence payload bytes versus332,690,155 for the
+production fixed-output miniz path. Candidate-unique body models are311,246,584
+versus257,704,200 bytes; fingerprint grouping is not native equality or bank fit.
+The separate growing-output historical reference reproduces the old332,690,138
+and257,270,806 payload pins. Its35 differing selected block lengths expose47
+production-larger and30 reference-larger bytes, with no store-choice changes.
+No precise internal cause is inferred from that net17-byte difference.
+
+Scope is the private Bzlmod body codec and its construction tests, workspace
+dependency wiring and these contracts. Pin `lz4_flex =0.14.0` with only
+`safe-encode`, `safe-decode` and `checked-decode`; resolved `alloc`, `std` and
+frame features must remain absent. Use bounded block `compress_into` and
+`decompress_into`, no frames, prepended lengths, dictionaries or decoder fork.
+Require input at most72,109 bytes and output at most65,536 bytes, exact returned
+output length and full original-byte comparison before closed publication.
+The safe decoder returns no consumed count: full input exhaustion relies on the
+audited pinned decoder's sole successful exit, not an invented runtime counter.
+Malformed input must be distinguished from legal equivalent encodings.
+
+Packed owners and blocks remain private and unexported. Rename the private
+compression flag without changing its layout. Keep the existing64KiB framing,
+raw-if-not-smaller choice, Arc/Dupe/Allocative ownership, full logical Eq/Hash,
+cached routing, canonical SHA, histories, native coverage and release ordering.
+Keep2MiB construction admission and the admitted Linux64 decode reservation of
+291,344 bytes; reclaim no resource headroom in this substitution. The previous
+reservation is4*65,536+2*10,504+8,192, measured against the pinned miniz decoder.
+Prove the LZ4 table and nested decode workspace fit these reservations; codec
+no-allocation does not make body construction allocation-free.
+
+Independent design review precedes code. Reuse the actual256KiB thread test
+with its live64KiB caller buffer, extending it across both encoder table regimes.
+Run focused body/identity/coverage checks and named direct dependents, fresh
+default CLI, protected native pressure/refund/history/metadata/warm cases, the
+actual six-archive/File/Read/seal/last-reader gate and the exact original command.
+Preserve512MiB native credit, FD512, backing8GiB,27+3 seconds and the fixed worker
+stack. Larger encoded storage must pass actual admission; forecasts cannot
+replace this gate. Genuine fresh-backend REAPI execution/restoration remains
+required. Accept only the evidenced reusable component; full bootstrap,
+completed-command RSS<=1.25xBazel and production activation remain open.
+
+Executed proof:854 Bzlmod checks include the actual fixed-stack/table-threshold
+regression;60 focused Core and18 protected native cases pass. The actual six
+chain reaches sealing at12,405ms with335,539,406 peak native credit and exact
+last-reader retirement. Both genuine fresh-backend REAPI transport/restoration
+checks pass. Loading1190/1196 retains the exact six independently verified
+baseline failures, without omitted assertions. The original reaches840
+computes/55roots/114records, accepts LLVM4 and partially decodes std5; it remains
+unfinished with sticky WorkDeadline, an unclassified Materialization mutation
+and exact168-byte/zero-FD/zero-backing cleanup. The inner mutation cause is
+unproved. Root-compute wall remains10.176s and completed workspace progress
+12.670s in this stopped run; process CPU, nested wall scopes and event counts
+are not self CPU or proof of redundant work. Next attribute these remaining
+categories under the same freshness/history/cap contracts before selecting reuse.
 
 ### Archive completion canonical body routing
 
