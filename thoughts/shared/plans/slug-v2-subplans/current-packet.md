@@ -3,7 +3,21 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [retention-compatible right-superset union](wp1225-general-repository-workspace-design.md#retention-compatible-right-superset-observation-union)
+Current delta: [unique-owner growth assignment](wp1225-general-repository-workspace-design.md#unique-owner-observation-growth-assignment)
+passes causal RED/GREEN, full ownership/error/priority controls and the required
+mid-transfer unwind/credit-retirement proof. The original records20,941 exact
+successful transfers into the old LEFT controller. Temporary instrumentation is
+retired before final validation; Map72/Workspace134/Core60/native18 pass and
+Loading1194/1200 retains the six qualified baseline failures. A reproduced
+reference-count fixture race is repaired using its existing DICE lifetime guard,
+with all assertions unchanged. The
+[component proof](wp1225-owned-growth-union-acceptance-2026-11-10.json) has
+independent final acceptance. Observed/final originals still stop at840/55/114 with
+std Archive5 pending and exact168/0FD/0backing cleanup. Next attribute remaining
+reached work on current source; no speed/RSS/completion claim or production
+activation follows.
+
+Accepted [retention-compatible right-superset union](wp1225-general-repository-workspace-design.md#retention-compatible-right-superset-observation-union)
 passes causal RED/GREEN and exact whole-left custody/conflict/coverage controls.
 The actual original observes690 new right-map reuses with clear validity flags;
 the temporary counter is retired before final production validation. Full
@@ -13,8 +27,10 @@ Loading1193/1199 pass their stated gates. The
 independent final acceptance. No command speed, RSS or completion claim follows.
 The final production original stops at WorkDeadline with840computes/55roots/
 114records and std Archive5 pending; the instrumented prefix reaches841/55/115
-and File6. Both clean to168 retained bytes/zeroFDs/zero backing. Next attribute
-remaining original work under unchanged full-history/freshness/resource contracts.
+and File6. Both clean to168 retained bytes/zeroFDs/zero backing. The pre-component source-free profile
+still stops at 841/55/115 with File6 pending and exact cleanup. It selects reached
+growth copying, without establishing caller, phase or removable cost. Keep all
+full-history/freshness/resource contracts unchanged.
 
 Accepted predecessor [registration frontier union reuse](wp1225-registration-union-acceptance-2026-11-10.json)
 retains its actual-DICE facts/custody/conflict and native protection proof. The

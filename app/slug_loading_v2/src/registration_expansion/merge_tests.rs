@@ -181,3 +181,66 @@ async fn observed_certificate_growth_and_sorted_conflict_match_constructor() {
         before.observations()
     ));
 }
+
+#[tokio::test]
+async fn observed_certificate_unique_disjoint_growth_retains_left_controller() {
+    let certificate =
+        crate::registration_expansion_tests::observed_certificate_for_merge_test().await;
+    let middle = certificate.observations().len() / 2;
+    assert!(middle > 0);
+    let left = PathObservationEpoch::from_shared(
+        certificate
+            .observations()
+            .iter()
+            .take(middle)
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .unwrap();
+    let right = PathObservationEpoch::from_shared(
+        certificate
+            .observations()
+            .iter()
+            .skip(middle)
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .unwrap();
+    assert!(!right.observations().is_empty());
+    assert!(
+        left.observations()
+            .keys()
+            .all(|key| right.get(key).is_none())
+    );
+    let expected = reference(&left, &right).unwrap();
+    let mut scratch = scratch();
+    merge(&mut scratch, &left);
+    full_facts(&scratch.observations, &left);
+    // The certificate/reference retain rows, not this subset's map controller.
+    // Do not clone the scratch epoch or create a Weak controller observer.
+    drop(left);
+    let old_controller = std::ptr::from_ref(scratch.observations.observations());
+    merge(&mut scratch, &right);
+    full_facts(&scratch.observations, &expected);
+    full_facts(&scratch.observations, &certificate);
+    // This genuine fixture contains ordinary path keys. Establish their exact
+    // original shared path buffers and result owners before testing map work.
+    for ((actual_key, actual_result), (original_key, original_result)) in scratch
+        .observations
+        .observations()
+        .iter()
+        .zip(certificate.observations())
+    {
+        assert_eq!(actual_key, original_key);
+        assert!(actual_key.image_path().is_none());
+        assert!(actual_key.windows_long_path_input().is_none());
+        assert!(std::ptr::eq(
+            actual_key.path().as_path(),
+            original_key.path().as_path(),
+        ));
+        assert!(Arc::ptr_eq(actual_result, original_result));
+    }
+    // The initial delegating API must fail only this unique-growth discriminator.
+    assert!(std::ptr::eq(
+        old_controller,
+        scratch.observations.observations(),
+    ));
+}

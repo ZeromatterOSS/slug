@@ -519,11 +519,13 @@ impl ExpansionScratch {
     }
 
     fn merge(&mut self, incoming: &PathObservationEpoch) -> Step<()> {
-        self.observations = self.observations.try_union(incoming).map_err(|error| {
-            DriverBreak::Outer(ModuleRegistrationExpansionObservationError::Frontier(
-                error.into(),
-            ))
-        })?;
+        self.observations
+            .try_union_assign(incoming)
+            .map_err(|error| {
+                DriverBreak::Outer(ModuleRegistrationExpansionObservationError::Frontier(
+                    error.into(),
+                ))
+            })?;
         Ok(())
     }
 

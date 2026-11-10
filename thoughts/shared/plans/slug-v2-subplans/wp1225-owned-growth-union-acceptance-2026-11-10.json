@@ -1,0 +1,558 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "b4306ca4061a21f1288937b503bde5613febd66f",
+  "classification": "Slug-native physical ownership/work reuse over unchanged complete semantic observations",
+  "outcome": "Registration scratch can transfer complete LEFT observation pairs during genuine growth when its map has one strong and no Weak observers. Causal controller RED becomes GREEN; the original command records 20,941 such transfers. Full original Rust remains unfinished.",
+  "scope": {
+    "api": "PathObservationEpoch::try_union_assign(&mut self,&Self) migrates only ExpansionScratch::merge. Existing Frontier error conversion remains unchanged. Borrowed try_union uses the same single private validation plan and preserves all previous behavior.",
+    "algorithm": "Complete sorted overlap validation, full result equality, earliest conflict, LEFT/no-new and compatible-RHS priorities precede mutation. Checked growth capacity is fixed first. Arc::get_mut admits only unique storage; allocate destination before mem::take, consume existing sorted LEFT rows, keep RIGHT borrowed and clone only selected additions, then install complete sorted map in the same controller. Shared/Weak maps use original clone growth without revalidation or unused allocation.",
+    "retention": "Full original LEFT demand/result representatives move intact, including independent Image issued/request-anchor credit blocks and outer result Arcs. No constructor, field, layout, Hash/Eq/Ord/SHA/StableKey domain, DICE key/dependency, Need/error/event/cancellation policy, cache, authority, native IO, limit or activation changes.",
+    "memory": "No new retained field/container/cache/dependency. One bounded transient owning-iterator row replaces borrowed references. Existing destination capacity/index remains; no claim all allocations disappear or full command RSS fits.",
+    "error_and_unwind": "Every returned Err leaves original facts/custody/map identity unchanged. The new assigning API explicitly offers valid storage/basic unwind after rows move, not strong panic rollback. A panic bypasses finish_driver and discards private Scratch; successfully completed assignments may contribute observations even to semantic-error certificates. Need/Outer discard Scratch. Existing borrowed API behavior is unchanged."
+  },
+  "utility": {
+    "source": "Pinned Buck2 088c75c7e36805df99c3de29062baa95db700b8b, existing SortedMap IntoIterator -> OrderedMap -> VecMap owned pairs",
+    "mode": "Reuse already-retained consuming leaf API; no new map API, copied donor source, container or dependency. RIGHT remains borrowed, avoiding discarded duplicate clones."
+  },
+  "causal_basis": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/post-superset-owner-ip-validation.json",
+      "sha256": "d4d2839263a91188e4401d8819063ea65eefe8777cccc664c27e4cd400c93f67"
+    },
+    "samples": 3464,
+    "rows": 572,
+    "lost": 0,
+    "throttled": 0,
+    "current_union_samples": 81,
+    "growth_clone_insert_samples": 76,
+    "method": "Current b430 Core MMAP2/PT_LOAD mapping recomputes4096 page file/VMA delta and resolves pinned DWARF inline source; 76 samples at growth pair cloning/insertion and5 iterator.",
+    "qualification": "Whole-run reached self work only. No phase, runtime caller, unique-owner eligibility, removed cost or speed/RSS claim from samples. XZ source audit finds no redundant accepted-record decode or accidental O0/HAVE_SMALL build setting."
+  },
+  "validation": {
+    "red_workspace": {
+      "selected": 15,
+      "exit_code": 101,
+      "elapsed_seconds": 0.02091966799343936,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-red-workspace-tests.json",
+        "sha256": "1db2c84385d7e6a1a13ee867be5294d582e61587ddcb4dada07c3c8201226a6d"
+      }
+    },
+    "red_loading": {
+      "selected": 4,
+      "exit_code": 101,
+      "elapsed_seconds": 0.020813518000068143,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-red-loading-tests.json",
+        "sha256": "ddeb0814c9b13406baa5ad456d8cd9aa3f06f0f0900eec7459b0c9ae79ce51a5"
+      }
+    },
+    "red_meaning": "Workspace14/15 and actual-DICE Loading3/4 pass; each sole failure is final old-controller identity after full reference facts, sorted keys and original row owners/Hash. Existing borrowed implementation and prior tests byte-exact at RED.",
+    "green_workspace": {
+      "selected": 16,
+      "exit_code": 0,
+      "elapsed_seconds": 0.021006438008043915,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-green-workspace-tests.json",
+        "sha256": "252830e08a5917debe8b5026dab9a44d7736324bcad5776c316fd97878feda19"
+      }
+    },
+    "green_loading": {
+      "selected": 4,
+      "exit_code": 0,
+      "elapsed_seconds": 0.020785567990969867,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-green-loading-tests.json",
+        "sha256": "5911a0dc2196c0e364f6ad76491853e7d6cc70a6944f48d48e40c90d64816948"
+      }
+    },
+    "green_meaning": "Same causal tests pass; all RED Workspace bytes are an exact prefix, with only the mandatory unwind case appended. All Image custody/refund, shared/Weak, no-new/empty/shared/compatible-RHS priority and earliest/late error-atomicity controls pass.",
+    "unwind": "Private cfg(test)-only scoped one-shot TLS fault after moved LEFT a and cloned borrowed RIGHT m while LEFT z remains. Exact fixed panic is caught; same controller contains valid empty storage, moved and remaining LEFT path/result Weak owners expire and both left banks refund0. Borrowed RIGHT stays exactly charged/live then refunds0 at final drop. Hook disarms before panic and is absent in dependency production.",
+    "final_map": {
+      "selected": 72,
+      "exit_code": 0,
+      "elapsed_seconds": 0.02112340900930576,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-production-map-full.json",
+        "sha256": "eb6126454d5f056c4e0732edc51ef37fc8dc8c178171c96208de310e9571d9cb"
+      }
+    },
+    "final_workspace": {
+      "selected": 134,
+      "exit_code": 0,
+      "elapsed_seconds": 0.10138416700647213,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-production-workspace-full.json",
+        "sha256": "d819d2ac316075d5a634892f0e1541e182c7ea5b0ea2aa7cd3bc01153c05087f"
+      }
+    },
+    "final_core": {
+      "selected": 60,
+      "exit_code": 0,
+      "elapsed_seconds": 0.5828487839899026,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-production-core-focused.json",
+        "sha256": "b0c682da72a7a60435199744c876be8770777ecd82ac5b3da6c16cf9fed4adce"
+      }
+    },
+    "suite_reuse": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production2-reused-tests.json",
+      "sha256": "1bc3ecc815a928f6795d24b7668b62548d029acaf83d062dc7865454932ae2f1"
+    },
+    "suite_reuse_meaning": "Later test-only DICE-guard fixture correction changes only Loading unit binary; Map/Workspace/Core executables are byte-exact, retaining their executed72/134/60 evidence.",
+    "loading": {
+      "selected": 1200,
+      "passed": 1194,
+      "failed": 6,
+      "matching_failed_names": [
+        "bzl_module::bzl_source_memory_tests::host_load_keys_preserve_raw_alias_order_and_retained_exports",
+        "bzl_module::host_package_load_tests::repository_package_rejects_provider_or_aspect_dependency_before_recording",
+        "bzl_module::module_extension_definition_loading_tests::selected_external_dispatch_uses_each_resolved_child_route",
+        "bzl_visibility::tests::every_live_composition_site_calls_the_shared_checker",
+        "package::module_extension_definition_tests::exec_group_declarations_retain_constraints_and_named_transitions",
+        "provider::tests::config_feature_flag_info_rejects_invalid_constructor_arguments"
+      ],
+      "qualification": "All1200 ordinary tests executed. Six exact baseline failure names and complete containing stderr paragraphs match after only numeric thread-ID normalization. Separate reproduced reference-count fixture race repaired using existing DICE lifetime guard, preserving every assertion. No excluded or weakened test; not an all-green Loading claim.",
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-production-loading-qualification.json",
+        "sha256": "7f2ebe6cc7db8bc125b71dd74a4c7bee93f753c48270766575ac94d205de62df"
+      }
+    },
+    "native_protected": {
+      "selected": 18,
+      "exit_code": 0,
+      "elapsed_seconds": 15.834688328002812,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-production-native-protected.json",
+        "sha256": "9850acc0bcf5161754e3d966e15c114db8cc353730305144ca3ecbcd434ca75d"
+      }
+    },
+    "native_scope": "All18 protected cases, including four warm original compiler commands, full history/fresh bytes/foreign origin/changed body/cancellation/last-reader/refunds and closed realization.",
+    "fresh_profile": "Opt3 with debug assertions/overflow including build overrides. Core uses existing observer feature only and static ELF proves Unwind; fresh default CLI uses only default features and static ELF proves Abort. Temporary owned-growth observer removed.",
+    "static_checks": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-static-checks.json",
+      "sha256": "beb2791cef136aa5e212362c75453ba9ed94db0472946979a9b35a2344172caf"
+    },
+    "final_integration_checks": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-final-integration-checks.json",
+      "sha256": "def38cfcc83efcda252205b42826e8e0714cfbe1e951203c68a6a16ee2e2e6a1"
+    }
+  },
+  "actual_original_use": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-observed-validation.json",
+      "sha256": "25e37300bcf39271f8c32e5690bddd650e89de4f142fd4ca6320794c4eda8310"
+    },
+    "count": 20941,
+    "counter": {
+      "after": 20941,
+      "after_overflow": false,
+      "arithmetically_exact": true,
+      "atomic_snapshot": false,
+      "before": 0,
+      "before_overflow": false,
+      "checked_delta": 20941,
+      "class": "successful_nonempty_growth_retaining_old_left_controller",
+      "process_wide": true,
+      "qualification": "O(1) local pointer/length geometry after successful assign; no pointer/input retained or reported; process-wide non-atomic per-cell snapshots; not allocation bytes, removed samples, saving, latency, RSS or command success",
+      "request_isolated": false,
+      "reset": false,
+      "reversed": false,
+      "saturated": false
+    },
+    "proof": "Successful nonempty growth retains old LEFT controller. Existing no-new/empty/shared cases cannot grow; RHS/clone fallback constructs its result while old LEFT is still live, so allocator address recycling cannot imitate this class. Only a local pointer/length comparison is used, no pointer/input is retained or reported.",
+    "counter_tests": {
+      "loading": {
+        "selected": 2,
+        "exit_code": 0,
+        "elapsed_seconds": 0.020808247005334124,
+        "receipt": {
+          "path": "/tmp/slug-wp425-validation/owned-growth-counter-loading-tests.json",
+          "sha256": "21cfdacc08ba89365c4d7e8d3dd527506bc0b0ad14c1f39562317c4d9a426037"
+        }
+      },
+      "core_report": {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 0.020774007978616282,
+        "receipt": {
+          "path": "/tmp/slug-wp425-validation/owned-growth-counter-core-tests.json",
+          "sha256": "581f5c291942b9336fa4918789c4ee1b62bfb70afee9191ee8a0ca68eef76604"
+        }
+      }
+    },
+    "qualification": "Exact checked process-wide non-atomic per-cell use count. Not request isolated; not allocation bytes, removed samples, saving, latency, RSS or command success.",
+    "functional_result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 840,
+    "roots": 55,
+    "records": 114,
+    "pending": "std Archive5",
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    }
+  },
+  "diagnostic_retirement": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-counter-retirement.json",
+      "sha256": "54009056991547ea87f416b6ebf85d7573811f12ecfc67e81f90703d7785040d"
+    },
+    "proof": "All3 preinstrument candidate copies restored exactly and one new observer module removed. Registration assign migration c25dcd is retained; HEAD restoration would wrongly undo it. Existing phase16KiB/trace512KiB/event allowance restored before final production builds/tests/native. Instrumented source/binaries/raw receipts preserved. Permanent cfg(test) unwind regression remains."
+  },
+  "fixture_correction": {
+    "initial_sweep": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-loading-full.json",
+      "sha256": "572d559e047a82935f58eb50483182da44776c6b1f14ff24be87b59691241c9a"
+    },
+    "initial_result": "1193/1200 pass with six baseline failures and one extra Arc-count fixture race, preserved without waiver.",
+    "paired_control": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-env-count-paired-control.json",
+      "sha256": "2311ae1b4b8e8559c09f2c5be1dbdd025128bf81a636e76d50f2d7245797433a"
+    },
+    "control_result": "Three paired isolated current-main/candidate runs: both2 fail and1 pass at the same catalog count checkpoints, proving existing teardown race rather than excluding a new failure.",
+    "correction": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-env-count-fixture-correction-format.json",
+      "sha256": "add39b21bb7dd3401877744492ebba6e29ecd2674379eed89738f9b909a6835a"
+    },
+    "repair": "One exact-count test retains named _guard from existing mixed_catalog_pair_with_guard, keeping both real DICE transactions/engines alive for the measured interval. All assertions and separate last-drop tests byte-exact. No production lifetime or semantic implementation changes.",
+    "after_repair": "Three focused exact runs pass; all1200 ordinary tests rerun with1194pass and only six exact baseline failure paragraphs after numeric thread-ID normalization."
+  },
+  "final_original": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-original.json",
+      "sha256": "fda1c0ece13d3e508f99b2a1adfd79ed1533d10f3d1938ed27e5bb5114d43246"
+    },
+    "postcheck": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-postcheck.json",
+      "sha256": "04c8578bcc6cba84a837dd41a4e4bc3211f2326d770a841771c226589d27d2aa"
+    },
+    "supervisor_exit_code": 0,
+    "elapsed_seconds": 27.105413495009998,
+    "functional_result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 840,
+    "roots": 55,
+    "records": 114,
+    "pending": "std Archive5, latest accepted llvm-tools Archive4",
+    "peak_native_credit_bytes": 342612884,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "One stopped production prefix. It establishes no speed/regression, full original completion, repeatability, completed-command latency/RSS or activation. All executed source/artifact/input hashes verified after native work; native credit is not RSS."
+  },
+  "inherited_body_transport": {
+    "through": "wp1225-right-superset-union-acceptance-2026-11-10.json at b430",
+    "evidence": [
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-native-six-2.json",
+        "sha256": "d207cdfd18eea1945b66d8ed2ede3d40f7e50ada7e5f69531ec67f714da651cb"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-execute.json",
+        "sha256": "f883ba1703e063e4c87ead157b73c4bec74529f7e179869c9b0f7046dfc75cf8"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-corruption.json",
+        "sha256": "6de2d95d62f4b82e4280a0862768fbefd3fd4774b5d660d248c2e4cfc84e262d"
+      }
+    ],
+    "scope": "Historical generic explicit-pinned6 Archive/File/Read/seal/last-reader and two fresh-backend REAPI execute/runfiles + corrupt-CAS/refusal/restoration cases. Body/codec/native capture/freshness/history/SHA/transport/CAS/dependencies/clocks/caps/policy unchanged. Specific inherited domains only; no current full-original/RSS claim."
+  },
+  "limits": {
+    "native_bytes": 536870912,
+    "fds": 512,
+    "backing_bytes": 8589934592,
+    "roots": 128,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack_bytes": 262144,
+    "xz_decoder_bytes": 142606336,
+    "qualification": "All inherited Source/Meta/Process/Execute/archive/stream/tmpfs/tree limits unchanged. Operational caps/bank credit/address space are separate from RSS."
+  },
+  "builds": [
+    {
+      "label": "owned-growth-red-build",
+      "elapsed_seconds": 42.36811493401183,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-red-build-result.json",
+        "sha256": "b8982d1cac1b36ae514cc1cf7183a34ecb8d351965ad428c89b687b20ee8f330"
+      }
+    },
+    {
+      "label": "owned-growth-green-build",
+      "elapsed_seconds": 149.61970033601392,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-green-build-result.json",
+        "sha256": "a2353d0f8bf3d6c5fa404daa22d97fe3fd4ecd1813a120e18dcd04796b820343"
+      }
+    },
+    {
+      "label": "owned-growth-cli-build",
+      "elapsed_seconds": 78.81189359800192,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-cli-build-result.json",
+        "sha256": "c129aeaef0f3e2114d8f35dc60e868b033ddad60e9f212573aacd22ae42f7732"
+      }
+    },
+    {
+      "label": "owned-growth-production-build",
+      "elapsed_seconds": 146.43225145200267,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-production-build-result.json",
+        "sha256": "1d6b648a91b1fe6a6e5f28977a8943841a3432619f3a9cd42be630dd87500721"
+      }
+    },
+    {
+      "label": "owned-growth-production2-build",
+      "elapsed_seconds": 32.370122617983725,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-production2-build-result.json",
+        "sha256": "693f5da2a0c57a68239da025826fa8d3ecc070a42dbd137021d67f22d821c238"
+      }
+    },
+    {
+      "label": "owned-growth-production-cli-build",
+      "elapsed_seconds": 75.64167290600017,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/owned-growth-production-cli-build-result.json",
+        "sha256": "ec07f245d42ec2f2d5f11bc46cd095e41838b131277bcb149f20382dba8ca7c4"
+      }
+    }
+  ],
+  "compile_seconds_total": 525.2437558440142,
+  "review": {
+    "design": "ACCEPT including explicit basic-unwind contract and required proof",
+    "red_source": "ACCEPT",
+    "green_source": "ACCEPT",
+    "actual_use_and_retirement": "ACCEPT",
+    "fixture_correction_and_requalification": "ACCEPT",
+    "final": "ACCEPT",
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/owned-growth-final-review.json",
+      "sha256": "212694937fb7e8ac8fb77ece998c767ff26ef4be52781e47ea172fcd77b7e8d0"
+    },
+    "scope": "Five Rust files match the executed freeze; all 47 receipt hash links and five executable hashes verify. RED/GREEN, unwind credit retirement, 20,941 actual transfers, diagnostic retirement, fixture repair and final native gates support the stated scope. Six Loading failures remain explicitly qualified. Full original completion, latency/RSS and activation remain open; no speed or regression claim follows from stopped prefixes."
+  },
+  "preserved_executables": {
+    "map": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/starlark_map-35af16227080e929",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/owned-growth-production2-map-starlark_map-f97b02e52893ece5",
+      "executable_sha256": "f97b02e52893ece573a52df24f1e2a7966bd89378ff51fbd9305d11684048a7f",
+      "build": "owned-growth-production2-build",
+      "target": "starlark_map"
+    },
+    "workspace": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_workspace_v2-6536c065cf463cf4",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/owned-growth-production2-workspace-slug_workspace_v2-a7ef06e66968c152",
+      "executable_sha256": "a7ef06e66968c152a3c84c25513f3824c62e82ef88cd677115638c6f996811ac",
+      "build": "owned-growth-production2-build",
+      "target": "slug_workspace_v2"
+    },
+    "loading": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_loading_v2-9801899498f6d5c5",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/owned-growth-production2-loading-slug_loading_v2-5ee64ba068ed1962",
+      "executable_sha256": "5ee64ba068ed1962c4a7d61a06fbefc80aa71754eaaa2a5165aefa50e786e75f",
+      "build": "owned-growth-production2-build",
+      "target": "slug_loading_v2"
+    },
+    "core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/owned-growth-production2-core-slug_core_v2-d5bd7383bc1d3707",
+      "executable_sha256": "d5bd7383bc1d3707402c2375c565a48bd98654271dbc54c4a2b1683f0b783086",
+      "build": "owned-growth-production2-build",
+      "target": "slug_core_v2"
+    },
+    "cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/owned-growth-production-cli-slug-798bc624e9d7a9af",
+      "executable_sha256": "798bc624e9d7a9affb61fe2e824ea8f15fedbdb7cc601c26c54b27ecfc27a4dd",
+      "build": "owned-growth-production-cli-build",
+      "target": "slug"
+    }
+  },
+  "raw_evidence": [
+    {
+      "path": "/tmp/slug-wp425-validation/post-superset-owner-ip-validation.json",
+      "sha256": "d4d2839263a91188e4401d8819063ea65eefe8777cccc664c27e4cd400c93f67"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/union-owned-growth-design.json",
+      "sha256": "c396f9d941cafdcfbdb47aebff9a89a83e481f37bdf2ccb7ed713d4b41433ed2"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/union-owned-growth-design-review.json",
+      "sha256": "9f1d646564f36bbd6db5d8e140213bd6057d455b05b4097bc0fca754958f4e71"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-red-source-1-freeze.json",
+      "sha256": "cccdaed5e9bcb82c50dc77bfdf0dbd150ee98c2b5eb69c738eff4a8851dcd51b"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-red-source-review.json",
+      "sha256": "dbb9f7be46ea3edc1bb2b6797669826b35616f915e98c0a0725b585561cd384c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-red-workspace-tests.json",
+      "sha256": "1db2c84385d7e6a1a13ee867be5294d582e61587ddcb4dada07c3c8201226a6d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-red-loading-tests.json",
+      "sha256": "ddeb0814c9b13406baa5ad456d8cd9aa3f06f0f0900eec7459b0c9ae79ce51a5"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-red-validation.json",
+      "sha256": "5e2685ac1c9c02444642adbbfbcb75813c7dcd63839113e3371eabc366cc6742"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-green-counter-source-1-freeze.json",
+      "sha256": "fd9d7d8e263bdd383629e7a1d056385fdcb6d8eeebb0bcbe2ae6482dddc365fc"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-green-source-review.json",
+      "sha256": "598880348ef4351d4ae95b62549d802218ba8e608214f089711e2d377e2d98e6"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-green-workspace-tests.json",
+      "sha256": "252830e08a5917debe8b5026dab9a44d7736324bcad5776c316fd97878feda19"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-green-loading-tests.json",
+      "sha256": "5911a0dc2196c0e364f6ad76491853e7d6cc70a6944f48d48e40c90d64816948"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-counter-loading-tests.json",
+      "sha256": "21cfdacc08ba89365c4d7e8d3dd527506bc0b0ad14c1f39562317c4d9a426037"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-counter-core-tests.json",
+      "sha256": "581f5c291942b9336fa4918789c4ee1b62bfb70afee9191ee8a0ca68eef76604"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-observed-original.json",
+      "sha256": "4124cb4c925f1d3147e2b9d008e2c926b69fe1b37833b28f02b3a658c1711083"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-observed-validation.json",
+      "sha256": "25e37300bcf39271f8c32e5690bddd650e89de4f142fd4ca6320794c4eda8310"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-observed-native-freeze.json",
+      "sha256": "c6cff994d9f5731092c74b848701a36c286d88c64ca59f12ef021b714d51de41"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-counter-retirement.json",
+      "sha256": "54009056991547ea87f416b6ebf85d7573811f12ecfc67e81f90703d7785040d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-source-3-freeze.json",
+      "sha256": "ce6517532e1d954e111208853316918c3b491caa0f1ee4bd52f62b115b6786d5"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-map-full.json",
+      "sha256": "eb6126454d5f056c4e0732edc51ef37fc8dc8c178171c96208de310e9571d9cb"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-workspace-full.json",
+      "sha256": "d819d2ac316075d5a634892f0e1541e182c7ea5b0ea2aa7cd3bc01153c05087f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-core-focused.json",
+      "sha256": "b0c682da72a7a60435199744c876be8770777ecd82ac5b3da6c16cf9fed4adce"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-loading-full.json",
+      "sha256": "572d559e047a82935f58eb50483182da44776c6b1f14ff24be87b59691241c9a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-env-count-paired-control.json",
+      "sha256": "2311ae1b4b8e8559c09f2c5be1dbdd025128bf81a636e76d50f2d7245797433a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-env-count-fixture-correction.json",
+      "sha256": "ce76121ce4e8ee719a33f1d93ec4e551326f9dc78fee0fe68a94462c34414e9d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-env-count-fixture-correction-format.json",
+      "sha256": "add39b21bb7dd3401877744492ebba6e29ecd2674379eed89738f9b909a6835a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-env-count-fixed-0.json",
+      "sha256": "9bad09c2a45619337a81ffa66d2d35230059222963d3c40c692f006ff77cc9fd"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-env-count-fixed-1.json",
+      "sha256": "c5fd9e7440823180c3df4e5554e767916d20a406e6d47374185438520cccfa26"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-env-count-fixed-2.json",
+      "sha256": "695ccb02a1192774b22e70b118be4c4e09b299b44b6407ade9f882ad5bebf68f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production2-loading-full.json",
+      "sha256": "fdfdfc33e506ec03da23a57408f0a5de07528f77900ca019181d7f6e26a015f7"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-loading-qualification.json",
+      "sha256": "7f2ebe6cc7db8bc125b71dd74a4c7bee93f753c48270766575ac94d205de62df"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production2-reused-tests.json",
+      "sha256": "1bc3ecc815a928f6795d24b7668b62548d029acaf83d062dc7865454932ae2f1"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-native-protected.json",
+      "sha256": "9850acc0bcf5161754e3d966e15c114db8cc353730305144ca3ecbcd434ca75d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-original.json",
+      "sha256": "fda1c0ece13d3e508f99b2a1adfd79ed1533d10f3d1938ed27e5bb5114d43246"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-postcheck.json",
+      "sha256": "04c8578bcc6cba84a837dd41a4e4bc3211f2326d770a841771c226589d27d2aa"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-production-panic.json",
+      "sha256": "dea567d81c32e3b26afc33ebbc944a0d0f7034f14953bdc35d61b4565df0ba0c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-final-native-freeze.json",
+      "sha256": "a552068f8277929abc2a051f430b0452b0b6e7ec2fc78ff7e8045bdb20f3835f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/owned-growth-static-checks.json",
+      "sha256": "beb2791cef136aa5e212362c75453ba9ed94db0472946979a9b35a2344172caf"
+    }
+  ],
+  "fixture_hygiene": "No new external oracle fixture or caller/profile recipe. Private inline Rust ownership/unwind tests, genuine existing DICE fixture and one preserved-assertion lifetime correction. No generated binaries/inputs enter Git.",
+  "remaining": "Full authentic Rust/action/REAPI/Slug bootstrap, completed-command latency/RSS<=1.25xBazel and General production activation remain open. Next attribute remaining reached work on the new source under unchanged complete-history/freshness/resource contracts."
+}

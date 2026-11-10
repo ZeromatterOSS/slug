@@ -218,6 +218,18 @@ observer layout and total report ceiling remain unchanged. This is dependency
 cutoff and bounded attribution evidence, not completed-command memory fit; see
 the [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json).
 
+Unique-owner growth assignment uses existing `SortedMap::into_iter` through
+`OrderedMap` and owned `VecMap` rows from pinned Buck2 donor
+`088c75c7e36805df99c3de29062baa95db700b8b`. Complete LEFT rows move only behind
+`Arc::get_mut`, after full validation and destination allocation; RIGHT stays
+borrowed. Shared/Weak storage keeps clone growth. No new container, retained
+field, dependency, identity or credit domain appears. A bounded transient owned
+iterator row replaces borrowed references. Causal RED/GREEN, exact custody,
+returned-error atomicity and basic-unwind valid-storage/credit-retirement checks
+pass; the original records20,941 exact transfers. All temporary instrumentation
+is retired before production checks. The [component proof](wp1225-owned-growth-union-acceptance-2026-11-10.json)
+has independent final acceptance; command completion/latency/RSS and activation remain open.
+
 Retention-compatible RHS-superset union reuses an existing
 complete immutable map only after full conflicts and exact left key/result
 custody. Private owner predicates add no retained state or authority. Its thin

@@ -99,8 +99,9 @@ fn declaration_scratch_bound_and_precopy_refusals_are_positive() {
 
 #[tokio::test]
 async fn original_environment_stream_declares_duplicate_and_foreign_catalog_guards() {
-    let (a, mixed) =
-        crate::bzl_environment::environment_publication_tests::mixed_catalog_pair().await;
+    let (a, mixed, _guard) =
+        crate::bzl_environment::environment_publication_tests::mixed_catalog_pair_with_guard()
+            .await;
     let m = manifest();
     let child = owner_with_environment(&m, "def f(): return 1", &mixed, []).unwrap();
     let pm = parent_manifest(1, &m);

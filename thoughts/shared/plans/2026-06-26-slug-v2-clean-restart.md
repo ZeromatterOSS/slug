@@ -52,9 +52,16 @@ preserving complete left-owner custody and sorted conflicts. Temporary counters
 are retired; the [component proof](./slug-v2-subplans/wp1225-right-superset-union-acceptance-2026-11-10.json)
 has independent final acceptance. Final production stops at840computes/55roots/
 114records with std Archive5 pending; the observed prefix reaches841/55/115 and
-File6. Both remain WorkDeadline refusals with exact cleanup. Next attribute
-remaining original work; completion, completed-command latency/RSS and activation
-remain open under unchanged limits.
+File6. Both remain WorkDeadline refusals with exact cleanup. A fresh source-free
+profile still places 76 of 81 union samples at growth pair copying. The
+[unique-owner growth component](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#unique-owner-observation-growth-assignment)
+passes causal RED/GREEN, explicit basic-unwind credit retirement and20,941 exact
+original transfers. Temporary instrumentation is retired; its
+[component proof](./slug-v2-subplans/wp1225-owned-growth-union-acceptance-2026-11-10.json)
+has independent final acceptance. Final production remains unfinished at840/55/114 with std
+Archive5 pending and exact cleanup. Next attribute remaining reached work on
+current source; completion, completed-command latency/RSS and activation remain
+open under unchanged limits.
 
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.

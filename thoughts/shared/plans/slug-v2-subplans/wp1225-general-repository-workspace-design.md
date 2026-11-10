@@ -1361,6 +1361,73 @@ work must discriminate prerequisite serialization rather than infer time from
 map counts. The following bounded Lstat-only scheduling contract selects the
 first discovery class; other Need families retain their own resource decisions.
 
+### Unique-owner observation growth assignment
+
+Status: independent design/source/final review ACCEPT.
+The [component receipt](wp1225-owned-growth-union-acceptance-2026-11-10.json)
+records causal Workspace/genuine-DICE RED/GREEN and the required mid-transfer
+unwind/refund proof. Full ordinary Map72/Workspace134, Core60/native18 pass;
+Loading1194/1200 has the same six baseline failures and matching complete
+failure paragraphs after numeric thread-ID normalization only. Its additional
+reference-count fixture race reproduces on current main and candidate, then
+passes three focused runs and the full sweep after retaining the existing DICE
+lifetime guard; no assertion changes.
+This Slug-native physical ownership component targets the current original command.
+The source-free profile at main `b4306ca4061a21f1288937b503bde5613febd66f`
+reconciles 3,464 samples, 572 flat rows and zero loss/throttling. Its current
+Core MMAP2/PT_LOAD/DWARF mapping places 76 of 81 `try_union` self samples at
+fallback pair cloning/insertion and five at the growth iterator. This is
+whole-run reached work, not a caller, phase, unique-owner eligibility or saving.
+The preserved attribution is `/tmp/slug-wp425-validation/post-superset-owner-ip-validation.json`;
+the detailed proposal is `/tmp/slug-wp425-validation/union-owned-growth-design.json`.
+
+`PathObservationEpoch::try_union_assign(&mut self, &Self)` migrates only
+`ExpansionScratch::merge`, retaining its exact Frontier wrapper. A private
+stack-only plan shares one complete sorted validation pass with borrowed
+`try_union`; preserve full result equality, first conflict, LEFT/no-new priority,
+compatible RHS priority and checked capacity. Borrowed behavior remains intact.
+For remaining growth, `Arc::get_mut` requires one strong and no Weak observers.
+Within that unique borrow, allocate the existing destination capacity before
+taking the old map. Existing `SortedMap::into_iter` moves complete LEFT pairs;
+keep RIGHT borrowed and clone only selected additions. Preserve sorted merge,
+complete left duplicate custody and existing conversion guards, then install
+the complete map into the same unique controller. Shared/Weak maps use the old
+clone-growth fallback without duplicate validation or a discarded allocation.
+
+Returned errors must leave all original facts, owners and map identity unchanged.
+The new assigning API proposes basic unwind safety after rows move, not strong
+panic rollback: storage remains valid, and unwinding discards private Scratch;
+only successfully completed assignments may contribute facts. Semantic-error
+certificates may publish completed observations; panic bypasses `finish_driver`,
+while Need/Outer discard scratch. Existing borrowed API behavior remains.
+Independent design review accepts this boundary with a documented private
+test-only injected mid-transfer unwind proving valid storage and exact credit
+retirement. Unwound Scratch must never publish. No await, IO, user callback or new
+semantic key/cache/retained field/authority is introduced. The owning iterator
+adds only a bounded transient row. Image issued/request-anchor credits move
+intact; identities, full histories, freshness, clocks and every cap remain.
+
+The initial delegating API fails only the unique-controller discriminator after
+full reference facts/custody/Hash assertions in Workspace and genuine DICE
+Scratch; unchanged tests become GREEN. Shared/Weak, Image credit/refund,
+conflict/error-atomicity and all LEFT/RHS priority controls pass. A private
+`cfg(test)` one-shot fault after moved LEFT and cloned RIGHT rows, with another
+LEFT row still in the owning iterator, proves valid storage and exact retirement
+on unwind. No fault hook exists in dependency production code.
+
+The temporary Loading observer records 20,941 successful nonempty growths into
+the old LEFT controller in the original, with exact checked delta and clear
+invalidity flags. Local pointers never leave the synchronous call or enter the
+report; snapshots remain process-wide and non-atomic. This proves use, not
+allocation bytes, removed samples, saving, latency or RSS. Three preinstrument
+candidate files are restored byte-exact and the observer module removed before
+final production builds/tests. The assigning call and unwind regression remain.
+Both observed and final production originals stop at 840computes/55roots/
+114records with std Archive5 pending at WorkDeadline, cleaning to168 retained
+bytes/zeroFDs/zero backing. Full Rust/action/REAPI/Slug, completed-command
+latency/RSS and activation remain open. Next attribute remaining reached work
+on the new source under unchanged full-history/freshness/resource contracts.
+
 ### Retention-compatible right-superset observation union
 
 Status: independent design/source/final review ACCEPT.

@@ -609,3 +609,391 @@ fn union_larger_compatible_right_missing_left_key_uses_full_growth() {
     assert!(!std::ptr::eq(actual.observations(), right.observations()));
     assert!(!std::ptr::eq(actual.observations(), left.observations()));
 }
+
+fn assignment_rows(
+    epoch: &PathObservationEpoch,
+) -> Vec<(PathObservationDemand, Arc<PathObservationResult>)> {
+    epoch
+        .observations()
+        .iter()
+        .map(|(key, result)| (key.dupe(), result.dupe()))
+        .collect()
+}
+
+fn assignment_facts(
+    actual: &PathObservationEpoch,
+    expected: &PathObservationEpoch,
+    left_rows: &[(PathObservationDemand, Arc<PathObservationResult>)],
+) {
+    assert_eq!(actual, expected);
+    assert_eq!(
+        actual.observations().keys().collect::<Vec<_>>(),
+        expected.observations().keys().collect::<Vec<_>>()
+    );
+    for (key, result) in left_rows {
+        let (retained_key, retained_result) = actual.observations().get_key_value(key).unwrap();
+        assert!(retained_key.same_retention_owners(key));
+        assert!(Arc::ptr_eq(retained_result, result));
+        assert_eq!(key_hash(retained_key), key_hash(key));
+    }
+}
+
+#[test]
+fn union_assign_unique_growth_preserves_facts_then_reuses_left_controller() {
+    let key = |name| {
+        demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::Lstat,
+            name,
+        )
+    };
+    let a = key("/assign/a");
+    let m = key("/assign/m");
+    let z = key("/assign/z");
+    let mut left =
+        PathObservationEpoch::from_shared([(a.dupe(), missing()), (z.dupe(), missing())]).unwrap();
+    // Equal duplicate facts deliberately have independent path/result owners.
+    let foreign_a = key("/assign/a");
+    let right =
+        PathObservationEpoch::from_shared([(foreign_a.dupe(), missing()), (m.dupe(), missing())])
+            .unwrap();
+    assert!(!a.same_retention_owners(&foreign_a));
+    assert!(!Arc::ptr_eq(left.get(&a).unwrap(), right.get(&a).unwrap()));
+    assert!(right.get(&z).is_none());
+    let expected = reference(&left, &right).unwrap();
+    let rows = assignment_rows(&left);
+    let controller = left.observations() as *const _;
+    assert_eq!(Arc::strong_count(&left.observations), 1);
+    assert_eq!(Arc::weak_count(&left.observations), 0);
+
+    left.try_union_assign(&right).unwrap();
+    assignment_facts(&left, &expected, &rows);
+    assert_eq!(
+        left.observations().keys().cloned().collect::<Vec<_>>(),
+        vec![a, m, z]
+    );
+    assert!(!std::ptr::eq(left.observations(), right.observations()));
+    // Delegating RED passes every fact/custody/hash assertion above. Only the
+    // unique LEFT map controller is needlessly replaced at this final gate.
+    assert!(std::ptr::eq(left.observations(), controller));
+}
+
+#[test]
+fn union_assign_shared_and_weak_maps_keep_borrowed_growth_fallback() {
+    for weak_only in [false, true] {
+        let mut left = PathObservationEpoch::from_shared([(
+            demand(
+                PathObservationNamespace::Host,
+                PathObservationOperation::Lstat,
+                "/assign/shared-left",
+            ),
+            missing(),
+        )])
+        .unwrap();
+        let right = PathObservationEpoch::from_shared([(
+            demand(
+                PathObservationNamespace::Host,
+                PathObservationOperation::Lstat,
+                "/assign/shared-right",
+            ),
+            missing(),
+        )])
+        .unwrap();
+        let expected = reference(&left, &right).unwrap();
+        let rows = assignment_rows(&left);
+        let controller = left.observations() as *const _;
+        let held = (!weak_only).then(|| left.dupe());
+        let weak = weak_only.then(|| Arc::downgrade(&left.observations));
+        assert_eq!(
+            Arc::strong_count(&left.observations),
+            if weak_only { 1 } else { 2 }
+        );
+        assert_eq!(Arc::weak_count(&left.observations), usize::from(weak_only));
+        left.try_union_assign(&right).unwrap();
+        assignment_facts(&left, &expected, &rows);
+        assert!(!std::ptr::eq(left.observations(), controller));
+        if let Some(held) = held {
+            assert!(std::ptr::eq(held.observations(), controller));
+            assignment_facts(
+                &held,
+                &PathObservationEpoch::from_shared(rows.clone()).unwrap(),
+                &rows,
+            );
+        }
+        if let Some(weak) = weak {
+            assert!(weak.upgrade().is_none());
+        }
+    }
+}
+
+#[test]
+fn union_assign_first_sorted_and_late_conflicts_leave_unique_left_unchanged() {
+    let key = |name| {
+        demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::Lstat,
+            name,
+        )
+    };
+    let a = key("/assign/conflict-a");
+    let z = key("/assign/conflict-z");
+    let changed = || {
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+            PathLstat::new(PathNodeKind::Directory, 1, 2, 3, 4, 0o755),
+        )))
+    };
+    for early_conflict in [false, true] {
+        let mut left =
+            PathObservationEpoch::from_shared([(a.dupe(), missing()), (z.dupe(), missing())])
+                .unwrap();
+        let right = PathObservationEpoch::from_shared([
+            (z.dupe(), changed()),
+            (key("/assign/conflict-m"), missing()),
+            (
+                key("/assign/conflict-a"),
+                if early_conflict { changed() } else { missing() },
+            ),
+        ])
+        .unwrap();
+        let expected_error = reference(&left, &right).unwrap_err();
+        assert_eq!(
+            expected_error,
+            PathObservationEpochError::ConflictingDemand(if early_conflict {
+                a.dupe()
+            } else {
+                z.dupe()
+            })
+        );
+        let rows = assignment_rows(&left);
+        let unchanged = PathObservationEpoch::from_shared(rows.clone()).unwrap();
+        let controller = left.observations() as *const _;
+        assert_eq!(Arc::strong_count(&left.observations), 1);
+        assert_eq!(left.try_union_assign(&right).unwrap_err(), expected_error);
+        assignment_facts(&left, &unchanged, &rows);
+        assert!(std::ptr::eq(left.observations(), controller));
+    }
+}
+
+#[test]
+fn union_assign_preserves_empty_shared_no_new_and_compatible_right_priorities() {
+    let a = demand(
+        PathObservationNamespace::Host,
+        PathObservationOperation::Lstat,
+        "/assign/priority-a",
+    );
+    let left = PathObservationEpoch::from_shared([(a.dupe(), missing())]).unwrap();
+    let rows = assignment_rows(&left);
+    let equal_foreign = PathObservationEpoch::from_shared([(
+        demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::Lstat,
+            "/assign/priority-a",
+        ),
+        missing(),
+    )])
+    .unwrap();
+    let empty = PathObservationEpoch::empty();
+    for right in [&empty, &left, &equal_foreign] {
+        let mut actual = left.dupe();
+        let expected = reference(&actual, right).unwrap();
+        actual.try_union_assign(right).unwrap();
+        assignment_facts(&actual, &expected, &rows);
+        assert!(std::ptr::eq(actual.observations(), left.observations()));
+    }
+    let mut empty_left = PathObservationEpoch::empty();
+    empty_left.try_union_assign(&left).unwrap();
+    assignment_facts(&empty_left, &left, &rows);
+    assert!(std::ptr::eq(empty_left.observations(), left.observations()));
+
+    let superset = PathObservationEpoch::from_shared(rows.iter().cloned().chain([(
+        demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::Lstat,
+            "/assign/priority-z",
+        ),
+        missing(),
+    )]))
+    .unwrap();
+    let mut actual = PathObservationEpoch::from_shared(rows.iter().cloned()).unwrap();
+    assert_eq!(Arc::strong_count(&actual.observations), 1);
+    assert_eq!(Arc::weak_count(&actual.observations), 0);
+    let expected = reference(&actual, &superset).unwrap();
+    actual.try_union_assign(&superset).unwrap();
+    assignment_facts(&actual, &expected, &rows);
+    assert!(std::ptr::eq(actual.observations(), superset.observations()));
+}
+
+#[test]
+fn union_assign_keeps_same_bank_independent_issued_and_anchor_credits_until_last_owner() {
+    for replace_anchor in [false, true] {
+        let bank = ImageDescriptorBudget::new(16 * 1024);
+        let anchor =
+            ImageChargedPath::pin_existing(NormalizedAbsolutePath::new("/assign").unwrap(), &bank)
+                .unwrap();
+        let issued = ImageChargedPath::pin_existing(
+            NormalizedAbsolutePath::new("/assign/image").unwrap(),
+            &bank,
+        )
+        .unwrap();
+        let request = ImageObservationRequest::new(anchor.dupe(), ImageObservationOperation::Lstat);
+        let result = Arc::new(PathObservationResult::InputImage(
+            ImageObservationResult::new(
+                issued.dupe(),
+                request.dupe(),
+                ImageObservationData::Lstat(PathOperationResult::Missing),
+                bank.try_reserve(64).unwrap(),
+            )
+            .unwrap(),
+        ));
+        let key = PathObservationDemand::input_image(
+            PathObservationNamespace::Host,
+            issued.dupe(),
+            request.dupe(),
+        )
+        .unwrap();
+        let before_foreign = bank.used_bytes();
+        let foreign_key = if replace_anchor {
+            PathObservationDemand::input_image(
+                PathObservationNamespace::Host,
+                issued.dupe(),
+                ImageObservationRequest::new(
+                    anchor.retain_charge(bank.try_reserve(1).unwrap()).unwrap(),
+                    ImageObservationOperation::Lstat,
+                ),
+            )
+        } else {
+            PathObservationDemand::input_image(
+                PathObservationNamespace::Host,
+                issued.retain_charge(bank.try_reserve(1).unwrap()).unwrap(),
+                request.dupe(),
+            )
+        }
+        .unwrap();
+        // retain_charge prepays its new block and normalized capacity as well
+        // as the requested byte; measure that complete independent owner.
+        let foreign_charge = bank.used_bytes() - before_foreign;
+        assert!(foreign_charge > 0);
+        assert_eq!(key, foreign_key);
+        assert!(!key.same_retention_owners(&foreign_key));
+        let mut left = PathObservationEpoch::from_shared([
+            (key.dupe(), result.dupe()),
+            (
+                demand(
+                    PathObservationNamespace::Host,
+                    PathObservationOperation::Lstat,
+                    "/assign/left-only",
+                ),
+                missing(),
+            ),
+        ])
+        .unwrap();
+        let right = PathObservationEpoch::from_shared([
+            (foreign_key, result.dupe()),
+            (
+                demand(
+                    PathObservationNamespace::Host,
+                    PathObservationOperation::Lstat,
+                    "/assign/right-only",
+                ),
+                missing(),
+            ),
+        ])
+        .unwrap();
+        let rows = assignment_rows(&left);
+        let expected = reference(&left, &right).unwrap();
+        let used = bank.used_bytes();
+        left.try_union_assign(&right).unwrap();
+        assignment_facts(&left, &expected, &rows);
+        assert_eq!(bank.used_bytes(), used);
+        assert!(!std::ptr::eq(left.observations(), right.observations()));
+        drop(right);
+        assert_eq!(bank.used_bytes(), used - foreign_charge);
+        drop((rows, expected, key, result, request, issued, anchor));
+        assert!(bank.used_bytes() > 0);
+        drop(left);
+        assert_eq!(bank.used_bytes(), 0);
+    }
+}
+
+#[test]
+fn union_assign_mid_transfer_unwind_retires_moved_and_remaining_left_credits() {
+    let row = |bank: &ImageDescriptorBudget, name: &str| {
+        let anchor = ImageChargedPath::pin_existing(
+            NormalizedAbsolutePath::new("/assign-unwind").unwrap(),
+            bank,
+        )
+        .unwrap();
+        let issued =
+            ImageChargedPath::pin_existing(NormalizedAbsolutePath::new(name).unwrap(), bank)
+                .unwrap();
+        let request = ImageObservationRequest::new(anchor, ImageObservationOperation::Lstat);
+        let result = Arc::new(PathObservationResult::InputImage(
+            ImageObservationResult::new(
+                issued.dupe(),
+                request.dupe(),
+                ImageObservationData::Lstat(PathOperationResult::Missing),
+                bank.try_reserve(64).unwrap(),
+            )
+            .unwrap(),
+        ));
+        let key =
+            PathObservationDemand::input_image(PathObservationNamespace::Host, issued, request)
+                .unwrap();
+        (key, result)
+    };
+    let moved_bank = ImageDescriptorBudget::new(4096);
+    let remaining_bank = ImageDescriptorBudget::new(4096);
+    let right_bank = ImageDescriptorBudget::new(4096);
+    let (a, a_result) = row(&moved_bank, "/assign-unwind/a");
+    let (z, z_result) = row(&remaining_bank, "/assign-unwind/z");
+    let moved_path = Arc::downgrade(&a.path.path);
+    let moved_result = Arc::downgrade(&a_result);
+    let remaining_path = Arc::downgrade(&z.path.path);
+    let remaining_result = Arc::downgrade(&z_result);
+    // The maps are the only strong owners of either LEFT row and its credits.
+    let mut left = PathObservationEpoch::from_shared([(a, a_result), (z, z_result)]).unwrap();
+    let (m, m_result) = row(&right_bank, "/assign-unwind/m");
+    let right_path = Arc::downgrade(&m.path.path);
+    let right_result = Arc::downgrade(&m_result);
+    let right = PathObservationEpoch::from_shared([(m, m_result)]).unwrap();
+    let right_used = right_bank.used_bytes();
+    assert!(moved_bank.used_bytes() > 0);
+    assert!(remaining_bank.used_bytes() > 0);
+    assert!(right_used > 0);
+    let controller = left.observations() as *const _;
+    assert_eq!(Arc::strong_count(&left.observations), 1);
+    assert_eq!(Arc::weak_count(&left.observations), 0);
+
+    let caught = {
+        // Ordered insertion #1 moves a; #2 clones borrowed m while z is still
+        // retained by the owning LEFT iterator. The fault disarms before panic.
+        let _fault = super::assignment_unwind_after_for_test(2);
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            left.try_union_assign(&right)
+        }))
+    };
+    let panic = caught.expect_err("the selected mid-transfer test fault must unwind");
+    assert_eq!(
+        panic.downcast_ref::<&str>(),
+        Some(&"test-only observation assignment unwind")
+    );
+    assert!(left.observations().is_empty());
+    assert!(std::ptr::eq(left.observations(), controller));
+    assert_eq!(left, PathObservationEpoch::empty());
+    assert!(moved_path.upgrade().is_none());
+    assert!(moved_result.upgrade().is_none());
+    assert!(remaining_path.upgrade().is_none());
+    assert!(remaining_result.upgrade().is_none());
+    assert_eq!(moved_bank.used_bytes(), 0);
+    assert_eq!(remaining_bank.used_bytes(), 0);
+    assert_eq!(right.observations().len(), 1);
+    assert!(right_path.upgrade().is_some());
+    assert!(right_result.upgrade().is_some());
+    assert_eq!(right_bank.used_bytes(), right_used);
+    drop(left);
+    assert_eq!(right_bank.used_bytes(), right_used);
+    drop(right);
+    assert!(right_path.upgrade().is_none());
+    assert!(right_result.upgrade().is_none());
+    assert_eq!(right_bank.used_bytes(), 0);
+}
