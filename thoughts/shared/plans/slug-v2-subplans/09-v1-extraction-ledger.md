@@ -38,6 +38,17 @@ collection, retained cache, cap, forecast or identity change appears. Temporary
 stage instrumentation served selection and is preserved in evidence, with no
 Core/Source/report layout change in the final component.
 
+The [XZ library revision](wp1225-general-repository-workspace-design.md#pinned-single-threaded-xz-library-revision)
+selects maintained, source-static liblzma/liblzma-sys0.4.9 through ordinary
+dependency aliases. This is external codec leaf reuse, not a new allocator,
+utility collection, semantic cache or donor runtime. Keep the existing Rust
+callback owner/credits,136MiB ceiling and all native/stack/clock contracts.
+Its [component proof](wp1225-xz-library-revision-acceptance-2026-11-10.json)
+separates the warm standalone ABBA from current allocator/native/six-archive
+and generated-catalog checks. Those gates and independent final review pass.
+Cross-platform runtime parity, full command completion and matching latency/RSS
+remain unproved. No new C shim or Zabel source is imported.
+
 The accepted XZ allocation design uses Zabel
 `0795445f3ab60f4e49070bdd0b94425c5610f73a`'s
 `src/compress/{xz_decompress.zig,liblzma_bounded.c}` and

@@ -2860,6 +2860,66 @@ exact cleanup; prior stopped captures reached113. No speed/frontier attribution
 or command/RSS/activation closure follows. Next investigate reached end-to-end
 work; the archive-only ownership envelope now has actual native proof.
 
+### Pinned single-threaded XZ library revision
+
+Status: independent final ACCEPT for the bounded component. General
+production remains Disabled. Pre-revision
+whole-run owned userspace IP evidence reaches `lzma_decode`; it assigns no
+runtime caller, phase or removable cost. A separately reviewed warm ABBA
+comparison of the same low-level reader over the six pinned Rust archives
+retains all820,514,816 decoded bytes and full SHA256 values. Old/new mean worker
+CPU is6.286/4.390 seconds; CPU0.698387 and wall0.698361 ratios pass the declared
+0.95CPU/1.05wall thresholds. This default-allocator read/decode/hash/drop helper
+does not prove native admission, command latency/RSS or completed Rust.
+
+Select exact `liblzma` and `liblzma-sys`0.4.9 (vendored XZ5.8.4) through the
+existing `xz2`/`lzma-sys` dependency aliases, replacing both linked providers
+atomically. Disable defaults and enable only static linkage on both; no
+bindgen, runtime parallel decoder, LTO or version-check bypass. Preserve the
+pinned toolchain and assertions/overflow checks, including build overrides.
+This supersedes only the prior pinned-library-version promise below. The
+Source decoder, raw stream/allocator ABI, stable callback owner, exact native
+prepayment,136MiB logical/C ceiling and end-before-credit retirement stay with
+their existing Rust owners. Actual changed C allocation shapes must satisfy
+the same bank; no resource cap, clock, worker stack, full read/decode/hash,
+freshness, cancellation, history or authority contract is relaxed.
+
+The version revision is Slug-native. Admitted archive bytes/integrity stay
+exact; additional valid ARM64/RISC-V filters and earlier malformed-LZMA2
+refusal are genuine version behavior changes, not universal Bazel-format parity
+or new process permission. The high-level fallback changes empty-output and
+StreamEnd handling. Exercise its actual reader through the ordinary tar
+extractor on Linux with authored bytes/mode/mtime/counts, concatenation/padding,
+late footer/truncation/junk and repeated EOF/empty reads. Keep every existing
+oversized-dictionary magic/filter/property/CRC assertion unchanged.
+
+Acceptance requires current decoder/allocator/format/cancel/deadline/partial-init
+and refund controls, owner/direct-dependent builds, fresh CLI, protected native
+cases, actual six-archive/File/Read/seal/last-reader closure and one frozen
+original under unchanged27+3/512MiB/FD512/backing8GiB/256KiB limits. Inspect
+actual static library versions, C profiles/assertions and Rust build profiles.
+Cargo-only evidence is insufficient: regenerate and reconcile the current
+Cargo/Bazel catalog, including earlier missing LZ4 and the new aliases,
+features, build scripts and source checksums; do not invent generated entries.
+The root must review a finite pinned generator invocation before execution.
+Independent final review, compact evidence and source/plan checks precede
+commit/push. Full Rust/action/REAPI/Slug, scoped HTTPS-None, matching completed
+latency/RSS<=1.25xBazel and production activation remain open.
+
+The [component proof](wp1225-xz-library-revision-acceptance-2026-11-10.json)
+records Core/default-CLI builds,35 ordinary checks,20 native passes and all
+six original archives through File/Read,realization,seal and last-reader release.
+Full820,514,816 decoded bytes remain checked. Actual Cargo/Bazel regeneration
+reconciles all503 packages, aliases, static/manual bindings, build scripts and
+earlier LZ4; independent delta review and fresh no-repin/error-lock check pass.
+The generator uses a private fixed readonly ambient-config view and Shared-target
+scratch; original configuration bytes/modes and declared Cargo cache remain
+unchanged. This preparation environment does not alter Slug process permission.
+All6,774 pins were exact at every capture postcheck. One original records898/55/131,
+Execute12 accepted then Execute13 pending at typed SourceWorkDeadline; exact168/0FD/0backing
+cleanup. Prefix progress is not causal speed or completed-command RSS. Attribute
+current reached work next; no blind repeat or presumed API repair.
+
 ### Bounded actual XZ decoder allocations
 
 Implementation status: independent design/source/final review ACCEPT;

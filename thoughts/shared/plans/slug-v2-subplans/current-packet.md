@@ -3,7 +3,19 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [repository glob complete-anchor preservation](wp1225-general-repository-workspace-design.md#repository-glob-complete-anchor-preservation)
+Current delta: [pinned single-threaded XZ library revision](wp1225-general-repository-workspace-design.md#pinned-single-threaded-xz-library-revision)
+has current Core/default-CLI builds,35 ordinary checks,20 protected native passes
+and six-archive/File/Read/seal/last-reader closure under unchanged limits. The
+[component proof](wp1225-xz-library-revision-acceptance-2026-11-10.json) records
+the separately reviewed byte/hash-equivalent standalone ABBA, actual generated
+catalog reconciliation and fresh no-repin check. Independent final accepts this bounded component.
+One frozen original records898 computes/55roots/131records with Execute12
+accepted and Execute13 pending at SourceWorkDeadline; exact168/0FD/0backing
+cleanup. This is no completed-command latency/RSS or full Rust proof. Next
+attribute current reached work under the existing finite observation contract;
+no blind repeat or presumed API repair. General production remains Disabled.
+
+Accepted predecessor: [repository glob complete-anchor preservation](wp1225-general-repository-workspace-design.md#repository-glob-complete-anchor-preservation)
 passes identical corrected RED4/GREEN4 with strict fact-Arc custody, complete
 logical/terminal Source context, warm reuse and A/B/A restoration. Workspace19,
 Core authority2 and20 unique native selectors pass; ordinary Loading1191/1197

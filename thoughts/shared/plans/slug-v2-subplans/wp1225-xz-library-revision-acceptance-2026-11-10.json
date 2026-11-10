@@ -1,0 +1,267 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT; General production remains Disabled; full goal open",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "f97b3288cba90769872953de3f82e33c842c4873",
+  "classification": {
+    "library_revision": "Slug-native source-static codec leaf reuse, not universal Bazel malformed-input/error-timing parity",
+    "integrity": "Full admitted bytes, actual compressed SHA, decoded/hash/history/freshFD/EOF/modes/custody/credits remain required",
+    "unsupported_or_deferred": "Completed Rust/action/REAPI/Slug, scoped HTTPS-None end-to-end, equivalent completed-command latency/RSS<=1.25xBazel, nonLinux runtime/resource parity and General activation"
+  },
+  "outcome": "Atomically replace xz2/lzma-sys providers via existing aliases with exact liblzma/liblzma-sys0.4.9 vendoring XZ5.8.4, both defaultfalse/staticonly. Preserve actual Rust Source decoder/allocator and ownership. Reconcile generated Cargo/Bazel catalog from pinned generator; no hand-edited entries.",
+  "implementation": {
+    "root_edges": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "Cargo.Bazel.lock"
+    ],
+    "tests": "Four-line cfg(test) wire plus dedicated135line high-level fallback reader leaf; actual reader through unchanged extract_tar/PathDestination onLinux, exact bytes/mode/mtime/counts, concat/padding/fullEOF/empty/repeatedEOF/footer/truncate/junk. Existing assertions unchanged.",
+    "unchanged_owners": [
+      "SourceXzDecoder",
+      "XZ allocator callbacks/header/context/end-before-credit retirement",
+      "DICE Eq/Hash/SHA domains",
+      "Source/RootFD/authority",
+      "archive/tar limits and partial-failure rules",
+      "General production Disabled"
+    ],
+    "actual_build_profiles": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-build-profile.json",
+      "sha256": "8adfa24e69e9cbb785d09219aed5f591061e7e7986d527dc918eb09f2f329912"
+    },
+    "panic_strategies": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-panic.json",
+      "sha256": "38a3255a7f44ae63ca1032760a532ca20fcdc1f86a4a9dba00eeab2891dc6da5"
+    },
+    "source_prevalidation": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-prevalidation-source-review.json",
+      "sha256": "ca534deb55aa95a0dac3633cba5567077b38ca54a5898f92fdabde18b8b6b903"
+    },
+    "static_archive_preservation": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-static-archive-preservation.json",
+      "sha256": "feabf556e39aeee43b17dbfb0406db643d09c3fc8305c6df423af115c0b71f2c"
+    }
+  },
+  "design": {
+    "selection": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-production-design.json",
+      "sha256": "a4bbbfc4638e4f957e416d8a4c0a241a1f836386b2e42af1a4a57c0aa660346e"
+    },
+    "review": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-production-design-review.json",
+      "sha256": "56301b2a56885d328c5f6ac07ee6adea193e5a9bf54304caa7db743802601839"
+    },
+    "source_gap_analysis": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-production-gap-audit.json",
+      "sha256": "7d2dcbdd4d0640f7e045cd5922e2c6e067345cdd1f6f0a6dd12c37f34b51965a"
+    }
+  },
+  "causal_metric": {
+    "abba": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-xz-comparison-abba-v2.json",
+      "sha256": "80ef9c119d4e7b7c746912ce44d64ed2f63a72d4abff5263104dc5cab483722c"
+    },
+    "independent_execution_review": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-xz-comparison-execution-review.json",
+      "sha256": "e98c5151badc1bd156f8cb71ab51bb21af2ca0300cea71b80584aa1c6467d20c"
+    },
+    "warm_arms": 4,
+    "cpu_ratio": 0.6983867000531575,
+    "wall_ratio": 0.6983607813563336,
+    "thresholds": {
+      "cpu_max": 0.95,
+      "wall_max": 1.05
+    },
+    "decoded_bytes_per_arm": 820514816,
+    "controls": "44 tiny cases passed for each separately linked provider, identical full six decoded lengths/SHA values",
+    "qualification": "Standalone default-allocator same low-level full read/decode/hash/drop, not production admission/caller attribution or completed-command latency/RSS. Original prefix differences are not paired causal timing."
+  },
+  "catalog": {
+    "repin": {
+      "path": "/tmp/slug-wp425-validation/liblzma-catalog-repin-5.json",
+      "sha256": "b0a5a96327f69f267aad930a6150bf373e6befc41973d12fa1cf7bef1847fd7f"
+    },
+    "freeze": {
+      "path": "/tmp/slug-wp425-validation/liblzma-catalog-repin-freeze-5.json",
+      "sha256": "36b203144c9d19df723d7855468e369d32d2f2a0d60ba3cf7b3413d62b12f34e"
+    },
+    "source_design": {
+      "path": "/tmp/slug-wp425-validation/catalog-private-config-mask-design-review.json",
+      "sha256": "7aec77404aed9823b27300c71d735e68658aa0d78cb25fad30dba055306d2306"
+    },
+    "source_review": {
+      "path": "/tmp/slug-wp425-validation/catalog-private-config-mask-source-review.json",
+      "sha256": "bcf851ecf63ee028025aa84e3ae61f5e2d2a934946530f6784e8da309ac9d4ad"
+    },
+    "fixture_capability": {
+      "path": "/tmp/slug-wp425-validation/liblzma-catalog-mask-capability-v7.json",
+      "sha256": "510961588a51293e21c1e9a949ea14bfe64f569c4259b8d100d2b8530065a957"
+    },
+    "delta_review": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-generated-catalog-delta-review.json",
+      "sha256": "4885291b9efb6b04dc2e26d4111a9d0c41b22d3521ceab82051ab143a48ec873"
+    },
+    "fresh_check": {
+      "path": "/tmp/slug-wp425-validation/liblzma-catalog-check-1.json",
+      "sha256": "66ac7cc0146c8177541f593eb0868f2c4761f04641cccf225cde73a68485d557"
+    },
+    "fresh_check_freeze": {
+      "path": "/tmp/slug-wp425-validation/liblzma-catalog-check-freeze-1.json",
+      "sha256": "4d3ddc162139faa6fb6f39bbe454f29ffb650f72e45558e86572330ef5f1296f"
+    },
+    "fresh_check_review": {
+      "path": "/tmp/slug-wp425-validation/catalog-fresh-check-execution-review.json",
+      "sha256": "110578464c017c5ac97f2f23dad0abe6d5bc37820d581ce558b092b025a67eb7"
+    },
+    "summary": "503 exact lock/metadata keys =453 registry SHA-checked+49workspace+1unchangedGit. Add liblzma/liblzma-sys/jobserver and earlier missingLZ4, remove oldproviders. All7changedexisting entries classified against actualmanifests, Core aliases correct, static-only reaches syslib+buildscript/manualbindings; ccparallel/jobserver build-time only. MODULElock unchanged in actualrepin+freshcheck. Freshcheck noREPIN/errorlock changed nothing.",
+    "generator_environment": "Pinned Bazel9.2/rules_rust0.73 cargo-bazel, cache-only/offline, ownemptyNETRC/ignoreRC, private USER+NET+MOUNT/onlyloUP. Exactly fixed originalproject.cargo masked readonly/noexec/nosuid/nodev4KiB16inode in child; actualparent hash/mode unchanged, declaredCARGO_HOME separate/configfree. All generated executables/scratch inside Sharedtarget. No upstreamguard/codepatch or Slug runtime permission change.",
+    "failed_preparations_preserved": [
+      "missingrequiredtoolpin beforeowner/child",
+      "repin2 upstreamambientCargo guard",
+      "repin3 live observer ENOENT causeunproved",
+      "repin4 real upstream executable wrapper rejected by outside-metadata placementguard"
+    ],
+    "qualification": "Catalog metadata authoring/check only; not configured Bazel/bootstrap. Reconstructed host binaries verified after extraction; removed transient modextwd copy has no invented afterhash. Full limits and all raw refusal evidence remain preserved."
+  },
+  "validation": {
+    "core_build": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-core-build-result.json",
+      "sha256": "b97f69e261af179ea58570683d64d18c5f9789c66c5cd1b7340777dd88fac5f3",
+      "exit_code": 0,
+      "elapsed_seconds": 155.8974656080245
+    },
+    "cli_build": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-cli-build-result.json",
+      "sha256": "43431656f85647e6649685a48f9bc5ba526294280c2bdf648b66ef576d496cda",
+      "exit_code": 0,
+      "elapsed_seconds": 96.6516047269979
+    },
+    "ordinary35": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-focused.json",
+      "sha256": "2f9667d38b8db3a1138a41376cd058e780e1d1c8c7b6c639c0d06ae6fd56a4d4",
+      "exit_code": 0,
+      "elapsed_seconds": 0.14150162902660668,
+      "selected": 35,
+      "passed": 35,
+      "preflight_exact": true,
+      "qualification": "Expected internally caught FFI callback panic controls may emit stderr; actual libtest35/35exit0."
+    },
+    "native20": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-native20.json",
+      "sha256": "ae0f2912e1e629b6f7c5c5d938c76576cb80cdcf904820ed84444c75a8e8eafe",
+      "exit_code": 0,
+      "elapsed_seconds": 15.795541831990704,
+      "selected": 20,
+      "passed": 20,
+      "freeze_check": {
+        "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-native20-freeze-check.json",
+        "sha256": "5a438367bc1737bd2bb3671b8d98cfe0e46527dd41eaf9996f9146351eba2bf2"
+      }
+    },
+    "six_archive_closure": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-native-six.json",
+      "sha256": "2df42f9509d55168f0918ec52375a4ff9562d14231f87660392931b2e0b2b317",
+      "exit_code": 0,
+      "elapsed_seconds": 8.313045426999452,
+      "selected": 1,
+      "passed": 1,
+      "decoded_bytes": 820514816,
+      "body_bytes": 631202064,
+      "full_assertions": "Allsix same files, full acquisition/decode/bytes, File/Read, realization,seal,lastreader and exact owner/refund; nativecredit notRSS.",
+      "freeze_check": {
+        "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-native-six-freeze-check.json",
+        "sha256": "5a438367bc1737bd2bb3671b8d98cfe0e46527dd41eaf9996f9146351eba2bf2"
+      },
+      "observed_archive_stage_peak_native_credit_bytes": 335544782,
+      "peak_qualification": "Printed cumulative bank peak through sixthArchive; no later exact peak scalar emitted. CompleteFile/Read/seal/reader work still passes enforced512MiB bank and original27s clock. Credit is not RSS."
+    },
+    "frozen_artifacts": [
+      {
+        "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-core-preservation.json",
+        "sha256": "ede57eaff47a8d5b82c7fc6be0f27396e8533665ccca11c66df1331e7e29f153"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-cli-preservation.json",
+        "sha256": "e24b09affdfdd5584da129a4bbb1361b8faaeaa81e660146f3efb4e915c5bcd3"
+      }
+    ],
+    "capture_freeze": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-native-freeze.json",
+      "sha256": "d8344ebaa7901913037a70fa9e09a2456735acac2cda7bd1191bbfb97dc33aba"
+    },
+    "capture_pins": 6774,
+    "format": "Pinned rustfmt edition2024 skip_children=true/reorder_modules=false --check bothRustfiles PASS",
+    "independent_execution_qualification": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-production-execution-review.json",
+      "sha256": "ebb890c99b12aca720427a344447cea369c7ddb82268c94ddf1422269036b1b4"
+    }
+  },
+  "original_rust": {
+    "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-original.json",
+    "sha256": "7231e249c610fefd3ccdf51330b3b5a134b03f9ed76eb18fa9c59f533aab881e",
+    "exit_code": 0,
+    "elapsed_seconds": 27.119416542002,
+    "selected": 1,
+    "libtest_passed": 1,
+    "command_result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 898,
+    "last_epoch": {
+      "roots": 55,
+      "records": 131
+    },
+    "last_event": "progress_refused",
+    "last_recorded_execute": 12,
+    "pending_execute": 13,
+    "pending_repository": "rules_cc++cc_configure_extension+local_config_cc",
+    "scope_decoded_bytes": 849224319,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "trace_truncated": true,
+    "freeze_check": {
+      "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-original-freeze-check.json",
+      "sha256": "5a438367bc1737bd2bb3671b8d98cfe0e46527dd41eaf9996f9146351eba2bf2"
+    },
+    "qualification": "ONE original run. Test correctly records typed Source WorkDeadline; command incomplete. Progress-prefix counts do not establish speedup/caller/cost. No API repair selected. Next attribute current reached work under existing finite diagnostic contract, no blindrepeat."
+  },
+  "unchanged_limits": {
+    "native_credit_bytes": 536870912,
+    "FDs": 512,
+    "backing_bytes": 8589934592,
+    "roots": 128,
+    "source_metadata_bytes": 16777216,
+    "process_tree_bytes": 67108864,
+    "Source_work_seconds": 27,
+    "cleanup_seconds": 3,
+    "worker_stack_bytes": 262144,
+    "XZ_logical_bytes": 142606336,
+    "compressed_call_bytes": 134217728,
+    "decoded_call_bytes": 536870912,
+    "decoded_aggregate_bytes": 1073741824,
+    "qualification": "Preparation AS/storage limits and native internal credit are not completed workload RSS."
+  },
+  "timing": {
+    "compile_seconds": 252.5490703350224,
+    "ordinary_seconds": 0.14150162902660668,
+    "native20_seconds": 15.795541831990704,
+    "six_seconds": 8.313045426999452,
+    "original_seconds": 27.119416542002,
+    "review_and_packet_elapsed": "Not separately instrumented. Raw receipts retain command-specific elapsed values; no workflow-speed claim."
+  },
+  "residual": "Full original/bootstrap/action/REAPI/Slug, successful scoped HTTPS-None, matching completed latency/RSS<=1.25xBazel, and atomic General activation remain open. No cap/clock raise, caller adapter, body shortcut, discarded history or weakened archive assertions.",
+  "independent_final_review": {
+    "path": "/tmp/slug-wp425-validation/post-boundary-liblzma-final-review.json",
+    "sha256": "9e482e29e6027a68a112b378cfab23ffc4c5df1b66cd46421820e16330998e5e"
+  },
+  "finalization": "Only mechanical status/review-reference updates after independent ACCEPT; tested production/test/dependency bytes remain exact. Native freeze was exact at each capture postcheck; four plan files and this receipt finalized afterward."
+}

@@ -107,6 +107,17 @@ Disabled. Full Rust/action/REAPI/Slug, completed-command latency/RSS and activat
 remain open. The accepted [operation-local scratch component](./slug-v2-subplans/wp1225-range-scratch-acceptance-2026-11-10.json)
 retains full required work, exact TEMP retirement and fixed-stack proof.
 
+The [pinned XZ library revision](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#pinned-single-threaded-xz-library-revision)
+now has current Core/default-CLI,35 ordinary checks,20 native passes and complete
+six-archive/File/Read/seal/reader closure, with all existing limits unchanged.
+Its [component proof](./slug-v2-subplans/wp1225-xz-library-revision-acceptance-2026-11-10.json)
+separates standalone byte/hash-equivalent ABBA from actual native and generated
+catalog/fresh-check gates; independent final accepts this component. One frozen original
+reaches898/55/131 with Execute12 recorded and Execute13 pending at typed
+SourceWorkDeadline, exact168/0FD/0backing cleanup. Full Rust/action/REAPI/Slug,
+completed-command latency/RSS and General activation remain open. Next attribute
+current reached work under the existing finite diagnostic contract.
+
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.
 Inactive Core now covers rooted mutation/archive IO, complete snapshots/sealing,

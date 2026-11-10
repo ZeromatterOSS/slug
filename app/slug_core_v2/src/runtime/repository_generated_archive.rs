@@ -743,3 +743,7 @@ mod rooted_tests;
 ))]
 #[path = "repository_generated_archive_xz_accounting_tests.rs"]
 mod xz_accounting_tests;
+
+#[cfg(test)]
+#[path = "repository_generated_archive_high_level_xz_tests.rs"]
+mod high_level_xz_tests;

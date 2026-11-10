@@ -146,7 +146,7 @@ lalrpop = { version = "0.19.7", artifact = "bin" }
 lalrpop-util = "0.19.7"
 libc = "0.2.158"
 lz4_flex = { version = "=0.14.0", default-features = false, features = ["safe-encode", "safe-decode", "checked-decode"] }
-lzma-sys = "=0.1.20"
+lzma-sys = { package = "liblzma-sys", version = "=0.4.9", default-features = false, features = ["static"] }
 linked-hash-map = { version = "0.5", features = ["serde_impl"] }
 linkme = { version = "0.3.17", features = ["used_linker"] }
 log = "0.4"
@@ -263,7 +263,7 @@ winapi = { version = "0.3", features = ["everything", "std"] }
 bzip2 = "0.4"
 x509-parser = "0.14.0"
 xattr = "0.2.2"
-xz2 = "0.1"
+xz2 = { package = "liblzma", version = "=0.4.9", default-features = false, features = ["static"] }
 zip = "0.5"
 zstd = "0.13.0"
 
