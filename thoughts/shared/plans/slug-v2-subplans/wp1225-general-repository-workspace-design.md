@@ -1361,6 +1361,77 @@ work must discriminate prerequisite serialization rather than infer time from
 map counts. The following bounded Lstat-only scheduling contract selects the
 first discovery class; other Need families retain their own resource decisions.
 
+### Complete framed Body comparison without discarded digest
+
+Status: independent design/source/causal/GREEN/selected-use/retirement/final review ACCEPT.
+The [component receipt](wp1225-framed-comparison-acceptance-2026-11-10.json)
+records1finalTOTALSHA131085 REDfailure afterall4Raw/Packed semantic cases, then
+unchanged GREEN. Selectedhelper actual4,822,504,936read/comparison-argument bytes,
+74,277calls/SHA0, clear flags and25pins/source-state exact. This is repeated
+cross-invocation work, notone512MiB recoverywindow or CPU/speed/RSS proof.
+Temporary observer retires via5exactGREENcopies/1module; RootIO/readwitness and
+report/trace budgets return toHEAD. Fresh Core109/native18/six-archive closure
+pass (seal10295ms/peaknativecredit335,539,406). Final original observes Rusttools
+materialization progress then local_config_ccsymlink work; last recordedepoch
+847/55/119 needsSymlink1, followed by workspacesprogress withno later epoch, then
+typedSourceWorkDeadline. Observed prefix844/55/118 stopsattools materialization.
+Both cleanup to168retained/zeroFD/zero backing. Fullcompletion/latency/RSS and
+activation remain open; specifichistoricalLoading/REAPIproof inherits onlynamed scope.
+This Slug-native work revision advances authentic original Rust through the one
+shared comparator used by ordinary same-path reuse and bounded cross-path recovery.
+The current-source profile of main `e3f386de4afc938821b8770d72a309d6ea1da8c9`
+reconciles3,319samples/541rows with zero loss/throttling and20immutable pins.
+Shared SHA252samples is reached work, not this helper's runtime caller/phase/cost.
+Static current ELF confirms observed_equal still invokes real SHAupdate/finalize;
+source proves its returned digest is never compared, retained or published.
+Detailed design: `/tmp/slug-wp425-validation/framed-comparison-design.json`.
+
+This explicitly replaces the historical SHA-even-after-mismatch requirement in
+both the prior framed-stream exclusion and the cross-path recovery contract below.
+Full equality is authenticated by every actual chunk's logical Body::range_eq,
+complete length/EOF, regular/single-link/device checks, stable opened-FD/current
+name, and equality to the supplied snapshot frame. Request existing
+RootIo::read_file_contents and consume stat directly; never synthesize a digest.
+Keep read_file/digest_file full actual-SHA APIs and all Source/digest observations,
+routed readers, compressed actual Archive/SRI, canonical Body/Workspace Eq/Hash/
+SHA/StableKey/REAPI/CAS and codec roundtrip unchanged.
+
+Preserve eager comparison of EVERY delivered chunk even after first mismatch:
+retain bitwise `&=` with one private inline comparison forwarder, never short-
+circuit `&&` or early false. Preserve all reads/callbacks/checks/error positions,
+exact offset/frame/EOF and late error precedence over false or original Resource.
+Only full true permits same-path old-body reuse or exact claimed same-origin
+lease retention. Recovery still has128rows TOTAL/fixed endpoints,4comparisons/
+512MiB full-length predebit before IO, exact payload-ResourceLimit-only entry,
+control/origin/bank/association/lock/cancel/sticky-scope/retirement discipline.
+No lookup, allocation, decoder cache, identity, semantic selection or cap changes.
+
+RED leaves the old hashed caller in place. New real-helper Raw/Packed equal and
+first-byte mismatch cases must finish bool/full reads/frames/old-body lifetime/
+required-digest/FD/refund checks BEFORE a final TOTAL SHAupdate-bytes==0 gate.
+Count either API's delivered bytes; checking only contents_sha0 would falsely
+pass the old digest-class caller. Add a scoped cfg(test) comparison-call witness
+inside the inline forwarder; argument bytes/calls must cover the full stream
+for both equal and false, catching short-circuit source regressions. This is
+call-attempt evidence, not CPU instruction counts. After an actual first chunk,
+late mutation/grow/truncate/name/mode/cancel errors must not become Ok(false).
+Keep executed causal tests byte-exact for GREEN; change only shared helper API,
+stat access and obsolete SHA comment.
+
+A temporary operation-local thread-bound guard reuses both test TLS witnesses;
+no new temporary TLS/input/Scope/owner is retained. Checked before/after deltas
+including errors/unwind feed a fixed40B process-wide atomic collector of read/
+SHA/comparison-argument/call counts. Guard sizing <=64B and bounded local control
+must fit the existing1024B IO allowance/256KiB stack. Preserve an existing outer
+witness rather than clearing it. Partial/nested/callback reads are not unique
+request-isolated bytes or successes. Positive selected-helper read/comparison/
+call counts and SHA0, clear validity flags, immutable pins and exact cleanup are
+required; previous3consumers' global metadata counter is insufficient.
+Report2KiB trades from existing512KiB events; phase16KiB/prefix32/events128 stay.
+Restore exact GREEN candidate copies, notHEAD, and remove observer before final
+Core owner/direct-dependent/default CLI/native18/six-archive/finaloriginal gates.
+Full Rust/action/REAPI/Slug, completed-command latency/RSS and activation stay open.
+
 ### Framed content streams without discarded RootIo digests
 
 Status: independent design/source/corrected causal/GREEN/actual-use/retirement/final review ACCEPT.
@@ -1395,8 +1466,10 @@ Never return a synthetic/zero digest. Migrate only fresh raw/packed snapshot
 capture and complete seal: exact captured Body bytes and full immutable-Body
 comparison own those facts. All offsets, caller checks and frame comparisons
 remain. No required SHA, canonical logical identity, codec roundtrip or full
-content check is removed. Recovery retains its explicit SHA-even-after-mismatch
-contract; routed readers, FileBytes/FileDigest observations, Source manifests,
+content check was removed by that component. It left recovery on the historical
+hashed API; the [complete comparison amendment](#complete-framed-body-comparison-without-discarded-digest)
+now explicitly replaces only that helper's discarded SHA. Routed readers,
+FileBytes/FileDigest observations, Source manifests,
 archive actual compressed SHA/SRI and Source verification stay unchanged.
 
 Preserve every actual read, regular/single-link/device/path/size bound, callback
@@ -2565,9 +2638,12 @@ Permit at most4 complete comparisons and512MiB cumulative comparison bytes per
 recovery. Debit the full candidate length with checked arithmetic BEFORE IO;
 an exhausted window preserves Resource. These are local recovery-work bounds,
 not Source attempt/decoded-byte allowances or changes to existing caps. Reuse
-RootIo::read_file unchanged: actual regular FD and named-frame checks, exact
-length, true EOF and SHA over the same streamed bytes. Compare every byte even
-after mismatch, then also match the captured frame to the snapshot frame. Only
+the complete framed stream under the [reviewed comparison amendment](#complete-framed-body-comparison-without-discarded-digest):
+RootIo::read_file_contents keeps actual regular FD and named-frame checks, exact
+length and true EOF without requesting the independently discarded digest.
+This explicitly supersedes the prior SHA-even-after-mismatch algorithm promise;
+read_file/digest_file still compute full actual SHA for their consumers. Compare
+every byte eagerly even after mismatch, then also match the captured frame to the snapshot frame. Only
 full equality permits retain_claimed on the exact live lease in this same
 pending/ledger association, followed by returning its existing Arc. No new body
 allocation or partial snapshot is published. Mismatch continues within the

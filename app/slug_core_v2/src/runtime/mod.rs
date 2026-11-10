@@ -73,6 +73,8 @@ mod repository_process_wire;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)] // Inactive WP425 primitives; owners are integrated separately.
 mod repository_root_io;
+#[cfg(test)]
+mod repository_workspace_comparison_work_for_test;
 mod request_revision;
 mod root_apparent_repository_definition;
 mod root_apparent_repository_route;

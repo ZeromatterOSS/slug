@@ -75,8 +75,15 @@ exactly before Core102/native18 and six-archive seal/reader closure. Its
 [component proof](./slug-v2-subplans/wp1225-framed-content-stream-acceptance-2026-11-10.json)
 has final independent acceptance. Final production reaches843/55/117 with File8
 pending afteracceptedFile7, then nestedsource WorkDeadline and exact cleanup.
-Next attribute remaining reached work on current source. Fullcompletion,
-completed-command latency/RSS and activation remain open under unchanged limits.
+The [complete framed comparison amendment](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#complete-framed-body-comparison-without-discarded-digest)
+passes causal RED/GREEN and actual selected-helper4,822,504,936bytes/SHA0 while
+preserving eager/full reads, requiredSHA and recoverybounds. TEMPretired,
+Core109/native18/six-archive closure pass. Its
+[component proof](./slug-v2-subplans/wp1225-framed-comparison-acceptance-2026-11-10.json)
+has final independent acceptance. Final original progresses beyond Rusttools
+materialization into local_config_ccsymlinks, last recorded847/55/119 thentyped
+SourceWorkDeadline and exactcleanup. Next attribute current remainingreached work.
+Fullcompletion, completed-command latency/RSS and activation remainopen.
 
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.

@@ -1,0 +1,384 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "e3f386de4afc938821b8770d72a309d6ea1da8c9",
+  "classification": "Slug-native operation-local arithmetic revision with explicit internal owner-contract amendment; full equality/freshness and all independently consumed SHA domains unchanged",
+  "outcome": "The shared same-path/recovery comparator requests existing full contents+authenticated metadata rather than deriving a discarded per-file SHA. Actual selected-helper reads4822504936bytes and attempts samebytecomparison with0SHA across74277calls. Final original passes Rust tools materialization demand and reaches later C++ symlink work, then WorkDeadline; full command remainsunfinished.",
+  "owner_amendment": {
+    "decision": "Both old durableSHApromises explicitly amended before implementation: earlier3consumer exclusion and crosspath recovery SHA-even-after-mismatch algorithm requirement. Historical accepted receipts remain unchanged; new owner supersedes only discarded-output arithmetic.",
+    "fact_basis": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-source-decision.json",
+      "sha256": "a5ff44b65c9ff51a75cbca9fefcf7a0400af6cf1d25a614164a9e162a9963e9d"
+    },
+    "no_independent_digest_fact": "observed_equal never consumed returned digest. It authenticates equality with everyactual logicalBody.range_eq argument, exact length/EOF, regular/singlelink/device/openedFD/current-name checks and suppliedsnapshotframe. Only fulltrue retains oldbody/exact same-origin lease.",
+    "protected": "read_file/digest_file still return full actualSHA; RootIOkernel unchanged. RequiredSource manifests/verify/placement/FileDigest/owned/routed reads, compressed actualArchive/SRI, canonical Body/WorkspaceEq/Hash/SHA/StableKey/REAPI/CAS and codec roundtrip unchanged."
+  },
+  "implementation": {
+    "delta": "One helper usedbyBOTH samepath andcrosspath: read_file_contents +stataccess+obsoletecomment update. Eager same &= compare_chunk retained; privateinline forwarder calls old.range_eq with cfgtest-only argumentcounter. No shortcircuit/earlyfalse/IOskip/lookup/SourceScope/error/bound/debit/lease/retention/authority change.",
+    "recovery": "128rowsTOTAL/pendingthencommitted/fixedendpoints;4comparisons/512MiB fulllength predebit beforeIO; exactpayloadResourceLimit-onlyentry, origin/bank/association/controlprepay/noheldlock, stickyScope/currentcancel/IO/frame precedence andlastownerrelease unchanged.",
+    "memory": "No production retainedfield/cache/interner/container/dependency/hashdomain/donor/decoderbuffer/stackincrease. Same64KiBRootIO/3FD/256KiBworker. PrivatecfgtestcomparisonCell16BscalarSnapshot/threadboundguard retainsnoinput/body/Scope/owner andclearsDrop; hook countsrange_eq invocationarguments, notCPU instructions."
+  },
+  "causal_basis": {
+    "profile": {
+      "path": "/tmp/slug-wp425-validation/post-framed-stream-owner-ip-final-validation.json",
+      "sha256": "17ce9a5f25152d0a147aaa50f5bfa47407a7a9667e22bf9ec6ef452c0a7e0321"
+    },
+    "profile_review": {
+      "path": "/tmp/slug-wp425-validation/post-framed-stream-owner-ip-evidence-review.json",
+      "sha256": "19ae7860d599687925c320cdf98db8075a51233f3a65810b5614aebc7beb6d79"
+    },
+    "current_static": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-current-static-feasibility.json",
+      "sha256": "898fed9b4a14e132d72fbe603c953b461e6f6c06c6ecfce5d068e2360002b0a3"
+    },
+    "source_tests": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-test-source-audit.json",
+      "sha256": "5ba21d740a8b5d34b7ec518df41aa1132e138302cbecd7fcf12a51640a265950"
+    },
+    "qualification": "3319samples/541rows/period16678389875 withzero loss-throttle/20pins exact. SharedSHA252samples onlyreachedwork, no caller/phase/cost/saving/speed inference. Currenthelper retains actualSHAupdate/finalize; actualuse separately gated."
+  },
+  "validation": {
+    "red": {
+      "selected": 2,
+      "exit_code": 101,
+      "elapsed_seconds": 0.06124640299822204,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-red-core-tests.json",
+        "sha256": "d702dac4aca8f7f5d302b2c7fd0ceba7fc45e105e79a80567a9fbfb1004e81f9"
+      }
+    },
+    "red_meaning": "Oldhashedhelper intact.1late-errorcontrolPASS; solefailure finalTOTALSHA131085vs0 atline166 AFTERall4Raw/Packed equal/firstbytemismatch semantics/fullread/eagercomparison/requiredactualSHA/leaseWeak/FD/bank checks. Class-specific checks followzeroSHAgate; neverfalse-proofcontentsSHAalone.",
+    "red_proof": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-red-validation.json",
+      "sha256": "0d48cfc3fffc542c502bc5c8d2e00d26d48cc355dd514dc6923e669fa6a8198a"
+    },
+    "green": {
+      "selected": 6,
+      "exit_code": 0,
+      "elapsed_seconds": 0.06125956098549068,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-green-core-tests.json",
+        "sha256": "f335729e12690c3fee59f4a576e73fc4e53bcac9649a10244bd544efab814179"
+      }
+    },
+    "green_meaning": "Same2executedcausaltests byteexact nowPASS; TEMP3math/lifecycle/layout/borrowedTLS/unwind+1boundedreport testsalsoPASS.",
+    "green_preserved": {
+      "selected": 107,
+      "exit_code": 0,
+      "elapsed_seconds": 1.3657825159898493,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-green-protected.json",
+        "sha256": "84b4623ac983d9fbb97971c022b41e155aabd33991eb03b9ded7d35f2bd10aee"
+      }
+    },
+    "production_core": {
+      "selected": 109,
+      "exit_code": 0,
+      "elapsed_seconds": 1.4266160349943675,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-production-core-tests.json",
+        "sha256": "113cc822695501f5c0aa0cdcee6caa5169974500cfe7df0e31f39d8a1dcbb4a6"
+      }
+    },
+    "ordinary_scope": "109exactunique: previous102+5cursor/predebit/origin/refund/error controls+new2causal; freshactualpreflight. Comparewitness arguments coverentirestream afterfirstmismatch; byteIOwitnessalone wouldnotproveeagercalls. Late truncate/grow/name/mode/cancel musttypederror, neverfalse.",
+    "selection_audit": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-validation-scope-audit.json",
+      "sha256": "73d8a4e89a839a29dcf210883a23803b2d8dc0fd6497ba202f26c256c9d39ac5"
+    },
+    "native_protected": {
+      "selected": 18,
+      "exit_code": 0,
+      "elapsed_seconds": 15.454277896991698,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-production-native-protected.json",
+        "sha256": "a98f76eed93e1e8d8ce903f65be0bf1307e894c6125782d03859287b3a582fc5"
+      }
+    },
+    "native_scope": "18protected cases including4warmoriginalcompilercommands, samepathchangedbodyoverlap/crosspathsamebytesretain anddifferentbytesResource, fullhistory/closedrealization/freshness/foreign/lastreader/refunds.",
+    "six_archive": {
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 10.455807293998078,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-production-native-six.json",
+        "sha256": "b842dd8faa23c943f2fdd13bb74b82cc3c574a1e9f12d06740ea04d5780d24d1"
+      }
+    },
+    "six_scope": "Required freshpinned6Archive/File/Read/seal/lastreader closure. Sealwork_elapsed10295ms/nativecredit335539406/logicalbodies631202064/decodedtar820514816 underunchangedlimits. Oneboundedclosure isnot speed/RSS or originalcompletionproof.",
+    "profile": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-production-build-profile.json",
+      "sha256": "97b502561d5be00d22f3289004cd0ddeb250309c437fc5c9b3a17f2646d80189"
+    },
+    "panic": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-production-panic.json",
+      "sha256": "94f7762446d05334ea487c3642b553eb9301b12364cc8573d08a9700768341ae"
+    },
+    "build_scope": "Opt3/debugassertions/overflow inclbuildoverrides. Core inheritedobserverfeature TEMPgone/staticUnwind; freshdefaultCLI onlydefaultfeatures/staticAbort.",
+    "native_postcheck": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-production-native-validation.json",
+      "sha256": "e03091bec8e47666d9cb3a3e5353f63e710daf6cdb1fd06bca49bdfa3b2366ba"
+    },
+    "final_integration_checks": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-final-integration-checks.json",
+      "sha256": "8c14b9feec72a1ecf802df04cf64897fde9b6560d2a5ee8ffdc492ac6b64676b"
+    }
+  },
+  "actual_selected_helper_use": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-observed-validation.json",
+      "sha256": "95ac879ca3e67d6603c06dc869b376ca26536e4416dfe120e938b4370ccb9cf6"
+    },
+    "postcheck": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-observed-original-freeze-check.json",
+      "sha256": "bf81559c9ce5a41cb09735bc36d9b090a10f44475c91a001419865818372987e"
+    },
+    "work": {
+      "after": [
+        4822504936,
+        0,
+        4822504936,
+        74277
+      ],
+      "after_overflow_mask": 0,
+      "arithmetically_exact": true,
+      "atomic_snapshot": false,
+      "before": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_overflow_mask": 0,
+      "checked_delta": [
+        4822504936,
+        0,
+        4822504936,
+        74277
+      ],
+      "columns": [
+        "read_payload_bytes",
+        "sha_update_bytes",
+        "range_eq_argument_bytes",
+        "range_eq_calls"
+      ],
+      "process_wide": true,
+      "qualification": "Selected synchronous comparator operation-local read/SHA and range_eq argument/call deltas via reused scalar test witnesses; partial/nested/callback work is not unique or request-isolated. Checked processwide non-atomic aggregates; no inputs/Scope retained, not CPU, saving, speed, RSS or success",
+      "request_isolated": false,
+      "reset": false,
+      "reversed_mask": 0,
+      "saturated_mask": 0,
+      "unknown_overflow_bits": 0
+    },
+    "functional_result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 844,
+    "roots": 55,
+    "records": 118,
+    "last_need": "Rustnightlytools finalGeneralWorkspace materialization afterall6archives/File8",
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "All25pins+fulltracked/untracked source-state exact.4.8GB is repeatedsamepath+recovery work acrossinvocations, notone512MiBwindow. Operationlocal deltas/processwide nonatomic/nonisolated/nested/callback/partialwork, notunique bytes/successes/CPU/saving/latency/RSS."
+  },
+  "observer_retirement": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-counter-retirement.json",
+      "sha256": "eb3c01294edb85e941ab3170149adba6ca4163e60295931c9b6c44e722ad959a"
+    },
+    "production_source": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-production-source-1-freeze.json",
+      "sha256": "9b9a86c025f4c8c1c3aa58113599ee617cceeb279d0fa1a763eb80fdf4242cec"
+    },
+    "design": "Fixed40BAtomiccollector; executedGuard<=64B plus existingtestTLS reused, no newTEMP TLS/body/input/Scope/owner/pointer. Ownedwitnesses clearafterDropaggregation; borrowedouterwitness survives. Checkedclasscombination/reversal/missingwitness/overflow/saturation/unknownflagsinvalidate, nowrap/newobserverpanic.",
+    "proof": "FiveexactGREENpreinstrumentcopies restored, notHEAD; onenewprobe removed. Keepnewmetadatahelper/inlineforwarder/permanentcomparisonwitness+modulewire. TEMPcurrentgetters removed; RootIOkernel/readwitness andoldtoolchainreport HEADexact/512KiBtrace16KiBphase/prefix32/events128 restored. Instrumentedsource/binaries/rawpreserved."
+  },
+  "final_original": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-production-original.json",
+      "sha256": "fe8185293b9f2877ae941ef9abb978a87dcc0760dd61c27629c1ed7063660c29"
+    },
+    "postcheck": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-production-original-freeze-check.json",
+      "sha256": "73757d4e029c4d985467d98b7e3a4b8ed20ee1ef22fa25c48d02181c21e5401a"
+    },
+    "supervisor_exit_code": 0,
+    "elapsed_seconds": 27.136616634001257,
+    "functional_result": {
+      "error": {
+        "code": "WorkDeadline",
+        "kind": "source_service"
+      },
+      "status": "driver_refusal"
+    },
+    "last_recorded_compute": 847,
+    "last_recorded_roots": 55,
+    "last_recorded_records": 119,
+    "progress_boundary": "At844RusttoolsGeneralWorkspace materialization requested thenrepositoriesprogressobserved; at845materializationrowsclear/pathneedonly; at846local_config_ccSymlink0 requested; at847epochrecordsSymlink0accepted andneedsSymlink1. Finalevent847workspacesprogressobserved hasno subsequentepoch; do notinferSymlink1accepted orunfinished fromthat eventalone.",
+    "peak_native_credit_bytes": 348807557,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "All24pins+fullGit source-state exact across3serialnativegates. One stoppedprefix withtypedSourceWorkDeadline; not repeatability/regression/speed/fullRust/completedlatency/RSS/activationproof."
+  },
+  "inherited": {
+    "through": "wp1225-framed-content-stream-acceptance-2026-11-10.json ate3f386de4",
+    "loading": "No Loading/Workspace/Map sourcechange; priorfullLoading1194/1200 exact6qualifiedbaselinefailures andMap72/Workspace134 ownerproof inherited, notnewexecution/allgreen.",
+    "reapi": [
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-execute.json",
+        "sha256": "f883ba1703e063e4c87ead157b73c4bec74529f7e179869c9b0f7046dfc75cf8"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-corruption.json",
+        "sha256": "6de2d95d62f4b82e4280a0862768fbefd3fd4774b5d660d248c2e4cfc84e262d"
+      }
+    ],
+    "reapi_scope": "Specificunchanged Body/identity/CAS/transport/physicalsource/runfiles/corruptrefusal-restoration only. Changedcomparator separatelycoveredby109/native18/six/currentoriginal. No freshbroadREAPIpipelineclaim."
+  },
+  "limits": {
+    "native_bytes": 536870912,
+    "fds": 512,
+    "backing_bytes": 8589934592,
+    "roots": 128,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack_bytes": 262144,
+    "xz_decoder_bytes": 142606336,
+    "qualification": "AllSource/Meta/Process/Execute/archive/stream/tmpfs/tree ceilingsunchanged. Credit/AS/capsarenotRSS."
+  },
+  "builds": [
+    {
+      "label": "framed-comparison-red-build",
+      "exit_code": 0,
+      "elapsed_seconds": 77.02703969800496,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-red-build-result.json",
+        "sha256": "5a06ceb5f5133f1fa284a237448ccd1ca75e8f137cedcbc7e5cd8501f740a914"
+      }
+    },
+    {
+      "label": "framed-comparison-green-build",
+      "exit_code": 0,
+      "elapsed_seconds": 80.14826018401072,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-green-build-result.json",
+        "sha256": "3b91f588b3bc4dda4d31da46ff173b4ba43ebd9fafc6ecc72be9bc96f723a7f0"
+      }
+    },
+    {
+      "label": "framed-comparison-cli-build",
+      "exit_code": 0,
+      "elapsed_seconds": 6.488732944999356,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-cli-build-result.json",
+        "sha256": "be30e22767ffd5146b6efec50f5ec044db9c9806d2ae418375c26c0fd1be256b"
+      }
+    },
+    {
+      "label": "framed-comparison-production-build",
+      "exit_code": 0,
+      "elapsed_seconds": 80.68774113399559,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-production-build-result.json",
+        "sha256": "ae65356b62af0338150e798f9cc900a8d0b5f6ea52bfd79eabccc8323d89c8cc"
+      }
+    },
+    {
+      "label": "framed-comparison-production-cli-build",
+      "exit_code": 0,
+      "elapsed_seconds": 6.3317773189919535,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-production-cli-build-result.json",
+        "sha256": "8365f530b15b43d31e610441e532a7ba2a56abfc0c9275c197700ed7d665cbcb"
+      }
+    }
+  ],
+  "compile_seconds_total": 250.68355128000258,
+  "review": {
+    "design": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-design-review.json",
+      "sha256": "2b11d189c348c140ab7940b188331e43419918101bebe9866c3f47b76cc4f6b3"
+    },
+    "red_source": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-red-source-review.json",
+      "sha256": "394da0268514e2688a9efd08e8dbe79073fe11e5abfd79d8fb14a7f0917c7939"
+    },
+    "red_execution": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-red-execution-review.json",
+      "sha256": "d4976bc1365b54f6ced4b267843c9ef55ed0da77df75112e32089a74d4b823fb"
+    },
+    "green_source": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-green-source-review.json",
+      "sha256": "7efcac596b7f1fd796d7efaaf1d1af287c13b9866096d328ed8740b9578bf26a"
+    },
+    "green_execution_scope": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-green-execution-review.json",
+      "sha256": "41b71a5b114b464cd6de3acc6920606f2cc5942f7050ce3b10256e24b6f2e8f3"
+    },
+    "selecteduse_retirement": {
+      "path": "/tmp/slug-wp425-validation/framed-comparison-retirement-review.json",
+      "sha256": "6fe3715ae2d814d8e6163d917107ac2ea262f7e172af3d989f227ec8a46a58c0"
+    },
+    "final": {
+      "verdict": "ACCEPT",
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/framed-comparison-final-review.json",
+        "sha256": "6d2c79052421ff5a68b84a7096b080f81bf0c19267789a239b30364061548bc7"
+      },
+      "scope": "Source/evidence pins and requiredgates verify; fullcomparison/recoverybounds/requiredSHA protected, TEMPretired. Trace doesnotestablishSymlink1terminalstate; fullRust/latency/RSS/activationremainopen."
+    }
+  },
+  "preserved_executables": {
+    "red_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/framed-comparison-red-core-slug_core_v2-3e70c3ba7a9e6d21",
+      "executable_sha256": "3e70c3ba7a9e6d212d740612ccc7fed97c730593a8c2690412f79491fd33c9ac",
+      "build": "framed-comparison-red-build",
+      "target": "slug_core_v2"
+    },
+    "green_instrumented_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/framed-comparison-green-core-slug_core_v2-d130c248ab3e5b33",
+      "executable_sha256": "d130c248ab3e5b33375a7b89352031040a859a9a13957774d77294eb9bd201d0",
+      "build": "framed-comparison-green-build",
+      "target": "slug_core_v2"
+    },
+    "instrumented_source_default_cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/framed-comparison-cli-slug-731ea252078a912e",
+      "executable_sha256": "731ea252078a912e166e044564c77b70b726f53e3966410c7ef3bc83ac62f018",
+      "build": "framed-comparison-cli-build",
+      "target": "slug"
+    },
+    "production_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/framed-comparison-production-core-slug_core_v2-192ba0d923ce334b",
+      "executable_sha256": "192ba0d923ce334bc24c4d8cf5e51317146689b059f6a746ac79e88bd3ccfd1d",
+      "build": "framed-comparison-production-build",
+      "target": "slug_core_v2"
+    },
+    "production_cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/framed-comparison-production-cli-slug-51dba5d40ad4266f",
+      "executable_sha256": "51dba5d40ad4266fd61722fb1b71e265d17694503d8d7293fae32ec6559ed370",
+      "build": "framed-comparison-production-cli-build",
+      "target": "slug"
+    }
+  },
+  "fixture_hygiene": "No new externaloraclefixture/callerrecipe. NewprivateactualhelperRaw/Packed/eager/mismatch/lateerror fixtures reuseexistingRootIo/canonicalBody/leases; alloldassertionsunchanged. No testwaiver/correction needed. Requiredroundtrip/freshbytes/SHAidentity domains preserved.",
+  "remaining": "FullauthenticRust/action/REAPI/Slug, completed-command latency/RSS<=1.25xBazel, successfulscopedHTTPSNone andGeneralactivation remainopen. Next attribute current-source remainingreached work/boundary; do notselectcaller/cap/clock/cache shortcut or presumed APIrepair fromdeadline."
+}

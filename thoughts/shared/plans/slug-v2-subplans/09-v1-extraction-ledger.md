@@ -218,6 +218,18 @@ observer layout and total report ceiling remain unchanged. This is dependency
 cutoff and bounded attribution evidence, not completed-command memory fit; see
 the [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json).
 
+Complete framed comparison reuses existing stat+fullstream RootIo, logical Body
+range_eq and exact same-origin leases. Explicitly reviewed owner amendment removes
+only discarded per-file SHA from the shared same-path/recovery helper while
+retaining EVERY read/eager call/frame/EOF/predebit/error/lease check and allactual
+SHA/identity domains. No retainedstorage/cache/interner/donor/dependency change.
+Scoped cfg(test) argument counts prove eager attempts, notCPU instructions.
+Actualselectedhelper4,822,504,936bytes/74,277calls/SHA0 is qualified aggregatework;
+exact TEMPretirement precedes Core109/native18/six-archive proof. The
+[component proof](wp1225-framed-comparison-acceptance-2026-11-10.json) has final
+acceptance; no fullcompletion/latency/RSS/activation claim. See the
+[owner](wp1225-general-repository-workspace-design.md#complete-framed-body-comparison-without-discarded-digest).
+
 Framed content streams keep the old RootIo SHA-returning API and one fixed
 64KiB/3FD kernel while adding a stat-only result for full fresh Raw/Packed Body
 capture and full-byte seal comparison. No retained storage/cache/interner/donor/

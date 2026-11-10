@@ -3,18 +3,24 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [framed content streams](wp1225-general-repository-workspace-design.md#framed-content-streams-without-discarded-rootio-digests)
-pass corrected causal RED/GREEN and positive actual-original work proof:
-820,087,533 content-stream bytes/SHA0, with digest-returning reads still fully
-hashed. Full bytes, frames, EOF and all required SHA owners remain protected.
-The independent Packed reference correction preserves full transcript/identity
-and exact control accounting. Temporary counters are retired; Core102/native18
-and required six-archive/File/Read/seal/lastreader pass. Final production reaches
-843/55/117File8pending afteracceptedFile7, then nestedsource WorkDeadline and exact
-168/0FD/0backing cleanup. The
-[component proof](wp1225-framed-content-stream-acceptance-2026-11-10.json) has
-final independent acceptance. Next attribute remaining reached work on current source;
-fullcompletion, latency/RSS and activation remain open under unchanged limits.
+Current delta: [complete framed Body comparison](wp1225-general-repository-workspace-design.md#complete-framed-body-comparison-without-discarded-digest)
+passes causal RED/GREEN and selected-helper original-use proof:4,822,504,936read/
+comparison-argument bytes,74,277calls/SHA0. Full reads/eager comparisons/frames/EOF,
+all requiredSHA domains and recovery128/4/512MiB predebit/lease/error contracts
+remain. Both old internalSHApromises are explicitly superseded. TEMPretired;
+Core109/native18/six-archive closure pass. Final original gets beyond Rusttools
+materialization into local_config_ccsymlinks; last recorded847/55/119NeedSymlink1,
+then progressobserved/no later epoch andSourceWorkDeadline, exact168/0FD/0backing.
+The [component proof](wp1225-framed-comparison-acceptance-2026-11-10.json) has
+independent final acceptance. Next attribute current remainingreached work; no presumed
+APIrepair, fullcompletion/latency/RSS or activation claim underunchangedlimits.
+
+Accepted [framed content streams](wp1225-general-repository-workspace-design.md#framed-content-streams-without-discarded-rootio-digests)
+retain all required SHA/freshness while skipping discarded snapshots/seal hashes.
+Its [component proof](wp1225-framed-content-stream-acceptance-2026-11-10.json) has final
+acceptance: actual820,087,533contents bytes/SHA0; TEMPretired/Core102/native18/six
+pass. Final843/55/117File8pending atSourceWorkDeadline, exact168/0FD/0backing cleanup.
+Fullcompletion/latency/RSS/activation remain open under unchanged limits.
 
 Accepted [expectation-gated acquisition hashing](wp1225-general-repository-workspace-design.md#expectation-gated-archive-acquisition-hashing)
 passes causal RED/GREEN and actual169,263,416checksumless bytes/SHA0 with mandatory
