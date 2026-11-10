@@ -218,6 +218,18 @@ observer layout and total report ceiling remain unchanged. This is dependency
 cutoff and bounded attribution evidence, not completed-command memory fit; see
 the [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json).
 
+Framed content streams keep the old RootIo SHA-returning API and one fixed
+64KiB/3FD kernel while adding a stat-only result for full fresh Raw/Packed Body
+capture and full-byte seal comparison. No retained storage/cache/interner/donor/
+dependency/identity change. Corrected independent control-accounting RED and
+unchanged GREEN preserve full transcript/canonicalSHA/freshness proof. Actual
+original820,087,533contents bytes/SHA0 has checked flags; exact temporary retirement
+precedes Core102/native18/six-archive closure. The
+[component proof](wp1225-framed-content-stream-acceptance-2026-11-10.json) has final
+acceptance. Full bytes/roundtrip/required SHA domains and limits remain; no command
+completion/latency/RSS or activation claim follows. See the
+[owner contract](wp1225-general-repository-workspace-design.md#framed-content-streams-without-discarded-rootio-digests).
+
 Expectation-gated acquisition hashing changes only operation-local
 checksum work. A private fixed-stack wrapper uses existing `sha2::Sha256` for
 supplied expectations; mandatory actual captured-FD SHA remains unchanged.

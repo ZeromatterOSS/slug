@@ -71,7 +71,7 @@ pub(super) fn capture(
     let mut filled = 0usize;
     let mut offset = 0usize;
     let mut callback_error = None;
-    let captured = io.read_file(path, &|| active() && scope.check().is_ok(), |chunk| {
+    let captured = io.read_file_contents(path, &|| active() && scope.check().is_ok(), |chunk| {
         let result = (|| {
             check(scope, active)?;
             offset = offset
@@ -104,7 +104,7 @@ pub(super) fn capture(
             return Err(error);
         }
         let captured = captured?;
-        if offset != length || !seal::unchanged(framed, &captured.metadata) {
+        if offset != length || !seal::unchanged(framed, &captured) {
             return Err(PhysicalRootError::Snapshot);
         }
         if filled != 0 {

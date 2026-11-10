@@ -68,7 +68,14 @@ instrumentation is retired; Core61/native18 and the six-archive seal/reader gate
 pass. Its [component proof](./slug-v2-subplans/wp1225-expectation-hash-acceptance-2026-11-10.json)
 has independent final acceptance. Final production reaches841/55/115 with File6
 pending after all6archives, then typed source WorkDeadline and exact cleanup.
-Next attribute remaining reached work on current source. Full completion,
+The [framed content stream component](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#framed-content-streams-without-discarded-rootio-digests)
+passes corrected causal RED/GREEN and actual820,087,533contents bytes/SHA0 with
+full bytes/framing and required digest APIs preserved. Temporary counters retire
+exactly before Core102/native18 and six-archive seal/reader closure. Its
+[component proof](./slug-v2-subplans/wp1225-framed-content-stream-acceptance-2026-11-10.json)
+has final independent acceptance. Final production reaches843/55/117 with File8
+pending afteracceptedFile7, then nestedsource WorkDeadline and exact cleanup.
+Next attribute remaining reached work on current source. Fullcompletion,
 completed-command latency/RSS and activation remain open under unchanged limits.
 
 The active capability replaces GCC/Homebrew process profiles with one general

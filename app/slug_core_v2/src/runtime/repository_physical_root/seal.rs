@@ -177,7 +177,7 @@ pub(super) fn verify(
                 }
                 let mut offset = 0usize;
                 let mut mismatch = false;
-                let captured = io.read_file(path, &running, |chunk| {
+                let captured = io.read_file_contents(path, &running, |chunk| {
                     let end = offset.checked_add(chunk.len());
                     if end.is_none_or(|end| end > body.len() || !body.range_eq(offset, chunk)) {
                         mismatch = true;
@@ -193,7 +193,7 @@ pub(super) fn verify(
                     return Err(PhysicalRootError::Snapshot);
                 }
                 let captured = captured?;
-                if offset != body.len() || !unchanged(&before, &captured.metadata) {
+                if offset != body.len() || !unchanged(&before, &captured) {
                     return Err(PhysicalRootError::Snapshot);
                 }
             }

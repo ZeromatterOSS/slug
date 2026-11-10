@@ -667,7 +667,7 @@ fn capture_body_covered(
     }
     let mut body = Arc::<[u8]>::new_uninit_slice(length);
     let mut offset = 0usize;
-    let captured = io.read_file(path, &running, |chunk| {
+    let captured = io.read_file_contents(path, &running, |chunk| {
         let end = offset
             .checked_add(chunk.len())
             .ok_or_else(|| io::Error::other("workspace capture overflow"))?;
@@ -683,7 +683,7 @@ fn capture_body_covered(
     });
     check(scope, active)?;
     let captured = captured?;
-    if offset != length || !seal::unchanged(framed, &captured.metadata) {
+    if offset != length || !seal::unchanged(framed, &captured) {
         return Err(PhysicalRootError::Snapshot);
     }
     // SAFETY: every exact admitted slot was initialized once; actual EOF and

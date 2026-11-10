@@ -1,0 +1,465 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "e4fcb753e2bc3e69e59f496abee913bb8815f41b",
+  "classification": "Slug-native operation-local arithmetic revision; complete actual IO/freshness/full semantic identity and required SHA domains unchanged",
+  "outcome": "Fresh raw/packed snapshots and complete-tree sealing request full FD contents plus authenticated metadata without deriving an independently discarded per-file digest. Existing digest-returning RootIo API remains full SHA. Actual original uses820087533contents bytes with0SHA; full Rust remainsunfinished.",
+  "scope": {
+    "api": "Private RootIo::read_file_contents returns authenticated libc::stat after complete actual byte streaming. Existing read_file/digest_file still return actual SHA FileCapture, fail closed if required state missing. One private const-result-mode kernel, no synthetic digest or publicAPI.",
+    "algorithm": "Only DERIVE_DIGEST.then(Sha256::new) controls checksum initialization; update/finalize only if stateSome. Same complete regularFD read/check/active/callback/error order, single-link/device/path/size bounds, premature/extraEOF, openedFD/current-name frame,64KiB scratch/3FDs/fixed256KiB worker.",
+    "consumers": "Exactly fresh Raw snapshot capture, fresh Packed capture and complete-tree seal. Full actual bytes still initialize exact Raw slots or strict Packed encode/decode/full-byte validation; seal still compares all chunks against immutable Body. All offsets, frames, modes, links, complete directory/state/history, credits and retirement unchanged.",
+    "required_sha": "No body_recovery::observed_equal, routed Owned reader, FileBytes/FileDigest observation, Source digest manifest, compressed archive acquisition/verified actual SHA/SRI, Source verify/placement or canonical Body/Workspace Eq/Hash/SHA/StableKey/REAPI/CAS change. Digest-returning API contract stays exact.",
+    "storage": "No new retained field/cache/index/interner/container/dependency/authority. Reuse existing RootIo and sha2; no donor import. Permanent cfgtest thread-bound TLS Copy witness retains no input/Scope/owner, clears onDrop; absent dependencyproduction."
+  },
+  "causal_basis": {
+    "current_profile": {
+      "path": "/tmp/slug-wp425-validation/post-expectation-hash-owner-ip-final-validation.json",
+      "sha256": "3612cbae051946363c38b379d8ba5b6173027faae470098310d71a21ea54a60d"
+    },
+    "profile_review": {
+      "path": "/tmp/slug-wp425-validation/post-expectation-hash-owner-ip-evidence-review.json",
+      "sha256": "3d72821f51c85432e1c4586db6215cc18ba52e5cb5c3d2632b74c93be550335a"
+    },
+    "current_binary_static": {
+      "path": "/tmp/slug-wp425-validation/rootio-current-discarded-digest-static-feasibility.json",
+      "sha256": "1982c83b67710859ad5a9609bfae50ab4500e2d8edc153a1f798c5b865081dd1"
+    },
+    "source_audit": {
+      "path": "/tmp/slug-wp425-validation/rootio-snapshot-framed-stream-feasibility.json",
+      "sha256": "9d8323cd829b83cd667c793becd894db9f0ace3d116ffd894b1265281c3219ad"
+    },
+    "qualification": "3387samples/566rows/zero loss-throttle and20pins exact. SharedSHA335samples is reached work, not this pass caller/phase/cost. CurrentELF all3discarded-result consumers still call actualSHAupdate/finalize. Actualuse counter separately proves selected APIclass."
+  },
+  "validation": {
+    "corrected_red": {
+      "selected": 6,
+      "exit_code": 101,
+      "elapsed_seconds": 0.04086086101597175,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-red4-core-tests.json",
+        "sha256": "2afbdc390415017cdbecdf3c5229f50e83363bb7b34fe7b4525fc61ad7049107"
+      }
+    },
+    "red_discriminators": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red4-validation.json",
+      "sha256": "829206a74cdfc2bb3a8ce4a316d00197feb393193356fffaf8b435ddfc3390af"
+    },
+    "red_actual_code": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red4-static-work.json",
+      "sha256": "1bbe1255a9026438db49057e24418f41d80faf8acdb58e36fbbfbee0c3696186"
+    },
+    "red_meaning": "6selected:3protectionpass, only3finalcontents_sha0 gates fail after independent semantic/frame/EOF/canonicalidentity/retention/custody/refund assertions. SHAbytes kernel131085,rawpacked131109,seal21. ActualboundedELF verifies all3REDcontents functions retain realupdate/finalize.",
+    "green": {
+      "selected": 9,
+      "exit_code": 0,
+      "elapsed_seconds": 0.041077541012782604,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-green-core-tests.json",
+        "sha256": "dbac6711e008b672b3afdb8b48c8c07b00f4e5f5000e1f1197c670f40c46d29d"
+      }
+    },
+    "green_meaning": "Same6executedcausal tests unchanged pass; temporary collector2 and fixedreport1 also pass.",
+    "green_preserved_controls": {
+      "selected": 96,
+      "exit_code": 0,
+      "elapsed_seconds": 1.2853950330172665,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-green-protected.json",
+        "sha256": "40383203b4aeaefb71cd80c4d273095f9b39b6ede47a544cdb47b3f0e41922e9"
+      }
+    },
+    "production_core": {
+      "selected": 102,
+      "exit_code": 0,
+      "elapsed_seconds": 1.3053561720007565,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-production-core-tests.json",
+        "sha256": "7104d90c2b76ef072070d918eeb1f85db3357782f7e8579dd7c5994d355af47b"
+      }
+    },
+    "ordinary_scope": "102unique exact ordinary checks: prior acquisition61+all35RootIo/snapshot/seal/owned/Source digesttree controls+6new causal. Fresh actual preflight on final executable; old consumer SHA/freshness/identity contracts protected.",
+    "scope_review": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-validation-scope-review.json",
+      "sha256": "2334b02dcfc64b1b1ce622f9f167bc44f52b82aa48d0b0cdd695f75ab95d34e3"
+    },
+    "native_protected": {
+      "selected": 18,
+      "exit_code": 0,
+      "elapsed_seconds": 15.553673511982197,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-production-native-protected.json",
+        "sha256": "f39361272891565a035b67064e8ce7a0582c37fa8725c788759e1909b0f5f5d3"
+      }
+    },
+    "native_scope": "18protected cases including4warmoriginalcompiler commands, Some/None archives/replay/freshness, changed/foreign/fullhistory/nativeownership/lastreader/refunds and closedrealization.",
+    "six_archive": {
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 11.906081059976714,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-production-native-six.json",
+        "sha256": "a95dd0a758b3161fcf803e4ef833fd0b0147d431f24f4baab54a58afba64cea6"
+      }
+    },
+    "six_scope": "Required fresh pinned6Archive/File/Read/seal/lastreader pass. Seal work_elapsed11750ms; nativecredit335539406, logicalbodies631202064, decodedtar820514816. This is bounded generic closure, not RSS or originalcompletion/speedcomparison.",
+    "production_profile": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-production-build-profile.json",
+      "sha256": "97b502561d5be00d22f3289004cd0ddeb250309c437fc5c9b3a17f2646d80189"
+    },
+    "production_panic": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-production-panic.json",
+      "sha256": "702ec7b4bf14fa712b3e9bc89fb61f7b72418f3dd66ae8db9d9cbf0ab5af4eed"
+    },
+    "profile_scope": "Opt3+debugassertions/overflow inclbuildoverrides; Core existingobserverfeature with TEMPgone/staticUnwind. Fresh defaultCLI onlydefaultfeatures/staticAbort.",
+    "native_postcheck": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-production-native-validation.json",
+      "sha256": "20e245615541a685ceb94ed07e765fdec90f3748a84954c63d0cf326a7358dc5"
+    },
+    "final_integration_checks": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-final-integration-checks.json",
+      "sha256": "3daf50a8b689b94929b774584018f613223674de15f9e28171a97858694a99d1"
+    }
+  },
+  "fixture_corrections": {
+    "initial_failed_build": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-build-result.json",
+      "sha256": "0622bdaa78bd1a434176b672d4522a10fdf514a3442ac9d656d5e4d835811606"
+    },
+    "borrow_fix": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-borrow-fix.json",
+      "sha256": "1ac5bd54f04fee121ecc1885348297831d9207b1fb8b842c8aa651862e83efa3"
+    },
+    "initial_executed_red": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-core-tests.json",
+      "sha256": "45f6986855d4f48eb2a037310b3e2e789de31a110a57e71966ce3f3497e8ed38"
+    },
+    "invalidated_derived_validation": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-validation-invalidated.json",
+      "sha256": "5fb2aed47e9063ff39ce5db1cf5019659ce1caff089b097a85424c9f9089f0ad"
+    },
+    "initial_result": "Matching3failednames was insufficient: snapshot fullTranscriptEq failed beforeworkgate because Raw reference had185fewer representation-control metadata bytes. Initial derivedwork-only claim explicitly invalidated; rawpreserved. Kernel/seal remained finalworkfailures.",
+    "reference_correction": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-reference-accounting-correction.json",
+      "sha256": "60958436740ec0a6e12f634f72f974b4ef24e96f8aa79dad07903e9620a8e888"
+    },
+    "reference_review": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-reference-correction-review.json",
+      "sha256": "70784309f70bdcbfa6f1eb4d9c5cf0152047e954ce5915d56b6de99ed588bf3d"
+    },
+    "repair": "Expected Packed Body independently built from authoredpayload/publicBuilder; neveractualasexpected. FullTranscriptEq retained, Rawbaseline/crossreprcanonicalSHA/exactrawmetadata+expectedcontrol\u2212rawcontrol/state2/execute0/bodylength, existingbyte/ptr/ledgerWeak/frame/cancel/refund/finalwork checks all retained/strengthened.",
+    "getter_fix": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-retention-getter-fix.json",
+      "sha256": "fc68c4435278fd2ce4a1e656728983512a5061910cb8439538f6d5ff1c2023c3"
+    },
+    "compile_scope": "Two test-only3tuple drops become sequential drops to endRootIo borrow beforemovingFD; private retention fields replaced byexistingpublicgetters. No production change or assertion weakening. CorrectedRED4 is the accepted causal run."
+  },
+  "static_green_qualification": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-green-static-qualification.json",
+      "sha256": "928984b0c9babf6e677ab5f7891a667c33d036153bc37360dc882760ce80999e"
+    },
+    "meaning": "Optional stronger static no-call-instruction assertion was too strong: GREEN retains SHAcall instructions behind Optionstate guards. SourceNone plus state-driven bytewitness proves zeroexecutedupdate bytes; no instructionabsence/optimizercause claim. RED4 static realcalls remainsvalid."
+  },
+  "actual_original_use": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-observed-validation.json",
+      "sha256": "74afc3fbbfd045ac63addb71a687833723c733e7cfd782308e36cf5790a477b8"
+    },
+    "postcheck": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-observed-original-freeze-check.json",
+      "sha256": "92e780a422d72366ddaedb90c16ea7001127410621fb4e95965d82c543f56a44"
+    },
+    "work": {
+      "after": [
+        3957873540,
+        3957873540,
+        820087533,
+        0
+      ],
+      "after_overflow_mask": 0,
+      "arithmetically_exact": true,
+      "atomic_snapshot": false,
+      "before": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_overflow_mask": 0,
+      "checked_delta": [
+        3957873540,
+        3957873540,
+        820087533,
+        0
+      ],
+      "columns": [
+        "digest_payload_bytes",
+        "digest_sha_bytes",
+        "contents_payload_bytes",
+        "contents_sha_bytes"
+      ],
+      "process_wide": true,
+      "qualification": "Actual rooted FD read chunks and SHAupdate bytes by requested digest-returning versus fullcontents+metadata API. Partial attempts are bytes, not successes; checked processwide non-atomic per-cell deltas; no payload/Scope retained; not CPU, saving, speed, RSS or command success",
+      "request_isolated": false,
+      "reset": false,
+      "reversed_mask": 0,
+      "saturated_mask": 0,
+      "unknown_overflow_bits": 0
+    },
+    "functional_result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 842,
+    "roots": 55,
+    "records": 116,
+    "pending": "File7 afteracceptedFile6/all6archives",
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "28pins exact; checked processwide/non-atomic/nonisolated partialattempt bytecounts, notsuccesses/cost/speed/RSS. Digest-returning API reads3957873540bytes andhashesall; contentstreams820087533/0SHA."
+  },
+  "diagnostic_retirement": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-counter-retirement.json",
+      "sha256": "264889b0a78a43b9e50e048c7ca96821ca762bab6622c9a53f5363004516bf47"
+    },
+    "production_source_freeze": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-production-source-1-freeze.json",
+      "sha256": "713b64c5c97d2a13d94232dd18560bd20736c7c8f4070a6ac37ac568b28352f4"
+    },
+    "meaning": "Three exactGREENcandidatecopies restored, notHEAD; onenewprobe removed. RootIO newAPI/kernel/testwitness70bc hash retained; runtime/mod and original toolchainreport/test/eventallowance HEADexact,512KiBtrace/16KiBphase/prefix32/events128 restored. Instrumentedsource/binaries/rawpreserved."
+  },
+  "final_original": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-production-original.json",
+      "sha256": "ab321956981e6a628bded999e410d4625fa9c5039dd9dafacf7f043087fb0bec"
+    },
+    "postcheck": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-production-original-freeze-check.json",
+      "sha256": "16d7fbc06d77ebe8bc0d7ed2d9149c8c3e5b2dde7f8fcc5abcc4c6e7f1bec89c"
+    },
+    "supervisor_exit_code": 0,
+    "elapsed_seconds": 27.12128058099188,
+    "functional_result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 843,
+    "roots": 55,
+    "records": 117,
+    "pending": "File8 afteracceptedFile7/all6archives",
+    "peak_native_credit_bytes": 342612884,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "All28source/docs/artifact/prep/config/supervisor pins exact across serialnativegates. One stopped productionprefix, not repeatability/speed/regression/fullcommand/latency/RSS/activation proof."
+  },
+  "inherited_evidence": {
+    "through": "wp1225-expectation-hash-acceptance-2026-11-10.json ate4fcb753e",
+    "loading": "No Loading/Workspace/Map production/test source change. FullLoading1194/1200 retains exact6qualifiedbaseline failures; inherited notfreshlyrun orallgreen. PriorMap72/Workspace134 scopedownerproof unchanged.",
+    "reapi": [
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-execute.json",
+        "sha256": "f883ba1703e063e4c87ead157b73c4bec74529f7e179869c9b0f7046dfc75cf8"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-corruption.json",
+        "sha256": "6de2d95d62f4b82e4280a0862768fbefd3fd4774b5d660d248c2e4cfc84e262d"
+      }
+    ],
+    "reapi_scope": "Only unchanged Body/logicalidentity/CAS/transport/physical-source/runfiles/corruptionrefusal-restoration domains; newRootIo behavior separately protected by102/native18/six/currentoriginal. No new entire REAPI pipeline claim."
+  },
+  "limits": {
+    "native_bytes": 536870912,
+    "fds": 512,
+    "backing_bytes": 8589934592,
+    "roots": 128,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack_bytes": 262144,
+    "xz_decoder_bytes": 142606336,
+    "qualification": "AllSource/Meta/Process/Execute/archive/stream/tmpfs/tree ceilingsunchanged. Credit/AS/operationalcapsarenotRSS."
+  },
+  "builds": [
+    {
+      "label": "rootio-stream-red-build",
+      "exit_code": 101,
+      "elapsed_seconds": 27.58666849997826,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-red-build-result.json",
+        "sha256": "0622bdaa78bd1a434176b672d4522a10fdf514a3442ac9d656d5e4d835811606"
+      }
+    },
+    {
+      "label": "rootio-stream-red2-build",
+      "exit_code": 0,
+      "elapsed_seconds": 78.59625334301381,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-red2-build-result.json",
+        "sha256": "cc668cc13d62edaa08dd4f77089ad11e93034059208ccf2d7c65baf036f38ecd"
+      }
+    },
+    {
+      "label": "rootio-stream-red3-build",
+      "exit_code": 101,
+      "elapsed_seconds": 2.5421157930104528,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-red3-build-result.json",
+        "sha256": "b9cab5b3261fa29939ed1c8006863039d721e4aeea1140cb528907c1f3cffb7f"
+      }
+    },
+    {
+      "label": "rootio-stream-red4-build",
+      "exit_code": 0,
+      "elapsed_seconds": 33.85632127101417,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-red4-build-result.json",
+        "sha256": "6136dde7798dbbd792a5df8eaeae5e489264323809478940b351f26a536cdd03"
+      }
+    },
+    {
+      "label": "rootio-stream-green-build",
+      "exit_code": 0,
+      "elapsed_seconds": 79.41250852998928,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-green-build-result.json",
+        "sha256": "20700f0611cc54fe7a8b35db9126a2285a52b6eb6a6d4a4f6b953d7551d8afc1"
+      }
+    },
+    {
+      "label": "rootio-stream-cli-build",
+      "exit_code": 0,
+      "elapsed_seconds": 6.984797432989581,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-cli-build-result.json",
+        "sha256": "8842b4f91f4d4c617e3008e3635fe877022f198378adf3f8275d23893b207896"
+      }
+    },
+    {
+      "label": "rootio-stream-production-build",
+      "exit_code": 0,
+      "elapsed_seconds": 78.64386830700096,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-production-build-result.json",
+        "sha256": "f33e415e31778ba30555180ee065a4a3e996b3d4a4be43044f5d1e5f5b7b8a57"
+      }
+    },
+    {
+      "label": "rootio-stream-production-cli-build",
+      "exit_code": 0,
+      "elapsed_seconds": 6.534027466987027,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-production-cli-build-result.json",
+        "sha256": "2e8a6732bcc050c1a8a86a7990e7d578f7c4be300f83166f1856c95ab16c84b1"
+      }
+    }
+  ],
+  "compile_seconds_total": 314.15656064398354,
+  "review": {
+    "design": {
+      "path": "/tmp/slug-wp425-validation/rootio-framed-content-stream-design-review.json",
+      "sha256": "bfe4f93affd99efbbd78f632701b0aecce5c54ca7cb1911722748b9480d25651"
+    },
+    "red_kernel": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-kernel-review.json",
+      "sha256": "840e5210c03bbf532274f5d8152ccc4cd376be94ba88f8a5c3b08a10293d3966"
+    },
+    "red_whole_source": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-source-review.json",
+      "sha256": "b2b805a54cb3b763c9828dcdb30aa7bd03fbc11be2cb53ba2c2f0ccc17946591"
+    },
+    "reference_correction": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red-reference-correction-review.json",
+      "sha256": "70784309f70bdcbfa6f1eb4d9c5cf0152047e954ce5915d56b6de99ed588bf3d"
+    },
+    "corrected_red_execution": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-red4-execution-review.json",
+      "sha256": "6976fd9a93c46fcc945cf03237f42b7ef599db7856cc031c6fef9bb032d2ee1d"
+    },
+    "green_source": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-green-source-review.json",
+      "sha256": "335932e7c2b58c95b41162743c46e9252c9b30fdcf34315e12ecadf189c2b3a3"
+    },
+    "green_execution": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-green-execution-review.json",
+      "sha256": "ec3b82f046df87a1134262a9ada67956180089d2ed07be4e29761f1f207b3dfb"
+    },
+    "actualuse_retirement": {
+      "path": "/tmp/slug-wp425-validation/rootio-stream-retirement-review.json",
+      "sha256": "970999fd7c383f2812a6c8c65a9fdc5594213b46f5840a06dae7592ede4ac8a3"
+    },
+    "final": {
+      "verdict": "ACCEPT",
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rootio-stream-final-review.json",
+        "sha256": "cf60c2732640f5feafd870b05a4811f11e4e89ee3795572ce30d654ab1204d53"
+      },
+      "scope": "Source/evidence pins and required gates verify; requiredSHA paths protected, TEMPdiagnostics retired; correctedRED history/static limitations qualified. Fullcompletion/latency/RSS/activationremainopen."
+    }
+  },
+  "preserved_executables": {
+    "initial_red_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rootio-stream-red-core-slug_core_v2-c089877dde8a6820",
+      "executable_sha256": "c089877dde8a6820faf6e2abfc66e3d47676b1cfc763cb1b1758494dd431f8f5",
+      "build": "rootio-stream-red2-build",
+      "target": "slug_core_v2"
+    },
+    "corrected_red_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rootio-stream-red4-core-slug_core_v2-d24420e67fc4c82e",
+      "executable_sha256": "d24420e67fc4c82eb2bac5a0c6932d7ad032eff7c4a4005254eb7df0025b683b",
+      "build": "rootio-stream-red4-build",
+      "target": "slug_core_v2"
+    },
+    "instrumented_green_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rootio-stream-green-core-slug_core_v2-7b5989964a436d41",
+      "executable_sha256": "7b5989964a436d419e537a3edf131c663a1cacca774bfadbbc920bd70343c052",
+      "build": "rootio-stream-green-build",
+      "target": "slug_core_v2"
+    },
+    "instrumented_source_default_cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rootio-stream-cli-slug-1e5da7bff4ec43b8",
+      "executable_sha256": "1e5da7bff4ec43b8d544426d45fcc90593c1889fe1b7a54a703ea7a458b5a408",
+      "build": "rootio-stream-cli-build",
+      "target": "slug"
+    },
+    "production_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rootio-stream-production-core-slug_core_v2-79a202b651084094",
+      "executable_sha256": "79a202b651084094bcc57eedc54ac0979f132e16d9ba54a9851553e2337570b9",
+      "build": "rootio-stream-production-build",
+      "target": "slug_core_v2"
+    },
+    "production_cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rootio-stream-production-cli-slug-fbdeacd9ef401bd5",
+      "executable_sha256": "fbdeacd9ef401bd5586c968cb4d45a12a11a3fa42e7ef8fdf7da5d6a5569c27a",
+      "build": "rootio-stream-production-cli-build",
+      "target": "slug"
+    }
+  },
+  "fixture_hygiene": "No new externaloracle fixture/callerrecipe/dependency. PrivateactualFD/kernel/RawPacked/seal fixtures reuse existing owners; initialreference-accounting error fullyqualified and repaired with strongerindependent assertions. No required roundtrip/freshbytes/SHAidentity check skipped.",
+  "remaining": "FullauthenticRust/action/REAPI/Slug bootstrap, successful scopedHTTPSNone integration, completed-command latency/RSS<=1.25xBazel and Generalproductionactivation remainopen. Next attribute remaining reached work on newsource, preserving fullhistory/freshness/resources; no caller/cap/clock/cache shortcut selected."
+}

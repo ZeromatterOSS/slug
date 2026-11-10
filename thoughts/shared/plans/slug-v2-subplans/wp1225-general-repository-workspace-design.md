@@ -1361,6 +1361,68 @@ work must discriminate prerequisite serialization rather than infer time from
 map counts. The following bounded Lstat-only scheduling contract selects the
 first discovery class; other Need families retain their own resource decisions.
 
+### Framed content streams without discarded RootIo digests
+
+Status: independent design/source/corrected causal/GREEN/actual-use/retirement/final review ACCEPT.
+The [component receipt](wp1225-framed-content-stream-acceptance-2026-11-10.json)
+records corrected work-only RED and unchanged GREEN, plus actual original
+contents820,087,533/SHA0 while digest-returning reads3,957,873,540 bytes/hash match.
+All flags clear and28pins unchanged. An initial Raw-only Packed reference was
+corrected with independent authored Packed construction, full Transcript Eq,
+exact physical-control accounting and cross-representation canonical SHA.
+Temporary counters retire through3exactGREENcopies/1newmodule; source/testreport
+budgets return to HEAD. Fresh Core102/native18 and required six-archive/File/
+Read/seal/lastreader pass. Seal11750ms/nativecredit335,539,406 is bounded closure,
+not RSS/speed. Final original reaches843/55/117 with File8 pending afteraccepted
+File7, then nested source WorkDeadline; observed prefix842/55/116 hasFile7pending.
+Both retain exact168/zeroFD/zero backing cleanup. No fullcompletion/latency/RSS
+or activation follows; historical REAPI/Loading proof inherits only named scope.
+This Slug-native private IO revision advances authentic original Rust snapshots
+and complete sealing while preserving every full-byte/freshness/identity check.
+Main `e4fcb753e2bc3e69e59f496abee913bb8815f41b` has3,387 reconciled IP-only
+samples/566rows, zero loss/throttling and20immutable pins. Shared SHA335samples
+is reached work, not caller/phase/removable cost. The source audit finds3specific
+discarded results: fresh raw snapshot capture, fresh packed capture and seal
+verification use complete bytes plus authenticated metadata, never the returned
+RootIo digest. Static current-ELF callsites still contain SHAupdate/finalize.
+Detailed evidence/design is `/tmp/slug-wp425-validation/rootio-framed-content-stream-design.json`.
+
+Add one private `RootIo::read_file_contents` returning authenticated `libc::stat`
+after the same complete rooted-FD stream. Preserve existing `read_file` and
+`digest_file` full actual SHA-returning API. Share one fixed-scratch IO kernel;
+select checksum work only by requested API result, never caller/ruleset/profile.
+Never return a synthetic/zero digest. Migrate only fresh raw/packed snapshot
+capture and complete seal: exact captured Body bytes and full immutable-Body
+comparison own those facts. All offsets, caller checks and frame comparisons
+remain. No required SHA, canonical logical identity, codec roundtrip or full
+content check is removed. Recovery retains its explicit SHA-even-after-mismatch
+contract; routed readers, FileBytes/FileDigest observations, Source manifests,
+archive actual compressed SHA/SRI and Source verification stay unchanged.
+
+Preserve every actual read, regular/single-link/device/path/size bound, callback
+and failure position, premature and extra EOF, opened-FD/current-name frame,
+mode/link/complete-directory and cancellation check. Same64KiB scratch/3FDs,
+fixed256KiB worker stack, no new heap/retained field/cache/interner/dependency or
+authority. Existing credited Body construction and complete histories remain.
+Historical codec scope left capture/SHA untouched; this separate decision may
+remove only independently unused output arithmetic. It cannot relax the old
+SHA-returning API or a targeted consumer's independently required digest fact.
+
+Require unconditional-hash RED factoring with the new metadata-result API and
+all3real migrations. Kernel and actual raw/packed/seal tests must finish their
+byte/frame/EOF/mutation/cancel/FD/refund semantics before final zero-hash work
+gates. Private thread-bound cfg(test) Copy witnesses retain no inputs/Scope;
+keep executed RED tests byte-exact for GREEN, changing only checksum creation.
+Existing required actual-SHA controls stay. Fresh Core owner/direct-dependent
+checks and default CLI precede bounded original-use proof: positive contents
+payload with zero SHA, required-digest bytes still hashed, all checked flags
+clear and exact cleanup. Temporary fixed process-wide non-atomic counters/report
+trade2KiB from existing512KiB event allowance; no caller/phase/speed/RSS claim.
+Preserve and restore exact GREEN candidate copies, notHEAD, before production
+validation. Rerun native18, six pinned Archive/File/Read/seal/lastreader and final
+original with unchanged inputs/clocks/caps. Full Rust/action/REAPI/Slug,
+completed-command latency/RSS and production activation remain open.
+
 ### Expectation-gated archive acquisition hashing
 
 Status: independent design/source/causal/actual-use/retirement/final review ACCEPT.

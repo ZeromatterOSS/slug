@@ -3,19 +3,26 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [expectation-gated acquisition hashing](wp1225-general-repository-workspace-design.md#expectation-gated-archive-acquisition-hashing)
-passes unchanged causal RED/GREEN and positive actual-original work proof:
-169,263,416 checksumless payload bytes with zero acquisition SHA bytes, while
-mandatory captured-FD SHA and supplied-expectation hashing remain present.
-Temporary counters are retired exactly; fresh Core61/native18 and the required
-six-archive/File/Read/seal/last-reader gate pass. Final original reaches841/55/115
-with File6 pending after all6archives, then typed source WorkDeadline and exact
-168/0FD/0backing cleanup. The instrumented prefix instead has outer unclassified
-Mutation/Materialization with sticky WorkDeadline. The
-[component proof](wp1225-expectation-hash-acceptance-2026-11-10.json) has final
-independent acceptance. Successful scoped HTTPS-None end-to-end, full completion,
-completed-command latency/RSS and activation remain open. Next attribute remaining
-reached work on current source under unchanged full-history/freshness/limits.
+Current delta: [framed content streams](wp1225-general-repository-workspace-design.md#framed-content-streams-without-discarded-rootio-digests)
+pass corrected causal RED/GREEN and positive actual-original work proof:
+820,087,533 content-stream bytes/SHA0, with digest-returning reads still fully
+hashed. Full bytes, frames, EOF and all required SHA owners remain protected.
+The independent Packed reference correction preserves full transcript/identity
+and exact control accounting. Temporary counters are retired; Core102/native18
+and required six-archive/File/Read/seal/lastreader pass. Final production reaches
+843/55/117File8pending afteracceptedFile7, then nestedsource WorkDeadline and exact
+168/0FD/0backing cleanup. The
+[component proof](wp1225-framed-content-stream-acceptance-2026-11-10.json) has
+final independent acceptance. Next attribute remaining reached work on current source;
+fullcompletion, latency/RSS and activation remain open under unchanged limits.
+
+Accepted [expectation-gated acquisition hashing](wp1225-general-repository-workspace-design.md#expectation-gated-archive-acquisition-hashing)
+passes causal RED/GREEN and actual169,263,416checksumless bytes/SHA0 with mandatory
+FD SHA retained. Temporary counters are retired; Core61/native18/six-archive pass.
+Its [component proof](wp1225-expectation-hash-acceptance-2026-11-10.json) has final
+acceptance. Final original reaches841/55/115File6 after all6archives, then typed
+source WorkDeadline and168/0FD/0backing cleanup. Full completion, successful
+scoped HTTPS-None end-to-end, latency/RSS and activation remain open.
 
 Accepted [unique-owner growth assignment](wp1225-general-repository-workspace-design.md#unique-owner-observation-growth-assignment)
 passes causal RED/GREEN, full ownership/error/priority controls and the required

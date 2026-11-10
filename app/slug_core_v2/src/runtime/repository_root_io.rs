@@ -312,15 +312,42 @@ impl<'root> RootIo<'root> {
         &self,
         relative: &Path,
         active: &dyn Fn() -> bool,
-        mut capture: impl FnMut(&[u8]) -> io::Result<()>,
+        capture: impl FnMut(&[u8]) -> io::Result<()>,
     ) -> io::Result<FileCapture> {
+        let (metadata, digest) = self.read_file_kernel::<true>(relative, active, capture)?;
+        Ok(FileCapture {
+            metadata,
+            digest: digest.ok_or_else(|| invalid("required rooted digest was not derived"))?,
+        })
+    }
+
+    /// Stream complete actual file contents with the same admission, EOF and
+    /// opened/named-frame checks, returning authenticated metadata only.
+    pub fn read_file_contents(
+        &self,
+        relative: &Path,
+        active: &dyn Fn() -> bool,
+        capture: impl FnMut(&[u8]) -> io::Result<()>,
+    ) -> io::Result<libc::stat> {
+        self.read_file_kernel::<false>(relative, active, capture)
+            .map(|(metadata, _)| metadata)
+    }
+
+    fn read_file_kernel<const DERIVE_DIGEST: bool>(
+        &self,
+        relative: &Path,
+        active: &dyn Fn() -> bool,
+        mut capture: impl FnMut(&[u8]) -> io::Result<()>,
+    ) -> io::Result<(libc::stat, Option<[u8; 32]>)> {
         check_active(active)?;
         let mut file = self.open_read_regular(relative)?;
         let before = self.check_regular(&file)?;
         let mut remaining = u64::try_from(before.st_size).map_err(|_| limit())?;
         self.admit_file_size(remaining)?;
         let mut buffer = [0u8; 64 * 1024];
-        let mut digest = Sha256::new();
+        // Only a digest-returning API requests SHA; both result classes retain
+        // the same complete byte stream and opened/named-frame checks.
+        let mut digest = DERIVE_DIGEST.then(Sha256::new);
         while remaining != 0 {
             check_active(active)?;
             let length = usize::try_from(remaining.min(buffer.len() as u64)).unwrap();
@@ -328,7 +355,11 @@ impl<'root> RootIo<'root> {
             if count == 0 {
                 return Err(stale());
             }
-            digest.update(&buffer[..count]);
+            #[cfg(test)]
+            read_work_for_test::record_chunk(DERIVE_DIGEST, count, digest.is_some());
+            if let Some(digest) = &mut digest {
+                digest.update(&buffer[..count]);
+            }
             capture(&buffer[..count])?;
             remaining -= count as u64;
         }
@@ -340,10 +371,7 @@ impl<'root> RootIo<'root> {
             return Err(stale());
         }
         check_active(active)?;
-        Ok(FileCapture {
-            metadata: before,
-            digest: digest.finalize().into(),
-        })
+        Ok((before, digest.map(|digest| digest.finalize().into())))
     }
 
     pub fn digest_file(
@@ -661,3 +689,11 @@ fn stale() -> io::Error {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "repository_root_io/read_work_for_test.rs"]
+pub(crate) mod read_work_for_test;
+
+#[cfg(test)]
+#[path = "repository_root_io/framed_stream_tests.rs"]
+mod framed_stream_tests;
