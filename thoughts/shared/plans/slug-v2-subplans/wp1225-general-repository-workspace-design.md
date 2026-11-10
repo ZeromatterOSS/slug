@@ -2471,6 +2471,88 @@ then the actual six-archive chain/File/Read/seal/last-reader closure under512MiB
 FD512, backing8GiB and27+3sec, plus the exact original separately. Whole-command
 RSS<=1.25xBazel, public Rust and General activation remain independent open gates.
 
+### Operation-local Body comparison scratch
+
+Status: independent design/source/final review ACCEPT; executed gates pass.
+The [bounded component proof](wp1225-range-scratch-acceptance-2026-11-10.json)
+preserves causal work, actual use and exact TEMP retirement. This Slug-native
+scratch revision preserves the full immutable Body representation and every
+exact identity/integrity domain. Current-source IP and static initialization
+evidence motivated the work without identifying caller or CPU cost.
+
+Add synchronous `Body::with_range_comparison`, whose callback borrows a mutable
+`FnMut(usize, &[u8]) -> bool`. It exposes no decoded bytes, pointer, validity tag
+or authority; neither comparator nor scratch may escape the callback. Raw and
+empty Packed dispatch delegate ordinary `range_eq` without preparing a block.
+For nonempty Packed, a separate private `#[inline(never)]` frame owns one
+initialized64KiB stack array. Public dispatch and the shared Packed range kernel
+own no array. The comparison closure borrows that array; it must not move/copy
+the payload into another closure frame. Concrete fixed-stack testing must prove
+compiled nesting, not merely count semantically live buffers.
+
+Every invocation repeats checked offset+length bounds and the same complete
+decode of every intersected compressed block, including repeated offsets and
+calls after mismatch. Retain the old inside-range short circuit, raw-selected
+blocks and exact Boolean outputs. There is no decoded-answer/block-index cache,
+pool, dictionary, unsafe uninitialized storage or new dependency. Ordinary
+single-range `range_eq` keeps bounds-before-initialization and its valid-empty
+Packed behavior. Whole-body traversal and `copy_into` remain unchanged. Body Eq
+keeps pointer/length fastpaths and left traversal, preparing the repeated right
+comparison once; all full Hash/routing/canonical SHA and stored bytes remain.
+
+Migrate the repeated whole-operation loops in same-path/recovery observation,
+seal, ViewComparison, routed Owned read and rooted owned content verification.
+Keep observed_equal's eager comparisons after mismatch, every FD read/frame/
+EOF/mode/name/cancel check,128row/4comparison/512MiB recovery predebit and leases.
+Other loops keep their existing mismatch and error precedence. Both Owned
+`read_file` SHA APIs remain mandatory; FileDigest still consumes captured SHA.
+Keep actual DecodedBytes charging before comparison, materialized Arc prepay/
+fresh-byte filling, pair memo/active checks and all ownership coverage unchanged.
+
+The prepared nonempty Packed helper initializes before its callback, so an
+early FD failure, no callbacks or invalid-only callbacks may initialize once
+where the old loop did none. This bounded preparation timing is explicit, with
+no new heap/fallible admission or error mapping. Existing native IO/decode and
+double ViewComparison reservations precede use. Reuse replaces the old callee
+block without adding another simultaneous buffer; keep291,344decode scratch,
+2MiB construction and actual256KiB workers without refund or cap changes.
+
+Prove causal RED first using a forwarding-only callback helper and real scoped
+cfg(test) initialization/range/decode argument counts. Unchanged mixed Eq and
+nonaligned/repeated/mismatch-then-later/empty/invalid scripts must complete full
+logical/stored-byte, Hash/canonical SHA and lifetime controls before the final
+N-to-one initialization gate, with identical required decode calls/bytes. Raw,
+empty-helper zero callbacks and old invalid single-range behavior stay distinct.
+Extend the actual256KiB/live64KiB test across Raw/empty Packed, every Eq
+orientation and direct prepared calls. Require ordinary Bzlmod and affected Core
+controls, fresh default CLI, native18/six-archive closure and final original.
+Bounded actual-original scalar work proof and exact TEMP retirement precede
+final acceptance. Historical REAPI inherits only unchanged logical/storage/
+identity/transport domains after equivalence proof. Full Rust/action/REAPI/Slug,
+HTTPS-None, completed-command latency/RSS<=1.25xBazel and activation remain open.
+
+The initial forwarding baseline aborted at the unchanged fixed-stack gate.
+Static ELF inspection exposed inlined array frames; independent review accepted
+outlining the old single-range scratch and callback forwarding before reuse.
+The corrected baseline passes the unchanged actual256KiB/live64KiB test and
+policy control, failing only the two final initialization tuples (3-to-1 and
+7-to-1). Candidate passes all four with identical required range/decode work,
+stored bytes, Hash/canonical SHA and Weak lifetime controls. No stack increase
+or waived case. Actual original-use counters record967 initializations,
+89,708 valid Packed ranges and88,557 full compressed-block decodes; flags clear.
+These are source work requests, not measured baseline savings or machine cost.
+
+After exact three-copy TEMP retirement, production Bzlmod860/Core114/native18
+and six-archive seal/reader closure pass under unchanged limits. Six-archive
+seal closes at10,104ms work with335,544,782 peak native credit, not RSS. Observed
+original stops859/55roots/123records at an unclassified native-workspace refusal;
+final production stops earlier785/53/109 at source WorkDeadline, with a30.272s
+refused callback. Different reached work and finite phase data establish no
+cause or comparative performance. Both clean to168retained/0FD/0backing. Keep
+both outcomes; a blind repeat is unjustified. Next attribute the refused work
+through a reviewed finite stage/typed discriminator on current source, without
+presuming an API repair or changing resource limits.
+
 ### Construction-local Body encoding workspace
 
 Status: independent design/source/final review ACCEPT; executed gates pass. The bounded

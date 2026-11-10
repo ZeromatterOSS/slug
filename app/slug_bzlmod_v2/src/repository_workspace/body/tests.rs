@@ -322,6 +322,17 @@ fn native_like_stack_caller_exercises_body_content() {
             assert_eq!(first, second);
             assert_eq!(raw, first);
             assert_eq!(first, raw);
+            let independent_raw = RepositoryWorkspaceBody::from_arc(Arc::from(bytes.as_slice()));
+            assert_eq!(raw, independent_raw);
+            for body in [&raw, &first] {
+                body.with_range_comparison(|compare| {
+                    assert!(compare(0, &bytes));
+                    assert!(compare(length, &[]));
+                    assert!(!compare(usize::MAX, &[0]));
+                    assert!(!compare(length + 1, &[]));
+                });
+                body.with_range_comparison(|_| ());
+            }
             let mut hash = StarlarkHasher::new();
             first.hash(&mut hash);
             assert_eq!(hash.finish_small(), raw.routing_hash());
@@ -342,6 +353,21 @@ fn native_like_stack_caller_exercises_body_content() {
             std::hint::black_box(&read_buffer);
         }
     }
+    let empty_packed = packed(&[]);
+    let independent_empty = packed(&[]);
+    let empty_raw = RepositoryWorkspaceBody::from_arc(Arc::from([]));
+    assert_eq!(empty_packed, independent_empty);
+    assert_eq!(empty_raw, empty_packed);
+    assert_eq!(empty_packed, empty_raw);
+    for body in [&empty_raw, &empty_packed] {
+        body.with_range_comparison(|_| ());
+        body.with_range_comparison(|compare| {
+            assert!(compare(0, &[]));
+            assert!(!compare(0, &[1]));
+            assert!(!compare(usize::MAX, &[1]));
+        });
+    }
+    std::hint::black_box(&read_buffer);
     assert_eq!(
         read_buffer
             .iter()

@@ -201,17 +201,19 @@ impl<'a> ViewComparison<'a> {
         let mut equal = left.len() == right.len();
         if equal {
             let mut offset = 0;
-            let compared = left.try_for_each_chunk(&mut |a| {
-                self.check().map_err(Some)?;
-                #[cfg(test)]
-                {
-                    self.compared_bytes += a.len();
-                }
-                if !right.range_eq(offset, a) {
-                    return Err(None);
-                }
-                offset += a.len();
-                Ok(())
+            let compared = right.with_range_comparison(|compare| {
+                left.try_for_each_chunk(&mut |a| {
+                    self.check().map_err(Some)?;
+                    #[cfg(test)]
+                    {
+                        self.compared_bytes += a.len();
+                    }
+                    if !compare(offset, a) {
+                        return Err(None);
+                    }
+                    offset += a.len();
+                    Ok(())
+                })
             });
             match compared {
                 Ok(()) => {}

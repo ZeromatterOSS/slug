@@ -15,6 +15,11 @@ mod codec;
 mod construction_work_for_test;
 #[cfg(test)]
 mod construction_workspace_tests;
+mod range_comparison;
+#[cfg(test)]
+mod range_comparison_tests;
+#[cfg(test)]
+mod range_comparison_work_for_test;
 pub use builder::RepositoryWorkspaceBodyBuildError;
 pub use builder::RepositoryWorkspaceBodyBuilder;
 
@@ -303,29 +308,7 @@ impl RepositoryWorkspaceBody {
                 // Compare the requested portion directly, with one block
                 // workspace. Calling copy_into here would retain a second
                 // decoded block beneath the caller's own streaming block.
-                let mut scratch = [0u8; CHUNK];
-                let mut position = offset;
-                let mut compared = 0;
-                while compared < bytes.len() {
-                    let index = position / CHUNK;
-                    let within = position % CHUNK;
-                    let block = &data.blocks[index];
-                    let length = (data.logical - index * CHUNK).min(CHUNK);
-                    let decoded = if block.compressed {
-                        codec::decode(&block.bytes, &mut scratch[..length])
-                            .expect("closed workspace body invariant");
-                        &scratch[..length]
-                    } else {
-                        &block.bytes
-                    };
-                    let count = (length - within).min(bytes.len() - compared);
-                    if decoded[within..within + count] != bytes[compared..compared + count] {
-                        return false;
-                    }
-                    position += count;
-                    compared += count;
-                }
-                true
+                range_comparison::single_packed_range_eq(data, offset, bytes)
             }
         }
     }
@@ -352,14 +335,16 @@ impl PartialEq for RepositoryWorkspaceBody {
             return false;
         }
         let mut offset = 0;
-        self.try_for_each_chunk(&mut |chunk| {
-            if !other.range_eq(offset, chunk) {
-                return Err(());
-            }
-            offset += chunk.len();
-            Ok(())
+        other.with_range_comparison(|compare| {
+            self.try_for_each_chunk(&mut |chunk| {
+                if !compare(offset, chunk) {
+                    return Err(());
+                }
+                offset += chunk.len();
+                Ok(())
+            })
+            .is_ok()
         })
-        .is_ok()
     }
 }
 impl Eq for RepositoryWorkspaceBody {}

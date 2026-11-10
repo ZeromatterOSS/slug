@@ -177,16 +177,18 @@ pub(super) fn verify(
                 }
                 let mut offset = 0usize;
                 let mut mismatch = false;
-                let captured = io.read_file_contents(path, &running, |chunk| {
-                    let end = offset.checked_add(chunk.len());
-                    if end.is_none_or(|end| end > body.len() || !body.range_eq(offset, chunk)) {
-                        mismatch = true;
-                        return Err(io::Error::other(
-                            "physical root file differs from final state",
-                        ));
-                    }
-                    offset = end.unwrap();
-                    Ok(())
+                let captured = body.with_range_comparison(|compare| {
+                    io.read_file_contents(path, &running, |chunk| {
+                        let end = offset.checked_add(chunk.len());
+                        if end.is_none_or(|end| end > body.len() || !compare(offset, chunk)) {
+                            mismatch = true;
+                            return Err(io::Error::other(
+                                "physical root file differs from final state",
+                            ));
+                        }
+                        offset = end.unwrap();
+                        Ok(())
+                    })
                 });
                 check(scope, active)?;
                 if mismatch {

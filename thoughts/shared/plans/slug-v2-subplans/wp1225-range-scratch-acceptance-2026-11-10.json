@@ -1,0 +1,503 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "e75e98323ff1cde00c839a0a808578301c974c5e",
+  "classification": "Slug-native transient comparison scratch reuse; exact logical/storage/identity/integrity domains unchanged",
+  "outcome": "Prepare one fixed Packed comparison block per synchronous operation toward authentic Rust toolchain closure under unchanged limits.",
+  "implementation": {
+    "api": "Body::with_range_comparison passes a borrowed mutable comparator synchronously. Separate neverinline Packed helper owns one initialized65536-byte block; closure borrows it. Public dispatcher, forward callback helper and range kernel own no block. Ordinary single-range Packed helper is also neverinline.",
+    "required_work": "Every range repeats checked bounds; every intersected compressed block is fully decoded again, including repeated offsets and mismatch-then-later calls. Same inside-range short circuit and raw-selected blocks. No decoded cache/tag, heap buffer, unsafe storage, donor, dependency, persistent owner or semantic key.",
+    "consumers": "Body::Eq repeated RHS only; snapshot observed_equal/recovery, physical seal, ViewComparison body_equal, routed Owned read, rooted owned verification. Original ptr/len fastpaths, left traversal, memo/active checks, eager &= comparisons, error precedence, predebits/leases/custody and full FD frame/EOF/mode/name checks preserved.",
+    "hash_and_history": "Both routed/rooted Owned read_file SHA calls remain; FileDigest consumes captured.digest. Full Hash/routing/canonicalSHA/REAPI bytes, immutable Arc/PackedData/Block representations, DecodedBytes-before-comparison and every cumulative history remain unchanged.",
+    "preparation_tradeoff": "Nonempty Packed helper eagerly initializes before callback: early FD failure, no callbacks or invalid-only may initialize once versus old zero. Raw/empty delegate ordinary range_eq without preparation; single invalid range still initializes zero. Old valid empty Packed single range still initializes one.",
+    "source11pins": [
+      {
+        "file": "app/slug_bzlmod_v2/src/repository_workspace/body.rs",
+        "sha256": "a6d9bc63866adb1f3138dc408ef38caf6c63ae51389c83c12bd240af39a02a51"
+      },
+      {
+        "file": "app/slug_bzlmod_v2/src/repository_workspace/body/construction_workspace_tests.rs",
+        "sha256": "bc7eeba59fc351f1c37892162c71590a45c30ce920a4be64972db6c14dce8471"
+      },
+      {
+        "file": "app/slug_bzlmod_v2/src/repository_workspace/body/range_comparison.rs",
+        "sha256": "3bcab3049db422dc2338b7760a3803f85f84426276723684fb4f5ee035b724ac"
+      },
+      {
+        "file": "app/slug_bzlmod_v2/src/repository_workspace/body/range_comparison_tests.rs",
+        "sha256": "088042bb9ad3fb37cfe8959476d49744d360239e20db3a31271dca65a24e9e4a"
+      },
+      {
+        "file": "app/slug_bzlmod_v2/src/repository_workspace/body/range_comparison_work_for_test.rs",
+        "sha256": "d40619407a6c5293d87986e230643e6d5eff10639344837568b8677a80bd7732"
+      },
+      {
+        "file": "app/slug_bzlmod_v2/src/repository_workspace/body/tests.rs",
+        "sha256": "ac3c941600f7ddfb2795322185d52e9e8258290b8b0daac7f488ab3460b012d0"
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/path_observation/rooted/owned.rs",
+        "sha256": "7405af028a55307087f92e4785c398c2ee4f3960ee9d9bc011d6689edaadc55e"
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/repository_physical_root/routed.rs",
+        "sha256": "ceade4fbec1f4b7aa68c47c1b287a161c90a73a01aa36963ebf3fb0fcf3e5185"
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/repository_physical_root/seal.rs",
+        "sha256": "91913d048051c6424257092f9113f2c2ffc505b7f888986b52dfc6662599a58a"
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/repository_view_comparison.rs",
+        "sha256": "62146b44c64bd50337fc9c94080405938dc5f9157c13cb4cc1a2d5784c7647c9"
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/repository_workspace_snapshot/body_recovery.rs",
+        "sha256": "6796c872b303f43408260b226af70cdf7272b169b5e96cf147ba4a8cf66d0ffa"
+      }
+    ]
+  },
+  "limits": {
+    "native_bank": 536870912,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack": 262144,
+    "encoding_scratch": 2097152,
+    "decode_scratch": 291344,
+    "xz_logical": 142606336,
+    "other_owner_caps": "Unchanged; no refund, deadline or activation change."
+  },
+  "selection": {
+    "research": [
+      {
+        "path": "/tmp/slug-wp425-validation/post-body-workspace-owner-ip-evidence-review.json",
+        "sha256": "21050817a119d2911389b196f4250c393f6ab831974fe27a68d572c15f0df93c"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/post-body-workspace-range-init-static.json",
+        "sha256": "1dfd37aa40c3a5f60d4b899afa189af4ed1a23bbe95c41e923d045f46dd85d33"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/post-body-workspace-range-scratch-audit.json",
+        "sha256": "0c473c285d0efca026f33e148452da4300f1d279c75e997276750d9845bf084e"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/range-scratch-design2.json",
+        "sha256": "f77a82b8e3d98c2f09f3eb9edf9898bf79855f5656898337490ca579f7c32fae"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/range-scratch-design-review.json",
+        "sha256": "04fe1a0135513a14031ee561627ddfceca226b33315bf3ef78c0902b06ac214a"
+      }
+    ],
+    "qualification": "Current-source codec IP samples and static single-range65536 memset motivate a bounded initialization-work hypothesis; no caller/phase/removablecost attribution from samples."
+  },
+  "causal": {
+    "initial_failure": {
+      "aggregate": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-red-tests.json",
+        "sha256": "3a663a6345dc66a40ce4e4776d5cbe739941806766f30ffa45e035b77f38b31a"
+      },
+      "invalidated": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-red-aggregate-invalidated.json",
+        "sha256": "7469df625aaaba3e8418ee3f4cd23f20394f40cc31ef9a382ff6b02304eb973f"
+      },
+      "result": "Initial aggregate aborted -6 at unchanged256KiB fixed-stack test after two expected final initialization tuple failures and policy pass. Narrow3case result is not stack proof.",
+      "static_diagnosis": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-baseline-frame-static.json",
+        "sha256": "9c47334eb4e659158d007715ab6f834f3cfd86cc727da26644089439cb34e73f"
+      },
+      "qualification": "Static ELF candidate chain exceeded262144 from callback/single-range inlining; this is not runtime overflow-site attribution."
+    },
+    "correction": {
+      "design": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-frame-correction-design-review.json",
+        "sha256": "38d78feea0f2e15801755aafaf6db5dea4f86177893a24d57743027e24121076"
+      },
+      "change": "Outline old single-range scratch and forwarding callback into separate neverinline helpers; no reuse yet, no assertion/test/counter/Core5/doc change or stack increase."
+    },
+    "corrected_baseline": {
+      "validation": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-red2-validation.json",
+        "sha256": "64bca7b45e9c43c9e81d12b278c6ee337d537b841830cce2fc759308697747ed"
+      },
+      "execution": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-red2-tests.json",
+        "sha256": "b29ef64ff9b48363eff1885f6387b61cfa89f36acbf5134cde8d39b9111bbd28",
+        "selected": 4,
+        "exit_code": 101,
+        "elapsed_seconds": 0.02078853201237507,
+        "timed_out": false,
+        "output_overflow": false,
+        "command_summary": {
+          "executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-red2-slug_bzlmod_v2-75dd42f10a54bf88",
+          "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+        }
+      },
+      "review": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-red-execution-review.json",
+        "sha256": "dcc349ccc1431bc07c07e723e38eedcafee186ea5d3dadad88a9820d14f9ceb0"
+      },
+      "result": "Complete4 selected: policy and unchanged actual256KiB/live64KiB test PASS, only2 expected final gates RED (3,196608) and (7,458752) versus (1,65536). Required logical/stored/Hash/canonicalSHA/Weak/range/decode controls execute before gates."
+    },
+    "green": {
+      "validation": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-green-validation.json",
+        "sha256": "e339bc6e14ad31efafe6eb10a963e4778f042dfe41689ea186932b8a582cd959"
+      },
+      "execution": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-green-tests.json",
+        "sha256": "fc53390191bfc4161a773228b1bf7287b96774bfce04d1512da4cf009d1ea0cb",
+        "selected": 4,
+        "exit_code": 0,
+        "elapsed_seconds": 0.021113552007591352,
+        "timed_out": false,
+        "output_overflow": false,
+        "command_summary": {
+          "executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-green-slug_bzlmod_v2-479f7a7d08434f18",
+          "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+        }
+      },
+      "review": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-candidate-source-review.json",
+        "sha256": "c03def1cab0d69445ed6835fe56300ceb61a7e31195453b6f8dd517d2ba7cf75"
+      },
+      "result": "Same4 cases PASS. Mixed RHS3ranges/131109argumentbytes,2compresseddecodes/65573bytes; scripted7validranges/131106argumentbytes,5compresseddecodes/262181bytes unchanged. Only initialization N-to-one changes."
+    }
+  },
+  "actual_use": {
+    "validation": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-observed-validation.json",
+      "sha256": "6700b92f470dfc38e2930073ec7e0d55e74828de69fa929c8193c317a6e37deb"
+    },
+    "columns": [
+      "range_scratch_init_calls",
+      "range_scratch_init_bytes",
+      "valid_packed_range_calls",
+      "valid_packed_range_argument_bytes",
+      "range_compressed_block_decode_calls",
+      "range_compressed_block_decode_bytes",
+      "invalid_flags",
+      "reserved"
+    ],
+    "delta": [
+      967,
+      63373312,
+      89708,
+      5830942511,
+      88557,
+      5756492970,
+      0,
+      0
+    ],
+    "meaning": "89708 valid Packed ranges with967 real initialization requests and88557 compressed full-block decodes. Argument/decode bytes count repeated processwide work; all invalid/reserved lanes zero. No baseline-original saving, unique-byte, machine-store, CPU, caller/phase, wall or RSS inference.",
+    "source_model": {
+      "initialization_calls": 89708,
+      "initialization_bytes": 5879103488
+    },
+    "model_qualification": "Counterfactual explicit source initialization for same captured validPacked calls; not measured baseline original, unique bytes, machine memset/CPU/saving/speed/RSS/caller/phase. Current processwideRelaxed nonisolated/noncoherent counts include ordinarysingle calls and eager preparations before failed/no valid ranges; every recorded compressed block still decoded.",
+    "collector": "TEMP8AtomicU64/64B, checked finite deltas/sticky flags. ProcesswideRelaxed nonisolated/noncoherent; bracket before drive through runtime/outcome drop; same conditional hooks in observed defaultCLI.",
+    "budget": "Same producer report worst1033bytes including24MAXcells/false fits2048 predebit inside512KiB. Existing event128/prefix32/retainedphase16KiB and work/cleanup/streams unchanged.",
+    "math_policy_stack": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-observed-unit-tests.json",
+      "sha256": "5694e75e8dc9d9543a761839dfd5af060d5758d062551cb74839126b7a91f7ad",
+      "selected": 8,
+      "exit_code": 0,
+      "elapsed_seconds": 0.02092436101520434,
+      "timed_out": false,
+      "output_overflow": false,
+      "command_summary": {
+        "executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-observed-bzlmod-slug_bzlmod_v2-072fecf3d9e95219",
+        "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+      }
+    },
+    "core_owner_report_controls": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-observed-core-tests.json",
+      "sha256": "cb87ea6453e69bcb863297d480247ae8ec5c3b861c40d223ade4f71120b7cb39",
+      "selected": 115,
+      "exit_code": 0,
+      "elapsed_seconds": 1.48579340899596,
+      "timed_out": false,
+      "output_overflow": false,
+      "command_summary": {
+        "executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-observed-core-slug_core_v2-cb436cb8614e68fb",
+        "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+      }
+    },
+    "reviews": [
+      {
+        "path": "/tmp/slug-wp425-validation/range-scratch-actual-probe-design-review.json",
+        "sha256": "32fdc1ff69e05fab4750f09505cf64f4fdfca51113751ac138702f48231d6e26"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/range-scratch-actual-probe-source-review.json",
+        "sha256": "d53eeeb23c66548c335a4c0c1e4a5564b4dbcfe3e2a2fd79aa66f37244504882"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/range-scratch-actual-probe-execution-review.json",
+        "sha256": "58a70d42b0eb4edf73d9b2476697fd5f82ce640eb20fc7f62c746f11608681bd"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/range-scratch-actual-use-retirement-review.json",
+        "sha256": "6eb338311cccc4190a7e266c7cb662f0a0c14e954a578457fb8338c4df2263ec"
+      }
+    ],
+    "functional_outcome": {
+      "result": {
+        "error": {
+          "detail": {
+            "detail": {
+              "reason": "unclassified"
+            },
+            "kind": "native_workspace"
+          },
+          "kind": "repository"
+        },
+        "status": "driver_refusal"
+      },
+      "computes": 859,
+      "roots": 55,
+      "records": 123,
+      "scope_first_error": null,
+      "last_compute_outcome": "need",
+      "qualification": "Unclassified native_workspace refusal; recorded parentScopefirst_error=None does not prove inner cause. No APIrepair or deadline cause inferred. No fullcompletion or terminalExecute success claim.",
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      }
+    }
+  },
+  "retirement": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-counter-retirement.json",
+      "sha256": "fd53c8ed01b187eaeb2ca02aaee7428f811090c1ef66005ebbf29ebb823c8ff3"
+    },
+    "exact_candidate_not_HEAD": true,
+    "restored_candidate_files": 3,
+    "executed17source_archive": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-observed-retired-source.tar",
+      "sha256": "acecde38bcca45d30d0020c2ce1f6306b087c3fd0c3bf28e4fd3a0974b78f6fb"
+    },
+    "pure15pins_match_before_final_docs": true,
+    "permanent_test_counter": "cfg(test) scoped threadbound initialization/range/decode counter only; no production TLS/probe/report API."
+  },
+  "final_production_gates": {
+    "bzlmod": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-production-bzlmod-tests.json",
+      "sha256": "c50381dd2f1c123dfa0eb77c2125eb858c672edbea063be2688db669150cb8bb",
+      "selected": 860,
+      "exit_code": 0,
+      "elapsed_seconds": 0.924071465007728,
+      "timed_out": false,
+      "output_overflow": false,
+      "command_summary": {
+        "executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-production-bzlmod-slug_bzlmod_v2-4ac4539e289f9c71",
+        "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+      }
+    },
+    "core": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-production-core-tests.json",
+      "sha256": "1e7df99cc37cc53e36d284a9b43784df3501b4703b63d13c755c93ed43e044c6",
+      "selected": 114,
+      "exit_code": 0,
+      "elapsed_seconds": 1.48629030000302,
+      "timed_out": false,
+      "output_overflow": false,
+      "command_summary": {
+        "executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-production-core-slug_core_v2-f7c46a6f78ef2259",
+        "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+      }
+    },
+    "native_protections": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-production-native-protected.json",
+      "sha256": "47baecedd6f24fc5e41c86c239cfa3667131f1495e6af1b29c4eb729a44933b5",
+      "selected": 18,
+      "exit_code": 0,
+      "elapsed_seconds": 15.472880213987082,
+      "timed_out": false,
+      "output_overflow": false,
+      "command_summary": {
+        "executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+        "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+      }
+    },
+    "six_archives": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-production-native-six.json",
+      "sha256": "4b4fbe0021aee250143cf93d0da20713fe1c47328d0aeb0bb2893b0a9c68a884",
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 10.240561189013533,
+      "timed_out": false,
+      "output_overflow": false,
+      "command_summary": {
+        "executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+        "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+      }
+    }
+  },
+  "native_six_result": {
+    "decoded_tar_bytes": 820514816,
+    "logical_body_bytes": 631202064,
+    "peak_native_credit_bytes": 335544782,
+    "archive5_work_ms": 8651,
+    "realization_elapsed_ms": 563,
+    "seal_elapsed_ms": 295,
+    "seal_work_ms": 10104,
+    "qualification": "Native credit is not RSS; one completed internal chain is not whole bootstrap latency or comparative performance proof."
+  },
+  "final_artifacts": {
+    "bzlmod": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_bzlmod_v2-a6f26a44fa1511d1",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-production-bzlmod-slug_bzlmod_v2-4ac4539e289f9c71",
+      "executable_sha256": "4ac4539e289f9c71cf6faa01fdfb7d201d7f02001648253500dfacf73456b098",
+      "build": "range-scratch-production-bzlmod-build",
+      "target": "slug_bzlmod_v2",
+      "record": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-production-bzlmod-preservation.json",
+        "sha256": "697ea4895c675c1f5769d0d23cacdc6fae35d00d68fe91e59ccd10f56c737582"
+      }
+    },
+    "core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-production-core-slug_core_v2-f7c46a6f78ef2259",
+      "executable_sha256": "f7c46a6f78ef2259af96d6033357256637528d6db2dcc4612d13feb432026cd1",
+      "build": "range-scratch-production-build",
+      "target": "slug_core_v2",
+      "record": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-production-core-preservation.json",
+        "sha256": "4e4e6fb24259e8b6bf6b3e9e100da868f44c7546b6c6d1fcba5373872a82ff06"
+      }
+    },
+    "cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-production-cli-slug-766a237b73204fb9",
+      "executable_sha256": "766a237b73204fb93fc4e259ed70e47be5ed6ed37285ce25b210b17cc95d58dc",
+      "build": "range-scratch-production-cli-build",
+      "target": "slug",
+      "record": {
+        "path": "/tmp/slug-wp425-validation/range-scratch-production-cli-preservation.json",
+        "sha256": "3c530f7289ed9042ece69de443b044e556dd688eead81d12da6bbf1636ea3f9b"
+      }
+    }
+  },
+  "profile": {
+    "record": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-production-build-profile.json",
+      "sha256": "97b502561d5be00d22f3289004cd0ddeb250309c437fc5c9b3a17f2646d80189"
+    },
+    "panic": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-production-panic.json",
+      "sha256": "4334cfb0a0588de82350bc477c7054bb84c1da2f064fd1537dc9fc19f1b500a9"
+    },
+    "assertions": "opt3, debug+overflow true; Core test/nativeobserver unwind; defaultCLI noobserver abort."
+  },
+  "native_freeze": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-production-native-validation.json",
+      "sha256": "1f921b092e0bd7e52ee3522a613d22c7c30d270e5732ee12e26bd1c2e4c08095"
+    },
+    "pins": 30,
+    "all_pins_and_full_git_state_unchanged": true
+  },
+  "final_original": {
+    "execution": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-production-original.json",
+      "sha256": "525e0a8985a8adcc20d7483b6df7e1b6d37b76c8f198e5747a4afbc91748b797",
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 42.1447751870146,
+      "timed_out": false,
+      "output_overflow": false,
+      "command_summary": {
+        "executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/range-scratch-production-core-slug_core_v2-f7c46a6f78ef2259",
+        "arguments": "Exact selected tests; full executed argv retained in linked execution record."
+      }
+    },
+    "result": {
+      "error": {
+        "code": "WorkDeadline",
+        "kind": "source_service"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 785,
+    "roots": 53,
+    "records": 109,
+    "last_need": "Immutable rules_license+ http_archive materialization2URLs, paths6/operations0; Rust archive not reached. Diagnostic repository name is not a semantic selector.",
+    "scope_totals": {
+      "decoded_bytes": 28700808,
+      "source_attempts": 17,
+      "transferred_bytes": 23580833,
+      "written_bytes": 51634367
+    },
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "Harness exit0 records driver refusal, not functional success. Final production records one30.272128526s refused callback, with substantially different reached work. Earlier prefix versus observed859 and previous production850 establishes neither speed nor regression causality; recorded phase data does not identify the cause. No blind repeat justified; a reviewed finite stage/typed discriminator would test a new hypothesis. Fixed work deadline retained.",
+    "prefix_qualification": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-final-prefix-qualification.json",
+      "sha256": "e44ba724003993f79a426dd778cc3a3480979127c3d814a373fc698886b264d5"
+    }
+  },
+  "inheritance": {
+    "reapi": "Historical execute/corruption controls inherited solely for unchanged byte representation, identity, CAS/transport after equivalence proof; no fresh backend or scratch proof claim.",
+    "loading": "Unchanged baseline1194/1200 with exact6 recorded failures; no new allgreen claim. Map72/Workspace134 inherited unchanged owners.",
+    "core_scope_audit": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-core-scope-audit.json",
+      "sha256": "cdfeb3356b83e17846119782472df60aed4c6105ba1dc9eae93de7716704af68"
+    },
+    "reapi_receipts": [
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-execute.json",
+        "sha256": "f883ba1703e063e4c87ead157b73c4bec74529f7e179869c9b0f7046dfc75cf8"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-corruption.json",
+        "sha256": "6de2d95d62f4b82e4280a0862768fbefd3fd4774b5d660d248c2e4cfc84e262d"
+      }
+    ]
+  },
+  "fixture_growth": {
+    "audit": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-final-scope-audit.json",
+      "sha256": "5d109efd82f884def383205bac792a7d0ee405f4a56ce5fb2dc681366fd1a9bc"
+    },
+    "since_checkpoint": "e75e98323ff1cde00c839a0a808578301c974c5e; previous component checkpoint accepted",
+    "rust_files": 11,
+    "new_rust_leaves": 3,
+    "rust_added_removed_net": [
+      467,
+      110,
+      357
+    ],
+    "new_leaf_lines": {
+      "production": 98,
+      "tests": 178,
+      "cfgtest_witness": 56
+    },
+    "corpus": "No new oracle/input/native fixture or semantic adapter. Reuse independent existing deterministic codec/storage/identity helpers; four helper visibility changes only."
+  },
+  "remaining": "Full authentic Rust/action/REAPI/Slug bootstrap, successful HTTPS-None and General activation, completed-command latency/RSS<=1.25xBazel remain open. General production remains Disabled. Next use current-source finite owner attribution; no presumed API repair.",
+  "independent_final_review": {
+    "verdict": "ACCEPT",
+    "path": "/tmp/slug-wp425-validation/range-scratch-final-review.json",
+    "sha256": "babc848ef84254342d08e5094c7d7e7873570f4397fc24557eb16e19ed8fe1f9",
+    "scope": "Bounded operation-local comparison scratch only; full goal remains active."
+  },
+  "next_refusal_readonly_audit": {
+    "record": {
+      "path": "/tmp/slug-wp425-validation/range-scratch-next-refusal-source-audit.json",
+      "sha256": "17023388b70ea00ee842906ad6fea0d9799088de32885b934f5eced2c6c8bd35"
+    },
+    "qualification": "Observed outer unclassified detail does not identify root.observe invocation or error cause. Existing anchored finite category marker absent from stored stdout/stderr; absence establishes no cause. Retain typed finite cause before flattening only after design review; no private payload/string predicate or semantic repair selected."
+  },
+  "static_validation": {
+    "path": "/tmp/slug-wp425-validation/range-scratch-final-static-validation.json",
+    "sha256": "203ce2752f03837ffd33b9a6cea0b6e2e60f736fa6e8135d7adcbe8217740a25"
+  }
+}

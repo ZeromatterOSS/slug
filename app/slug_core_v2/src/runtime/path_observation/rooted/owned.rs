@@ -71,33 +71,35 @@ pub(super) fn verify(
     }
     let mut offset = 0usize;
     let mut callback_error = None;
-    let captured = root.read_file(path, &|| active() && scope.check().is_ok(), |chunk| {
-        let verified = (|| {
-            check(scope, active)?;
-            // Every returned body keeps this independent monotonic history
-            // debit even after the native State owner's credit retires.
-            scope.charge(SourceCounter::DecodedBytes, chunk.len() as u64)?;
-            let end = offset
-                .checked_add(chunk.len())
-                .filter(|end| *end <= body.len())
-                .ok_or(RootedObservationError::Unstable)?;
-            if !body.range_eq(offset, chunk) {
-                return Err(RootedObservationError::Unstable);
-            }
-            if let Some(output) = materialized.bytes.as_mut() {
-                let slots = Arc::get_mut(output).expect("unpublished returned Arc is unique");
-                for (slot, byte) in slots[offset..end].iter_mut().zip(chunk) {
-                    slot.write(*byte);
+    let captured = body.with_range_comparison(|compare| {
+        root.read_file(path, &|| active() && scope.check().is_ok(), |chunk| {
+            let verified = (|| {
+                check(scope, active)?;
+                // Every returned body keeps this independent monotonic history
+                // debit even after the native State owner's credit retires.
+                scope.charge(SourceCounter::DecodedBytes, chunk.len() as u64)?;
+                let end = offset
+                    .checked_add(chunk.len())
+                    .filter(|end| *end <= body.len())
+                    .ok_or(RootedObservationError::Unstable)?;
+                if !compare(offset, chunk) {
+                    return Err(RootedObservationError::Unstable);
                 }
+                if let Some(output) = materialized.bytes.as_mut() {
+                    let slots = Arc::get_mut(output).expect("unpublished returned Arc is unique");
+                    for (slot, byte) in slots[offset..end].iter_mut().zip(chunk) {
+                        slot.write(*byte);
+                    }
+                }
+                offset = end;
+                Ok(())
+            })();
+            if let Err(error) = verified {
+                callback_error = Some(error);
+                return Err(io::Error::other("owned file verification refused"));
             }
-            offset = end;
             Ok(())
-        })();
-        if let Err(error) = verified {
-            callback_error = Some(error);
-            return Err(io::Error::other("owned file verification refused"));
-        }
-        Ok(())
+        })
     });
     if let Some(error) = callback_error {
         return Err(error);

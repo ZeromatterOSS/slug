@@ -43,18 +43,20 @@ pub(super) fn observed_equal(
     let mut offset = 0usize;
     let mut same = true;
     let running = || active() && scope.check().is_ok();
-    let captured = io.read_file_contents(path, &running, |chunk| {
-        let end = offset
-            .checked_add(chunk.len())
-            .ok_or_else(|| io::Error::other("workspace compare overflow"))?;
-        if end > old.len() {
-            return Err(io::Error::other("workspace comparison grew"));
-        }
-        // Complete the framed contents stream even after mismatch, preserving
-        // every comparison, exact EOF and opened/named-frame validation.
-        same &= compare_chunk(old, offset, chunk);
-        offset = end;
-        Ok(())
+    let captured = old.with_range_comparison(|compare| {
+        io.read_file_contents(path, &running, |chunk| {
+            let end = offset
+                .checked_add(chunk.len())
+                .ok_or_else(|| io::Error::other("workspace compare overflow"))?;
+            if end > old.len() {
+                return Err(io::Error::other("workspace comparison grew"));
+            }
+            // Complete the framed contents stream even after mismatch, preserving
+            // every comparison, exact EOF and opened/named-frame validation.
+            same &= compare_chunk(compare, offset, chunk);
+            offset = end;
+            Ok(())
+        })
     });
     check(scope, active)?;
     let captured = captured?;
@@ -65,8 +67,12 @@ pub(super) fn observed_equal(
 }
 
 #[inline]
-fn compare_chunk(old: &RepositoryWorkspaceBody, offset: usize, chunk: &[u8]) -> bool {
+fn compare_chunk(
+    compare: &mut dyn FnMut(usize, &[u8]) -> bool,
+    offset: usize,
+    chunk: &[u8],
+) -> bool {
     #[cfg(test)]
     crate::runtime::repository_workspace_comparison_work_for_test::record_call(chunk.len());
-    old.range_eq(offset, chunk)
+    compare(offset, chunk)
 }

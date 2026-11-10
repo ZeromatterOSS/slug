@@ -748,6 +748,24 @@ and all limits remain. Proof/memo tables and consumed output-array backings are
 fully paid producer scratch and end before publication. No donor import, global
 cache or new semantic identity is introduced.
 
+## Operation-local Body comparison scratch
+
+Independent design revision2 accepts existing fixed64KiB decoder storage reused
+within one synchronous Body comparison callback. A separate Packed-only frame
+and array-free dispatcher/kernel preserve actual stack nesting. Reuse pinned
+safe decoder/slice APIs and immutable Arc Body ownership; retain every decode,
+full comparison and actual FD/SHA/freshness/history check. No generic Alloca
+arena, donor import, decoded cache, pool, dependency or semantic owner is added.
+Existing291,344decode and2MiB construction reservations remain; no new allocation
+or resource refund. The [owner contract](wp1225-general-repository-workspace-design.md#operation-local-body-comparison-scratch)
+is validated by corrected causal RED/GREEN, actual256KiB/live64KiB frame tests,
+positive original use (967initializations/89,708valid Packed ranges), exact TEMP
+retirement and production Bzlmod860/Core114/native18/six closure. The
+[component proof](wp1225-range-scratch-acceptance-2026-11-10.json) has independent
+final acceptance and retains the initial stack failure/correction. Observed859
+unclassified and final785SourceWorkDeadline prefixes both clean exactly; neither
+establishes cause, CPU/speed/RSS or full completion.
+
 ## Construction-local Body encoding workspace
 
 Independent design review accepts reuse of two bounded heap Vecs within one

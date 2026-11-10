@@ -314,23 +314,25 @@ impl<'a> RouteRoots<'a> {
                     io_limits(self.state.mode(), self.state.reservation()),
                 )?;
                 let mut offset = 0usize;
-                let captured = io.read_file(
-                    relative,
-                    &|| (self.active)() && self.scope.check().is_ok(),
-                    |chunk| {
-                        check(self.scope, self.active)
-                            .map_err(|_| io::Error::other("inactive source read"))?;
-                        let end = offset
-                            .checked_add(chunk.len())
-                            .filter(|end| *end <= body.len())
-                            .ok_or_else(|| io::Error::other("source read size changed"))?;
-                        if !body.range_eq(offset, chunk) {
-                            return Err(io::Error::other("source read bytes changed"));
-                        }
-                        offset = end;
-                        Ok(())
-                    },
-                );
+                let captured = body.with_range_comparison(|compare| {
+                    io.read_file(
+                        relative,
+                        &|| (self.active)() && self.scope.check().is_ok(),
+                        |chunk| {
+                            check(self.scope, self.active)
+                                .map_err(|_| io::Error::other("inactive source read"))?;
+                            let end = offset
+                                .checked_add(chunk.len())
+                                .filter(|end| *end <= body.len())
+                                .ok_or_else(|| io::Error::other("source read size changed"))?;
+                            if !compare(offset, chunk) {
+                                return Err(io::Error::other("source read bytes changed"));
+                            }
+                            offset = end;
+                            Ok(())
+                        },
+                    )
+                });
                 check(self.scope, self.active)?;
                 captured?;
                 if offset != body.len() {

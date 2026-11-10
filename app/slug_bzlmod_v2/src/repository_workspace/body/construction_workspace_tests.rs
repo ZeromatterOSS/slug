@@ -6,7 +6,7 @@ use super::*;
 use crate::repository_workspace::*;
 
 const OUTPUT: usize = 72_109;
-fn noise(length: usize) -> Vec<u8> {
+pub(super) fn noise(length: usize) -> Vec<u8> {
     let mut state = 0x12345678u32;
     (0..length)
         .map(|_| {
@@ -17,7 +17,7 @@ fn noise(length: usize) -> Vec<u8> {
         })
         .collect()
 }
-fn build(bytes: &[u8]) -> RepositoryWorkspaceBody {
+pub(super) fn build(bytes: &[u8]) -> RepositoryWorkspaceBody {
     let mut builder = RepositoryWorkspaceBodyBuilder::new(bytes.len()).unwrap();
     for raw in bytes.chunks(CHUNK) {
         builder.append(raw, &mut |_| Ok::<(), ()>(())).unwrap();
@@ -26,7 +26,7 @@ fn build(bytes: &[u8]) -> RepositoryWorkspaceBody {
 }
 // Independent original public compressor and fresh initialized buffers, never
 // codec::encode or the proposed reusable workspace implementation.
-fn fresh_selected(raw: &[u8]) -> (bool, Vec<u8>) {
+pub(super) fn fresh_selected(raw: &[u8]) -> (bool, Vec<u8>) {
     let mut encoded = vec![0; OUTPUT];
     let written = lz4_flex::block::compress_into(raw, &mut encoded).unwrap();
     encoded.truncate(written);
@@ -119,7 +119,7 @@ fn canonical(body: RepositoryWorkspaceBody) -> Arc<str> {
         .unwrap();
     crate::source_preparation::general_workspace_source_identity(&terminal)
 }
-fn closed_semantics(body: &RepositoryWorkspaceBody, bytes: &[u8], admissions: &[usize]) {
+pub(super) fn closed_semantics(body: &RepositoryWorkspaceBody, bytes: &[u8], admissions: &[usize]) {
     let Repr::Packed(data) = &body.0 else {
         panic!("closed builder must return Packed");
     };
