@@ -1340,9 +1340,10 @@ owners. Retain shared payloads without copying bodies; add no temporary full
 sort vector, interner, global cache, retained field or donor dependency. Pure
 union does not establish source freshness or grant native authority.
 
-Migrate only the three measured Loading helpers, keeping their mode gates,
+The initial migration selects only three measured Loading helpers, keeping their mode gates,
 error wrappers and diagnostic counters. Other wrappers and raw append/capture
-paths remain outside this selection. Workspace tests compare exact results and
+paths remain outside that selection; the registration extension below has
+separate direct CPU evidence. Workspace tests compare exact results and
 errors against the existing constructor, protect two-bank key/result custody
 and last-Drop refunds, and reuse per-demand change/revoke/restore controls.
 Actual original-rule RED/GREEN, existing Bzl ownership controls, direct-dependent
@@ -1359,6 +1360,62 @@ without demonstrating deeper Rust progress, command latency or RSS fit. Further
 work must discriminate prerequisite serialization rather than infer time from
 map counts. The following bounded Lstat-only scheduling contract selects the
 first discovery class; other Need families retain their own resource decisions.
+
+### Registration frontier union reuse
+
+Status: independent design/source/final review ACCEPT; executed bounded reuse
+proof is in the [component receipt](wp1225-registration-union-acceptance-2026-11-10.json).
+Toward the complete original
+Rust command, replace only `ExpansionScratch::merge` concatenation/reconstruction
+with the existing `PathObservationEpoch::try_union` over its two closed epochs.
+Keep the exact Frontier error wrapper and assignment only after success. Add no
+registration cache, skipped row, new key/value/field, dependency or native grant.
+Every registration family, sign/reversal, lookahead/barrier, cancellation, Need
+cacheability, certificate and terminal event rule remains unchanged.
+
+The preserved nine-row synchronous probe is validated at
+`/tmp/slug-wp425-validation/root-owner-cpu-validation.json`
+(SHA256 `1e9ab95e13673e92c15321203f4a2572a558ee99e874a51b4275c49981c9ebb5`).
+It observes37,718 merge calls and3.278573899s inclusive thread CPU, with19,092,086
+left,3,924,530 right and19,486,906 result row units. This is whole merge time,
+not sort/hash self time or a promised saving. All nine rows close, max active is
+one and all validity flags are clear. The temporary source/Cargo/report/control
+changes are retired byte-exact to main, with source and artifacts preserved;
+the retirement receipt SHA256 is
+`20316d0f42cdca709c45c8824f118542536b21d3e1d530df450cec57ac829e54`.
+
+Reuse the already reviewed utility contract: complete facts and full result Eq,
+first sorted conflict, canonical order and the entire left key/result pair on
+duplicates. Reuse empty/shared/subset map owners only after required overlap
+validation. Raw constructor checks remain mandatory for arbitrary rows; both
+scratch inputs already satisfy them. Growth retains every row through ordered
+merge, not a new concatenation/sort vector. Native/source/history limits and
+source freshness remain unchanged; pure union creates no authority.
+
+Scope is the private registration merge, a focused child test/wire and one
+test-only bridge to the existing genuine observed DICE fixture.
+Require a genuine observed DICE certificate fed through actual scratch merges:
+baseline retains full facts/result Arcs but reconstructs the map; candidate must
+reuse it for no-new-fact unions. Compare growth against the raw constructor and
+preserve scratch on conflict. Reuse Workspace union first-conflict and two-bank
+Image key/result custody/refund tests, plus current registration order, barrier,
+retry/Need, event and change/revoke/restore controls. Compile named direct
+dependents and a fresh default CLI, then run the exact original and protected
+native/warm cases under unchanged caps. Counts and owner reuse establish bounded
+work removal; completed-command latency/RSS and full bootstrap still need proof.
+
+Executed evidence: the genuine certificate retains every fact/result Arc on
+baseline, then fails only map ownership; candidate passes the same test plus
+growth/earliest-conflict/unchanged-scratch controls. All39 registration and three
+Workspace union controls pass, including independent charged Image key/result
+custody. Core60 and18 native protection cases pass. Loading1192/1198 retains six
+verified baseline failures with identical panic bodies after thread-ID
+normalization. The original accepts std5/all six original archives and reaches
+File6 at841 computes/55roots/115records, then refuses at SourceService
+WorkDeadline. Cleanup is168 bytes/zero FDs/zero backing, peak native credit
+342,612,884. This one stopped prefix establishes neither full original closure
+nor completed-command latency/RSS. Further attribution must preserve the same
+complete facts, Need/event rules, source freshness and fixed caps.
 
 ### Ordered metadata prerequisite discovery
 

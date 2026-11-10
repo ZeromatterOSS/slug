@@ -1,0 +1,232 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "7e9a78d80b42830392125c38631014a8dd4c54eb",
+  "classification": "Slug-native work/storage reuse over unchanged full semantic certificates",
+  "outcome": "Registration frontier merge reuses existing validated observation union. Actual-DICE map reconstruction RED becomes GREEN, with unchanged full facts and conflict behavior. Original Rust acquires std5/all six archives and reaches File6; it remains unfinished.",
+  "scope": {
+    "production": "Only ExpansionScratch::merge RHS delegates to self.observations.try_union(incoming). Exact Frontier error wrapper and assignment-only-after-success preserved.",
+    "tests": "Private child tests plus one test-only bridge to the existing genuine observed DICE registration fixture; no surrogate key or fake completed registration result.",
+    "unchanged": "All registration families/sign/reversal/order, lookahead/barriers, cancellation, Need noncacheability, terminal events, full certificates/Hash/Eq, raw constructors, limits and activation. No new key/value/field/cache/counter/dependency/native grant."
+  },
+  "utility": "Existing PathObservationEpoch::try_union over closed immutable epochs: full overlap validation, first sorted conflict, full LEFT demand/result custody, empty/shared/subset owner reuse, checked ordered growth without concatenation/sort vector. Raw input validation remains mandatory for arbitrary rows.",
+  "causal_basis": {
+    "temporary_diagnostic": {
+      "path": "/tmp/slug-wp425-validation/root-owner-cpu-validation.json",
+      "sha256": "1e9ab95e13673e92c15321203f4a2572a558ee99e874a51b4275c49981c9ebb5"
+    },
+    "retirement": {
+      "path": "/tmp/slug-wp425-validation/root-owner-cpu-retirement.json",
+      "sha256": "20316d0f42cdca709c45c8824f118542536b21d3e1d530df450cec57ac829e54"
+    },
+    "source_profile": "37718 actual synchronous registration merges consumed3.278573899s inclusive threadCPU, not sort/hash selfcost or a promised saving. All9owners closed, maxactive1, overflow/clock/excess/unwind flags0. Nativecontrol16KiB exactlypaid, reportcaps preserved.",
+    "preservation": "All17 temporary source/Cargo/report/control files restored byte-exact before production work; no diagnostic-only main commit."
+  },
+  "validation": {
+    "actual_registration_red": {
+      "selected": 2,
+      "exit_code": 101,
+      "passed": 1,
+      "failed": 1,
+      "meaning": "Full facts/resultArcs pass, no-op map custody fails atactualprivateScratch. Growth/earliestconflict/errorwrapper/unchangedscratch control passes.",
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/registration-union-red.json",
+        "sha256": "3da0277c8b4bcae1fc41bd87724487f4b0241d5c1e830b627a16ce42ddd4dd68"
+      },
+      "source": {
+        "path": "/tmp/slug-wp425-validation/registration-union-red-source-freeze.json",
+        "sha256": "58c2be45959c8853bf4b751fb7d55ca9533fda803370227efb3ff4e71dfc53f9"
+      }
+    },
+    "registration_green": {
+      "selected": 39,
+      "passed": 39,
+      "elapsed_seconds": 0.07892616197932512,
+      "includes": "Both new actualScratch tests and37 existing registration order/family/barrier/Need/event/cancellation/change/recovery controls"
+    },
+    "workspace_union": {
+      "selected": 3,
+      "passed": 3,
+      "includes": "Shared/subset/fullEq/reference, first sorted conflict and independent2bank Image key/result custody+lastdrop refunds"
+    },
+    "loading": {
+      "selected": 1198,
+      "passed": 1192,
+      "matching_failed_names": [
+        "bzl_module::bzl_source_memory_tests::host_load_keys_preserve_raw_alias_order_and_retained_exports",
+        "bzl_module::host_package_load_tests::repository_package_rejects_provider_or_aspect_dependency_before_recording",
+        "bzl_module::module_extension_definition_loading_tests::selected_external_dispatch_uses_each_resolved_child_route",
+        "bzl_visibility::tests::every_live_composition_site_calls_the_shared_checker",
+        "package::module_extension_definition_tests::exec_group_declarations_retain_constraints_and_named_transitions",
+        "provider::tests::config_feature_flag_info_rejects_invalid_constructor_arguments"
+      ],
+      "failure_body_comparisons": [
+        {
+          "name": "bzl_module::bzl_source_memory_tests::host_load_keys_preserve_raw_alias_order_and_retained_exports",
+          "same_failure_body_after_thread_id_normalization": true
+        },
+        {
+          "name": "bzl_module::host_package_load_tests::repository_package_rejects_provider_or_aspect_dependency_before_recording",
+          "same_failure_body_after_thread_id_normalization": true
+        },
+        {
+          "name": "bzl_module::module_extension_definition_loading_tests::selected_external_dispatch_uses_each_resolved_child_route",
+          "same_failure_body_after_thread_id_normalization": true
+        },
+        {
+          "name": "bzl_visibility::tests::every_live_composition_site_calls_the_shared_checker",
+          "same_failure_body_after_thread_id_normalization": true
+        },
+        {
+          "name": "package::module_extension_definition_tests::exec_group_declarations_retain_constraints_and_named_transitions",
+          "same_failure_body_after_thread_id_normalization": true
+        },
+        {
+          "name": "provider::tests::config_feature_flag_info_rejects_invalid_constructor_arguments",
+          "same_failure_body_after_thread_id_normalization": true
+        }
+      ],
+      "inherited_qualification": {
+        "path": "/tmp/slug-wp425-validation/fast-body-loading-qualification.json",
+        "sha256": "281b8e270cfeef79c5b26f8a48b61f15d642a0298a66dcb4abef9e48d62164ab"
+      },
+      "qualification": "All1196 inherited ordinary tests plus2new merge tests executed. Same six failed names and panic bodies as accepted7e9 component afterthread-id normalization; inheritedreceipt pins actualmain695 baseline. No selector/assertion omitted."
+    },
+    "core": {
+      "selected": 60,
+      "passed": 60,
+      "elapsed_seconds": 0.5827236899931449
+    },
+    "native_protected": {
+      "selected": 18,
+      "passed": 18,
+      "elapsed_seconds": 15.730531915993197,
+      "includes": "15 guards,warmcase4commands,2 closed-realization cases; fullhistory/old-newpressure/foreignorigin/freshbytes/cancel/lastreader/refund invariants"
+    },
+    "postcheck": {
+      "path": "/tmp/slug-wp425-validation/registration-union-execution-postcheck.json",
+      "sha256": "d9d36003dc5f0057ff17d9663598c33324f93ab5ae8a6a215bdd3430d57c69b3"
+    },
+    "fresh_core_cli": "Opt3 withdebugassertions/overflow; CoreUnwind/defaultCLIAbort verified in staticELF; no temporaryownerCPU feature/module/control/report remains. Existingnative-probe-observer phase/frequency feature only in Core.",
+    "static_checks": {
+      "path": "/tmp/slug-wp425-validation/registration-union-static-checks.json",
+      "sha256": "938a0f27114702ec4cbed20cd217eef67ceda43c3280f037133a06363c1f4393"
+    }
+  },
+  "original": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/registration-union-original.json",
+      "sha256": "f2af9be6b13e916980a0061f77e86f59bb57e84682a0dbf905f8c4c0528990bc"
+    },
+    "supervisor_exit_code": 0,
+    "elapsed_seconds": 27.122065142000793,
+    "functional_result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 841,
+    "roots": 55,
+    "records": 115,
+    "accepted": "All six original Rust archives, std index5 included; expectedchecksums omitted byoriginal Starlark and actual integrity verified bynativeowners.",
+    "pending": "File operation index6, refused before work with SourceService WorkDeadline",
+    "peak_native_credit_bytes": 342612884,
+    "peak_backing_bytes": 8187281408,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "One qualified stopped prefix, not full original completion, repeatable/causal completed latency, full-command fit or RSS proof. Native credit is not RSS. No timing claim that all baseline merge CPU was removed."
+  },
+  "limits": {
+    "native": 536870912,
+    "fds": 512,
+    "backing": 8589934592,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack": 262144
+  },
+  "review": {
+    "design": "ACCEPT",
+    "source": "ACCEPT",
+    "final": "ACCEPT",
+    "scope": "Independent final review verified stagedsource/executedevidence and24receiptpins; boundedreuse only, allwhole-goalresiduals retained."
+  },
+  "source_freeze": {
+    "path": "/tmp/slug-wp425-validation/registration-union-source-1-freeze.json",
+    "sha256": "83eab15e6a547dd151c8906ed602712b775962b1b38f7effd0f8f915da8d9704"
+  },
+  "preserved_executables": {
+    "core": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/registration-union-core-slug_core_v2-52e49e056ca3e672",
+      "sha256": "52e49e056ca3e6724f43dd6998d3a8c8e3644be5c1647826edfaf12e350e15ed"
+    },
+    "cli": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/registration-union-cli-slug-ed3a9564acb48115",
+      "sha256": "ed3a9564acb48115c854fd525175d946dc074262b9fb72adf729f7069b218e24"
+    },
+    "loading": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/registration-union-green-loading-slug_loading_v2-d2c3e57806555024",
+      "sha256": "d2c3e578065550244139d20a3e90a9240307de09a02931bbcefb7f9f72a026bc"
+    },
+    "workspace": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/registration-union-workspace-slug_workspace_v2-6e8d588ff15558dc",
+      "sha256": "6e8d588ff15558dc99542fda6425ac4d81eba102600674d9e07ee9245357eb2f"
+    }
+  },
+  "raw_evidence": [
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-red.json",
+      "sha256": "3da0277c8b4bcae1fc41bd87724487f4b0241d5c1e830b627a16ce42ddd4dd68"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-loading-focused.json",
+      "sha256": "1d4826e5f53b78bb844eb0ec5ba5dd0d9c8607f0515feee908e36b8d0902743c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-workspace-controls.json",
+      "sha256": "93bacc7ba7ada93de02a6d6fdf3b0ff33ce46981a82ee16c60432fc1704e5885"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-loading-full.json",
+      "sha256": "5118727bd8099be511008e6e8ed23776d94dda36c78e013b85c8fcbf571a8a27"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-loading-qualification.json",
+      "sha256": "faaed4a3f085869f2ff7337ff52986444ad420b3b02a08633cf2b45f8d3e7381"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-core-focused.json",
+      "sha256": "6cc4f66483bd8f25fcdecf876b4727e73dd05e5bb2c8ea5c731899697da3124c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-native-protected.json",
+      "sha256": "3c2f7f2321c54a55b34ad947db7a24d3f07f8d8a48e477f7e9f27488173d1b63"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-original.json",
+      "sha256": "f2af9be6b13e916980a0061f77e86f59bb57e84682a0dbf905f8c4c0528990bc"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-native-freeze.json",
+      "sha256": "abdc6aebf074c19294261c8d5b769a6f59d064aaf79ae68d68a8bd519451e42f"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-panic.json",
+      "sha256": "c4ec4414393ac4694070cb6c8ffb9c861b35392afadab6602edf38cce4c99cea"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/registration-union-execution-postcheck.json",
+      "sha256": "d9d36003dc5f0057ff17d9663598c33324f93ab5ae8a6a215bdd3430d57c69b3"
+    }
+  ],
+  "inherited_transport_and_body_proof": "Accepted7e9 fast-body component retains sixArchive/File/Read/seal/lastreader and genuinefreshbackend REAPI evidence. This private registration-only migration changes no transport/body/public interface; namedCore/defaultCLI consumers and nativeprotection/original rerun here.",
+  "remaining": "Full original Rust/action/REAPI/Slug closure, completed-command RSS<=1.25xBazel and production activation remain open. Next attribute remaining work around File6/fulloriginal under the same freshness/history/resource contracts; no new reuse or caller-specific behavior selected."
+}

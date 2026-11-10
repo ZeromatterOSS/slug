@@ -86,6 +86,10 @@ use crate::bzl_module::RepositoryPackageInventoryObservationKey;
 use crate::package::NativeToolchainTarget;
 use crate::path_need_lookahead::HomogeneousPathLookahead as PathLookahead;
 
+#[cfg(test)]
+#[path = "registration_expansion/merge_tests.rs"]
+mod merge_tests;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 pub enum ModuleRegistrationFamily {
     Toolchains,
@@ -515,14 +519,7 @@ impl ExpansionScratch {
     }
 
     fn merge(&mut self, incoming: &PathObservationEpoch) -> Step<()> {
-        self.observations = PathObservationEpoch::from_shared(
-            self.observations
-                .observations()
-                .iter()
-                .chain(incoming.observations())
-                .map(|(demand, result)| (demand.dupe(), result.dupe())),
-        )
-        .map_err(|error| {
+        self.observations = self.observations.try_union(incoming).map_err(|error| {
             DriverBreak::Outer(ModuleRegistrationExpansionObservationError::Frontier(
                 error.into(),
             ))

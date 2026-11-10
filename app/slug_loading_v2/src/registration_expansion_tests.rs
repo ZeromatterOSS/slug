@@ -99,6 +99,30 @@ fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
 }
 
+pub(crate) async fn observed_certificate_for_merge_test() -> PathObservationEpoch {
+    let module = "module(name='bazel_tools')\nregister_toolchains('//pkg:tc')\n";
+    let build = "filegroup(name='impl')\ntoolchain_type(name='type')\ntoolchain(name='tc',toolchain_type=':type',toolchain=':impl')\n";
+    let epoch = EpochBuilder::root_package(module, build, 77);
+    let expected = epoch.dupe();
+    let mut tx = transaction(module, epoch).await;
+    let outcome = tx
+        .compute(&ModuleRegistrationExpansionObservationKey::toolchains(
+            workspace(),
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(observed)) = outcome else {
+        panic!("the genuine observed registration fixture must complete")
+    };
+    assert_eq!(labels(observed.result()), ["@@//pkg:tc"]);
+    assert!(observed.observations().observations().len() > 1);
+    for (demand, result) in observed.observations().observations() {
+        assert_eq!(result, expected.get(demand).unwrap());
+        assert!(Arc::ptr_eq(result, expected.get(demand).unwrap()));
+    }
+    observed.observations().dupe()
+}
+
 pub(crate) async fn registration_diagnostic_missing_route(
     extension_name: &str,
 ) -> Arc<crate::ModuleRegistrationExpansionError> {

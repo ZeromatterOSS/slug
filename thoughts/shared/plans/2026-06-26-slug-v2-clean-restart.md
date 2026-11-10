@@ -40,10 +40,14 @@ The [private fast body codec](./slug-v2-subplans/wp1225-general-repository-works
 now passes six-archive seal/reader closure at12,405ms with335,539,406 peak native
 credit under the unchanged bank and27+3 clock. Its
 [bounded component proof](./slug-v2-subplans/wp1225-fast-body-codec-acceptance-2026-11-10.json)
-preserves full logical history and identity. The exact original advances through
-LLVM4 into std5 decoding, but remains unfinished with sticky WorkDeadline and
-exact cleanup. Next attribute remaining root-compute/workspace work within the
-same limits; counters alone select no new reuse. Original completion,
+preserves full logical history and identity.
+[Registration frontier union reuse](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#registration-frontier-union-reuse)
+now passes actual-DICE ownership RED/GREEN and behavior controls. Its
+[bounded component proof](./slug-v2-subplans/wp1225-registration-union-acceptance-2026-11-10.json)
+reaches all six original Rust archives through std5 and the following File6 at
+841 computes/55roots/115records. The command remains unfinished at WorkDeadline
+with exact cleanup. Next attribute remaining work toward full original closure
+under the same limits. Original completion,
 completed-command latency/RSS and activation remain open.
 
 The active capability replaces GCC/Homebrew process profiles with one general

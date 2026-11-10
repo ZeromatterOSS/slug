@@ -224,12 +224,24 @@ Arc/Dupe and charged Image custody; exact overlap comparison precedes allocation
 Growth uses existing Buck2-derived OrderedMap/SortedMap in sorted order, avoiding
 a temporary full sort vector without a donor import or new container. The raw
 constructors, semantic facts, per-demand freshness and native admission stay
-unchanged. Only three measured Loading helpers migrate. A separate feature-only
+unchanged. The initial three measured Loading helpers migrate. A separate feature-only
 264-byte process scalar collector qualifies observed helper returns; it is no
 semantic cache or request-isolated allocation/time meter. The
 [union receipt](wp1225-observation-union-acceptance-2026-11-08.json) owns causal
 map-identity, full equality/key/result custody and bounded original-command proof;
 completed-command latency/RSS remain independent gates.
+
+The [registration frontier extension](wp1225-general-repository-workspace-design.md#registration-frontier-union-reuse)
+reuses that same validated union in private expansion scratch. Direct synchronous
+CPU evidence selects the merge, and all temporary instrumentation is retired.
+It introduces no container, cache, retained field or donor import. Whole left
+key/result custody, full certificates, conflict precedence and all registration
+rows/Need/event rules remain authoritative. The
+[component receipt](wp1225-registration-union-acceptance-2026-11-10.json)
+records actual-DICE map ownership RED/GREEN,39 registration/three Workspace/60
+Core/18 native checks and qualified Loading1192/1198. The original acquires all
+six Rust archives and reaches File6 before WorkDeadline; full closure,
+completed-command latency/RSS and activation remain open.
 
 Ordered Lstat prerequisite discovery keeps one attempt-local pending Source
 Need and reuses existing immutable Arc-backed demands and sorted union. A checked

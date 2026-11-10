@@ -3,22 +3,25 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: the [private fast body codec](wp1225-general-repository-workspace-design.md#private-fast-body-codec-trial)
-passes the generic six-archive/File/Read/seal/last-reader gate under the fixed bank
-and27+3 clock. The [bounded component receipt](wp1225-fast-body-codec-acceptance-2026-11-10.json)
-records631,202,064 retained logical archive body bytes,335,539,406 peak native
-credit and sealing at12,405ms. This one qualified pass leaves14,595ms observed
-work headroom; it establishes no repeatability, causal completed latency or RSS.
-Full histories, identities, native allocation/release and fresh-byte checks stay
-unchanged. All854 Bzlmod and60 focused Core checks,18 protected native cases
-including four warm commands, and two genuine fresh-backend REAPI checks pass.
-Loading remains1190/1196 with the same six independently verified baseline failures.
-The exact original advances from be6's rustfmt3 stop through LLVM4 into std5
-decoding:840 computes,55roots/114records. It remains unfinished with sticky
-WorkDeadline and an unclassified Materialization mutation; the precise inner
-cause is unproved. Cleanup is168 baseline bytes, zero native FDs and zero backing.
-Next attribute remaining root-compute/workspace work toward the complete original
-under unchanged limits. Reachability counters alone select no new reuse.
+Current delta: [registration frontier union reuse](wp1225-general-repository-workspace-design.md#registration-frontier-union-reuse)
+passes actual-DICE map-custody RED/GREEN while preserving full facts, left
+key/result owners, sorted conflicts and assignment only after success. Its
+[bounded component receipt](wp1225-registration-union-acceptance-2026-11-10.json)
+records39 registration and three Workspace union checks,60 focused Core checks
+and18 protected native cases including four warm commands passing. Loading is
+1192/1198 with the exact six verified baseline failure names and panic bodies.
+The retired synchronous probe measured37,718 merge calls and3.279s inclusive
+thread CPU; it selected this merge, not a registration cache or altered Need.
+The exact original now acquires all six Rust archives through std5 and reaches
+File6 at841 computes/55roots/115records. It remains unfinished at SourceService
+WorkDeadline, with168 baseline bytes, zero native FDs and zero backing after
+cleanup. Peak native credit is342,612,884 bytes. This stopped prefix proves no
+completed-command latency/RSS, repeatability or full-command fit.
+Next attribute remaining work toward File6 and full original closure under the
+same full-history, fresh-byte,27+3 clock and resource contracts; no new reuse is
+selected. The [private fast codec predecessor](wp1225-fast-body-codec-acceptance-2026-11-10.json)
+retains its generic six-archive/File/Read/seal/last-reader and fresh-backend REAPI
+proof; body/transport APIs, production gating and all limits remain unchanged.
 Production remains Disabled; full Rust/action/REAPI/Slug and memory gates remain.
 
 Accepted [immutable root-route operational hash reuse](wp1225-general-repository-workspace-design.md#immutable-root-route-operational-hash-reuse)
