@@ -3,7 +3,20 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [complete framed Body comparison](wp1225-general-repository-workspace-design.md#complete-framed-body-comparison-without-discarded-digest)
+Current delta: [construction-local Body encoding workspace](wp1225-general-repository-workspace-design.md#construction-local-body-encoding-workspace)
+passes unchanged causal RED/GREEN and actual original-use proof: 12,730 full
+encode/decode/comparison calls over 819,965,538 bytes with 259 requests per buffer.
+All required work and exact stored bytes remain; only transient reserve/init
+requests change. Builder headers grow 48 to 96 bytes and stay forecast; full
+2MiB scratch and 256KiB stack remain. TEMP retired exactly; production Bzlmod857,
+Core109, native18 and six-archive closure pass. Final original reaches 850/55/122:
+Execute3 is recorded, then NeedExecute4 and progress observed with no later
+epoch before SourceWorkDeadline. Cleanup is exact168/0FD/0backing. The
+[component proof](wp1225-body-workspace-acceptance-2026-11-10.json) has independent
+final acceptance. Next attribute remaining reached work on current source;
+full completion, latency/RSS and activation remain open under unchanged limits.
+
+Accepted predecessor: [complete framed Body comparison](wp1225-general-repository-workspace-design.md#complete-framed-body-comparison-without-discarded-digest)
 passes causal RED/GREEN and selected-helper original-use proof:4,822,504,936read/
 comparison-argument bytes,74,277calls/SHA0. Full reads/eager comparisons/frames/EOF,
 all requiredSHA domains and recovery128/4/512MiB predebit/lease/error contracts
@@ -12,8 +25,8 @@ Core109/native18/six-archive closure pass. Final original gets beyond Rusttools
 materialization into local_config_ccsymlinks; last recorded847/55/119NeedSymlink1,
 then progressobserved/no later epoch andSourceWorkDeadline, exact168/0FD/0backing.
 The [component proof](wp1225-framed-comparison-acceptance-2026-11-10.json) has
-independent final acceptance. Next attribute current remainingreached work; no presumed
-APIrepair, fullcompletion/latency/RSS or activation claim underunchangedlimits.
+independent final acceptance. No presumed APIrepair, fullcompletion/latency/RSS
+or activation claim follows under unchanged limits.
 
 Accepted [framed content streams](wp1225-general-repository-workspace-design.md#framed-content-streams-without-discarded-rootio-digests)
 retain all required SHA/freshness while skipping discarded snapshots/seal hashes.

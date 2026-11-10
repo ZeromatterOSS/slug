@@ -9,6 +9,9 @@ pub struct RepositoryWorkspaceBodyBuilder {
     appended: usize,
     blocks: Vec<Block>,
     routing: StarlarkHasher,
+    // Vec headers are covered by storage_bytes(sizeofSelf); their bounded heap
+    // storage belongs to the separately prepaid encoding scratch allowance.
+    workspace: codec::Workspace,
 }
 impl RepositoryWorkspaceBodyBuilder {
     pub fn storage_bytes(expected: usize) -> Result<usize, Error> {
@@ -44,6 +47,7 @@ impl RepositoryWorkspaceBodyBuilder {
             appended: 0,
             blocks,
             routing,
+            workspace: codec::Workspace::default(),
         })
     }
     pub fn append<E>(
@@ -56,24 +60,11 @@ impl RepositoryWorkspaceBodyBuilder {
         if raw.is_empty() || raw.len() != remaining.min(CHUNK) {
             return Err(B::Body(Error::Length));
         }
-        let encoded = codec::encode(raw).map_err(B::Body)?;
-        // The caller prepays the fixed encoding workspace before append. Keep
-        // validation off the fixed native owner stack; no decoded bytes escape
-        // into the returned Body or its retained-storage accounting.
-        let mut decoded = Vec::new();
-        decoded
-            .try_reserve_exact(CHUNK)
-            .map_err(|_| B::Body(Error::Allocation))?;
-        if decoded.capacity() > CHUNK {
-            return Err(B::Body(Error::Storage));
-        }
-        decoded.resize(raw.len(), 0);
-        codec::decode(&encoded, &mut decoded).map_err(B::Body)?;
-        if decoded != raw {
-            return Err(B::Body(Error::Codec));
-        }
+        // Framing is checked before lazy scratch allocation. A refused append
+        // may keep scratch, but every retry reruns encode/decode/full comparison.
+        let encoded = self.workspace.encode_and_validate(raw).map_err(B::Body)?;
         let compressed = encoded.len() < raw.len();
-        let selected = if compressed { encoded.as_slice() } else { raw };
+        let selected = if compressed { encoded } else { raw };
         admit(arc_bytes(selected.len()).map_err(B::Body)?).map_err(B::Admission)?;
         // Table was prepaid/reserved exactly before any block allocation.
         self.blocks.push(Block {
@@ -104,6 +95,9 @@ impl RepositoryWorkspaceBodyBuilder {
         }
         let native = add(control, payload)?;
         let retained = add(control, self.expected)?;
+        // No working slice escapes into PackedData; retire both buffers before
+        // constructing the immutable owner and before native scratch can retire.
+        drop(self.workspace);
         let data = PackedData {
             logical: self.expected,
             routing: self.routing.finish_small(),

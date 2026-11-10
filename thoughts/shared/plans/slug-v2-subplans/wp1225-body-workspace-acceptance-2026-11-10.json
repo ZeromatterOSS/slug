@@ -1,0 +1,266 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "e90bea87eac017b81e5e1c4c8ac2e294c5c49cec",
+  "classification": "Slug-native construction scratch reuse; logical identity and byte-identical private block storage unchanged",
+  "outcome": "Reuse two bounded transient heap buffers within each fresh Packed Body construction toward authentic Rust closure under unchanged caps.",
+  "implementation": {
+    "buffers": "Initially empty output/validation Vecs, fallible exact capacities72109/65536 and excess-capacity refusal; output retains full initialized bound, validation initializes only maximum actual block length.",
+    "every_append": "Same fresh-table compress_into, strict complete decode/full original-byte comparison including raw-selected/retry blocks, same compressed-if-smaller choice and exact independent Arc admission/copy; routing/cursor advance only after success.",
+    "failure_lifetime": "First-append order unchanged. Later refusal may retain scratch only in this Builder. Changed retry repeats every codec/check and preserves logical state. finish drops workspace before PackedData; error/drop/unwind before native credit.",
+    "layout": {
+      "legacy_builder_bytes": 48,
+      "candidate_builder_bytes": 96,
+      "workspace_headers_bytes": 48,
+      "probe_static_bytes": 128,
+      "scratch_components": 463706,
+      "scratch_reservation": 2097152,
+      "unit_selected_passed": 8,
+      "math": "independent counters, checked exact deltas, overflow, conversion, bad lanes, reversal, saturation, reserved and unknown flags all pass",
+      "qualifier": "Concrete Rust type sizes and positive fullprepay; not allocator overhead or RSS. Legacy type mirrors unchanged preworkspace fields; final retained PackedData layout unchanged."
+    },
+    "unchanged": "Public signatures; PackedData/Block layouts and immutable Arc ownership; full logical Eq/Hash/routing/canonicalSHA/StableKey; native freshness, full reads, histories, origin/lease/error and every source/archive integrity domain.",
+    "absent": "No cache/pool/interner/dictionary, persistent compression table, unsafe uninitialized storage, dependency, semantic/DICE owner, caller adapter or activation."
+  },
+  "limits": {
+    "native_bank": 536870912,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack": 262144,
+    "encoding_scratch": 2097152,
+    "decode_scratch": 291344,
+    "fd": 512,
+    "backing": 8589934592,
+    "xz_logical": 142606336,
+    "all_other_owner_caps": "unchanged"
+  },
+  "research": {
+    "post-framed-comparison-owner-ip-evidence-review.json": {
+      "path": "/tmp/slug-wp425-validation/post-framed-comparison-owner-ip-evidence-review.json",
+      "sha256": "f6351f3f12c94e75406bfbbadf8444f13f8c6c773fcdf7b0945a018046b6c039"
+    },
+    "post-framed-comparison-body-workspace-audit.json": {
+      "path": "/tmp/slug-wp425-validation/post-framed-comparison-body-workspace-audit.json",
+      "sha256": "72b6bb0eb503325cbd9f43e436dd0b98af87d9f8dbc68ce9c9223a330b02052b"
+    },
+    "post-framed-comparison-remaining-digest-audit.json": {
+      "path": "/tmp/slug-wp425-validation/post-framed-comparison-remaining-digest-audit.json",
+      "sha256": "fa409b39e5dcf46be7c1bd57408bc769d15aa1b44d4f7d6f09160b45092a9a8d"
+    },
+    "post-framed-comparison-xz-work-audit.json": {
+      "path": "/tmp/slug-wp425-validation/post-framed-comparison-xz-work-audit.json",
+      "sha256": "0f6601ec609c86ccd336859a59b309d50b24f55db878bf228c79f72d3c5c8f56"
+    }
+  },
+  "selection_boundary": "3363sample current-source profile reaches Body codec, not allocation caller/removable cost. XZ has no source-proven redundant recreation/universally tiny payload read; neither remaining discarded-digest seam selected.",
+  "causal": {
+    "baseline3": {
+      "path": "/tmp/slug-wp425-validation/body-workspace-red2-validation.json",
+      "sha256": "9288b3853b73a25f0dc4ad9f504cbf8f4aafb18605cebc74672cd0b5f9d1f492"
+    },
+    "baseline_result": "37byte control passes; multiblock/retry fail only final reserve tuples(3,3)/(2,2) vs(1,1), after required codec/work, independent fresh-compressor bytes/flags/layout, full Eq/Hash/routing/canonicalSHA, admission/Weak checks.",
+    "candidate3": {
+      "path": "/tmp/slug-wp425-validation/body-workspace-green-tests.json",
+      "sha256": "48125b46e4cc5dca43ae0ef01ee0992e31a638af1d53c20833902343d07c3a1a"
+    },
+    "candidate_result": "All3unchanged controls pass, including exact reserve/init bounds and unchanged required encode/decode/compare calls/bytes.",
+    "provenance": "Authored deterministic full/short compressible/noise bytes, no copied fixture corpus. Scoped checked cfg(test) witness at real explicit sites; requests, not allocator calls or machine stores.",
+    "reviews": [
+      {
+        "path": "/tmp/slug-wp425-validation/body-workspace-red2-review.json",
+        "sha256": "974c00ed9ea43075e07ede1874fdb2e6c87efe0000eaa5f591acc54454becbbe"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/body-workspace-candidate-source-review.json",
+        "sha256": "590e1544f24a1a8b7929d9d281ebd846815beb6a22227ba585a6f939f8641992"
+      }
+    ]
+  },
+  "actual_use": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/body-workspace-observed-validation.json",
+      "sha256": "2d606f6cd0d912cca1950ebea930a5a9718238f2a4848188e0983fc48849cc59"
+    },
+    "columns": [
+      "constructed_success",
+      "finished_success",
+      "output_reserve_calls",
+      "output_capacity_bytes",
+      "validation_reserve_calls",
+      "validation_capacity_bytes",
+      "output_init_bytes",
+      "validation_init_bytes",
+      "encode_calls",
+      "encode_bytes",
+      "validation_decode_calls",
+      "validation_decode_bytes",
+      "compare_calls",
+      "compare_bytes",
+      "invalid_flags",
+      "reserved"
+    ],
+    "delta": [
+      261,
+      261,
+      259,
+      18676231,
+      259,
+      16973824,
+      18676231,
+      4873660,
+      12730,
+      819965538,
+      12730,
+      819965538,
+      12730,
+      819965538,
+      0,
+      0
+    ],
+    "pins_and_full_git_exact": 28,
+    "qualification": "Counterfactual explicit request/init arguments derived from baseline source and causal RED; not a measured baseline original, allocator/machine store count, unique bytes, CPU, saving, phase/caller, latency or RSS. Current counters processwide Relaxed nonisolated/noncoherent, include reached failed attempts. constructed/finished mean Builder only, not native or command success.",
+    "temporary": "Unconditional Bzlmod hooks/APIs including observed defaultCLI,16AtomicU64/128B, checked flags/deltas. Same-producer worst-width1634B within4KiB prepaid512KiB report;8Bzlmod math/layout/control and110Core/report tests pass.",
+    "retirement": {
+      "path": "/tmp/slug-wp425-validation/body-workspace-counter-retirement.json",
+      "sha256": "9e007297c31f196adcf054d437a09dce068719c5cea3685985d76c2594232fea"
+    },
+    "review": {
+      "path": "/tmp/slug-wp425-validation/body-workspace-actual-use-retirement-review.json",
+      "sha256": "f09d456506daf428445916b51e6c4dc38132e8eef012079d0f7fd43084fea7c9"
+    }
+  },
+  "final_production_gates": {
+    "bzlmod": {
+      "selected_passed": 857,
+      "elapsed_seconds": 0.9236923299904447,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/body-workspace-production-bzlmod-tests.json",
+        "sha256": "eb27914319241b86eb5c197996d08febd79bec4d689135fcd726d363001754d2"
+      }
+    },
+    "core": {
+      "selected_passed": 109,
+      "elapsed_seconds": 1.4059345349960495,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/body-workspace-production-core-tests.json",
+        "sha256": "0159bbccac0b39e0a2088e53cdfda4a8c13343d8cfd2aa40e14d703b89b6529c"
+      }
+    },
+    "native_protected": {
+      "selected_passed": 18,
+      "elapsed_seconds": 15.371248198993271,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/body-workspace-production-native-protected.json",
+        "sha256": "198c4f290ac897e60c94de432a279732beaa7350dbf669e11278c02484285903"
+      }
+    },
+    "six_archive": {
+      "passed": true,
+      "elapsed_seconds": 10.337634999013972,
+      "seal_work_ms": 10186,
+      "peak_native_credit_not_rss": 335544782,
+      "logical_body_bytes": 631202064,
+      "decoded_tar_bytes": 820514816,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/body-workspace-production-native-six.json",
+        "sha256": "177b00946be29dfec5d7d2028d95672af9d448f558b53b64def5193c6a914903"
+      },
+      "qualification": "One generic pinned Archive/File/Read/seal/lastreader pass; not causal speed, repeatability, RSS or reconstruction of original omitted-checksum Starlark."
+    }
+  },
+  "final_artifacts": {
+    "bzlmod": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_bzlmod_v2-a6f26a44fa1511d1",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/body-workspace-production-bzlmod-slug_bzlmod_v2-e6c569df914d0fbc",
+      "executable_sha256": "e6c569df914d0fbc35ec4899a9f13e54602327ba279d26f9cd83d5d134b9b7af",
+      "build": "body-workspace-production-bzlmod-build",
+      "target": "slug_bzlmod_v2"
+    },
+    "core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/body-workspace-production-core-slug_core_v2-47e3548ffa39b883",
+      "executable_sha256": "47e3548ffa39b883dde94d0156fa7c011078d512fe08fec9c27148ec89c9285e",
+      "build": "body-workspace-production-build",
+      "target": "slug_core_v2"
+    },
+    "cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/body-workspace-production-cli-slug-57b26e3653e8c3f5",
+      "executable_sha256": "57b26e3653e8c3f56dda79d394c5831a27c6e846dde148465172f596fe6b047e",
+      "build": "body-workspace-production-cli-build",
+      "target": "slug"
+    }
+  },
+  "final_profile": {
+    "path": "/tmp/slug-wp425-validation/body-workspace-production-build-profile.json",
+    "sha256": "97b502561d5be00d22f3289004cd0ddeb250309c437fc5c9b3a17f2646d80189"
+  },
+  "final_panic": {
+    "path": "/tmp/slug-wp425-validation/body-workspace-production-panic.json",
+    "sha256": "5d8ccdc24d32c3cdaaf0dc29e39706997b0ba28673f16a84a63ec201d9266466"
+  },
+  "all24_native_pins_exact": {
+    "path": "/tmp/slug-wp425-validation/body-workspace-production-native-validation.json",
+    "sha256": "b9c6c84d0f604ec3bcfc82b9a1ce459cbe7c9c1d52661308b5c1a6bda8163fd3"
+  },
+  "final_original": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/body-workspace-production-original.json",
+      "sha256": "6ae172cd4d71bc980a6b1169b3c85b939a2702af889914763356c9f66e11bd7b"
+    },
+    "harness_exit": 0,
+    "elapsed_seconds": 27.124575341003947,
+    "result": {
+      "error": {
+        "code": "WorkDeadline",
+        "kind": "source_service"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 850,
+    "last_epoch_roots_records": [
+      55,
+      122
+    ],
+    "last_need": [
+      {
+        "archive": null,
+        "index": 4,
+        "kind": "execute",
+        "repository": "rules_cc++cc_configure_extension+local_config_cc"
+      }
+    ],
+    "trace_boundary": "Epoch850 includes local_config_cc Execute3 record after Symlink0/1 and File2; needs Execute4, then progress_observed/no later epoch. Execute4 terminal state unproved. Differing stopped prefixes establish no causal saving.",
+    "peak_native_credit_not_rss": 348814421,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "temporary_key_absent": true
+  },
+  "inheritance": {
+    "historical_reapi": [
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-execute.json",
+        "sha256": "f883ba1703e063e4c87ead157b73c4bec74529f7e179869c9b0f7046dfc75cf8"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-corruption.json",
+        "sha256": "6de2d95d62f4b82e4280a0862768fbefd3fd4774b5d660d248c2e4cfc84e262d"
+      }
+    ],
+    "scope": "Only unchanged Body logical/byte/identity/CAS/transport domains after independent fresh-compressor stored flag/byte/layout equivalence. Not fresh REAPI execution or proof of scratch reuse.",
+    "unchanged_suites": "Map/Workspace and baseline-qualified Loading inherited only unchanged owners. No full Loading green claim; current full Bzlmod, direct Core/defaultCLI and native owners rerun."
+  },
+  "fixture_growth": {
+    "path": "/tmp/slug-wp425-validation/body-workspace-fixture-growth-checkpoint.json",
+    "sha256": "1b424a8300056f644138ef6b168fbe3013c820e0f426fbcd8a4fcac14eec2b58"
+  },
+  "remaining": "Full authentic Rust/action/REAPI/Slug bootstrap, successful HTTPS-None end-to-end, completed-command latency/RSS<=1.25xBazel and activation remain open. Next attribute remaining reached work on pushed source; no presumed API repair.",
+  "independent_final_review": {
+    "path": "/tmp/slug-wp425-validation/body-workspace-final-review.json",
+    "sha256": "e4a59c061bf8d4e0ab006024f9dd8f12d094bfb3fa2827d067d35cacfe7d3c5b"
+  }
+}

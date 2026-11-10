@@ -2471,6 +2471,63 @@ then the actual six-archive chain/File/Read/seal/last-reader closure under512MiB
 FD512, backing8GiB and27+3sec, plus the exact original separately. Whole-command
 RSS<=1.25xBazel, public Rust and General activation remain independent open gates.
 
+### Construction-local Body encoding workspace
+
+Status: independent design/source/final review ACCEPT; executed gates pass. The bounded
+[component proof](wp1225-body-workspace-acceptance-2026-11-10.json) preserves source,
+causal work, actual use and retirement evidence. This is Slug-native construction
+scratch reuse toward the same
+generic repository/Rust closure. The current source-free profile reaches Body
+codec work; it assigns no allocation caller, removable CPU cost, speed or RSS.
+The separate XZ audit remains evidence, not permission to omit decoder work.
+
+One `RepositoryWorkspaceBodyBuilder` owns two initially empty heap Vecs for
+encoder output and roundtrip validation. After the existing append framing
+checks, first use fallibly reserves exact output capacity72,109, rejects observed
+excess capacity and initializes its full slice. Every block still invokes the
+same fresh-table `compress_into`. After successful compression, first validation
+use fallibly reserves exact65,536 with the same capacity check. Initialize only
+the maximum logical block length seen, so a single short block keeps its old
+initialization work. Reuse initialized slices across this construction only.
+Every append, including raw-selected blocks and retries, still strictly decodes
+the entire encoded block and compares every original byte before admission.
+Keep byte-identical encoded streams, raw-if-not-smaller selection, independently
+allocated immutable block Arcs and exact admission before retained allocation.
+
+Vec headers belong to `storage_bytes` through `size_of::<Builder>()`; dynamic
+buffers and complete assembler/codec/transfer overlap remain under the existing
+separately prepaid2MiB scratch allowance. Retire workspace before publication
+and before its scratch credit on finish, error, cancellation, unwind and recovery.
+First-append allocation/codec/admission order stays unchanged. On later failures,
+initialized scratch may remain in this Builder until retry or drop; blocks,
+cursor and routing state do not advance on refusal. A changed-byte retry must
+repeat the full codec and comparison work. No working slice enters PackedData.
+Keep the fresh small/large LZ4 table choice on every call; a persistent table can
+change final-short storage and is outside this decision. No cache, pool, unsafe
+uninitialized buffer, dictionary, new dependency or DICE/semantic owner is added.
+
+Acceptance requires a real-site scoped work RED/GREEN with unchanged tests:
+mixed compressible/noise full blocks and a final short block preserve independent
+fresh-compressor block bytes/flags/layout, complete decoded bytes, logical Eq,
+full Hash/routing/canonical SHA, exact Arc admission and last-owner retirement
+before the bounded-work assertion. Required per-block encode/decode/comparison
+calls and bytes stay unchanged; transient reserve requests become two per
+nonempty Builder and initialization72,109 plus maximum logical block length.
+Empty/invalid framing performs no workspace requests. Refusal/changed retry,
+single-short initialization, independent builders, full scratch/control forecasts
+and the actual256KiB thread
+with a live64KiB caller remain discriminated. These are explicit reserve and
+initialization requests, not global allocator calls or machine zeroing counts.
+
+Require positive actual-original repeated append use with bounded temporary
+scalar counters, exact diagnostic retirement, ordinary Bzlmod and affected Core
+controls, fresh default CLI, native18 protections, six-archive/File/Read/seal/
+last-reader closure and a final production original under all unchanged limits.
+Historical REAPI proof inherits only unchanged stored/logical identity and
+transport domains after independent byte/flag/layout equivalence; it does not
+prove new scratch behavior. Full Rust/action/REAPI/Slug completion, successful
+HTTPS-None, completed-command latency/RSS<=1.25xBazel and activation remain open.
+
 ### Private fast body codec trial
 
 Status: independent design/source/final review ACCEPT; executed bounded component

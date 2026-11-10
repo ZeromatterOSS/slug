@@ -11,6 +11,10 @@ use starlark_map::StarlarkHasher;
 
 mod builder;
 mod codec;
+#[cfg(test)]
+mod construction_work_for_test;
+#[cfg(test)]
+mod construction_workspace_tests;
 pub use builder::RepositoryWorkspaceBodyBuildError;
 pub use builder::RepositoryWorkspaceBodyBuilder;
 

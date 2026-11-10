@@ -82,7 +82,17 @@ Core109/native18/six-archive closure pass. Its
 [component proof](./slug-v2-subplans/wp1225-framed-comparison-acceptance-2026-11-10.json)
 has final independent acceptance. Final original progresses beyond Rusttools
 materialization into local_config_ccsymlinks, last recorded847/55/119 thentyped
-SourceWorkDeadline and exactcleanup. Next attribute current remainingreached work.
+SourceWorkDeadline and exactcleanup. The
+[construction-local encoding workspace](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#construction-local-body-encoding-workspace)
+passes unchanged causal RED/GREEN and actual12,730 full codec/check calls over
+819,965,538 bytes with259 requests per buffer. Exact stored bytes and all required
+work remain; 48-byte additional Builder headers are forecast under unchanged
+2MiB scratch. TEMP retired; production Bzlmod857/Core109/native18/six pass. Its
+[component proof](./slug-v2-subplans/wp1225-body-workspace-acceptance-2026-11-10.json)
+has independent final acceptance. Final original reaches850/55/122, records
+Execute3 then needs Execute4; progress observed has no later epoch before typed
+SourceWorkDeadline and exact cleanup. Next attribute remaining reached work;
+no causal speed or RSS claim follows from stopped prefixes.
 Fullcompletion, completed-command latency/RSS and activation remainopen.
 
 The active capability replaces GCC/Homebrew process profiles with one general

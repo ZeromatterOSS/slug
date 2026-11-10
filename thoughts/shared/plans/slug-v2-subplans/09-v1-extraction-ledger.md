@@ -748,6 +748,24 @@ and all limits remain. Proof/memo tables and consumed output-array backings are
 fully paid producer scratch and end before publication. No donor import, global
 cache or new semantic identity is introduced.
 
+## Construction-local Body encoding workspace
+
+Independent design review accepts reuse of two bounded heap Vecs within one
+Body Builder. This reuses pinned safe LZ4 slice APIs and existing native scratch
+prepay, with no donor import, persistent compression table, cache, pool or new
+semantic owner. Full fresh-table compression, strict decode, byte comparison,
+independent Arc blocks, structural identity and canonical SHA remain required.
+Headers are covered by Builder control forecasts; all dynamic overlap stays
+under unchanged2MiB construction credit and the actual256KiB stack. The
+[owner contract](wp1225-general-repository-workspace-design.md#construction-local-body-encoding-workspace)
+requires causal real-site request-work proof, positive original use, exact
+diagnostic retirement and protected native closure before acceptance.
+Production Bzlmod857/Core109/native18 and six-archive closure pass; actual
+original use records12,730 full codec/check calls with259 requests per buffer.
+The [component proof](wp1225-body-workspace-acceptance-2026-11-10.json) records exact
+TEMP retirement and positive48-byte header forecasting, with final acceptance.
+Full completion, CPU/speed, RSS and activation remain unproved.
+
 ## Compact workspace body representation
 
 Design/source/final review accepted; executed bounded component proof is in the
