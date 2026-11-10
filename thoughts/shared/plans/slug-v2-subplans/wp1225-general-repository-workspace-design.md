@@ -2471,6 +2471,45 @@ then the actual six-archive chain/File/Read/seal/last-reader closure under512MiB
 FD512, backing8GiB and27+3sec, plus the exact original separately. Whole-command
 RSS<=1.25xBazel, public Rust and General activation remain independent open gates.
 
+### Repository glob complete-anchor preservation
+
+Status: validated bounded component; independent acceptance is recorded in the
+[component proof](wp1225-repository-glob-anchor-acceptance-2026-11-10.json).
+This Slug-native tracked-boundary repair preserves existing admitted glob
+semantics and native authority. Repository segment listing first resolves its
+actual source path, then retains that result's complete logical anchor beside
+the requested logical path. Both Legacy and Observed listing use the existing
+checked anchored constructor for `Some`; Host and unbounded `None` keep their
+existing constructors. Never substitute the terminal content-origin anchor for
+a different logical path: existing anchored resolution selects the correct
+terminal Source namespace and directory facts.
+
+Checked construction failure returns existing `EscapesAnchor` with the complete
+anchor and empty failed-listing observations. The caller still unions original
+resolution observations. No fallback, path-derived authority, prefix relaxation,
+new error/API/key field, cache or native owner is introduced. Existing anchor
+Arc/Dupe/Allocative storage, full structural Eq/Hash/source context, observations,
+raw names, ordering, exclusions, Need/error precedence and confinement remain.
+
+Corrected identical tests fail RED4 and pass GREEN4, including actual observed
+General anchors, bounded Legacy, fact-Arc custody, warm reuse and materialization/
+Source A/B/A restoration. Fixtures reuse independent fact epochs rather than
+inventing new owners for unchanged inputs. Workspace19 passes; ordinary Loading
+1191/1197 retains the exact six baseline failure bodies; Core authority2 passes.
+Fresh Core/defaultCLI and20 unique native selectors pass across qualified runs.
+The new authored four-File BUILD recursive glob/exclude reaches normal cquery
+with exact root/sub-directory confinement and complete owner/resource retirement.
+Its bounded test-only graph-thread retirement wait preserves every Weak and exact
+refund assertion; command clocks and production cleanup remain unchanged.
+
+The frozen original remains incomplete:840computes/55roots/122records, Execute3
+recorded then Execute4 plus one path pending at typed SourceWorkDeadline. Cleanup
+is exact168/0FD/0backing. This does not attribute the earlier859 refusal to glob,
+prove its removal, establish speed/RSS or close Rust/action/REAPI/Slug. All limits
+remain unchanged and General production stays Disabled. Next attribute current
+reached work under the existing finite observation contract; no blind repeat or
+presumed successor API repair.
+
 ### Operation-local Body comparison scratch
 
 Status: independent design/source/final review ACCEPT; executed gates pass.

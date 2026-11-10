@@ -1010,3 +1010,6 @@ mod optional_archive_tests;
 
 #[path = "body_coverage_tests.rs"]
 mod body_coverage_tests;
+
+#[path = "repository_glob_tests.rs"]
+mod repository_glob_tests;

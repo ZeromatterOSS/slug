@@ -3550,6 +3550,13 @@ replay pass to the next generic declaration-schema boundary. No V1, Buck2 or
 Zabel code extraction is required for the next audit; Zabel remains peer
 architecture guidance only.
 
+The 2026-11-10 [complete-anchor correction](wp1225-general-repository-workspace-design.md#repository-glob-complete-anchor-preservation)
+reuses the existing listing-key anchor field and immutable Arc/Dupe/Allocative
+source context. It adds no retained field/type, collection, cache, descriptor,
+credit exemption or donor import. Logical anchors remain complete DICE inputs;
+existing anchored listing resolves terminal Source facts without path inference.
+The linked component proof carries causal, ownership and genuine native gates.
+
 ### Repository Label-path owner utility decision (2026-09-02)
 
 `WP-2-4-5-7A-repository-label-path-owner-design-r1` requires no V1 or Buck2

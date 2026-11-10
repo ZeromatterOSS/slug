@@ -33,6 +33,8 @@ use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+#[cfg(unix)]
+use slug_workspace_v2::MaterializationPathAnchor;
 #[cfg(all(test, unix))]
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -520,27 +522,60 @@ impl HostGlobSegmentMode {
         ctx: &mut DiceComputations<'_>,
         namespace: PathObservationNamespace,
         logical_path: NormalizedAbsolutePath,
+        anchor: Option<MaterializationPathAnchor>,
     ) -> SegmentInputOutcome<PathDirectoryListing, PathDirectoryListingError> {
         match self {
-            Self::Legacy => legacy_segment_input(dice_invariant(
-                ctx.compute(&PathDirectoryListingKey::new(namespace, logical_path))
-                    .await,
-            )),
-            Self::Observed => path_segment_input(
-                dice_invariant(
-                    ctx.compute(&PathDirectoryListingObservationKey::new(
-                        namespace,
-                        logical_path,
-                    ))
-                    .await,
-                )
-                .map(|observed| {
+            Self::Legacy => {
+                let listing = match anchor {
+                    Some(anchor) => {
+                        match PathDirectoryListingKey::new_anchored(
+                            anchor.dupe(),
+                            logical_path.as_path(),
+                        ) {
+                            Ok(listing) => listing,
+                            Err(_) => {
+                                return SourcePreparationOutcome::Complete(Ok(SegmentInput {
+                                    result: Err(PathDirectoryListingError::EscapesAnchor {
+                                        logical_path,
+                                        anchor,
+                                    }),
+                                    observations: PathObservationEpoch::empty(),
+                                }));
+                            }
+                        }
+                    }
+                    None => PathDirectoryListingKey::new(namespace, logical_path),
+                };
+                legacy_segment_input(dice_invariant(ctx.compute(&listing).await))
+            }
+            Self::Observed => {
+                let listing = match anchor {
+                    Some(anchor) => {
+                        match PathDirectoryListingObservationKey::new_anchored(
+                            anchor.dupe(),
+                            logical_path.as_path(),
+                        ) {
+                            Ok(listing) => listing,
+                            Err(_) => {
+                                return SourcePreparationOutcome::Complete(Ok(SegmentInput {
+                                    result: Err(PathDirectoryListingError::EscapesAnchor {
+                                        logical_path,
+                                        anchor,
+                                    }),
+                                    observations: PathObservationEpoch::empty(),
+                                }));
+                            }
+                        }
+                    }
+                    None => PathDirectoryListingObservationKey::new(namespace, logical_path),
+                };
+                path_segment_input(dice_invariant(ctx.compute(&listing).await).map(|observed| {
                     observed.map(|observed| SegmentInput {
                         result: observed.result().clone(),
                         observations: observed.observations().dupe(),
                     })
-                }),
-            ),
+                }))
+            }
         }
     }
 
@@ -549,10 +584,11 @@ impl HostGlobSegmentMode {
         ctx: &mut DiceComputations<'_>,
         key: &HostGlobSegmentCandidatesKey,
     ) -> SegmentInputOutcome<PathDirectoryListing, HostGlobSegmentError> {
-        let (namespace, logical_path, resolution_observations) = match &key.source {
+        let (namespace, logical_path, anchor, resolution_observations) = match &key.source {
             HostGlobSegmentSource::Host => (
                 PathObservationNamespace::Host,
                 key.logical_directory.dupe(),
+                None,
                 PathObservationEpoch::empty(),
             ),
             HostGlobSegmentSource::Repository { .. } => {
@@ -575,12 +611,13 @@ impl HostGlobSegmentMode {
                     Ok(resolved) => (
                         resolved.namespace(),
                         resolved.requested_path().dupe(),
+                        resolved.anchor().map(Dupe::dupe),
                         input.observations,
                     ),
                 }
             }
         };
-        self.scoped_list(ctx, namespace, logical_path)
+        self.scoped_list(ctx, namespace, logical_path, anchor)
             .await
             .map(|result| {
                 result.and_then(|input| {

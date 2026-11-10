@@ -1718,3 +1718,6 @@ async fn external_segments_follow_current_materialization_a_b_a() {
         matches!(tx.compute(&wildcard).await.unwrap(), SourcePreparationOutcome::Complete(result) if result.is_ok())
     );
 }
+
+#[path = "anchored_repository_tests.rs"]
+mod anchored_repository_tests;

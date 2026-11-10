@@ -1,0 +1,332 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "fe18849ec9e058a501d830e52097917914deb030",
+  "classification": "Slug-native tracked materialization-anchor preservation; existing admitted glob semantics, native authority and exact integrity domains unchanged",
+  "outcome": "Repository wildcard listing retains its actually resolved complete logical anchor instead of asking for ancestors outside that repository. Advances generic authored General BUILD glob through ordinary Native cquery.",
+  "implementation": {
+    "production_files": [
+      "app/slug_loading_v2/src/host_glob/mod.rs"
+    ],
+    "contract": "Carry resolved.anchor() with requested logical path and namespace into private scoped_list. Both Legacy and Observed modes use existing checked new_anchored for Some; None retains old constructors. Preserve full logical source-anchor context rather than substituting terminal content_origin anchor.",
+    "failure": "Checked constructor failure projects existing EscapesAnchor with complete anchor and empty failed-listing epoch; original resolution observations remain in the unchanged caller union. No unanchored or Host fallback, panic, new error family or authority inferred from path text.",
+    "ownership": "Existing listing-key Option<MaterializationPathAnchor> already participates in complete derived Eq/Hash/Allocative. Dupe shares immutable anchor data/source arrays. No new key field, layout, owner, collection, lock, cache, interner, native credit or IO.",
+    "unchanged": "Core physical prefix guard; Workspace anchored resolver/listing constructors; Bzlmod source/adoption producers; source scope; full structural/content/SHA/history/fresh FD/name/frame/EOF/mode/cancellation/error precedence contracts.",
+    "source_pins": [
+      {
+        "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/tests.rs",
+        "sha256": "b9c050e17cf3922bfc4df24da8af30bd8e90bf57223181e2f1d3fa4213c9ad4f"
+      },
+      {
+        "file": "app/slug_loading_v2/src/host_glob/tests.rs",
+        "sha256": "36ef3acc4be4a39a5d782bc770a42bcbc32f47586e345f85b3d5913b45e334cc"
+      },
+      {
+        "file": "app/slug_core_v2/src/runtime/repository_workspace_driver/repository_glob_tests.rs",
+        "sha256": "eb689413bc5df21ceec0fc74d8a124ef4bc60a008c8159014ee4fab015f58dfb"
+      },
+      {
+        "file": "app/slug_loading_v2/src/host_glob/anchored_repository_tests.rs",
+        "sha256": "c98f5a19750aa5cf8ce0c81b074b8aec1adca3afe13e35bfc10574981e1f95fe"
+      },
+      {
+        "file": "app/slug_loading_v2/src/host_glob/mod.rs",
+        "sha256": "3a557e7c3ccff652d5f7c87a3def2fe9bbb0d8bebad78c1ea7414205728666f4"
+      }
+    ]
+  },
+  "research": {
+    "design": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-anchor-design.json",
+      "sha256": "5c9c622b032fe157cb24b7c46c4dd3fc4195a402c21494b412e43b9fa6b451ea"
+    },
+    "design_review": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-anchor-design-review.json",
+      "sha256": "147271316da51f1f7d02dd1667884aae131ec63802ebc2c6c7cf4119d5866752"
+    },
+    "consumer_audit": {
+      "path": "/tmp/slug-wp425-validation/physical-prefix-consumer-source-audit.json",
+      "sha256": "2e0bc0b6a90de6c36fdca7e8fc1691656eaa01355862290ea69dcc52bf63f59b"
+    },
+    "producer_and_pinned_bazel_source_audit": {
+      "path": "/tmp/slug-wp425-validation/physical-prefix-producer-source-audit.json",
+      "sha256": "2ef4ea5342c726ae3b8f54916896fb1fe8cb3149d3a64381400b63dc0971735b"
+    },
+    "prior_diagnostic": {
+      "summary": {
+        "path": "/tmp/slug-wp425-validation/observation-origin-diagnostic-summary.json",
+        "sha256": "556bb26d83aba7552373a3d84069d3eee6d359dff421895280cd9520a8e22e43"
+      },
+      "execution_retirement_review": {
+        "path": "/tmp/slug-wp425-validation/observation-guard-execution-retirement-review.json",
+        "sha256": "293cdb31b93a3ae316893169c2b8602dba809694f65d9b62035a62d53a1ca5b3"
+      },
+      "meaning": "Finite returned first-failing physical split prefix guard22 selected a source audit, not a specific caller or repair. All temporary diagnostic source retired exactly before this semantic candidate."
+    }
+  },
+  "causal_proof": {
+    "red": {
+      "evidence": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-red7.json",
+        "sha256": "f8a5d455251874da8405da5ff749c47d8606068dc71b8341bc31ff3c331dc790"
+      },
+      "selected": 4,
+      "exit_code": 101,
+      "elapsed_seconds": 0.04118300901609473,
+      "timed_out": false,
+      "output_overflow": false
+    },
+    "red_failed": 4,
+    "red_passed": 0,
+    "green": {
+      "evidence": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-four2.json",
+        "sha256": "19cd74ec55a47b1a6dcb4f02e955b62e313dea34cb9a349c184740f868794dd4"
+      },
+      "selected": 4,
+      "exit_code": 0,
+      "elapsed_seconds": 0.04087640799116343,
+      "timed_out": false,
+      "output_overflow": false
+    },
+    "green_passed": 4,
+    "same_frozen_loading_tests_red_green": true,
+    "red_source": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-tests-red-source-7-freeze.json",
+      "sha256": "37b35e1fce94611372508ddfe34d143c43fd68143fa3566ae74346d36020a285"
+    },
+    "green_source": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-green-source-2-freeze.json",
+      "sha256": "608a6b136df6530b73ca0169e9d9a4c414eebf9ee7227bf5fa988fcf3923efea"
+    },
+    "discriminator": "First obtain actual original General realization and observed repository path anchor with exact fact-Arc custody. Three observed tests then fail solely at final Complete with Lstat outside root in SAME logical namespace701. Fourth Legacy test fails its final Complete gate. Exact candidate changes only listing anchor forwarding; all four complete GREEN.",
+    "green_controls": "Actual same-DICE materialization and Source-context A/B/A key changes/restoration, warm reuse, exact candidate bytes/kinds and supplied fact-Arc owners. Complete logical anchor differs from terminal Source anchor; DirectoryEntries uses terminal Source namespace.",
+    "fixture_corrections": "Earlier type/Builtin/continuation setup failures are not causal RED. First GREEN exposed newly wrapped equal fact owners in later A/B/A iterations; corrected fixture preconstructs independent A/B epochs once, restores original A Arcs, and shares unchanged logical facts across Source A/B. No ownership/anchor/key/assertion weakened. Corrected final fixture rerun RED then GREEN with exact preserved production copies; no HEAD reset.",
+    "provenance": "Primary tests drive actual observed General callable through two File Needs and replay; Source control adds explicitly qualified closed-protocol Symlink continuation consuming all3 records. Pure protocol fixtures grant no Native authority; genuine Native proof below.",
+    "owner_review": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-source-owner-review.json",
+      "sha256": "852190979ea97f751c79ae3c286e6f4b23b5a6811fc8c1aa7dff0a9201f7c75e"
+    }
+  },
+  "validation": {
+    "workspace_anchors": {
+      "evidence": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-workspace-anchored.json",
+        "sha256": "62c53119ac5a3e07a2bd0f0267679f2f34e2ecc777f76e479bd7cbd3d561dfde"
+      },
+      "selected": 19,
+      "exit_code": 0,
+      "elapsed_seconds": 0.021155691996682435,
+      "timed_out": false,
+      "output_overflow": false,
+      "passed": 19
+    },
+    "loading_ordinary": {
+      "evidence": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-loading-all.json",
+        "sha256": "573f504ac92ab4287f77bb3484949c63a08474a92cbf85becebd188e055dc551"
+      },
+      "selected": 1197,
+      "exit_code": 101,
+      "elapsed_seconds": 9.371967624989338,
+      "timed_out": false,
+      "output_overflow": false,
+      "passed": 1191,
+      "failed": 6,
+      "ignored": 0,
+      "baseline_qualification": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-loading-baseline-body-qualification.json",
+        "sha256": "884bac08414835f4d1b9e13f4274b5e602c97ed0a5f3517682a643456d71f5f2"
+      },
+      "qualification": "All six complete panic/assertion bodies match executed baseline after only numeric thread-ID normalization; all changed families pass. Not an all-green suite."
+    },
+    "core_authority": {
+      "evidence": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-core-authority.json",
+        "sha256": "a803334f15ae126260cc7202f270b0b65639aa8c19fc6c1f6cd049d9c67c66a3"
+      },
+      "selected": 2,
+      "exit_code": 0,
+      "elapsed_seconds": 0.020925290999002755,
+      "timed_out": false,
+      "output_overflow": false,
+      "passed": 2
+    },
+    "native_protected_and_original_general": {
+      "evidence": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-native20.json",
+        "sha256": "f4b158714da1c1db10025d1e19b764b3da6e702387948d04e5dbd303931da788"
+      },
+      "selected": 20,
+      "exit_code": 101,
+      "elapsed_seconds": 15.972141184000066,
+      "timed_out": false,
+      "output_overflow": false,
+      "passed": 19,
+      "failed": 1,
+      "freeze_check": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-native20-freeze-check.json",
+        "sha256": "ec4e499f30e651073b131e1a186ba7b384ace12a902f4c600a6ccd07b4645e9c"
+      },
+      "qualification": "All18 inherited protection selectors plus existing original General command pass. New glob passes query/labels/files/body/anchor/confinement and fails only immediate post-runtime Weak expiry; preserved as fixture timing failure."
+    },
+    "native_glob_corrected": {
+      "evidence": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-native-corrected.json",
+        "sha256": "6e34288974e2ce88d5a50024db63a3afe859c32bd8b460e8e0ac68dda13ba3ed"
+      },
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 0.10114194199559279,
+      "timed_out": false,
+      "output_overflow": false,
+      "passed": 1,
+      "freeze_check": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-native-corrected-freeze-check.json",
+        "sha256": "358be73cda1d6e726a99509ae905a0a8edeaa0f959187d2f85b5e6d4c0cf83c6"
+      },
+      "assertions": "Authored4File repository BUILD recursive glob/exclude through normal cquery; exact selected top/deep and absent skip; real transcript/final bytes, selected anchor, root+sub DirectoryEntries confinement, no Host binding; all3 Weak owners expire and exact retained baseline/FD0/backing0 after runtime retirement.",
+      "teardown": "Dedicated DICE state actor drains asynchronously after its channel closes. Test waits at most1second/yields for all3 Weak counts and bank baseline, then keeps every original expiry/refund assertion. Existing cancellation wait is not a graph-thread join. No production clock/cleanup change.",
+      "fixture_review": {
+        "path": "/tmp/slug-wp425-validation/repository-glob-native-retirement-fixture-review.json",
+        "sha256": "a97208a813a9ecca12ba645c82ef582dcbe6c180a75c3a1e5b7f04e5f39ccf4c"
+      }
+    },
+    "builds": [
+      {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-loading-workspace-build2-result.json",
+        "sha256": "35aeb2fa479ce3a1558baab1136f763103c3ff6283e3171e8e76afb2ee3147d2",
+        "exit_code": 0,
+        "elapsed_seconds": 35.18634140698123
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-core-build-result.json",
+        "sha256": "4f8901a3a0247ba7f848738e9826b36c0dd1c51597ede842314ecd03951ba827",
+        "exit_code": 0,
+        "elapsed_seconds": 57.83589187799953
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-core2-build-result.json",
+        "sha256": "3b53e5493ea2cc9cf15c09fab464fa391e2e6d448bace488bbe00811b2b90bdb",
+        "exit_code": 0,
+        "elapsed_seconds": 34.437818406004226
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-cli-build-result.json",
+        "sha256": "2f5292e5fe39d7bf6029a4b3839ba4782d7a4a1d76cc6d0a67e9c23bee851c33",
+        "exit_code": 0,
+        "elapsed_seconds": 23.215358312998433
+      }
+    ],
+    "profile": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-build-profile2.json",
+      "sha256": "cac2966bdf459e0f41955535d9b8b834c44382429546650d42a5cc9ce4a6e79b"
+    },
+    "static_panic": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-panic2.json",
+      "sha256": "6137e3a45cf7f7c6c983e4771fbe5c636ede762fcd367e0b90afa44b8e1ebd78"
+    },
+    "artifacts": [
+      {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-loading2-preservation.json",
+        "sha256": "a70f5b5d9f17f78dd215bdfd8e76d14f4679a5518a0537530b7ff2c319687675"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-workspace-preservation.json",
+        "sha256": "577899bb358a69e330817ec0bfa98078be3bf96469595efcf4dfd7eea7be0e3f"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-core2-preservation.json",
+        "sha256": "b1e6e7a84ee4b8ff4a4f283d603c1e6c9c76f0a8a685da9c871579c08f3e0f0d"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/repository-glob-green-cli-preservation.json",
+        "sha256": "4e17670cc5eed5a646f3c6577ac3c65b4228bafc2ca9b75e913d60172ad39df2"
+      }
+    ],
+    "inherited": "Accepted range-scratch six-archive/Bzlmod/Body/transport proofs remain applicable to byte-unchanged domains. Fresh Loading/Workspace/Core/defaultCLI and20 unique Native selectors cover the changed consumer; no redundant six-archive rerun.",
+    "independent_execution_qualification": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-execution-qualification.json",
+      "sha256": "0ada4be30b661dd1333c1be1b327cefe7dbfc2a1ad73633e58f9687ab394926f"
+    }
+  },
+  "original_rust": {
+    "evidence": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-original.json",
+      "sha256": "76e4116bf04e138915d15bf92499516a6c360e3168ce9a207728631dcca2fc45"
+    },
+    "freeze_check": {
+      "path": "/tmp/slug-wp425-validation/repository-glob-original-freeze-check.json",
+      "sha256": "5a6f06ef28e6b5e2ad118561aeb81bfd8b6ad63d039f08803ec73ee3d1cbb417"
+    },
+    "all69pins_and_full_git_exact": true,
+    "supervisor_exit": 0,
+    "elapsed_seconds": 27.11997396298102,
+    "functional_result": {
+      "error": {
+        "code": "WorkDeadline",
+        "kind": "source_service"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 840,
+    "roots": 55,
+    "records": 122,
+    "last_needs": {
+      "downloads": 0,
+      "environment_names": 0,
+      "legacy_executes": 0,
+      "legacy_filesystem": 0,
+      "materialization_rows": [],
+      "materializations": 0,
+      "operation_count": 1,
+      "operations": [
+        {
+          "archive": null,
+          "index": 4,
+          "kind": "execute",
+          "repository": "rules_cc++cc_configure_extension+local_config_cc"
+        }
+      ],
+      "paths": 1,
+      "reservations": 0,
+      "root_bootstrap": false,
+      "source_count": 0,
+      "sources": []
+    },
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "Harness0 is not command success. Latest local_config_cc Execute3 recorded; Execute4+one path pending at SourceWorkDeadline. Stopped finite event prefix does not prove prior859 caller, removal of its refusal, timing cause, speed, completed-command RSS or full completion. No blind repeat."
+  },
+  "unchanged_limits": {
+    "native_retained_bytes": 536870912,
+    "native_fds": 512,
+    "native_backing_bytes": 8589934592,
+    "roots": 128,
+    "metadata_bytes": 16777216,
+    "process_manifest_bytes": 67108864,
+    "source_attempts": 64,
+    "execute_count": 128,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack_bytes": 262144,
+    "archive_compressed_bytes": 134217728,
+    "archive_per_call_decoded_bytes": 536870912,
+    "archive_aggregate_decoded_bytes": 1073741824,
+    "xz_allowance_bytes": 142606336,
+    "encoding_scratch_bytes": 2097152,
+    "supervisor_seconds": 60,
+    "supervisor_address_space_bytes": 8589934592,
+    "stream_bytes": 1048576
+  },
+  "residual": "General production remains Disabled. Full authentic Rust/action/REAPI/Slug, successful scoped HTTPS-None and General activation, and matching completed-command latency/RSS<=1.25xBazel remain open. Native credit/AS and stopped wall intervals are not RSS or completed-command latency.",
+  "independent_final_review": {
+    "path": "/tmp/slug-wp425-validation/repository-glob-final-review.json",
+    "sha256": "6ffbb314bdd5c77c3c03a1f5cc36b0dfd10760dd91dadba1e4fa4961a08af81a",
+    "verdict": "ACCEPT"
+  }
+}

@@ -3,18 +3,25 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [operation-local Body comparison scratch](wp1225-general-repository-workspace-design.md#operation-local-body-comparison-scratch)
-passes corrected causal RED/GREEN and actual256KiB/live64KiB stack proof while
-preserving every decode/read/SHA/history. Observed original counts967 buffer
-initializations for89,708 valid Packed ranges and88,557 full block decodes.
-TEMP retired exactly; production Bzlmod860/Core114/native18/six-archive closure
-pass. The [component proof](wp1225-range-scratch-acceptance-2026-11-10.json)
-has independent final acceptance. Observed original859/55/123 ends unclassified;
-final production785/53/109 hits source WorkDeadline with a30.272s refused
-callback. Both clean to168/0FD/0backing. Different reached work establishes no
-cause, speed, completed-command RSS or activation result. Next review finite
-stage/typed attribution of refused work on current source; no blind repeat or
-presumed API repair. General production remains Disabled.
+Current delta: [repository glob complete-anchor preservation](wp1225-general-repository-workspace-design.md#repository-glob-complete-anchor-preservation)
+passes identical corrected RED4/GREEN4 with strict fact-Arc custody, complete
+logical/terminal Source context, warm reuse and A/B/A restoration. Workspace19,
+Core authority2 and20 unique native selectors pass; ordinary Loading1191/1197
+retains exactly six baseline failure bodies. Genuine authored General BUILD
+recursive glob/exclude completes normal cquery with confinement and exact owner/
+resource retirement. The [component proof](wp1225-repository-glob-anchor-acceptance-2026-11-10.json)
+records frozen source/artifacts/inputs and independent review. Frozen original
+840/55/122 records Execute3 then needs Execute4+one path at SourceWorkDeadline;
+cleanup exact168/0FD/0backing. Prior859 caller/removal, full completion, speed/RSS
+and activation remain unproved. Next attribute current reached work under the
+existing finite observation contract; no blind repeat or presumed API repair.
+General production remains Disabled.
+
+Accepted predecessor: [operation-local Body comparison scratch](wp1225-general-repository-workspace-design.md#operation-local-body-comparison-scratch)
+retains its corrected causal/fixed-stack proof and unchanged required reads,
+decodes, SHA and history. Its [component proof](wp1225-range-scratch-acceptance-2026-11-10.json)
+records exact TEMP retirement and production Bzlmod860/Core114/native18/six-
+archive closure under unchanged limits.
 
 Accepted predecessor: [construction-local Body encoding workspace](wp1225-general-repository-workspace-design.md#construction-local-body-encoding-workspace)
 passes unchanged causal RED/GREEN and actual original-use proof: 12,730 full

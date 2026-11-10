@@ -91,19 +91,21 @@ work remain; 48-byte additional Builder headers are forecast under unchanged
 [component proof](./slug-v2-subplans/wp1225-body-workspace-acceptance-2026-11-10.json)
 has independent final acceptance. Final original reaches850/55/122, records
 Execute3 then needs Execute4; progress observed has no later epoch before typed
-SourceWorkDeadline and exact cleanup. The
-[operation-local Body comparison scratch](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#operation-local-body-comparison-scratch)
-passes corrected causal RED/GREEN and actual256KiB/live64KiB stack proof,
-preserving every decode/read/SHA and history. Observed original records967
-initializations for89,708 valid Packed ranges. TEMP retired exactly; production
-Bzlmod860/Core114/native18/six pass. Its
-[component proof](./slug-v2-subplans/wp1225-range-scratch-acceptance-2026-11-10.json)
-has independent final acceptance. Observed original859/55/123 is an unclassified
-refusal; final production785/53/109 hits source WorkDeadline with a30.272s
-refused callback. Both clean exactly. Different stopped prefixes establish no
-cause, speed or RSS result. Next review finite stage/typed attribution of the
-refused work on current source; no blind repeat or presumed API repair.
-Fullcompletion, completed-command latency/RSS and activation remainopen.
+SourceWorkDeadline and exact cleanup. The [repository glob anchor repair](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#repository-glob-complete-anchor-preservation)
+now passes corrected identical RED4/GREEN4, complete logical/terminal Source
+context, strict fact-Arc custody and actual A/B/A restoration. Its
+[bounded component proof](./slug-v2-subplans/wp1225-repository-glob-anchor-acceptance-2026-11-10.json)
+records Workspace19/Core authority2, baseline-qualified ordinary Loading1191/1197
+and20 unique native passes. Genuine authored General BUILD recursive glob/exclude
+completes normal cquery with exact confinement and owner/resource retirement.
+The frozen original remains unfinished at840computes/55roots/122records: Execute3
+recorded, Execute4+one path pending at SourceWorkDeadline; cleanup exact168/0FD/
+0backing. Prior859 caller/removal, speed/RSS and full completion remain unproved.
+Next attribute current reached work under the existing finite observation
+contract; no blind repeat or presumed API repair. General production stays
+Disabled. Full Rust/action/REAPI/Slug, completed-command latency/RSS and activation
+remain open. The accepted [operation-local scratch component](./slug-v2-subplans/wp1225-range-scratch-acceptance-2026-11-10.json)
+retains full required work, exact TEMP retirement and fixed-stack proof.
 
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.
