@@ -299,3 +299,313 @@ fn union_growth_preserves_left_charged_key_and_result_owners() {
     assert_eq!(left_bank.used_bytes(), 0);
     assert_eq!(right_bank.used_bytes(), 0);
 }
+
+fn key_hash(key: &PathObservationDemand) -> u64 {
+    use std::hash::Hash;
+    use std::hash::Hasher;
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    key.hash(&mut hash);
+    hash.finish()
+}
+
+#[test]
+fn union_proper_superset_reuses_right_map_only_after_full_left_custody() {
+    let a = demand(
+        PathObservationNamespace::Host,
+        PathObservationOperation::Lstat,
+        "/superset/a",
+    );
+    let z = demand(
+        PathObservationNamespace::Host,
+        PathObservationOperation::Lstat,
+        "/superset/z",
+    );
+    let a_result = missing();
+    let z_result = missing();
+    let left = PathObservationEpoch::from_shared([
+        (a.dupe(), a_result.dupe()),
+        (z.dupe(), z_result.dupe()),
+    ])
+    .unwrap();
+    let extra = demand(
+        PathObservationNamespace::Host,
+        PathObservationOperation::Lstat,
+        "/superset/m",
+    );
+    let right = PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(d, r)| (d.dupe(), r.dupe()))
+            .chain([(extra.dupe(), missing())]),
+    )
+    .unwrap();
+    let actual = left.try_union(&right).unwrap();
+    let expected = reference(&left, &right).unwrap();
+    assert_eq!(actual, expected);
+    assert_eq!(actual.observations().len(), 3);
+    assert_eq!(
+        actual.observations().keys().cloned().collect::<Vec<_>>(),
+        vec![a.dupe(), extra, z.dupe()]
+    );
+    for (key, result) in left.observations() {
+        let (retained_key, retained_result) = actual.observations().get_key_value(key).unwrap();
+        assert!(retained_key.same_retention_owners(key));
+        assert!(Arc::ptr_eq(retained_result, result));
+        assert_eq!(key_hash(retained_key), key_hash(key));
+        let (right_key, right_result) = right.observations().get_key_value(key).unwrap();
+        assert!(right_key.same_retention_owners(key));
+        assert!(Arc::ptr_eq(right_result, result));
+    }
+    // Baseline causal RED: all facts and complete LEFT custody above already
+    // pass. Only reconstructing a map that RIGHT already owns fails here.
+    assert!(std::ptr::eq(actual.observations(), right.observations()));
+}
+
+fn assert_incompatible_superset_falls_back(
+    left_key: PathObservationDemand,
+    right_key: PathObservationDemand,
+    left_result: Arc<PathObservationResult>,
+    right_result: Arc<PathObservationResult>,
+    key_owners_match: bool,
+) {
+    assert_eq!(left_key, right_key);
+    assert_eq!(left_result, right_result);
+    assert_eq!(left_key.same_retention_owners(&right_key), key_owners_match);
+    let left = PathObservationEpoch::from_shared([(left_key.dupe(), left_result.dupe())]).unwrap();
+    let addition = demand(
+        PathObservationNamespace::Host,
+        PathObservationOperation::Lstat,
+        "/superset/new",
+    );
+    let right =
+        PathObservationEpoch::from_shared([(right_key, right_result), (addition, missing())])
+            .unwrap();
+    let actual = left.try_union(&right).unwrap();
+    assert_eq!(actual, reference(&left, &right).unwrap());
+    assert_eq!(actual.observations().len(), 2);
+    let (retained_key, retained_result) = actual.observations().get_key_value(&left_key).unwrap();
+    assert!(retained_key.same_retention_owners(&left_key));
+    assert!(Arc::ptr_eq(retained_result, &left_result));
+    assert!(!std::ptr::eq(actual.observations(), right.observations()));
+    assert!(!std::ptr::eq(actual.observations(), left.observations()));
+}
+
+#[test]
+fn union_superset_isolates_path_windows_and_result_owner_mismatches() {
+    let key = demand(
+        PathObservationNamespace::Host,
+        PathObservationOperation::Lstat,
+        "/superset/a",
+    );
+    let mut foreign_path = key.dupe();
+    foreign_path.path = NormalizedAbsolutePath::new(key.path().as_path().to_path_buf()).unwrap();
+    let result = missing();
+    assert_incompatible_superset_falls_back(
+        key.dupe(),
+        foreign_path,
+        result.dupe(),
+        result.dupe(),
+        false,
+    );
+    let foreign_result = Arc::new(result.as_ref().clone());
+    assert!(!Arc::ptr_eq(&result, &foreign_result));
+    assert_incompatible_superset_falls_back(key.dupe(), key, result, foreign_result, true);
+
+    for constructor in [
+        PathObservationDemand::windows_long_path,
+        PathObservationDemand::windows_option_path_long_name,
+    ] {
+        let key = constructor(
+            NormalizedAbsolutePath::new("/superset/windows").unwrap(),
+            Arc::from(&[67u16, 58, 92, 97][..]),
+        );
+        let mut foreign_windows = key.dupe();
+        foreign_windows.windows_long_path_input = Some(Arc::from(
+            key.windows_long_path_input.as_ref().unwrap().as_ref(),
+        ));
+        let result = match key.operation() {
+            PathObservationOperation::WindowsLongPath => Arc::new(
+                PathObservationResult::WindowsLongPath(Arc::from(&[67u16, 58, 92, 97][..])),
+            ),
+            PathObservationOperation::WindowsOptionPathLongName => {
+                // Keep a real constructor-produced closed operation/result pair.
+                Arc::new(PathObservationResult::WindowsOptionPathLongName(
+                    WindowsOptionPathLongNameOutcome::IOExceptionFallback,
+                ))
+            }
+            _ => unreachable!(),
+        };
+        assert_incompatible_superset_falls_back(key, foreign_windows, result.dupe(), result, false);
+    }
+}
+
+#[test]
+fn union_superset_keeps_same_bank_issued_and_anchor_credits_independently() {
+    let bank = ImageDescriptorBudget::new(16 * 1024);
+    let anchor =
+        ImageChargedPath::pin_existing(NormalizedAbsolutePath::new("/superset").unwrap(), &bank)
+            .unwrap();
+    let issued = ImageChargedPath::pin_existing(
+        NormalizedAbsolutePath::new("/superset/image").unwrap(),
+        &bank,
+    )
+    .unwrap();
+    let request = ImageObservationRequest::new(anchor.dupe(), ImageObservationOperation::Lstat);
+    let result = Arc::new(PathObservationResult::InputImage(
+        ImageObservationResult::new(
+            issued.dupe(),
+            request.dupe(),
+            ImageObservationData::Lstat(PathOperationResult::Missing),
+            bank.try_reserve(64).unwrap(),
+        )
+        .unwrap(),
+    ));
+    let left = PathObservationDemand::input_image(
+        PathObservationNamespace::Host,
+        issued.dupe(),
+        request.dupe(),
+    )
+    .unwrap();
+    let changed_issued = issued.retain_charge(bank.try_reserve(1).unwrap()).unwrap();
+    assert!(changed_issued.same_budget(&bank));
+    assert!(Arc::ptr_eq(
+        &changed_issued.normalized_ref().path,
+        &issued.normalized_ref().path
+    ));
+    let right = PathObservationDemand::input_image(
+        PathObservationNamespace::Host,
+        changed_issued,
+        request.dupe(),
+    )
+    .unwrap();
+    // Exact SAME outer result and request owner: only issued charged block differs.
+    assert_incompatible_superset_falls_back(
+        left.dupe(),
+        right,
+        result.dupe(),
+        result.dupe(),
+        false,
+    );
+
+    let changed_anchor = anchor.retain_charge(bank.try_reserve(1).unwrap()).unwrap();
+    assert!(changed_anchor.same_budget(&bank));
+    assert!(Arc::ptr_eq(
+        &changed_anchor.normalized_ref().path,
+        &anchor.normalized_ref().path
+    ));
+    let changed_request =
+        ImageObservationRequest::new(changed_anchor, ImageObservationOperation::Lstat);
+    let right = PathObservationDemand::input_image(
+        PathObservationNamespace::Host,
+        issued.dupe(),
+        changed_request,
+    )
+    .unwrap();
+    // Exact SAME outer result and issued charged block: only request anchor differs.
+    assert_incompatible_superset_falls_back(left, right, result.dupe(), result.dupe(), false);
+    drop((result, request, issued, anchor));
+    assert_eq!(bank.used_bytes(), 0);
+}
+
+#[test]
+fn union_superset_checks_late_conflict_after_incompatible_equal_prefix() {
+    let a = demand(
+        PathObservationNamespace::Host,
+        PathObservationOperation::Lstat,
+        "/superset/a",
+    );
+    let z = demand(
+        PathObservationNamespace::Host,
+        PathObservationOperation::Lstat,
+        "/superset/z",
+    );
+    let left =
+        PathObservationEpoch::from_shared([(a.dupe(), missing()), (z.dupe(), missing())]).unwrap();
+    let changed = || {
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+            PathLstat::new(PathNodeKind::Directory, 1, 2, 3, 4, 0o755),
+        )))
+    };
+    for two_conflicts in [false, true] {
+        let right = PathObservationEpoch::from_shared([
+            (a.dupe(), if two_conflicts { changed() } else { missing() }),
+            (
+                demand(
+                    PathObservationNamespace::Host,
+                    PathObservationOperation::Lstat,
+                    "/superset/m",
+                ),
+                missing(),
+            ),
+            (z.dupe(), changed()),
+        ])
+        .unwrap();
+        let expected = reference(&left, &right).unwrap_err();
+        assert_eq!(
+            expected,
+            PathObservationEpochError::ConflictingDemand(if two_conflicts {
+                a.dupe()
+            } else {
+                z.dupe()
+            })
+        );
+        assert_eq!(left.try_union(&right).unwrap_err(), expected);
+        assert_eq!(left.observations().len(), 2);
+        assert!(matches!(
+            left.get(&a).unwrap().as_ref(),
+            PathObservationResult::Lstat(PathOperationResult::Missing)
+        ));
+    }
+}
+
+#[test]
+fn union_larger_compatible_right_missing_left_key_uses_full_growth() {
+    let key = |name| {
+        demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::Lstat,
+            name,
+        )
+    };
+    let a = key("/count-gate/a");
+    let z = key("/count-gate/z");
+    let m = key("/count-gate/m");
+    let n = key("/count-gate/n");
+    let a_result = missing();
+    let z_result = missing();
+    let left = PathObservationEpoch::from_shared([
+        (a.dupe(), a_result.dupe()),
+        (z.dupe(), z_result.dupe()),
+    ])
+    .unwrap();
+    let right = PathObservationEpoch::from_shared([
+        (a.dupe(), a_result.dupe()),
+        (m.dupe(), missing()),
+        (n.dupe(), missing()),
+    ])
+    .unwrap();
+    assert!(right.observations().len() > left.observations().len());
+    let (left_a, left_result) = left.observations().get_key_value(&a).unwrap();
+    let (right_a, right_result) = right.observations().get_key_value(&a).unwrap();
+    assert!(left_a.same_retention_owners(right_a));
+    assert!(Arc::ptr_eq(left_result, right_result));
+    assert!(right.get(&z).is_none());
+
+    let actual = left.try_union(&right).unwrap();
+    assert_eq!(actual, reference(&left, &right).unwrap());
+    assert_eq!(
+        actual.observations().keys().cloned().collect::<Vec<_>>(),
+        vec![a, m, n, z.dupe()]
+    );
+    for (key, result) in left.observations() {
+        let (retained_key, retained_result) = actual.observations().get_key_value(key).unwrap();
+        assert!(retained_key.same_retention_owners(key));
+        assert!(Arc::ptr_eq(retained_result, result));
+        assert_eq!(key_hash(retained_key), key_hash(key));
+    }
+    assert!(Arc::ptr_eq(actual.get(&z).unwrap(), &z_result));
+    // RHS cardinality and every overlap's custody qualify, but it omits z.
+    // Count-based coverage must therefore force the complete growth fallback.
+    assert!(!std::ptr::eq(actual.observations(), right.observations()));
+    assert!(!std::ptr::eq(actual.observations(), left.observations()));
+}

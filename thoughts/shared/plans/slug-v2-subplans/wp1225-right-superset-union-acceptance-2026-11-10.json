@@ -1,0 +1,502 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "cba12499a86a049a3904ff892d3ed4693b5d9b71",
+  "classification": "Slug-native physical reuse over unchanged full semantic certificates",
+  "outcome": "A complete right observation map can be reused for genuine growth only when it retains all exact left key/result owners. Unchanged causal map-owner tests become GREEN, and the original command observes690 new reuses. Original Rust remains unfinished.",
+  "scope": {
+    "production": "PathObservationEpoch::try_union retains the entire sorted overlap validation and LEFT no-new priority. A strictly larger RHS with exact complete left key/result custody and right length minus additions equal to left length returns its existing map; otherwise the old checked ordered growth tail remains byte-exact. Private exhaustive custody predicates add no retained state; read-only SortedMap stored-key getter composes one existing lookup/index pair.",
+    "semantic_owners": "All existing Demand/epoch/result and DICE producers/dependencies remain authoritative. No new semantic key, result injection, cache, counter, retained field, dependency, native grant, IO or lock. Existing callbacks/wrappers/error assignment remain unchanged.",
+    "custody": "Exact normalized path and optional UTF16 Arcs, exact issued Image charged block and independently owned request-anchor charged block, and outer result Arc. Same bank, identical normalized Arc or equal values alone are insufficient. Copy fields structural, cached hash derived only.",
+    "unchanged": "Raw constructors, complete histories, full structural Eq/Ord/logical Hash, canonical SHA/StableKey domains, full-byte/FD/name/frame/EOF/mode checks, cancellation, Need/error/events, clocks/caps, Rust-native execution and default Disabled policy."
+  },
+  "utility": {
+    "donor": "Buck2088c75c7e36805df99c3de29062baa95db700b8b",
+    "mode": "Slug-owned thin composition of OrderedMap::get_index_of/get_index; no claim of copied upstream SortedMap getter",
+    "validation": "Stored-key versus equal foreign borrowed query, exactly one query hash, deliberate collisions and misses in small-linear and indexed modes. Normal lookup may scan in small-map mode. No new storage/layout/hasher/unsafe/dependency."
+  },
+  "causal_basis": {
+    "root_window": {
+      "path": "/tmp/slug-wp425-validation/root-window-timeline-validation.json",
+      "sha256": "eca4f8b2d9624a82b7e9278032df262a1da5b6eadb4b1a7b90e02ab9c10926d4"
+    },
+    "root_window_retirement": {
+      "path": "/tmp/slug-wp425-validation/root-window-timeline-retirement.json",
+      "sha256": "59d0561432762616cf7599fe250e8e9a17d3ab6435c068407ac0d25d945de55a"
+    },
+    "design": {
+      "path": "/tmp/slug-wp425-validation/union-right-superset-design.json",
+      "sha256": "21d599835fba4bc9151f636fc67ab813054e717937ba49100536fd7853ccd862"
+    },
+    "feasibility": {
+      "path": "/tmp/slug-wp425-validation/union-right-superset-feasibility.json",
+      "sha256": "818c2421d50fc11f3649df9e00fb24c4903c4277df36ee147027743fced468e5"
+    },
+    "qualification": "96 try_union samples in1094 in-window samples,92 statically mapped to growth cloning/insertion. Samples select reached work, not caller, RHS eligibility, removed cost or latency. All timeline source retired before implementation."
+  },
+  "validation": {
+    "red_workspace": {
+      "selected": 9,
+      "exit_code": 101,
+      "elapsed_seconds": 0.0012694050092250109,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-red-workspace-tests.json",
+        "sha256": "fd665fe4cdf57480f65b490c8360917e2dbe846550012bdf3fb8b3ad266f8937"
+      }
+    },
+    "red_loading": {
+      "selected": 3,
+      "exit_code": 101,
+      "elapsed_seconds": 0.009130080026807263,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-red-loading-tests.json",
+        "sha256": "86a90e639b9ba3074542568abd9d7547ea9fea2e96f40f87ee2fc63c0a4fcc4a"
+      }
+    },
+    "red_meaning": "Workspace8PASS/1FAIL and genuine-DICE Loading2PASS/1FAIL, each only at final incoming-map pointer assertion after full facts/reference/result custody; whole key custody independently checked in Workspace. All original control assertions unchanged. Getter1PASS.",
+    "green_workspace": {
+      "selected": 9,
+      "exit_code": 0,
+      "elapsed_seconds": 0.020949532015947625,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-green-workspace-tests.json",
+        "sha256": "0845136a4fadc1f95e1873964f725147a1184a135f2d9fcd764fa89c97a895a6"
+      }
+    },
+    "green_loading": {
+      "selected": 3,
+      "exit_code": 0,
+      "elapsed_seconds": 0.020786580978892744,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-green-loading-tests.json",
+        "sha256": "87091e74451df9d13b307e40cd0f4f76e77fbf421c8f4a6ffa86398df519fda1"
+      }
+    },
+    "green_map": {
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 0.020902081014355645,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-green-map-tests.json",
+        "sha256": "d6ff36e39c2302284db26b36f9e2b0062f1abbb5041d7f8cca6b8739d66d2e80"
+      }
+    },
+    "final_map": {
+      "selected": 72,
+      "exit_code": 0,
+      "elapsed_seconds": 0.020787689980352297,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-production-map-full.json",
+        "sha256": "cde914ca530b17a8608a5eced707a890f2ea6b2dba18edb5c28fdc2a991ec466"
+      }
+    },
+    "final_workspace": {
+      "selected": 128,
+      "exit_code": 0,
+      "elapsed_seconds": 0.12119702299241908,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-production-workspace-full.json",
+        "sha256": "d66ea4dd9926d7266b764e1cf165bffccfc572cc30555142b452eb51d66a2015"
+      }
+    },
+    "final_workspace_scope": "All128 actual ordinary tests including new isolated missing-left coverage gate, full source/identity/ownership controls. Total130 includes two existing explicitly ignored supervised RSS probes; ordinary-count preselection correction preserved, no Workspace test executed before correction.",
+    "final_loading": {
+      "selected": 1199,
+      "passed": 1193,
+      "failed": 6,
+      "matching_failed_names": [
+        "bzl_module::bzl_source_memory_tests::host_load_keys_preserve_raw_alias_order_and_retained_exports",
+        "bzl_module::host_package_load_tests::repository_package_rejects_provider_or_aspect_dependency_before_recording",
+        "bzl_module::module_extension_definition_loading_tests::selected_external_dispatch_uses_each_resolved_child_route",
+        "bzl_visibility::tests::every_live_composition_site_calls_the_shared_checker",
+        "package::module_extension_definition_tests::exec_group_declarations_retain_constraints_and_named_transitions",
+        "provider::tests::config_feature_flag_info_rejects_invalid_constructor_arguments"
+      ],
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-production-loading-qualification.json",
+        "sha256": "83f2412b5e74146101b1586ee43a5129d2f159bb8f9244c36c24580e71f9f94d"
+      },
+      "qualification": "All1199 ordinary selectors executed; exact six baseline failures and complete containing stderr paragraphs match after only numeric thread-ID normalization. Caught pending panic is not failed according to libtest. Not an all-green Loading claim."
+    },
+    "final_core": {
+      "selected": 60,
+      "exit_code": 0,
+      "elapsed_seconds": 0.6029802900156938,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-production-core-focused.json",
+        "sha256": "6978aabf02e3d77155704ba63475011d7fed34b947ace5221afd6f08350ba411"
+      }
+    },
+    "final_native_protected": {
+      "selected": 18,
+      "exit_code": 0,
+      "elapsed_seconds": 15.754809022997506,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-production-native-protected.json",
+        "sha256": "bdc9354f7dab85be3903b2e54cda368fd50c075657a1ccfa6e326a2da04a3d7c"
+      }
+    },
+    "native_scope": "All18 unchanged protected native cases, including four warm original compiler commands, source freshness/full history/foreign origin/changed bytes/cancellation/refunds/closed realization.",
+    "final_count_gate": "L={a,z},R={a,m,n}; exact shared a key/result owners and larger RHS established first; all four reference facts, left key/result custody and hashes, missing z retention then neither-input-map fallback assertions pass.",
+    "fresh_profile": "Opt3/debug assertions/overflow incl build overrides. Core observer feature only, static ELF proves Unwind; fresh default CLI only default features, static ELF proves Abort. All temporary hooks/report/control/module absent.",
+    "static_checks": {
+      "path": "/tmp/slug-wp425-validation/rhs-union-static-checks.json",
+      "sha256": "068a9e311068689f686341c13c3383080579b18bbc13d72e854818ebd5adaccf"
+    },
+    "final_integration_checks": {
+      "path": "/tmp/slug-wp425-validation/rhs-union-final-integration-checks.json",
+      "sha256": "48ec47b543273e5f29bf75db750e096efeea64e4cb3723001aa4b25223f4f1cd"
+    }
+  },
+  "actual_new_reuse": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/rhs-union-observed-validation.json",
+      "sha256": "0b213d81d6baf034811082b3f1b4dfb2f3644b5929d840efb7e06b0bf848ddb0"
+    },
+    "count": 690,
+    "validity": {
+      "after": 690,
+      "after_overflow": false,
+      "arithmetically_exact": true,
+      "atomic_snapshot": false,
+      "before": 0,
+      "before_overflow": false,
+      "checked_delta": 690,
+      "class": "successful_nonempty_left_growth_retaining_right_map",
+      "process_wide": true,
+      "qualification": "O(1) live map pointer/length geometry only; no retained inputs, clocks or scans; per-cell before/after; not allocation bytes, saving, latency, RSS or command success",
+      "request_isolated": false,
+      "reset": false,
+      "reversed": false,
+      "saturated": false
+    },
+    "discriminator": "Existing empty-left/no-new/shared-map classes excluded. Successful nonempty-left growth sharing live RHS map can arise only through the new production branch. Counter reads O1 lengths/pointers and retains no inputs.",
+    "qualification": "Process-wide/non-atomic, not request isolated. Exact arithmetic use count only; not allocation bytes or saving/latency/RSS/success.",
+    "original": {
+      "computes": 841,
+      "roots": 55,
+      "records": 115,
+      "pending": "File6 after all six original archives/std5",
+      "functional_result": {
+        "error": {
+          "detail": {
+            "code": "WorkDeadline",
+            "kind": "source_service"
+          },
+          "kind": "repository_workspace"
+        },
+        "status": "driver_refusal"
+      },
+      "cleanup": {
+        "backing_bytes": 0,
+        "baseline": 168,
+        "native_fds": 0,
+        "retained_bytes": 168
+      }
+    }
+  },
+  "diagnostic_retirement": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/rhs-union-counter-retirement.json",
+      "sha256": "ccb27ee29ed9f90b589e5a264f104bf2071a994787dac189551ad28cd3ce4a56"
+    },
+    "proof": "All6 preinstrument copies restored byte-exact and sole new counter module removed; instrumented source and binaries preserved. Production candidate files unchanged except later append-only count-gate test. Original phase16KiB/trace512KiB/event allowance restored before final production build/tests/native.",
+    "counter_tests": {
+      "loading": {
+        "selected": 2,
+        "exit_code": 0,
+        "elapsed_seconds": 0.02096703098504804,
+        "receipt": {
+          "path": "/tmp/slug-wp425-validation/rhs-union-counter-loading-tests.json",
+          "sha256": "1ffda30becff49735a7068c892eb3e6822f9ca193c7878d1970847751743fb8a"
+        }
+      },
+      "core": {
+        "selected": 1,
+        "exit_code": 0,
+        "elapsed_seconds": 0.020821621001232415,
+        "receipt": {
+          "path": "/tmp/slug-wp425-validation/rhs-union-counter-core-tests.json",
+          "sha256": "18e3000901591d6d90f8fef95450ab43e53a529e64bdbe3d41726b7ebfca6180"
+        }
+      }
+    }
+  },
+  "final_original": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-original.json",
+      "sha256": "82e2b09de894ea5672ab743f58baad344dd6a1252a7ffe91f25075015d16b4f7"
+    },
+    "postcheck": {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-postcheck.json",
+      "sha256": "089a597dee040728b7e976de6ebba7c2349a30590b3994a383c6f97822810e4b"
+    },
+    "supervisor_exit_code": 0,
+    "elapsed_seconds": 27.12242022200371,
+    "functional_result": {
+      "error": {
+        "detail": {
+          "code": "WorkDeadline",
+          "kind": "source_service"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 840,
+    "roots": 55,
+    "records": 114,
+    "pending": "std Archive5, latest accepted llvm-tools Archive4",
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "peak_native_credit_bytes": 342612884,
+    "qualification": "One stopped production prefix versus one instrumented prefix; neither a command success, speed/regression result, completed-command RSS comparison nor repeatability proof. All artifact/input and frozen source hashes verified after native work."
+  },
+  "inherited_body_transport": {
+    "component": "wp1225-fast-body-codec-acceptance-2026-11-10.json through wp1225-registration-union-acceptance-2026-11-10.json",
+    "receipts": [
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-native-six-2.json",
+        "sha256": "d207cdfd18eea1945b66d8ed2ede3d40f7e50ada7e5f69531ec67f714da651cb"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-execute.json",
+        "sha256": "f883ba1703e063e4c87ead157b73c4bec74529f7e179869c9b0f7046dfc75cf8"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-corruption.json",
+        "sha256": "6de2d95d62f4b82e4280a0862768fbefd3fd4774b5d660d248c2e4cfc84e262d"
+      }
+    ],
+    "scope": "Historical generic explicit-pinned six Archive/File/Read/seal/last-reader and two fresh-backend REAPI cases remain protected for unchanged Body/codec/native capture/freshness/history/SHA/transport domains. Current union consumers compile and execute here; historical proof does not establish current full original completion or RSS."
+  },
+  "limits": {
+    "native_bytes": 536870912,
+    "fds": 512,
+    "backing_bytes": 8589934592,
+    "roots": 128,
+    "metadata_bytes": 16777216,
+    "process_bytes": 67108864,
+    "source_calls": 64,
+    "execute_calls": 128,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "stream_bytes_each": 1048576,
+    "archive_compressed_bytes": 134217728,
+    "archive_decoded_bytes_per_call": 536870912,
+    "archive_decoded_bytes_total": 1073741824,
+    "xz_decoder_bytes": 142606336,
+    "worker_stack_bytes": 262144,
+    "qualification": "All inherited limits unchanged; bank credit and address-space envelope are not RSS."
+  },
+  "builds": [
+    {
+      "label": "rhs-union-red-build",
+      "elapsed_seconds": 66.12274125800468,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-red-build-result.json",
+        "sha256": "21fd36d41b4a51b2f2486b3e9be7b8545a1b5474d494c2f3fe759cd9c24f01e7"
+      }
+    },
+    {
+      "label": "rhs-union-green-build",
+      "elapsed_seconds": 168.73301847200491,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-green-build-result.json",
+        "sha256": "ee68ff3a749f95fef470e5bf565fcbf5934c633197bc9cdb39fb2cdb1c1ff82f"
+      }
+    },
+    {
+      "label": "rhs-union-cli-build",
+      "elapsed_seconds": 93.02549504200579,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-cli-build-result.json",
+        "sha256": "50b1b0ae038b0558115651876311bdbe9413bbeaf26fa7c1989ace6e5c0aac70"
+      }
+    },
+    {
+      "label": "rhs-union-production-build",
+      "elapsed_seconds": 138.16624600600335,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-production-build-result.json",
+        "sha256": "ab4cc171511bcbe0819c6908ea97f7117c1ce10065cf69bfb6329d0b1b8bfb9a"
+      }
+    },
+    {
+      "label": "rhs-union-production-cli-build",
+      "elapsed_seconds": 73.82053037101286,
+      "exit_code": 0,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/rhs-union-production-cli-build-result.json",
+        "sha256": "a1753463e25e0987eded86094b9a803d29f0f2babe51bea7454bab4110e9be2d"
+      }
+    }
+  ],
+  "compile_seconds_total": 539.8680311490316,
+  "review": {
+    "design": "ACCEPT",
+    "red_source": "ACCEPT",
+    "green_counter_execution_readiness": "ACCEPT",
+    "positive_runtime_and_retirement": "ACCEPT",
+    "production_source_and_count_gate": "ACCEPT for review stage",
+    "final": "ACCEPT",
+    "scope": "All eight Rust files match executed production sources; receipt and artifact pins match. Causal RED/GREEN, exact custody, missing-left coverage, positive actual use and diagnostic retirement are proved. Production and native gates pass with six explicitly qualified Loading failures. This accepts bounded reuse only. Stopped prefixes establish neither speed nor regression; full completion, latency/RSS and activation remain open.",
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/rhs-union-final-review.json",
+      "sha256": "dbb52b4d4c549e316abd73f1e57e79d3c01f507497d6befd38ebb67000cc9259"
+    }
+  },
+  "preserved_executables": {
+    "map": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/starlark_map-35af16227080e929",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rhs-union-production-map-starlark_map-f97b02e52893ece5",
+      "executable_sha256": "f97b02e52893ece573a52df24f1e2a7966bd89378ff51fbd9305d11684048a7f",
+      "build": "rhs-union-production-build",
+      "target": "starlark_map"
+    },
+    "workspace": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_workspace_v2-6536c065cf463cf4",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rhs-union-production-workspace-slug_workspace_v2-3f5713716a72cbd5",
+      "executable_sha256": "3f5713716a72cbd5cf3564dd5e0b17c4c75896ef733926b495b025f42c273cca",
+      "build": "rhs-union-production-build",
+      "target": "slug_workspace_v2"
+    },
+    "loading": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_loading_v2-9801899498f6d5c5",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rhs-union-production-loading-slug_loading_v2-2683fe560caa6686",
+      "executable_sha256": "2683fe560caa66868bd29e03c4db04350f98105f9ba762762b914e30f738969d",
+      "build": "rhs-union-production-build",
+      "target": "slug_loading_v2"
+    },
+    "core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rhs-union-production-core-slug_core_v2-5b3eed47af7f4944",
+      "executable_sha256": "5b3eed47af7f4944d00569245ae2fad44521ef95b554437419d6c6c3cc764b7f",
+      "build": "rhs-union-production-build",
+      "target": "slug_core_v2"
+    },
+    "cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/rhs-union-production-cli-slug-b59fb096f37a03e0",
+      "executable_sha256": "b59fb096f37a03e0650849121515560408517289a52c4ebf5c6e8f0d91197ce0",
+      "build": "rhs-union-production-cli-build",
+      "target": "slug"
+    }
+  },
+  "raw_evidence": [
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-red-source-2-freeze.json",
+      "sha256": "219c8c3e148e6f06b1df60e8a70285b319460e7d912e4e516112bd95342576b5"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-green-counter-source-1-freeze.json",
+      "sha256": "b373659c985e3eb96fe2cf61560ae8036990d30a38bb8feb44416647530f3ed0"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-green-source-review.json",
+      "sha256": "e0d09dac9e2e4433274c6a3aa35f7b6cad661648111b056f554d333d87c10b1a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-red-workspace-tests.json",
+      "sha256": "fd665fe4cdf57480f65b490c8360917e2dbe846550012bdf3fb8b3ad266f8937"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-red-loading-tests.json",
+      "sha256": "86a90e639b9ba3074542568abd9d7547ea9fea2e96f40f87ee2fc63c0a4fcc4a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-red-map-test.json",
+      "sha256": "94709fe65d955b6f52d9b2e218b8e7d9e0682ef9afea612b8e4de9b2183d9453"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-green-workspace-tests.json",
+      "sha256": "0845136a4fadc1f95e1873964f725147a1184a135f2d9fcd764fa89c97a895a6"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-green-loading-tests.json",
+      "sha256": "87091e74451df9d13b307e40cd0f4f76e77fbf421c8f4a6ffa86398df519fda1"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-green-map-tests.json",
+      "sha256": "d6ff36e39c2302284db26b36f9e2b0062f1abbb5041d7f8cca6b8739d66d2e80"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-counter-loading-tests.json",
+      "sha256": "1ffda30becff49735a7068c892eb3e6822f9ca193c7878d1970847751743fb8a"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-counter-core-tests.json",
+      "sha256": "18e3000901591d6d90f8fef95450ab43e53a529e64bdbe3d41726b7ebfca6180"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-observed-original.json",
+      "sha256": "17ba1d6027cbdf3ada470852b835965d5bd7070756ae5b775ffe74b338d43809"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-observed-validation.json",
+      "sha256": "0b213d81d6baf034811082b3f1b4dfb2f3644b5929d840efb7e06b0bf848ddb0"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-counter-retirement.json",
+      "sha256": "ccb27ee29ed9f90b589e5a264f104bf2071a994787dac189551ad28cd3ce4a56"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-source-1-freeze.json",
+      "sha256": "a296f57bc5d6a8677ce4a9464fd489ed6dd6c6d3ccbe00b5b1c7f8dcece85973"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-map-full.json",
+      "sha256": "cde914ca530b17a8608a5eced707a890f2ea6b2dba18edb5c28fdc2a991ec466"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-workspace-full.json",
+      "sha256": "d66ea4dd9926d7266b764e1cf165bffccfc572cc30555142b452eb51d66a2015"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-loading-full.json",
+      "sha256": "e30050d49fb8b644bf9b1d9d14639d0b6e84e2dbfd0ba77284d826b50099befe"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-loading-qualification.json",
+      "sha256": "83f2412b5e74146101b1586ee43a5129d2f159bb8f9244c36c24580e71f9f94d"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-core-focused.json",
+      "sha256": "6978aabf02e3d77155704ba63475011d7fed34b947ace5221afd6f08350ba411"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-native-protected.json",
+      "sha256": "bdc9354f7dab85be3903b2e54cda368fd50c075657a1ccfa6e326a2da04a3d7c"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-original.json",
+      "sha256": "82e2b09de894ea5672ab743f58baad344dd6a1252a7ffe91f25075015d16b4f7"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-postcheck.json",
+      "sha256": "089a597dee040728b7e976de6ebba7c2349a30590b3994a383c6f97822810e4b"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-panic.json",
+      "sha256": "bfb88ec541d53a940f703b5a4282d9c42390242f7164c6996544e3fdbe7c0eb4"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-static-checks.json",
+      "sha256": "068a9e311068689f686341c13c3383080579b18bbc13d72e854818ebd5adaccf"
+    },
+    {
+      "path": "/tmp/slug-wp425-validation/rhs-union-production-selector-correction.json",
+      "sha256": "b9e44966ca5042a7cbdca9058cdef6904a7172cade024d7c3cba90bede05e399"
+    }
+  ],
+  "fixture_hygiene": "No external oracle fixture or caller/profile recipe. New private inline Rust ownership/count controls and one genuine existing DICE certificate case; original RED/GREEN test bytes preserved. No generated artifact enters Git.",
+  "remaining": "Full original Rust/action/REAPI/Slug bootstrap, completed-command latency/RSS<=1.25xBazel and General production activation remain open. Next attribute remaining reached original work under the same full-history/freshness/resource contracts; no caller-specific bypass or cap increase selected."
+}

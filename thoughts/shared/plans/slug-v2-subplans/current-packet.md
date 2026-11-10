@@ -3,25 +3,24 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [registration frontier union reuse](wp1225-general-repository-workspace-design.md#registration-frontier-union-reuse)
-passes actual-DICE map-custody RED/GREEN while preserving full facts, left
-key/result owners, sorted conflicts and assignment only after success. Its
-[bounded component receipt](wp1225-registration-union-acceptance-2026-11-10.json)
-records39 registration and three Workspace union checks,60 focused Core checks
-and18 protected native cases including four warm commands passing. Loading is
-1192/1198 with the exact six verified baseline failure names and panic bodies.
-The retired synchronous probe measured37,718 merge calls and3.279s inclusive
-thread CPU; it selected this merge, not a registration cache or altered Need.
-The exact original now acquires all six Rust archives through std5 and reaches
-File6 at841 computes/55roots/115records. It remains unfinished at SourceService
-WorkDeadline, with168 baseline bytes, zero native FDs and zero backing after
-cleanup. Peak native credit is342,612,884 bytes. This stopped prefix proves no
-completed-command latency/RSS, repeatability or full-command fit.
-Next attribute remaining work toward File6 and full original closure under the
-same full-history, fresh-byte,27+3 clock and resource contracts; no new reuse is
-selected. The [private fast codec predecessor](wp1225-fast-body-codec-acceptance-2026-11-10.json)
-retains its generic six-archive/File/Read/seal/last-reader and fresh-backend REAPI
-proof; body/transport APIs, production gating and all limits remain unchanged.
+Current delta: [retention-compatible right-superset union](wp1225-general-repository-workspace-design.md#retention-compatible-right-superset-observation-union)
+passes causal RED/GREEN and exact whole-left custody/conflict/coverage controls.
+The actual original observes690 new right-map reuses with clear validity flags;
+the temporary counter is retired before final production validation. Full
+ordinary Map72/Workspace128, Core60/native18 and baseline-qualified
+Loading1193/1199 pass their stated gates. The
+[component receipt](wp1225-right-superset-union-acceptance-2026-11-10.json) has
+independent final acceptance. No command speed, RSS or completion claim follows.
+The final production original stops at WorkDeadline with840computes/55roots/
+114records and std Archive5 pending; the instrumented prefix reaches841/55/115
+and File6. Both clean to168 retained bytes/zeroFDs/zero backing. Next attribute
+remaining original work under unchanged full-history/freshness/resource contracts.
+
+Accepted predecessor [registration frontier union reuse](wp1225-registration-union-acceptance-2026-11-10.json)
+retains its actual-DICE facts/custody/conflict and native protection proof. The
+predecessor source remains unfinished at WorkDeadline after all six Rust
+archives; earlier diagnostic prefixes reach File6 or File7 with exact cleanup. Full
+histories, fresh bytes,27+3 clock and every resource cap remain unchanged.
 Production remains Disabled; full Rust/action/REAPI/Slug and memory gates remain.
 
 Accepted [immutable root-route operational hash reuse](wp1225-general-repository-workspace-design.md#immutable-root-route-operational-hash-reuse)

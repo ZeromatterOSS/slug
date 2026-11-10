@@ -109,6 +109,17 @@ where
         self.map.get(key)
     }
 
+    /// Get the actual stored key and its value using one ordinary map lookup.
+    #[inline]
+    pub fn get_key_value<Q>(&self, key: &Q) -> Option<(&K, &V)>
+    where
+        Q: ?Sized + Hash + Equivalent<K>,
+    {
+        self.map
+            .get_index_of(key)
+            .and_then(|index| self.map.get_index(index))
+    }
+
     /// Get a mutable reference to the value associated with the given key.
     #[inline]
     pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
@@ -215,6 +226,99 @@ where
 #[cfg(test)]
 mod tests {
     use crate::sorted_map::SortedMap;
+
+    #[test]
+    fn test_get_key_value_retains_stored_key_with_one_hash_and_collisions() {
+        use std::cell::Cell;
+        use std::cmp::Ordering;
+        use std::hash::Hash;
+        use std::hash::Hasher;
+        use std::sync::Arc;
+
+        use crate::Equivalent;
+
+        struct Stored {
+            value: u32,
+            owner: Arc<()>,
+        }
+        impl PartialEq for Stored {
+            fn eq(&self, other: &Self) -> bool {
+                self.value == other.value
+            }
+        }
+        impl Eq for Stored {}
+        impl Ord for Stored {
+            fn cmp(&self, other: &Self) -> Ordering {
+                self.value.cmp(&other.value)
+            }
+        }
+        impl PartialOrd for Stored {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+        impl Hash for Stored {
+            fn hash<H: Hasher>(&self, state: &mut H) {
+                7u8.hash(state);
+            }
+        }
+        struct Query<'a> {
+            equal_foreign_key: &'a Stored,
+            hashes: &'a Cell<usize>,
+        }
+        impl Hash for Query<'_> {
+            fn hash<H: Hasher>(&self, state: &mut H) {
+                self.hashes.set(self.hashes.get() + 1);
+                self.equal_foreign_key.hash(state);
+            }
+        }
+        impl Equivalent<Stored> for Query<'_> {
+            fn equivalent(&self, stored: &Stored) -> bool {
+                self.equal_foreign_key == stored
+            }
+        }
+        // Both small-linear and indexed map modes, with deliberate collisions.
+        for count in [2, 32] {
+            let owners: Vec<_> = (0..count).map(|_| Arc::new(())).collect();
+            let map = SortedMap::from_iter((0..count).rev().map(|n| {
+                (
+                    Stored {
+                        value: n as u32,
+                        owner: owners[n].clone(),
+                    },
+                    n * 10,
+                )
+            }));
+            let foreign = Stored {
+                value: 1,
+                owner: Arc::new(()),
+            };
+            let hashes = Cell::new(0);
+            let query = Query {
+                equal_foreign_key: &foreign,
+                hashes: &hashes,
+            };
+            let (stored, value) = map.get_key_value(&query).unwrap();
+            assert_eq!(hashes.get(), 1);
+            assert_eq!(stored.value, foreign.value);
+            assert_eq!(*value, 10);
+            assert!(Arc::ptr_eq(&stored.owner, &owners[1]));
+            assert!(!Arc::ptr_eq(&stored.owner, &foreign.owner));
+            let absent = Stored {
+                value: 99,
+                owner: Arc::new(()),
+            };
+            hashes.set(0);
+            assert!(
+                map.get_key_value(&Query {
+                    equal_foreign_key: &absent,
+                    hashes: &hashes
+                })
+                .is_none()
+            );
+            assert_eq!(hashes.get(), 1);
+        }
+    }
 
     #[test]
     fn test_from_iter() {

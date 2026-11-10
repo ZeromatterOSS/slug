@@ -235,6 +235,14 @@ impl<T> BudgetedImageBlock<T> {
 pub struct ImageChargedPath(BudgetedImageBlock<NormalizedAbsolutePath>);
 
 impl ImageChargedPath {
+    /// Same immutable allocation and its exact retained reservation, not merely
+    /// equal normalized bytes or membership in the same budget.
+    pub(crate) fn same_retention_owner(&self, other: &Self) -> bool {
+        let Self(BudgetedImageBlock(left)) = self;
+        let Self(BudgetedImageBlock(right)) = other;
+        Arc::ptr_eq(left, right)
+    }
+
     /// Conservative pin for a selector path already owned by the source owner.
     pub fn pin_existing(
         path: NormalizedAbsolutePath,

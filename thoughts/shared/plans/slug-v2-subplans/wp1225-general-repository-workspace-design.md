@@ -1361,6 +1361,59 @@ work must discriminate prerequisite serialization rather than infer time from
 map counts. The following bounded Lstat-only scheduling contract selects the
 first discovery class; other Need families retain their own resource decisions.
 
+### Retention-compatible right-superset observation union
+
+Status: independent design/source/final review ACCEPT.
+The [component receipt](wp1225-right-superset-union-acceptance-2026-11-10.json)
+records causal Workspace and genuine-DICE registration RED/GREEN, full ordinary
+Map72/Workspace128, Core60 and18 protected native checks. Loading1193/1199 has
+the exact six baseline failures and matching complete failure paragraphs after
+only numeric thread-ID normalization. The independent coverage-count control
+also retains a left-only fact despite a larger, owner-compatible right map.
+This Slug-native physical reuse targets reached growth copying in the existing
+closed-epoch union. A validated same-run callback-window/IP capture finds96
+samples in `try_union`, with92 statically mapped to growth cloning/insertion.
+These samples establish neither callers, reuse eligibility nor removable cost.
+The timeline source and binary are preserved, and all four diagnostic files
+were retired byte-exact before this trial.
+
+Keep every existing empty/shared branch and the full sorted right-hand conflict
+pass. A single normal map lookup returns the actual stored left key/result.
+Only a strictly larger right map is a candidate. After complete validation,
+no-new-key unions retain the left map first. For genuine growth, right length
+minus additions must equal left length, and every overlap must retain the same
+whole left key/result owners. Then reuse the complete right map; otherwise keep
+the original checked-capacity ordered growth path.
+
+Custody requires exact path and optional UTF-16 Arcs, exact charged blocks for
+both the issued Image path and the independently owned InputImage request
+anchor, and the outer result Arc. Copy fields remain structural; cached hashes,
+equal bytes and a shared bank are insufficient. Exhaustive private helpers
+expose no new capability. Raw constructors, Eq/Ord/Hash/SHA, DICE inputs/edges,
+Need/error/event behavior, histories, source freshness and all limits remain.
+The SortedMap stored-key getter composes existing OrderedMap lookup/index
+primitives from pinned Buck2 `088c75c7e36805df99c3de29062baa95db700b8b`.
+
+Map-owner RED fails only after full facts/reference/custody assertions; the
+unchanged tests become GREEN. Isolated foreign owners include same-bank,
+same-normalized-path distinct charged blocks. Late sorted conflicts remain
+authoritative even after custody incompatibility. The genuine DICE registration
+fixture supplies the subset/full certificate without injecting a completed key.
+
+A temporary feature-only counter observes690 successful nonempty-left growth
+returns sharing the live right map across the four Loading sites, with exact
+checked delta and clear invalidity flags. Its process-wide, non-atomic snapshots
+retain no input and establish use, not allocation bytes or saving. The temporary
+1KiB event-allowance trade, hooks and module were preserved then retired
+byte-exact before final production compilation and validation.
+The observed original reaches841computes/55roots/115records with File6 pending;
+the final production original reaches840/55/114 with std Archive5 pending.
+Both stop at WorkDeadline and clean to168 retained bytes/zeroFDs/zero backing.
+These stopped prefixes establish no speed or regression, command completion or
+RSS comparison. Production remains Disabled. Next attribute remaining original
+work under the same complete-history/freshness/27+3 clock and resource contracts;
+full Rust/action/REAPI/Slug, completed-command RSS<=1.25xBazel and activation stay open.
+
 ### Registration frontier union reuse
 
 Status: independent design/source/final review ACCEPT; executed bounded reuse

@@ -54,6 +54,18 @@ pub struct ImageObservationRequest {
 }
 
 impl ImageObservationRequest {
+    pub(crate) fn same_retention_owners(&self, other: &Self) -> bool {
+        let Self {
+            scope_anchor_root,
+            operation,
+        } = self;
+        let Self {
+            scope_anchor_root: other_anchor,
+            operation: other_operation,
+        } = other;
+        operation == other_operation && scope_anchor_root.same_retention_owner(other_anchor)
+    }
+
     pub fn new(scope_anchor_root: ImageChargedPath, operation: ImageObservationOperation) -> Self {
         Self {
             scope_anchor_root,

@@ -40,6 +40,9 @@ mod demand_hash_tests;
 #[cfg(test)]
 mod shared_path_order_tests;
 
+#[cfg(test)]
+mod retention_tests;
+
 /// A structural path computation result.
 ///
 /// `Need` is transient scheduling state. It deliberately has no Rust equality:
@@ -473,6 +476,57 @@ impl Hash for PathObservationDemand {
 }
 
 impl PathObservationDemand {
+    /// Physical custody only, after the caller validates semantic agreement.
+    /// Equal paths or image budgets can still own independent reservations.
+    fn same_retention_owners(&self, other: &Self) -> bool {
+        let Self {
+            namespace,
+            path,
+            operation,
+            windows_long_path_input,
+            image_path,
+            cached_hash: _,
+        } = self;
+        let Self {
+            namespace: other_namespace,
+            path: other_path,
+            operation: other_operation,
+            windows_long_path_input: other_windows_input,
+            image_path: other_image_path,
+            cached_hash: _,
+        } = other;
+        let NormalizedAbsolutePath { path } = path;
+        let NormalizedAbsolutePath { path: other_path } = other_path;
+        let same_operation_owners = match operation {
+            PathObservationOperation::InputImage(request) => match other_operation {
+                PathObservationOperation::InputImage(other_request) => {
+                    request.same_retention_owners(other_request)
+                }
+                _ => false,
+            },
+            PathObservationOperation::Lstat
+            | PathObservationOperation::ReadLink
+            | PathObservationOperation::FileBytes
+            | PathObservationOperation::FileDigest
+            | PathObservationOperation::DirectoryEntries
+            | PathObservationOperation::WindowsLongPath
+            | PathObservationOperation::WindowsOptionPathLongName => operation == other_operation,
+        };
+        namespace == other_namespace
+            && Arc::ptr_eq(path, other_path)
+            && same_operation_owners
+            && match (windows_long_path_input, other_windows_input) {
+                (None, None) => true,
+                (Some(left), Some(right)) => Arc::ptr_eq(left, right),
+                _ => false,
+            }
+            && match (image_path, other_image_path) {
+                (None, None) => true,
+                (Some(left), Some(right)) => left.same_retention_owner(right),
+                _ => false,
+            }
+    }
+
     // All semantic operations retain the original field order. Exhaustive
     // destructuring makes a future field require an explicit identity decision.
     #[inline]

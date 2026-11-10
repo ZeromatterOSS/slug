@@ -46,9 +46,15 @@ now passes actual-DICE ownership RED/GREEN and behavior controls. Its
 [bounded component proof](./slug-v2-subplans/wp1225-registration-union-acceptance-2026-11-10.json)
 reaches all six original Rust archives through std5 and the following File6 at
 841 computes/55roots/115records. The command remains unfinished at WorkDeadline
-with exact cleanup. Next attribute remaining work toward full original closure
-under the same limits. Original completion,
-completed-command latency/RSS and activation remain open.
+with exact cleanup. The [right-superset union component](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#retention-compatible-right-superset-observation-union)
+passes causal RED/GREEN and observes690 exact new reuses in the original while
+preserving complete left-owner custody and sorted conflicts. Temporary counters
+are retired; the [component proof](./slug-v2-subplans/wp1225-right-superset-union-acceptance-2026-11-10.json)
+has independent final acceptance. Final production stops at840computes/55roots/
+114records with std Archive5 pending; the observed prefix reaches841/55/115 and
+File6. Both remain WorkDeadline refusals with exact cleanup. Next attribute
+remaining original work; completion, completed-command latency/RSS and activation
+remain open under unchanged limits.
 
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.

@@ -80,6 +80,33 @@ async fn observed_certificate_noop_merges_retain_registration_map_owner() {
 }
 
 #[tokio::test]
+async fn observed_certificate_superset_growth_reuses_complete_right_map() {
+    let certificate =
+        crate::registration_expansion_tests::observed_certificate_for_merge_test().await;
+    assert!(certificate.observations().len() > 1);
+    let subset = PathObservationEpoch::from_shared(
+        certificate
+            .observations()
+            .iter()
+            .take(1)
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .unwrap();
+    let expected = reference(&subset, &certificate).unwrap();
+    let mut scratch = scratch();
+    merge(&mut scratch, &subset);
+    merge(&mut scratch, &certificate);
+    // Complete facts and original result owners are established first. The
+    // baseline's only failure is reconstructing an already complete carrier.
+    full_facts(&scratch.observations, &expected);
+    full_facts(&scratch.observations, &certificate);
+    assert!(std::ptr::eq(
+        scratch.observations.observations(),
+        certificate.observations()
+    ));
+}
+
+#[tokio::test]
 async fn observed_certificate_growth_and_sorted_conflict_match_constructor() {
     let certificate =
         crate::registration_expansion_tests::observed_certificate_for_merge_test().await;

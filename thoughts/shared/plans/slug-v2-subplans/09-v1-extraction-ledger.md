@@ -218,6 +218,20 @@ observer layout and total report ceiling remain unchanged. This is dependency
 cutoff and bounded attribution evidence, not completed-command memory fit; see
 the [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json).
 
+Retention-compatible RHS-superset union reuses an existing
+complete immutable map only after full conflicts and exact left key/result
+custody. Private owner predicates add no retained state or authority. Its thin
+`SortedMap::get_key_value` composes the pinned Buck2 OrderedMap
+`get_index_of`/`get_index` primitives (donor `088c75c7e36805df99c3de29062baa95db700b8b`),
+not a copied upstream getter. Storage/layout/hash domains and raw constructors
+remain unchanged. Causal map-owner RED/GREEN, independent charged-owner and
+missing-left coverage controls pass. The original observes690 exact new reuses;
+all temporary instrumentation is retired. Full ordinary Map72/Workspace128,
+Core60/native18 and baseline-qualified Loading1193/1199 pass their stated gates.
+Independent final review accepts this bounded component. No speed/RSS or full original completion claim is
+accepted; see the [component receipt](wp1225-right-superset-union-acceptance-2026-11-10.json)
+and [owner contract](wp1225-general-repository-workspace-design.md#retention-compatible-right-superset-observation-union).
+
 Validated observation unions lift the accepted private Loading no-op policy
 into the Workspace epoch owner. Full left demand/result representatives retain
 Arc/Dupe and charged Image custody; exact overlap comparison precedes allocation.
