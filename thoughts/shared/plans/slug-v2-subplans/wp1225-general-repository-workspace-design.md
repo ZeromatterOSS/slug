@@ -1361,6 +1361,79 @@ work must discriminate prerequisite serialization rather than infer time from
 map counts. The following bounded Lstat-only scheduling contract selects the
 first discovery class; other Need families retain their own resource decisions.
 
+### Expectation-gated archive acquisition hashing
+
+Status: independent design/source/causal/actual-use/retirement/final review ACCEPT.
+The [component receipt](wp1225-expectation-hash-acceptance-2026-11-10.json)
+records unchanged real-capture RED/GREEN and positive original-use bytes.
+None payload169,263,416/SHA0, Some payload/SHA125,238,417, mandatory captured-FD
+SHA171,737,276; all checked flags clear and23pins unchanged. Instrumented
+outer Mutation/Materialization/unclassified has sticky WorkDeadline at840/55/114
+with std Archive5 pending. After exact4-copy/1-module temporary retirement,
+fresh Core61/native18 and six pinned Archive/File/Read/seal/lastreader pass;
+seal12465ms/peaknativecredit335,539,406. Final original reaches841/55/115 with
+File6 pending after all6archives, then typed source WorkDeadline. Both clean to
+168retained/zeroFD/zero backing. This is bounded work removal, not sampled saving,
+command speed, RSS or functional completion. Specific historical REAPI2 and
+unchanged Loading baseline qualification inherit; see receipt for exact scope.
+This Slug-native work revision targets authentic original Rust acquisition.
+The source-free profile of main `537618cf59c0dbe21ca78166d4d5a6896049f19a`
+reconciles 2,991 samples/542 flat rows with zero loss/throttling. Shared SHA has
+270 samples/9.03%; that is reached work, not this pass's cost or caller proof.
+The source audit identifies a narrower discarded pass: Linux file acquisition
+and scoped HTTPS compute a payload SHA used only when expectation is `Some`.
+All `None` production entries come through command-fresh General acquisition.
+The preserved profile is `/tmp/slug-wp425-validation/post-owned-growth-owner-ip-final-validation.json`;
+the detailed proposal is `/tmp/slug-wp425-validation/expected-acquisition-hash-design.json`.
+
+One private fixed-stack wrapper around existing `sha2::Sha256` is used by BOTH
+actual acquisition payload loops. Initialize/update/finalize the checksum only
+for a supplied expectation; keep the complete `Some` comparison and fail closed
+if required state is missing. Preserve exact early mismatch/Miss/mirror order
+and messages. Keep every pin/open/frame/read/write/Source charge/bound/cancel/
+EOF/flush/HTTP status/redirect/disposal operation, the checksumless distdir bypass
+and the complete `None` source-frame revalidation. Expected presence is existing
+API intent, not a ruleset/caller/source selector. No cache, retained field,
+identity, permission or dependency changes. The operation-local checksum state
+stays bounded by256 bytes beside the unchanged64KiB buffer and256KiB worker stack.
+
+`VerifiedWorkspaceArchiveCapture::verify_capture` still unconditionally rereads
+the entire captured FD, checks EOF and the complete frame, computes actual SHA,
+compares any supplied expectation and publishes that actual digest in complete
+Archive history and original Starlark sha256/SRI. Its production algorithm must
+remain unchanged. Natural Source/BCR/distdir consumers keep mandatory checksums.
+This removes only arithmetic whose result is discarded; it skips no bytes or
+integrity/freshness/history check and widens no transport or public API.
+
+Require a helper/wiring RED that initially preserves unconditional acquisition
+hashing. An actual closed-capture A/B/A file test must establish independent
+actual SHA, exact bytes/frame/charges, post-source-mutation rooted extraction,
+FD/unlink and complete cleanup BEFORE the final work discriminator: acquisition
+SHA bytes must be zero for `None`, while mandatory captured-FD SHA bytes equal
+the nonempty payload. Collect witnesses without stopping early and omitting the
+B/A semantic checks. Keep causal tests unchanged for GREEN; test multi-chunk/
+empty/correct/wrong `Some` behavior and reuse mismatch/mirror/frame/EOF/cancel
+controls. A private `cfg(test)` TLS Copy witness retains no input or Scope.
+
+There is no existing successful local scoped-TLS fixture. Shared helper proof,
+actual file/closed capture, real Hyper-duplex and legacy scripted transport
+guards compose the arithmetic boundary; do not call scripted plain transport
+successful General HTTPS-None proof. No global trust override, TLS permission
+bypass or new CA seam is selected. Independent review accepts that composed arithmetic evidence scope; successful
+General HTTPS-None end-to-end proof remains separate.
+
+A temporary fixed Core observer must show positive actual-original `None`
+payload, zero acquisition hashing for it, and positive mandatory captured-FD
+hashing, with checked overflow/delta qualifications. Counts are process-wide,
+non-atomic and not request-isolated; partial attempts are bytes, not successes.
+The fixed report trades2KiB from the existing event allowance within512KiB;
+phase16KiB/prefix32/events128 remain. Preserve and retire temporary files exactly
+before production validation. Rerun six-archive/File/Read/seal/reader closure
+because acquisition changes, plus protected18 native cases and final original
+with a fresh default CLI. All source/native/clock/stack limits stay unchanged.
+Full Rust/action/REAPI/Slug, completed-command latency/RSS, successful HTTPS-None
+integration and production activation remain open; no sampled saving is claimed.
+
 ### Unique-owner observation growth assignment
 
 Status: independent design/source/final review ACCEPT.

@@ -320,6 +320,8 @@ fn verify_capture(
             .checked_add(count as u64)
             .ok_or(PhysicalRootError::Resource)?;
         hash.update(&buffer[..count]);
+        #[cfg(test)]
+        crate::runtime::repository_archive_checksum::work_for_test::record_verified(count);
     }
     if !unchanged(frame, &file.metadata()?) {
         return Err(PhysicalRootError::Snapshot);

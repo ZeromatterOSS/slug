@@ -40,6 +40,7 @@ fn omitted_checksum_observes_same_file_url_a_b_a_and_bypasses_distdir() {
     let baseline = bank.snapshot().retained_bytes;
     let runtime = runtime();
     let mut observed = Vec::new();
+    let mut work_rows = Vec::new();
     for (index, body) in [b"A".as_slice(), b"B".as_slice(), b"A".as_slice()]
         .into_iter()
         .enumerate()
@@ -49,6 +50,7 @@ fn omitted_checksum_observes_same_file_url_a_b_a_and_bypasses_distdir() {
         fs::write(&source, &bytes).unwrap();
         let request = unpinned(Arc::from([url.clone().into()]), 880 + index as u64);
         let scope = scope();
+        let work = crate::runtime::repository_archive_checksum::work_for_test::begin();
         let mut capture = VerifiedWorkspaceArchiveCapture::capture(
             &request,
             &bank,
@@ -61,6 +63,8 @@ fn omitted_checksum_observes_same_file_url_a_b_a_and_bypasses_distdir() {
         assert_eq!(capture.sha256, actual);
         assert_eq!(capture.frame.as_ref().unwrap().len(), bytes.len() as u64);
         assert_eq!(scope.snapshot().source_attempts, 1);
+        work_rows.push((bytes.len() as u64, work.snapshot()));
+        drop(work);
         let temporary = capture.capture.as_ref().unwrap().path().to_owned();
         let fd = capture.capture.as_ref().unwrap().as_file().as_raw_fd();
         // Exact captured bytes survive a later source mutation; a later command
@@ -100,6 +104,18 @@ fn omitted_checksum_observes_same_file_url_a_b_a_and_bypasses_distdir() {
     }
     assert_ne!(observed[0], observed[1]);
     assert_eq!(observed[0], observed[2]);
+    // Finish every real A/B/A observation, extraction, FD and bank retirement
+    // assertion before testing discarded acquisition work. Captured-FD SHA
+    // remains mandatory even when the acquisition expectation is absent.
+    assert_eq!(work_rows.len(), 3);
+    for (length, work) in &work_rows {
+        assert!(*length > 0);
+        assert_eq!(work.copied, *length);
+        assert_eq!(work.verified, *length);
+    }
+    for (_, work) in work_rows {
+        assert_eq!(work.hashed, 0);
+    }
 }
 
 #[test]

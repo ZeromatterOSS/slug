@@ -3,7 +3,21 @@
 Packet: WP-7-425-m7a-general-repository-process
 
 Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS; production execution remains gated.
-Current delta: [unique-owner growth assignment](wp1225-general-repository-workspace-design.md#unique-owner-observation-growth-assignment)
+Current delta: [expectation-gated acquisition hashing](wp1225-general-repository-workspace-design.md#expectation-gated-archive-acquisition-hashing)
+passes unchanged causal RED/GREEN and positive actual-original work proof:
+169,263,416 checksumless payload bytes with zero acquisition SHA bytes, while
+mandatory captured-FD SHA and supplied-expectation hashing remain present.
+Temporary counters are retired exactly; fresh Core61/native18 and the required
+six-archive/File/Read/seal/last-reader gate pass. Final original reaches841/55/115
+with File6 pending after all6archives, then typed source WorkDeadline and exact
+168/0FD/0backing cleanup. The instrumented prefix instead has outer unclassified
+Mutation/Materialization with sticky WorkDeadline. The
+[component proof](wp1225-expectation-hash-acceptance-2026-11-10.json) has final
+independent acceptance. Successful scoped HTTPS-None end-to-end, full completion,
+completed-command latency/RSS and activation remain open. Next attribute remaining
+reached work on current source under unchanged full-history/freshness/limits.
+
+Accepted [unique-owner growth assignment](wp1225-general-repository-workspace-design.md#unique-owner-observation-growth-assignment)
 passes causal RED/GREEN, full ownership/error/priority controls and the required
 mid-transfer unwind/credit-retirement proof. The original records20,941 exact
 successful transfers into the old LEFT controller. Temporary instrumentation is

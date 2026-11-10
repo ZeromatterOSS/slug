@@ -218,6 +218,19 @@ observer layout and total report ceiling remain unchanged. This is dependency
 cutoff and bounded attribution evidence, not completed-command memory fit; see
 the [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json).
 
+Expectation-gated acquisition hashing changes only operation-local
+checksum work. A private fixed-stack wrapper uses existing `sha2::Sha256` for
+supplied expectations; mandatory actual captured-FD SHA remains unchanged.
+No stored hash, semantic identity/domain, retained representation, container,
+interner, cache, dependency or donor algorithm is introduced. Source-free shared
+SHA samples do not identify this pass's cost. Actual-capture RED/GREEN and
+qualified original work show169,263,416 checksumless bytes/SHA0 while mandatory
+FD SHA remains. Exact temporary retirement precedes fresh Core61/native18 and
+six-archive seal/reader proof. The
+[component receipt](wp1225-expectation-hash-acceptance-2026-11-10.json) has final
+acceptance; no speed/RSS/completion/activation claim follows. See the
+[owner contract](wp1225-general-repository-workspace-design.md#expectation-gated-archive-acquisition-hashing).
+
 Unique-owner growth assignment uses existing `SortedMap::into_iter` through
 `OrderedMap` and owned `VecMap` rows from pinned Buck2 donor
 `088c75c7e36805df99c3de29062baa95db700b8b`. Complete LEFT rows move only behind

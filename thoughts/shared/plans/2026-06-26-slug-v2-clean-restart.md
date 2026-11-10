@@ -59,9 +59,17 @@ passes causal RED/GREEN, explicit basic-unwind credit retirement and20,941 exact
 original transfers. Temporary instrumentation is retired; its
 [component proof](./slug-v2-subplans/wp1225-owned-growth-union-acceptance-2026-11-10.json)
 has independent final acceptance. Final production remains unfinished at840/55/114 with std
-Archive5 pending and exact cleanup. Next attribute remaining reached work on
-current source; completion, completed-command latency/RSS and activation remain
-open under unchanged limits.
+Archive5 pending and exact cleanup. A current-source profile reconciles2,991
+samples with zero loss/throttling; shared SHA is reached but its caller/cost
+remains unassigned. The [expectation-gated acquisition hash component](./slug-v2-subplans/wp1225-general-repository-workspace-design.md#expectation-gated-archive-acquisition-hashing)
+passes causal RED/GREEN and observes169,263,416 checksumless acquisition bytes
+with zero acquisition SHA, preserving mandatory full captured-FD SHA. Temporary
+instrumentation is retired; Core61/native18 and the six-archive seal/reader gate
+pass. Its [component proof](./slug-v2-subplans/wp1225-expectation-hash-acceptance-2026-11-10.json)
+has independent final acceptance. Final production reaches841/55/115 with File6
+pending after all6archives, then typed source WorkDeadline and exact cleanup.
+Next attribute remaining reached work on current source. Full completion,
+completed-command latency/RSS and activation remain open under unchanged limits.
 
 The active capability replaces GCC/Homebrew process profiles with one general
 sequential repository workspace and command-fresh actual process observations.

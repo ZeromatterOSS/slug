@@ -3,6 +3,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use super::repository_archive_checksum::ExpectedArchiveChecksum;
 use super::repository_io::source_service::SourceCounter;
 use super::repository_io::source_service::SourceServiceScope;
 use super::repository_io::source_service::{self};
@@ -200,9 +201,6 @@ fn capture_path_with_expected(
     use std::os::unix::fs::MetadataExt;
     use std::os::unix::fs::OpenOptionsExt;
 
-    use sha2::Digest;
-    use sha2::Sha256;
-
     let check_active = || {
         source_service::check(scope).map_err(FileCaptureError::Fatal)?;
         if active() {
@@ -261,7 +259,7 @@ fn capture_path_with_expected(
         source_service::buffer(scope, 64 * 1024).map_err(FileCaptureError::Fatal)?;
     let mut buffer = [0u8; 64 * 1024];
     let mut total = 0u64;
-    let mut hasher = Sha256::new();
+    let mut checksum = ExpectedArchiveChecksum::new(expected);
     loop {
         check_active()?;
         let count = match source_service::read_counted(
@@ -288,11 +286,10 @@ fn capture_path_with_expected(
             .ok_or_else(oversized)?;
         source_service::write_counted(&mut capture, &buffer[..count], active, scope)
             .map_err(|error| FileCaptureError::Fatal(format!("writing capture: {error}")))?;
-        hasher.update(&buffer[..count]);
+        checksum.update(&buffer[..count]);
     }
     check_active()?;
-    let actual: [u8; 32] = hasher.finalize().into();
-    if expected.is_some_and(|digest| digest != actual) {
+    if !checksum.matches_expected() {
         return Err(FileCaptureError::Miss(format!(
             "BCR {subject} SHA-256 SRI mismatch"
         )));

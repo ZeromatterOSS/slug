@@ -10,6 +10,7 @@ use crate::runtime::dice::source_service::SourceChargeIdentity;
 use crate::runtime::dice::source_service::SourceChargePhase;
 use crate::runtime::dice::source_service::SourceHttpAdmission;
 use crate::runtime::dice::source_service::request_scoped;
+use crate::runtime::repository_archive_checksum::ExpectedArchiveChecksum;
 
 fn charge_archive(
     scope: &SourceServiceScope,
@@ -359,7 +360,7 @@ fn capture_one_with_expected(
                     .to_string());
             }
             let mut written = 0u64;
-            let mut hasher = Sha256::new();
+            let mut checksum = ExpectedArchiveChecksum::new(expected);
             loop {
                 live()?;
                 let Some(bytes) = runtime.block_on(response.next_data())? else {
@@ -380,13 +381,12 @@ fn capture_one_with_expected(
                     })?;
                 source_service::write_counted(&mut capture, &bytes, active, Some(scope))
                     .map_err(|e| e.to_string())?;
-                hasher.update(&bytes);
+                checksum.update(&bytes);
             }
             capture
                 .flush()
                 .map_err(|_| "flushing source capture failed")?;
-            let actual: [u8; 32] = hasher.finalize().into();
-            if expected.is_some_and(|integrity| actual != integrity) {
+            if !checksum.matches_expected() {
                 return Err(format!("BCR {subject} SHA-256 SRI mismatch"));
             }
             live()

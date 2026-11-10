@@ -1,0 +1,374 @@
+{
+  "status": "ACCEPTED_BOUNDED_COMPONENT",
+  "packet": "WP-7-425-m7a-general-repository-process",
+  "baseline": "537618cf59c0dbe21ca78166d4d5a6896049f19a",
+  "classification": "Slug-native operation-local arithmetic revision over unchanged exact acquired bytes, integrity and actual Archive identity",
+  "outcome": "Both file and scoped HTTPS acquisition omit only the discarded payload SHA when no expected checksum is supplied. Mandatory full captured-FD verification and actual digest publication remain unchanged. Authentic original Rust reaches this work class; full command remains unfinished.",
+  "scope": {
+    "producer": "Private fixed-stack ExpectedArchiveChecksum shared by Linux file and scoped HTTPS payload loops; expected.map initializes existing sha2 only for Some. Preserve required digest compare and fail closed if required state absent. No new dependency/public API/cache/retained field/identity or source selection.",
+    "preserved": "Same pin/open/read/count/write/limit/cancel/frame/EOF/flush/HTTP status/redirect/disposal and Some early mismatch/Miss/mirror order; None source-frame revalidation and checksumless distdir bypass unchanged. Natural Source/BCR/distdir expectations remain mandatory.",
+    "mandatory_verifier": "Production byte-exact HEAD verify_capture after stripping only permanent cfg(test) record_verified. Still complete full-FD SHA, exact EOF/frame, optional expected compare and actual digest into full Archive history/Starlark SHA/SRI.",
+    "ownership": "Operation-local state bounded by256bytes beside unchanged64KiB IO buffer and256KiB worker stack; no heap/input/Scope retained by private test TLS work witness. Guard thread-bound and clears onDrop.",
+    "https_evidence": "No existing successful scoped General HTTPS-None fixture. Shared helper arithmetic plus real file closed-capture and real Hyper-duplex/legacy scripted transport guards compose accepted scope. No global trust override/new CA seam/admission bypass; not successful TLSNone end-to-end proof."
+  },
+  "causal_basis": {
+    "source_free_profile": {
+      "path": "/tmp/slug-wp425-validation/post-owned-growth-owner-ip-final-validation.json",
+      "sha256": "0807911691e218ed970451a2cb9059e1d37baa35c2690b8b17de506258de749e"
+    },
+    "static_feasibility": {
+      "path": "/tmp/slug-wp425-validation/expected-acquisition-hash-static-feasibility.json",
+      "sha256": "fb00fc42f76b988217ea790da47a7265fa9b25075a1dfcccb906e286389d5ee2"
+    },
+    "meaning": "Current-main profile shared SHA270/2991samples only identifies reached work. Static current-binary disassembly confirms both None paths really execute discarded SHA update/finalize before expectation test; not caller/time/saving proof."
+  },
+  "validation": {
+    "red": {
+      "selected": 6,
+      "exit_code": 101,
+      "elapsed_seconds": 0.0409094309725333,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-red-core-tests.json",
+        "sha256": "66380cd918bed97aaedfbb92fd44323c05e4c6bd92f7ad9dc011868d87214385"
+      }
+    },
+    "red_meaning": "Six causal tests:4pass and2expected final hashed==0 failures (helper12 and actualA/B/A93). All actual semantic, digest, source mutation/extraction, FD/unlink and cleanup assertions precede final discriminator.",
+    "green": {
+      "selected": 9,
+      "exit_code": 0,
+      "elapsed_seconds": 0.041154392005410045,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-green-core-tests.json",
+        "sha256": "bae7fc82ed4d75e1d24f0e2ccad83091e866df2b064ea870095270ee97ec4b52"
+      }
+    },
+    "green_meaning": "Same6causal tests unchanged byte-for-byte all pass; plus2temporary collector and1report validity/budget tests.",
+    "green_additional_protection": {
+      "selected": 20,
+      "exit_code": 0,
+      "elapsed_seconds": 0.48281068200594746,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-green-protected.json",
+        "sha256": "f93178ad76e70895d471feaea98d35407f200c05ccf39ae51984cdf72eb6a90a"
+      }
+    },
+    "test_continuity": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-green-test-continuity.json",
+      "sha256": "cb09b3955013c7bba2ddca19962ef9003ea24fd2a3e7ffba939b6bf12814442b"
+    },
+    "production_core": {
+      "selected": 61,
+      "exit_code": 0,
+      "elapsed_seconds": 0.803709786006948,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-production-core-tests.json",
+        "sha256": "d576a6ca90aaaa72ce6b04759a4376018e6a4adee300c79b64e00c20a730680a"
+      }
+    },
+    "production_scope": "61 unique exact ordinary checks = existing optionalArchive47 + proposed26 -12overlap. Shared helper Some/None/empty/wrong/partial/failclosed, file/path/cancel/pin/frame, mirror/transport guards, full closed capture and genuineDICE archive/progress/delete/lifecycle; selection preflight fresh on exact artifact.",
+    "native_protected": {
+      "selected": 18,
+      "exit_code": 0,
+      "elapsed_seconds": 15.79641673900187,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-production-native-protected.json",
+        "sha256": "25d44de73c7dfbe447b7e5ddea71318000300d4d8ce5d0bbc64bbc502442f433"
+      }
+    },
+    "native_scope": "18 protected cases including4 warm original compiler commands, Some/None replay/freshness/foreign/changed-body/history/lastreader/refunds.",
+    "six_archive": {
+      "selected": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 12.609426059992984,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-production-native-six.json",
+        "sha256": "b54acb88027d012f1be2cf64e651d3df4297e3bab22dd70fa64a886350cb5c6c"
+      }
+    },
+    "six_scope": "Fresh required explicit pinned6 Archive effects plusFile/Read/seal/lastreader closure, source preparation/config immutable. Seal work_elapsed12465ms; peaknativecredit335539406, logicalbodies631202064, decodedtar820514816. Operational credit is notRSS.",
+    "profile": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-production-build-profile.json",
+      "sha256": "97b502561d5be00d22f3289004cd0ddeb250309c437fc5c9b3a17f2646d80189"
+    },
+    "panic": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-production-panic.json",
+      "sha256": "bf3b7079dcdcb38ad6dda97b6270703808a45a5b06c876d99bc63912e2e24a5c"
+    },
+    "profile_scope": "Core opt3/assertions/overflow incl buildoverrides uses inherited observer feature only, temporary collector removed; staticUnwind. Fresh defaultCLI only defaultfeatures, staticAbort.",
+    "native_freeze_postcheck": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-production-native-validation.json",
+      "sha256": "d6b7b2cbb296122aac907a1de1e33062c2a0d869d0dcb1382fdf3133be14d194"
+    },
+    "scope_matrix": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-final-scope-matrix.json",
+      "sha256": "2807f092c0fff352997debc4295fe8253fff3ed32ec2a16aac34285b807a3dba"
+    },
+    "final_integration_checks": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-final-integration-checks.json",
+      "sha256": "8d17222ddfb0189d5f21c312244e4dfeceeb7e69539903d93b3d563db955a5f2"
+    },
+    "evidence_integrity": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-final-evidence-integrity.json",
+      "sha256": "1bc3cab59197f40e158fb6956f8aedc196b4a80bf1eec207afe657f856777f15"
+    }
+  },
+  "actual_original_use": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-observed-validation.json",
+      "sha256": "fa646e3080ced933bc681431ab783fd13986426244a80bc88fdc9424ce3347cf"
+    },
+    "freeze_postcheck": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-observed-original-freeze-check.json",
+      "sha256": "6717f3def7a76d3d6a7f285b2a638921ca96d7776cb9dd846b7fe83d47a3cdab"
+    },
+    "work": {
+      "after": [
+        169263416,
+        0,
+        125238417,
+        125238417,
+        171737276
+      ],
+      "after_overflow_mask": 0,
+      "arithmetically_exact": true,
+      "atomic_snapshot": false,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_overflow_mask": 0,
+      "checked_delta": [
+        169263416,
+        0,
+        125238417,
+        125238417,
+        171737276
+      ],
+      "columns": [
+        "none_payload_bytes",
+        "none_sha_bytes",
+        "some_payload_bytes",
+        "some_sha_bytes",
+        "verified_fd_sha_bytes"
+      ],
+      "process_wide": true,
+      "qualification": "Actual copied acquisition chunks and optional SHAupdate bytes, separately mandatory captured-FD SHAupdate bytes. Partial attempts are bytes, not successes; per-cell checked process-wide deltas, no payload/Scope retained; not CPU, saving, speed, RSS or command success",
+      "request_isolated": false,
+      "reset": false,
+      "reversed_mask": 0,
+      "saturated_mask": 0,
+      "unknown_overflow_bits": 0
+    },
+    "functional_result": {
+      "error": {
+        "detail": {
+          "kind": "mutation",
+          "reason": "unclassified",
+          "stage": "Materialization"
+        },
+        "kind": "repository_workspace"
+      },
+      "status": "driver_refusal"
+    },
+    "sticky_source_error": "WorkDeadline",
+    "computes": 840,
+    "roots": 55,
+    "records": 114,
+    "pending": "std Archive5",
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "23pins exact. Outer Mutation/Materialization/unclassified with sticky WorkDeadline; do not call outer result a typed deadline. Checked processwide/non-atomic/nonisolated partial-attempt byte work only, not successes/CPU/saving/speed/RSS."
+  },
+  "diagnostic_retirement": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-counter-retirement.json",
+      "sha256": "f3f98cca24c40eaa4110eb7de6103df47f484e2873a900d89ce80821f1c82c63"
+    },
+    "production_source_freeze": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-production-source-1-freeze.json",
+      "sha256": "965f1ce1dfb1f3902509df82ccc00985e567fec06acfde062f39586bf9b962c3"
+    },
+    "meaning": "Restore4 exact GREEN preinstrument candidate copies, notHEAD; remove1new probe module. Permanent private helper/modulewire/testTLS/verifier marker and actualA/B/A witness remain. Original toolchain report/test file byte-exact HEAD; phase16KiB/trace512KiB/event allowance restored. Instrumented source/binaries/raw receipts preserved."
+  },
+  "final_original": {
+    "receipt": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-production-original.json",
+      "sha256": "d06c58acf6c7e6322a79b80dc47fd3a603cefaec70836e68bb2774ec0a516cbb"
+    },
+    "postcheck": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-production-original-freeze-check.json",
+      "sha256": "d9abfc450c7a16a3ea780aa70495e782a8bfa9478fbd84b56c1606844b75013e"
+    },
+    "supervisor_exit_code": 0,
+    "elapsed_seconds": 27.13876738899853,
+    "functional_result": {
+      "error": {
+        "code": "WorkDeadline",
+        "kind": "source_service"
+      },
+      "status": "driver_refusal"
+    },
+    "computes": 841,
+    "roots": 55,
+    "records": 115,
+    "pending": "File6 after accepted std Archive5/all6archives",
+    "peak_native_credit_bytes": 342612884,
+    "cleanup": {
+      "backing_bytes": 0,
+      "baseline": 168,
+      "native_fds": 0,
+      "retained_bytes": 168
+    },
+    "qualification": "25 frozen source/docs/artifact/prep/config/supervisor pins exact across all serial native gates. One stopped production prefix; no speed/regression/repeatability/fullcommand/RSS/activation claim."
+  },
+  "inherited_evidence": {
+    "through": "wp1225-owned-growth-union-acceptance-2026-11-10.json at537618cf",
+    "loading": "No Loading/Workspace/Map source changed. Latest full Loading1194/1200 with exact6 qualified baseline failures and prior Map72/Workspace134 remain inherited, not freshly executed or allgreen.",
+    "reapi": [
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-execute.json",
+        "sha256": "f883ba1703e063e4c87ead157b73c4bec74529f7e179869c9b0f7046dfc75cf8"
+      },
+      {
+        "path": "/tmp/slug-wp425-validation/fast-body-reapi-corruption.json",
+        "sha256": "6de2d95d62f4b82e4280a0862768fbefd3fd4774b5d660d248c2e4cfc84e262d"
+      }
+    ],
+    "reapi_scope": "Specific historical fresh-backend physical-source/CAS/runfiles/corruptionrefusal/restoration proof only; unchanged Body/codec/logicalEq/Hash/SHA/REAPI/transport/dependencies/nativeowner/clocks/caps/policy. Current acquisition validated separately, sixarchive rerun rather than inherited."
+  },
+  "limits": {
+    "native_bytes": 536870912,
+    "fds": 512,
+    "backing_bytes": 8589934592,
+    "roots": 128,
+    "work_ms": 27000,
+    "cleanup_ms": 3000,
+    "worker_stack_bytes": 262144,
+    "xz_decoder_bytes": 142606336,
+    "qualification": "All Source/Meta/Process/Execute/archive/stream/tmpfs/tree limits unchanged. Operational caps/bank credit/addressspace are separate fromRSS."
+  },
+  "builds": [
+    {
+      "label": "expectation-hash-red-build",
+      "exit_code": 0,
+      "elapsed_seconds": 80.53680650499882,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-red-build-result.json",
+        "sha256": "ad9cae276b30d98e0010dbce7c3a902e948260eb44992c87964b2df777e13910"
+      }
+    },
+    {
+      "label": "expectation-hash-green-build",
+      "exit_code": 0,
+      "elapsed_seconds": 81.43418713100255,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-green-build-result.json",
+        "sha256": "df2e700c80531d42c62191db4cff2f98d66ed71da0f1529615631055de8aad9e"
+      }
+    },
+    {
+      "label": "expectation-hash-cli-build",
+      "exit_code": 0,
+      "elapsed_seconds": 11.122350669989828,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-cli-build-result.json",
+        "sha256": "2b4826b5a2a118ff5b2250b757f7a3146296dbcfd89a54523a11fa9f0bed05e5"
+      }
+    },
+    {
+      "label": "expectation-hash-production-build",
+      "exit_code": 0,
+      "elapsed_seconds": 78.91988343099365,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-production-build-result.json",
+        "sha256": "07077167c4d159bbeda3cd666c59e8ba2c650a7a591cbef659fabb5490acb3a5"
+      }
+    },
+    {
+      "label": "expectation-hash-production-cli-build",
+      "exit_code": 0,
+      "elapsed_seconds": 6.991905572009273,
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-production-cli-build-result.json",
+        "sha256": "b731a4f7ff1dac39a41f8dbbb65689ab2adc4431bb6186ae163102163c6b6a02"
+      }
+    }
+  ],
+  "compile_seconds_total": 259.0051333089941,
+  "review": {
+    "design": {
+      "path": "/tmp/slug-wp425-validation/expected-acquisition-hash-design-review.json",
+      "sha256": "b9ba781c27bf1a85617277188120f534760a9049b9099437c52bdc9050fe6c11"
+    },
+    "red_source": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-red-source-review.json",
+      "sha256": "b929f34af935b15cc773faa90b7849353bbebbe384c3ad9ccacb3f5325a532f1"
+    },
+    "green_source": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-green-source-review.json",
+      "sha256": "45983a9cd5729803de2bd45d9c1d2e2c02912ff6ab454157a738999d10a0665f"
+    },
+    "green_execution": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-green-execution-review.json",
+      "sha256": "e5b863544a249f51687abba7d5b1211c596247a54c34100594ea0784d8f1d1f1"
+    },
+    "actual_use_and_retirement": {
+      "path": "/tmp/slug-wp425-validation/expectation-hash-retirement-review.json",
+      "sha256": "21fa7becbfe43d891ebd6c61d45a619db7dbceca81d22c2a500fc3c5999137af"
+    },
+    "final": {
+      "verdict": "ACCEPT",
+      "receipt": {
+        "path": "/tmp/slug-wp425-validation/expectation-hash-final-review.json",
+        "sha256": "f22baf5c2bb2778d2447e969aec0cac030e2cae7b54b64bcf4dc6afaa56be5b3"
+      },
+      "scope": "Required source/evidence pins and gates verify; mandatory actual-FD hash, Some integrity and cleanup protected, temporary diagnostics retired. Full original/HTTPSNone/latency/RSS/activation remain open."
+    }
+  },
+  "preserved_executables": {
+    "red_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/expectation-hash-red-core-slug_core_v2-a4cdb6bf3dea6bd4",
+      "executable_sha256": "a4cdb6bf3dea6bd4568f589b81bd589784bad918f1391265723554b0b35d64a3",
+      "build": "expectation-hash-red-build",
+      "target": "slug_core_v2"
+    },
+    "green_instrumented_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/expectation-hash-green-core-slug_core_v2-923c47964d5e35be",
+      "executable_sha256": "923c47964d5e35beb773149033a8a938aa22bbefd15f60d9aadcde61dec5cf23",
+      "build": "expectation-hash-green-build",
+      "target": "slug_core_v2"
+    },
+    "instrumented_source_default_cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/expectation-hash-cli-slug-98e7ec5588d6f807",
+      "executable_sha256": "98e7ec5588d6f8075b1de660d3bc4f0f80bd18b9a856707ea008f9e888f5274c",
+      "build": "expectation-hash-cli-build",
+      "target": "slug"
+    },
+    "production_core": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/deps/slug_core_v2-bfb3b20442ec58f0",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/expectation-hash-production-core-slug_core_v2-a8f1e1f4162ff4a5",
+      "executable_sha256": "a8f1e1f4162ff4a51007767d8b34aacc65592e036b1b955caf817b084c05c72b",
+      "build": "expectation-hash-production-build",
+      "target": "slug_core_v2"
+    },
+    "production_cli": {
+      "source_executable": "/run/media/system/Colossus/dev/slug/target/release-symbols/slug",
+      "preserved_executable": "/run/media/system/Colossus/dev/slug/target/wp425-validation-artifacts/expectation-hash-production-cli-slug-bdf34c0128c84e1a",
+      "executable_sha256": "bdf34c0128c84e1a83bf1af050d615991d202d5bc98860cb62f15b51da890788",
+      "build": "expectation-hash-production-cli-build",
+      "target": "slug"
+    }
+  },
+  "fixture_hygiene": "No new external oracle fixture/caller recipe or dependency. Existing actual A/B/A assertions preserved,5private helper tests and private test-only work witness; temporary observer tests/report removed after proof.",
+  "remaining": "Full authentic Rust/action/REAPI/Slug bootstrap, completed-command latency/RSS<=1.25xBazel, successful scopedHTTPSNone end-to-end and General production activation remain open. Next attribute remaining reached work on new source under unchanged fullhistory/freshness/resources; no cap/clock/cache/caller shortcut selected."
+}
