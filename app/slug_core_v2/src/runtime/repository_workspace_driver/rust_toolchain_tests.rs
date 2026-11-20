@@ -711,9 +711,18 @@ impl NativeCommandRoot for ObservedCquery {
         error: &NativeDemandSessionError,
     ) {
         let scope = scope_summary(command.command_source_scope());
+        let workspace_stage = command.runtime.native_demand_sessions.workspace_stage();
         let mut trace = self.trace.lock().unwrap();
         let epoch = trace.latest_epoch.clone();
-        trace.record(json!({"event":"progress_refused","attempt":attempt,"error":native_error(error),"needs":needs_summary(needs),"scope":scope,"epoch":epoch}));
+        trace.record(json!({
+            "event": "progress_refused",
+            "attempt": attempt,
+            "workspace_stage": workspace_stage,
+            "error": native_error(error),
+            "needs": needs_summary(needs),
+            "scope": scope,
+            "epoch": epoch,
+        }));
         drop(trace);
         self.inner.progress_refused(needs, command, attempt, error);
     }

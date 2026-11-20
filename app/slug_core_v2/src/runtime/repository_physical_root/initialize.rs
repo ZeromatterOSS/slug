@@ -1,5 +1,8 @@
 //! Fixed native factory for a reserved, claimed general root. Registry callers
 //! receive only the consuming command, never a root File or mount seed.
+#[cfg(any(test, feature = "repository-workspace-test-support"))]
+use std::path::Path;
+
 use super::mount_lease::launch::BootstrapLaunch;
 use super::process_owner::ProcessPlatform;
 use super::process_owner::{self};
@@ -14,10 +17,14 @@ pub(super) fn platform() -> io::Result<ProcessPlatform> {
                 "actual compiled CLI required for native workspace initialization",
             )
         })?;
-        Ok(ProcessPlatform::compiled_cli(
-            image.into(),
-            "/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap".into(),
-        ))
+        let bwrap = Path::new("/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap");
+        #[cfg(test)]
+        let bwrap = match bwrap.symlink_metadata() {
+            Ok(_) => bwrap,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Path::new("/usr/bin/bwrap"),
+            Err(error) => return Err(error),
+        };
+        Ok(ProcessPlatform::compiled_cli(image.into(), bwrap.into()))
     }
     #[cfg(not(any(test, feature = "repository-workspace-test-support")))]
     {
