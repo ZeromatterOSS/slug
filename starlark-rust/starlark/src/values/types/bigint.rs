@@ -33,6 +33,8 @@ use starlark_derive::starlark_value;
 use crate as starlark;
 use crate::any::ProvidesStaticType;
 use crate::collections::StarlarkHasher;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::typing::Ty;
 use crate::typing::TyBasic;
 use crate::typing::TypingBinOp;
@@ -74,6 +76,49 @@ pub struct StarlarkBigInt {
     /// without checking the actual value of `positive_big_int`.
     #[allocative(skip)] // TODO(nga): do not skip.
     value: BigInt,
+}
+
+impl FrozenHeap {
+    /// Allocate the native integer represented by sign and big-endian magnitude.
+    /// Admit the conversion's scratch and retained digits before copying bytes.
+    pub fn alloc_budgeted_integer_be(
+        &self,
+        budget: &ExecutionBudget,
+        negative: bool,
+        magnitude: &[u8],
+    ) -> Result<FrozenValue, ExecutionLimit> {
+        budget.charge(1, 0)?;
+        budget.charge_text_work(magnitude.len())?;
+        let first_nonzero = magnitude
+            .iter()
+            .position(|byte| *byte != 0)
+            .unwrap_or(magnitude.len());
+        let magnitude = &magnitude[first_nonzero..];
+        if magnitude.len() <= 4 {
+            let unsigned = magnitude
+                .iter()
+                .fold(0i64, |value, &byte| (value << 8) | i64::from(byte));
+            let signed = if negative { -unsigned } else { unsigned };
+            if let Ok(value) = InlineInt::try_from(signed) {
+                return Ok(self.alloc(value));
+            }
+        }
+
+        // num-bigint 0.4.8 copies and reverses the bytes, then maps an exact
+        // number of chunks to 32- or 64-bit limbs. Leading zero bytes are
+        // removed above so digit normalization cannot shrink the buffer.
+        let bytes = magnitude.len();
+        let storage = bytes
+            .div_ceil(8)
+            .checked_mul(8)
+            .and_then(|limbs| bytes.checked_add(limbs))
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        budget.charge(bytes, storage)?;
+        let sign = if negative { Sign::Minus } else { Sign::Plus };
+        self.alloc_budgeted_simple(budget, || {
+            StarlarkBigInt::unchecked_new(BigInt::from_bytes_be(sign, magnitude))
+        })
+    }
 }
 
 impl StarlarkBigInt {
@@ -308,12 +353,64 @@ mod tests {
     use std::hash::Hasher;
 
     use num_bigint::BigInt;
+    use num_bigint::Sign;
 
     use crate::assert;
     use crate::collections::StarlarkHasher;
+    use crate::eval::ExecutionBudget;
+    use crate::eval::ExecutionLimit;
+    use crate::values::FrozenHeap;
     use crate::values::StarlarkValue;
     use crate::values::float::StarlarkFloat;
     use crate::values::types::bigint::StarlarkBigInt;
+
+    #[test]
+    fn frozen_integer_admits_conversion_and_aligned_storage() {
+        let magnitude = [0xa4; 24];
+        let expected = BigInt::from_bytes_be(Sign::Minus, &magnitude);
+        let ordinary = FrozenHeap::new();
+        let object_bytes = (0..8)
+            .find_map(|_| {
+                let (reserved, available) =
+                    (ordinary.allocated_bytes(), ordinary.available_bytes());
+                ordinary.alloc(expected.clone());
+                (ordinary.allocated_bytes() == reserved)
+                    .then(|| available - ordinary.available_bytes())
+            })
+            .expect("an integer allocation in an open chunk");
+        let bytes = object_bytes + 2 * magnitude.len();
+        let heap = FrozenHeap::new();
+        let short = ExecutionBudget::new(1000, bytes - 1, 16);
+        assert_eq!(
+            heap.alloc_budgeted_integer_be(&short, true, &magnitude),
+            Err(ExecutionLimit::AllocationBytes),
+        );
+        assert_eq!(heap.allocated_bytes(), 0);
+
+        let exact = ExecutionBudget::new(1000, bytes, 16);
+        let value = heap
+            .alloc_budgeted_integer_be(&exact, true, &magnitude)
+            .unwrap();
+        assert_eq!(
+            value.downcast_frozen_ref::<StarlarkBigInt>().unwrap().get(),
+            &expected
+        );
+        assert_eq!(exact.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+
+        let inline = ExecutionBudget::new(1000, 0, 16);
+        assert_eq!(
+            heap.alloc_budgeted_integer_be(&inline, true, &[0, 0, 31])
+                .unwrap()
+                .unpack_i32(),
+            Some(-31)
+        );
+        assert_eq!(
+            heap.alloc_budgeted_integer_be(&inline, true, &[0, 0])
+                .unwrap()
+                .unpack_i32(),
+            Some(0)
+        );
+    }
 
     #[test]
     fn magnitude_allocation_upper_bound_is_borrowed_zero_sign_and_limb_metadata() {
