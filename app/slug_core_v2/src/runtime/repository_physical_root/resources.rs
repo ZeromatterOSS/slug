@@ -197,6 +197,13 @@ pub(in crate::runtime) struct ResourceCredit {
     slots: SlotCredit,
 }
 
+#[cfg(test)]
+impl ResourceCredit {
+    pub(in crate::runtime) fn retained_bytes_for_test(&self) -> usize {
+        self.bytes.charged_bytes()
+    }
+}
+
 #[cfg(all(test, feature = "native-probe-observer"))]
 impl ResourceCredit {
     pub(super) fn backing_bytes_for_probe(&self) -> u64 {

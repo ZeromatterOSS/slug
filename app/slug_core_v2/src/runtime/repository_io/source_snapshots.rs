@@ -58,6 +58,21 @@ pub(super) struct SourceClaims {
     rows: Vec<ClaimRow>,
     capacity_credit: Option<ResourceCredit>,
 }
+impl SourceClaims {
+    pub(super) fn prune_retired(&mut self) {
+        self.rows.retain(|row| row.claim.strong_count() != 0);
+    }
+    #[cfg(test)]
+    pub(super) fn inventory_for_test(&self) -> reservations::ClaimTableInventory {
+        reservations::ClaimTableInventory::from_credits(
+            self.rows.capacity(),
+            self.capacity_credit.as_ref(),
+            self.rows
+                .iter()
+                .map(|row| (row.claim.strong_count() != 0, &row._credit)),
+        )
+    }
+}
 impl NativeSelectionDomain {
     fn reserve_source(
         self: &Arc<Self>,
@@ -77,7 +92,7 @@ impl NativeSelectionDomain {
         }
         let candidate: [u8; 32] = hash.finalize().into();
         let mut claims = self.source_claims.lock().map_err(|_| refusal())?;
-        claims.rows.retain(|row| row.claim.strong_count() != 0);
+        claims.prune_retired();
         for row in &claims.rows {
             if row.candidate == candidate {
                 if let Some(live) = row.claim.upgrade() {

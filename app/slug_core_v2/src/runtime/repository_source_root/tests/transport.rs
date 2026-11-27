@@ -79,7 +79,7 @@ fn native_captured_source_transport_rejects_foreign_epochs_metadata_and_scopes_a
         false,
     )
     .unwrap();
-    let expected = FrozenArchiveQuota::SMALL;
+    let expected = FrozenArchiveQuota::TINY;
     assert_eq!(a.frozen_archive_quota(), Some(expected));
     let a_lease = actor.workspace_lease(a_token).unwrap();
     let a_epoch = RepositorySourceSnapshotEpoch::fresh(normalized.clone(), a_lease)

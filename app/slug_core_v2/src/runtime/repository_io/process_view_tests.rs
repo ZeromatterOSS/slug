@@ -24,7 +24,7 @@ use crate::runtime::repository_physical_root::RepositoryWorkspaceCommand;
 
 const ARCHIVE: u64 = 2 * 1024 * 1024 * 1024;
 const PROCESS: u64 = 64 * 1024 * 1024;
-const SEALED_SMALL_ARCHIVE: u64 = 16 * 1024 * 1024;
+const SEALED_TINY_ARCHIVE: u64 = 8 * 1024 * 1024;
 const SEALED_MEDIUM_ARCHIVE: u64 = 256 * 1024 * 1024;
 struct Fixture {
     actor: RepositoryMaterializer,
@@ -263,7 +263,7 @@ impl Fixture {
         RepositoryWorkspaceOperation::Execute(RepositoryWorkspaceExecute::new(
             ["/usr/bin/python3","-c",r#"import errno,os,pathlib,subprocess,sys
 a=pathlib.Path(sys.argv[1])
-assert os.statvfs(a).f_blocks*os.statvfs(a).f_frsize == (268435456 if (a/'large').exists() else 16777216)
+assert os.statvfs(a).f_blocks*os.statvfs(a).f_frsize == (268435456 if (a/'large').exists() else 8388608)
 assert os.statvfs('.').f_blocks*os.statvfs('.').f_frsize == 67108864
 try: os.open(a/'data',os.O_WRONLY|os.O_APPEND)
 except OSError as e: assert e.errno == errno.EROFS
@@ -454,7 +454,7 @@ fn native_selected_execute_records_replays_and_retains_data_after_controller_dro
         RepositoryMaterializationResultEpoch::new(fixture.actor.workspace().clone(), []).unwrap();
     assert_eq!(
         fixture.bank.snapshot().backing_bytes,
-        SEALED_MEDIUM_ARCHIVE + SEALED_SMALL_ARCHIVE + PROCESS,
+        SEALED_MEDIUM_ARCHIVE + SEALED_TINY_ARCHIVE + PROCESS,
         "B's native history keeps both sealed Archive source roots after their rows and controllers retire"
     );
     assert_eq!(

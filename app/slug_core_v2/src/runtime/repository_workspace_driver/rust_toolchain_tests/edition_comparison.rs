@@ -146,6 +146,10 @@ fn native_original_rust_toolchain_action_edition_comparison() {
         }
         let trace = Arc::new(Mutex::new(Trace::default()));
         let before = resources.snapshot();
+        let before_claims = runtime
+            .repository_materializer
+            .claim_inventory_for_test()
+            .unwrap_or_default();
         let driven = match runtime.drive_command(
             inputs.clone(),
             ObservedCquery {
@@ -157,6 +161,10 @@ fn native_original_rust_toolchain_action_edition_comparison() {
             Err(error) => {
                 let stage = runtime.native_demand_sessions.workspace_stage();
                 let after = resources.snapshot();
+                let after_claims = runtime
+                    .repository_materializer
+                    .claim_inventory_for_test()
+                    .unwrap_or_default();
                 let (computes, attempt, operations) = {
                     let trace = trace.lock().unwrap();
                     let event = trace
@@ -194,6 +202,7 @@ fn native_original_rust_toolchain_action_edition_comparison() {
                             "retained": progress["last_retained_admission_refusal"],
                             "backing": progress["last_backing_admission_refusal"],
                             "source_inventory": progress["last_source_bootstrap_backing_inventory"],
+                            "closed_quotas": progress["closed_archive_quotas"],
                         })
                     );
                 }
@@ -202,7 +211,25 @@ fn native_original_rust_toolchain_action_edition_comparison() {
                 assert_eq!(cleanup.retained_bytes, baseline);
                 assert_eq!(after.native_fds, before.native_fds);
                 assert_eq!(after.backing_bytes, before.backing_bytes);
-                assert_eq!(after.retained_bytes, before.retained_bytes);
+                println!(
+                    "WP425_RUST_CLAIM_ROLLBACK before={before_claims:?} after={after_claims:?}"
+                );
+                let mut before_controls = before_claims.domain_bytes;
+                let mut after_controls = after_claims.domain_bytes;
+                for (before, after) in [
+                    (before_claims.general, after_claims.general),
+                    (before_claims.source, after_claims.source),
+                ] {
+                    assert_eq!((before.dead_rows, after.dead_rows), (0, 0));
+                    assert_eq!(before.live_rows, after.live_rows);
+                    assert_eq!(before.live_row_bytes, after.live_row_bytes);
+                    before_controls += before.capacity_bytes;
+                    after_controls += after.capacity_bytes;
+                }
+                assert_eq!(
+                    after.retained_bytes.checked_sub(after_controls).unwrap(),
+                    before.retained_bytes.checked_sub(before_controls).unwrap(),
+                );
                 panic!("{case} command failed");
             }
         };
@@ -257,7 +284,10 @@ fn native_original_rust_toolchain_action_edition_comparison() {
                     == fs::read(staged.join(relative)).unwrap()
             );
         }
-        println!("WP425_RUST_EDITION {case} {edition} accepted attempts={attempts}");
+        println!(
+            "WP425_RUST_EDITION {case} {edition} accepted attempts={attempts} bank={:?}",
+            resources.snapshot()
+        );
     }
 
     verify_inputs(&config, workspace);
@@ -268,4 +298,12 @@ fn native_original_rust_toolchain_action_edition_comparison() {
     assert_eq!(snapshot.native_fds, 0);
     assert_eq!(snapshot.backing_bytes, 0);
     assert_eq!(snapshot.retained_bytes, baseline);
+    #[cfg(feature = "native-probe-observer")]
+    {
+        let (_, progress) = profile.finish();
+        println!(
+            "WP425_RUST_SEALED_QUOTAS {}",
+            progress["closed_archive_quotas"]
+        );
+    }
 }

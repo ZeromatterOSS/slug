@@ -11,7 +11,7 @@ use super::*;
 use crate::runtime::repository_physical_root::RepositoryWorkspaceRetirementObserver;
 use crate::runtime::repository_physical_root::mount_lease::readonly_quota::FrozenArchiveQuota;
 
-const SMALL_ARCHIVE_BYTES: u64 = 16 * 1024 * 1024;
+const TINY_ARCHIVE_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Facts {
@@ -163,7 +163,7 @@ impl ProcessLaunch for CheckedFinalize {
             ARCHIVE_BYTES + process_owner::temporary_backing_for_test()
         );
         let after = facts(self.original_fd);
-        assert_eq!((after.bytes, after.inodes), (SMALL_ARCHIVE_BYTES, 8192));
+        assert_eq!((after.bytes, after.inodes), (TINY_ARCHIVE_BYTES, 8192));
         assert_eq!(
             (after.allocated, after.used_inodes),
             (self.before.allocated, self.before.used_inodes)
@@ -220,7 +220,7 @@ fn native_small_archive_finalization_contracts_same_original_root_only_after_rea
     assert_eq!(sealed.root().identity, identity);
     assert_eq!(
         sealed.root().frozen_archive_quota(),
-        Some(FrozenArchiveQuota::SMALL)
+        Some(FrozenArchiveQuota::TINY)
     );
     assert_eq!(
         sealed.root().state().mode(),
@@ -236,12 +236,12 @@ fn native_small_archive_finalization_contracts_same_original_root_only_after_rea
         realization.transcript().records()[0].request().operation(),
         RepositoryWorkspaceOperation::File { .. }
     ));
-    assert_eq!(bank.snapshot().backing_bytes, SMALL_ARCHIVE_BYTES);
+    assert_eq!(bank.snapshot().backing_bytes, TINY_ARCHIVE_BYTES);
     let mut reader = sealed.root().open_member("data", &scope, &|| true).unwrap();
     drop(command);
     drop(view);
     drop(sealed);
-    assert_eq!(bank.snapshot().backing_bytes, SMALL_ARCHIVE_BYTES);
+    assert_eq!(bank.snapshot().backing_bytes, TINY_ARCHIVE_BYTES);
     assert_eq!(
         bank.snapshot().native_fds,
         2,
@@ -270,7 +270,7 @@ fn native_compact_archive_view_is_readonly_and_data_outlives_all_controllers() {
     } = fixture(false);
     assert_eq!(
         sealed.root().frozen_archive_quota(),
-        Some(FrozenArchiveQuota::SMALL)
+        Some(FrozenArchiveQuota::TINY)
     );
     assert_eq!(
         sealed.root().state().mode(),
@@ -285,7 +285,7 @@ fn native_compact_archive_view_is_readonly_and_data_outlives_all_controllers() {
     let mut reader = sealed.root().open_member("data", &scope, &|| true).unwrap();
     drop(observed);
     drop(sealed);
-    assert_eq!(bank.snapshot().backing_bytes, SMALL_ARCHIVE_BYTES);
+    assert_eq!(bank.snapshot().backing_bytes, TINY_ARCHIVE_BYTES);
     assert_eq!(
         bank.snapshot().native_fds,
         2,
@@ -328,7 +328,7 @@ fn native_archive_compaction_does_not_promote_deleted_large_history_to_process()
         &scope,
     );
     let before = facts(fd);
-    assert!(before.allocated <= SMALL_ARCHIVE_BYTES && before.used_inodes <= 8192);
+    assert!(before.allocated <= TINY_ARCHIVE_BYTES && before.used_inodes <= 8192);
     let request = final_request(&command, &selected);
     let (command, sealed, view) = runtime
         .block_on(command.finalize_read_view(request, &scope, &|| true))
@@ -337,7 +337,7 @@ fn native_archive_compaction_does_not_promote_deleted_large_history_to_process()
     assert_eq!(sealed.root().identity, identity);
     assert_eq!(
         sealed.root().frozen_archive_quota(),
-        Some(FrozenArchiveQuota::SMALL)
+        Some(FrozenArchiveQuota::TINY)
     );
     assert_eq!(
         sealed.root().state().mode(),
@@ -360,8 +360,8 @@ fn native_archive_compaction_does_not_promote_deleted_large_history_to_process()
         Err(slug_bzlmod_v2::RepositoryWorkspaceError::RetentionLimit)
     ));
     let after = facts(fd);
-    assert_eq!((after.bytes, after.inodes), (SMALL_ARCHIVE_BYTES, 8192));
-    assert_eq!(bank.snapshot().backing_bytes, SMALL_ARCHIVE_BYTES);
+    assert_eq!((after.bytes, after.inodes), (TINY_ARCHIVE_BYTES, 8192));
+    assert_eq!(bank.snapshot().backing_bytes, TINY_ARCHIVE_BYTES);
     drop(command);
     drop(view);
     drop(sealed);
@@ -435,7 +435,7 @@ fn native_archive_measured_inode_crossing_keeps_wide_inode_quota_without_name_co
             "nonpositive charged-unit increase after archive batch {batch}"
         );
         assert!(
-            after.allocated <= SMALL_ARCHIVE_BYTES,
+            after.allocated <= TINY_ARCHIVE_BYTES,
             "empty directories must fit the smallest byte quota"
         );
         if after.used_inodes > 8192 {
@@ -457,7 +457,7 @@ fn native_archive_measured_inode_crossing_keeps_wide_inode_quota_without_name_co
     assert_eq!(sealed.root().identity, identity);
     assert_eq!(
         sealed.root().frozen_archive_quota(),
-        Some(FrozenArchiveQuota::SMALL_WIDE_INODES)
+        Some(FrozenArchiveQuota::TINY_WIDE_INODES)
     );
     assert_eq!(
         sealed.root().state().mode(),
@@ -466,11 +466,11 @@ fn native_archive_measured_inode_crossing_keeps_wide_inode_quota_without_name_co
     assert_eq!(
         facts(fd),
         Facts {
-            bytes: SMALL_ARCHIVE_BYTES,
+            bytes: TINY_ARCHIVE_BYTES,
             ..crossed
         }
     );
-    assert_eq!(bank.snapshot().backing_bytes, SMALL_ARCHIVE_BYTES);
+    assert_eq!(bank.snapshot().backing_bytes, TINY_ARCHIVE_BYTES);
     let slug_bzlmod_v2::RepositoryMaterializationKind::GeneralWorkspace(realization) =
         &sealed.request().kind
     else {

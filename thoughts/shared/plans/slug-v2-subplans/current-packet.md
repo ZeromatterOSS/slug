@@ -22,13 +22,17 @@ while both runfiles keys stayed stable. The inactive Slug edition-2024 result
 matched the target, ordered action names, owners, Rustc host platform and
 selected tool arguments. Its bounded projection adds no raw action text.
 
-Fresh trusted snapshots can share verified final file-body allocations with
-the prior accepted generation. Warm Rust passed the retained-bank refusal at
-493 and peaked at 406,173,582 retained bytes. At 574, Source bootstrap asked
-for 2 GiB with 6,510,608,384 backing bytes live, 65 MiB over the 8 GiB bank.
-Captured inputs held 129 MiB. Abort restored FDs and backing, with 18,944
-extra retained bytes until runtime drop. The final refund was exact.
-The initial edition passed. Warm completion and both mutation cases are pending.
+One inactive runtime completed initial edition 2024, warm 2024, changed 2021
+and restored 2024 in 94.44 seconds. Attempts were 1,025 then 598 each.
+CrateInfo, typed rows, stable support payloads and Rustc change/restoration
+matched the pinned comparison. Peak backing was 7,747,932,160 bytes, retained
+406,051,206 bytes and FDs 499. Runtime teardown refunded all credits.
+
+Exact prior accepted body sharing cleared the retained refusal at 493.
+Measured 8 MiB sealed backing cleared Source bootstrap at 574. Accepted backing
+was 1,536 MiB, down 448 MiB. Rollback prunes dead claims after owner retirement
+and accounts separately for reusable table capacity. Seven focused checks, 17
+native guards and the default CLI passed. The edition log used 1,486 bytes.
 
 Matched Source manifests reuse validated entry paths and modes and count closed
 state capacities directly. The 7,935-entry native fixture used 0.886 of control
@@ -55,12 +59,9 @@ backing was again 6,301 MiB. Across the three earlier identical compute
 prefixes, Archive acquisition ranged from 3.061 to 3.795 seconds. Preserve
 the [bounded phase and typed scope cause][attribution] for exact attribution.
 
-Resolve warm Source bootstrap backing admission under the fixed bank. Review
-fresh writable Source quota selection from actual input bounds and account for
-rollback claim storage. Complete the pinned edition comparison, public-command
-and activation gates. Keep atomic publication, existing readers, native quotas,
-clocks, launcher/PID1, rooted reads, codec and history checks. Compare equal
-work for timing.
+Continue the public command, action graph and activation gates. Keep atomic
+publication, existing readers, native quotas, clocks, launcher/PID1, rooted
+reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
 diagnostic-only integration, caller pruning, Need cacheability, new route,
 syntax or global path caches, and concurrent Archive batching remain outside
@@ -150,7 +151,7 @@ final review precedes activation.
 The bounded six-archive gate and authored General glob cquery are accepted.
 The authentic inactive Rust driver gate has completed. Full Archive envelope,
 same-URL scoped HTTPS freshness with omitted checksum, repeated Workspace
-publication, public Rust cquery, required action comparison, Rust REAPI,
+publication, public Rust cquery, required public action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. Native credit,
 standalone timings and incomplete originals are each evidence for their own

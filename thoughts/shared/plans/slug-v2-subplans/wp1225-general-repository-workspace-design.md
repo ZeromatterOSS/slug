@@ -748,8 +748,8 @@ That accepted General-only component preserved Source quotas; the Source
 contract below extends physical finalization separately. Process finalization
 is unchanged.
 The eligibility decision uses actual quiescent tmpfs allocated block bytes and
-used inode units. Select the smallest fitting byte quota from 16, 64, 256, 1,024
-and 2,048 MiB, independently of the 8,192 or 262,144 inode ceiling. The helper
+used inode units. Select the smallest fitting byte quota from 8, 16, 64, 256,
+1,024 and 2,048 MiB, independently of the 8,192 or 262,144 inode ceiling. The helper
 remounts the same superblock if either quota changes. Apply by physical owner
 and lifecycle facts. This is a Slug-native resource policy.
 
@@ -912,10 +912,12 @@ the full fresh bytes, EOF and name/FD frames before sharing the existing body
 allocation. Exact replay bypasses selection. Canonical completion keeps only
 the body lease. Prior roots and readers remain valid through atomic replacement.
 
-Warm passed the retained refusal at 493 and stopped at Source bootstrap 574.
-The fixed 8 GiB backing bank denied a 2 GiB request with 6,510,608,384 live.
-The Source capture set held 129 MiB. Fresh bootstrap quota selection and
-rollback claim accounting remain separate gates.
+The 8 MiB sealed class uses measured allocation and preserves the 16 MiB
+fallback and independent inode ceilings. Native Source checked 8 MiB exact
+and one allocated page over. This cleared the 65 MiB warm backing deficit at
+Source bootstrap 574 without changing writable quotas. One runtime completed
+the four edition cases with exact crate/action comparisons and final refunds.
+Public action graph and matched latency/RSS evidence remain open.
 
 The [frontier receipt](wp1225-rust-frontier-acceptance-2026-11-08.json) establishes
 a genuine admission conflict:43 initial states plus85 completed records fill
@@ -3347,6 +3349,9 @@ v1 derives from full workspace/selected-owner/repository/ordinal structural
 identity; full-key equality guards candidate collisions in the native selection
 domain. Claims survive through the actual shared backing, including cancelled
 bootstrap, and weak claim control blocks remain credited until pruning.
+Native retirement drops provisional tickets after worker quiescence. Acceptance
+and discard release retired owners outside the actor mutex before pruning dead
+claim rows. Live readers and actual table capacity keep their exact credits.
 Reservation tickets bind the expected RepoSpec independently of spelling.
 Only a closed command seal matching the full current native transcript and epoch
 can adopt the same actual root; generic metadata-only success refuses General.

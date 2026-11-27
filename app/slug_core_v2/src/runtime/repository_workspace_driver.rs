@@ -500,6 +500,8 @@ mod native {
                     source_service::SourceServiceError::CleanupDeadline,
                 ));
             }
+            // Drop provisional claims before the materializer retires its rows.
+            drop(std::mem::take(&mut self.tickets));
             Ok(())
         }
         pub(super) fn request_equal(

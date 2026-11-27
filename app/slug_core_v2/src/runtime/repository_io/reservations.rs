@@ -67,6 +67,54 @@ struct Claims {
     rows: Vec<ClaimRow>,
     capacity_credit: Option<ResourceCredit>,
 }
+impl Claims {
+    fn prune_retired(&mut self) {
+        self.rows.retain(|row| row.claim.strong_count() != 0);
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(in crate::runtime) struct ClaimTableInventory {
+    pub live_rows: usize,
+    pub dead_rows: usize,
+    pub live_row_bytes: usize,
+    pub dead_row_bytes: usize,
+    pub capacity: usize,
+    pub capacity_bytes: usize,
+}
+#[cfg(test)]
+impl ClaimTableInventory {
+    pub(super) fn from_credits<'a>(
+        capacity: usize,
+        capacity_credit: Option<&ResourceCredit>,
+        rows: impl IntoIterator<Item = (bool, &'a ResourceCredit)>,
+    ) -> Self {
+        let mut inventory = Self {
+            capacity,
+            capacity_bytes: capacity_credit.map_or(0, ResourceCredit::retained_bytes_for_test),
+            ..Self::default()
+        };
+        for (live, credit) in rows {
+            if live {
+                inventory.live_rows += 1;
+                inventory.live_row_bytes += credit.retained_bytes_for_test();
+            } else {
+                inventory.dead_rows += 1;
+                inventory.dead_row_bytes += credit.retained_bytes_for_test();
+            }
+        }
+        inventory
+    }
+}
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(in crate::runtime) struct NativeClaimInventory {
+    pub general: ClaimTableInventory,
+    pub source: ClaimTableInventory,
+    pub domain_bytes: usize,
+}
+
 #[derive(Debug)]
 pub(in crate::runtime) struct NativeSelectionDomain {
     resources: Arc<RepositoryRootResources>,
@@ -84,6 +132,37 @@ impl NativeSelectionDomain {
         bytes: usize,
     ) -> Result<ResourceCredit, RepositorySessionError> {
         self.resources.reserve(bytes, 0, 0).map_err(|_| refusal())
+    }
+    // Owners have already retired outside the actor mutex. These table locks
+    // cover only dead Weak rows and their credits, as in ordinary reservation.
+    // A poisoned table stays paid and unavailable to future reservations.
+    pub(super) fn prune_retired_claims(&self) {
+        if let Ok(mut claims) = self.claims.lock() {
+            claims.prune_retired();
+        }
+        if let Ok(mut claims) = self.source_claims.lock() {
+            claims.prune_retired();
+        }
+    }
+    #[cfg(test)]
+    pub(super) fn claim_inventory_for_test(&self) -> NativeClaimInventory {
+        let general = {
+            let claims = self.claims.lock().unwrap();
+            ClaimTableInventory::from_credits(
+                claims.rows.capacity(),
+                claims.capacity_credit.as_ref(),
+                claims
+                    .rows
+                    .iter()
+                    .map(|row| (row.claim.strong_count() != 0, &row._credit)),
+            )
+        };
+        let source = self.source_claims.lock().unwrap().inventory_for_test();
+        NativeClaimInventory {
+            general,
+            source,
+            domain_bytes: self._credit.retained_bytes_for_test(),
+        }
     }
     fn new(
         resources: Arc<RepositoryRootResources>,
@@ -114,7 +193,7 @@ impl NativeSelectionDomain {
         candidate: [u8; 32],
     ) -> Result<Arc<SourceRootClaim>, RepositorySessionError> {
         let mut claims = self.claims.lock().map_err(|_| refusal())?;
-        claims.rows.retain(|row| row.claim.strong_count() != 0);
+        claims.prune_retired();
         for row in &claims.rows {
             if row.candidate == candidate {
                 if let Some(live) = row.claim.upgrade() {
@@ -646,6 +725,125 @@ mod tests {
             (baseline, 0, 0)
         );
     }
+
+    #[test]
+    fn discard_prunes_retired_claims_and_keeps_live_claims_and_charged_capacity() {
+        let workspace = tempfile::tempdir().unwrap();
+        let workspace_path =
+            NormalizedAbsolutePath::new(workspace.path().canonicalize().unwrap()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let scope = SourceServiceScope::new_for_test(
+            workspace_path.clone(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            SourceServiceLimits::default(),
+        )
+        .unwrap();
+        let resources = resources();
+        let baseline = resources.snapshot().retained_bytes;
+        let actor =
+            RepositoryMaterializer::new_scoped(workspace_path.clone(), scope.clone()).unwrap();
+        let limits = RepositoryWorkspaceRetentionLimits::new(8, 1024 * 1024, 1024 * 1024).unwrap();
+        let begin = || {
+            let token = actor.begin().unwrap();
+            actor
+                .validate(token, &mut |_, _| panic!("no accepted roots"))
+                .unwrap();
+            let lease = actor
+                .begin_general_workspace(token, resources.clone(), limits, &scope)
+                .unwrap();
+            (token, lease)
+        };
+        let owner = crate::runtime::dice::physical_root_owner_for_test();
+        let workspace_key = |repo: &str| {
+            Arc::new(
+                RepositoryWorkspaceStableKey::new(
+                    workspace_path.clone(),
+                    owner.clone(),
+                    CanonicalRepoName::new(repo).unwrap(),
+                    0,
+                )
+                .unwrap(),
+            )
+        };
+        let (initial, lease) = begin();
+        let general = actor
+            .reserve_workspace(initial, workspace_key("held"), spec("a"), &scope)
+            .unwrap();
+        let source = actor
+            .reserve_source_snapshot(
+                initial,
+                crate::runtime::dice::workspace_source_request_for_test(
+                    workspace_path.as_path(),
+                    lease,
+                ),
+                &scope,
+            )
+            .unwrap();
+        actor.discard(initial).unwrap();
+        let initial = actor.claim_inventory_for_test().unwrap();
+        assert_eq!(
+            (initial.general.live_rows, initial.source.live_rows),
+            (1, 1)
+        );
+        assert_eq!((initial.general.capacity, initial.source.capacity), (4, 4));
+
+        for expected_growth in [true, false] {
+            let before = actor.claim_inventory_for_test().unwrap();
+            let before_retained = resources.snapshot().retained_bytes;
+            let (token, lease) = begin();
+            let request = crate::runtime::dice::workspace_source_request_for_test(
+                workspace_path.as_path(),
+                lease,
+            );
+            let mut pending = Vec::new();
+            for repository in ["first", "second", "third", "fourth"] {
+                pending.push((
+                    actor
+                        .reserve_workspace(token, workspace_key(repository), spec("a"), &scope)
+                        .unwrap(),
+                    actor
+                        .reserve_source_snapshot(token, request.clone(), &scope)
+                        .unwrap(),
+                ));
+            }
+            drop(pending);
+            let retired = actor.claim_inventory_for_test().unwrap();
+            assert_eq!(
+                (retired.general.dead_rows, retired.source.dead_rows),
+                (4, 4)
+            );
+            assert_eq!((retired.general.capacity, retired.source.capacity), (8, 8));
+            assert!(retired.general.dead_row_bytes > 0 && retired.source.dead_row_bytes > 0);
+
+            actor.discard(token).unwrap();
+            let after = actor.claim_inventory_for_test().unwrap();
+            assert_eq!(after.domain_bytes, before.domain_bytes);
+            for (before, after) in [
+                (before.general, after.general),
+                (before.source, after.source),
+            ] {
+                assert_eq!(after.live_rows, before.live_rows);
+                assert_eq!(after.live_row_bytes, before.live_row_bytes);
+                assert_eq!((after.dead_rows, after.dead_row_bytes), (0, 0));
+                assert_eq!(after.capacity, 8);
+                assert_eq!(
+                    after.capacity_bytes > before.capacity_bytes,
+                    expected_growth
+                );
+            }
+            let growth = after.general.capacity_bytes - before.general.capacity_bytes
+                + after.source.capacity_bytes
+                - before.source.capacity_bytes;
+            assert_eq!(
+                resources.snapshot().retained_bytes,
+                before_retained + growth
+            );
+        }
+        drop((general, source, actor));
+        assert_eq!(resources.snapshot().retained_bytes, baseline);
+    }
+
     #[test]
     fn reservation_binds_fresh_command_spec_scope_and_blocks_generic_success_before_callback() {
         let scope = scope();

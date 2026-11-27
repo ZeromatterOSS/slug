@@ -8,6 +8,7 @@ use super::readonly::ReadOnlyMountClone;
 use super::readonly::check_readonly;
 use super::*;
 
+const TINY_BYTES: u64 = 8 * 1024 * 1024;
 const SMALL_BYTES: u64 = 16 * 1024 * 1024;
 const MEDIUM_BYTES: u64 = 256 * 1024 * 1024;
 const LARGE_BYTES: u64 = 1024 * 1024 * 1024;
@@ -16,6 +17,7 @@ const FULL_INODES: u64 = 262_144;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FrozenArchiveSize {
+    Tiny,
     Small,
     Standard,
     Medium,
@@ -31,14 +33,19 @@ pub(in crate::runtime::repository_physical_root) struct FrozenArchiveQuota {
 
 impl FrozenArchiveQuota {
     #[cfg(test)]
-    pub(in crate::runtime::repository_physical_root) const SMALL: Self = Self {
-        size: FrozenArchiveSize::Small,
+    pub(in crate::runtime::repository_physical_root) const TINY: Self = Self {
+        size: FrozenArchiveSize::Tiny,
         wide_inodes: false,
     };
     #[cfg(test)]
-    pub(in crate::runtime::repository_physical_root) const SMALL_WIDE_INODES: Self = Self {
-        size: FrozenArchiveSize::Small,
+    pub(in crate::runtime::repository_physical_root) const TINY_WIDE_INODES: Self = Self {
+        size: FrozenArchiveSize::Tiny,
         wide_inodes: true,
+    };
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) const SMALL: Self = Self {
+        size: FrozenArchiveSize::Small,
+        wide_inodes: false,
     };
     #[cfg(test)]
     pub(in crate::runtime::repository_physical_root) const MEDIUM: Self = Self {
@@ -48,6 +55,7 @@ impl FrozenArchiveQuota {
 
     pub(in crate::runtime::repository_physical_root) fn bytes(self) -> u64 {
         match self.size {
+            FrozenArchiveSize::Tiny => TINY_BYTES,
             FrozenArchiveSize::Small => SMALL_BYTES,
             FrozenArchiveSize::Standard => PROCESS_BYTES,
             FrozenArchiveSize::Medium => MEDIUM_BYTES,
@@ -67,7 +75,8 @@ impl FrozenArchiveQuota {
     }
     pub(in crate::runtime::repository_physical_root) fn select(facts: QuotaFacts) -> Self {
         let size = match facts.allocated {
-            0..=SMALL_BYTES => FrozenArchiveSize::Small,
+            0..=TINY_BYTES => FrozenArchiveSize::Tiny,
+            ..=SMALL_BYTES => FrozenArchiveSize::Small,
             ..=PROCESS_BYTES => FrozenArchiveSize::Standard,
             ..=MEDIUM_BYTES => FrozenArchiveSize::Medium,
             ..=LARGE_BYTES => FrozenArchiveSize::Large,
@@ -317,7 +326,9 @@ mod tests {
             used_inodes,
         };
         for (allocated_mib, overshoot, capacity_mib) in [
-            (0, 0, 16),
+            (0, 0, 8),
+            (8, 0, 8),
+            (8, 4096, 16),
             (16, 0, 16),
             (16, 4096, 64),
             (64, 0, 64),

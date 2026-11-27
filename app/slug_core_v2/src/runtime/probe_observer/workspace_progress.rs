@@ -141,7 +141,7 @@ pub(super) struct Totals {
     last_backing_refusal: Option<[u64; 3]>,
     last_retained_refusal: Option<[usize; 3]>,
     backing_inventory: Option<BackingInventory>,
-    closed_archive_quotas: [Option<[u64; 4]>; 10],
+    closed_archive_quotas: [Option<(u32, u32, u64, u64)>; 12],
 }
 
 impl Totals {
@@ -168,15 +168,20 @@ impl Totals {
         (bytes, inodes): (u64, u64),
         source: bool,
     ) {
+        let (Ok(bytes), Ok(inodes)) = (u32::try_from(bytes), u32::try_from(inodes)) else {
+            self.invalid = true;
+            return;
+        };
         let Some(row) = self
             .closed_archive_quotas
             .iter_mut()
-            .find(|row| row.is_none_or(|[limit, units, ..]| (limit, units) == (bytes, inodes)))
+            .find(|row| row.is_none_or(|(limit, units, ..)| (limit, units) == (bytes, inodes)))
         else {
             self.invalid = true;
             return;
         };
-        let count = &mut row.get_or_insert([bytes, inodes, 0, 0])[2 + usize::from(source)];
+        let (_, _, general_count, source_count) = row.get_or_insert((bytes, inodes, 0, 0));
+        let count = if source { source_count } else { general_count };
         if let Some(next) = count.checked_add(1) {
             *count = next;
         } else {
@@ -502,7 +507,7 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
             }); 4],
             complete: false,
         }),
-        closed_archive_quotas: [Some([u64::MAX; 4]); 10],
+        closed_archive_quotas: [Some((u32::MAX, u32::MAX, u64::MAX, u64::MAX)); 12],
     }
     .report();
     assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);

@@ -501,12 +501,43 @@ impl Fixture {
 }
 
 #[test]
+#[ignore = "actual CLI Source contraction at one allocated page across the smallest class"]
+fn native_source_contraction_crosses_tiny_quota_by_one_allocated_page() {
+    let tiny = FrozenArchiveQuota::TINY;
+    let workspace = tempfile::tempdir().unwrap();
+    let payload = workspace.path().join("payload");
+    std::fs::write(&payload, []).unwrap();
+    let empty = Fixture::new(workspace.path());
+    let base_allocated = facts(empty.builder.as_ref().unwrap().file.as_raw_fd()).allocated;
+    empty.cleanup(Fault::None);
+    for (allocated, expected) in [
+        (tiny.bytes(), tiny),
+        (tiny.bytes() + 4096, FrozenArchiveQuota::SMALL),
+    ] {
+        // Preserve tree shape and calibrate the dense file using actual
+        // kernel charges for the same metadata.
+        let payload_bytes = allocated.checked_sub(base_allocated).unwrap();
+        std::fs::write(&payload, vec![b'a'; payload_bytes as usize]).unwrap();
+        let mut fixture = Fixture::new(workspace.path());
+        let before = facts(fixture.builder.as_ref().unwrap().file.as_raw_fd());
+        assert_eq!(before.allocated, allocated);
+        let (output, verified, _, _) = fixture.finalize(expected, Fault::None);
+        let output = output.unwrap();
+        assert!(verified.load(Ordering::Acquire));
+        assert_frozen_source(output.receipt.root(), expected);
+        assert_eq!(fixture.resources.snapshot().backing_bytes, expected.bytes());
+        drop(output);
+        fixture.cleanup(Fault::None);
+    }
+}
+
+#[test]
 #[ignore = "actual CLI Source contraction, original-FD/shared debit and last-reader lifetime"]
 fn native_small_source_contraction_keeps_original_identity_old_debit_until_reap_and_last_reader() {
     let workspace = tempfile::tempdir().unwrap();
     std::fs::write(workspace.path().join("payload"), b"source bytes").unwrap();
     let mut fixture = Fixture::new(workspace.path());
-    let expected = FrozenArchiveQuota::SMALL;
+    let expected = FrozenArchiveQuota::TINY;
     let (output, verified, fd, identity) = fixture.finalize(expected, Fault::None);
     let output = output.unwrap();
     assert!(verified.load(Ordering::Acquire));
@@ -578,7 +609,7 @@ fn native_source_contraction_refusals_reap_without_publishing_or_refunding_live_
         let workspace = tempfile::tempdir().unwrap();
         std::fs::write(workspace.path().join("payload"), b"source bytes").unwrap();
         let mut fixture = Fixture::new(workspace.path());
-        let (output, verified, _, _) = fixture.finalize(FrozenArchiveQuota::SMALL, fault);
+        let (output, verified, _, _) = fixture.finalize(FrozenArchiveQuota::TINY, fault);
         assert!(
             output.is_err(),
             "{fault:?}: no sealed Source/view may escape a refused attempt"
@@ -623,10 +654,10 @@ fn native_source_contraction_uses_wide_inodes_when_actual_charges_exceed_small_a
     );
     let before = facts(fixture.builder.as_ref().unwrap().file.as_raw_fd());
     assert!(
-        before.used_inodes > FrozenArchiveQuota::SMALL.quota().1,
+        before.used_inodes > FrozenArchiveQuota::TINY.quota().1,
         "actual charges must exceed the small inode allowance: {before:?}"
     );
-    let expected = FrozenArchiveQuota::SMALL_WIDE_INODES;
+    let expected = FrozenArchiveQuota::TINY_WIDE_INODES;
     assert!(
         before.allocated <= expected.bytes(),
         "actual allocation must fit the smallest byte class: {before:?}"
@@ -669,7 +700,7 @@ fn native_compact_source_views_remain_readonly_across_two_executes_and_data_outl
         false,
     )
     .unwrap();
-    let expected = FrozenArchiveQuota::SMALL;
+    let expected = FrozenArchiveQuota::TINY;
     assert_eq!(source.frozen_archive_quota(), Some(expected));
     assert_eq!(
         (
@@ -688,7 +719,7 @@ fn native_compact_source_views_remain_readonly_across_two_executes_and_data_outl
     let code = r#"import errno,os,pathlib,sys
 p=pathlib.Path(sys.argv[1])
 v=os.statvfs(p)
-assert v.f_blocks*v.f_frsize==16777216 and v.f_files==8192
+assert v.f_blocks*v.f_frsize==8388608 and v.f_files==8192
 assert (p/'payload').read_bytes()==b'small source'
 for name in ['payload','new']:
  try: os.open(p/name,os.O_WRONLY|os.O_CREAT,0o644)

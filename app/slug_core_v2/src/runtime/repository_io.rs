@@ -1521,6 +1521,8 @@ impl RepositoryMaterializer {
             validation,
             &mut |left, right| comparison.equal(left, right),
         )?;
+        #[cfg(target_os = "linux")]
+        let claim_domain;
         let released = {
             let mut state = self
                 .state
@@ -1613,6 +1615,10 @@ impl RepositoryMaterializer {
             }
             state.accepted_roots = retained;
             let previous = std::mem::replace(&mut state.accepted, accepted);
+            #[cfg(target_os = "linux")]
+            {
+                claim_domain = state.claim_domain.clone();
+            }
             #[cfg(not(target_os = "linux"))]
             let old_credit = ();
             // Semantic owners retire before guarded rows; scratch and vector
@@ -1620,6 +1626,10 @@ impl RepositoryMaterializer {
             (previous, active, released, old_credit, snapshot)
         };
         drop(released);
+        #[cfg(target_os = "linux")]
+        if let Some(domain) = claim_domain {
+            domain.prune_retired_claims();
+        }
         Ok(())
     }
 
@@ -1627,16 +1637,34 @@ impl RepositoryMaterializer {
         &self,
         token: RepositorySessionToken,
     ) -> Result<(), RepositorySessionError> {
+        #[cfg(target_os = "linux")]
+        let claim_domain;
         let released = {
             let mut state = self
                 .state
                 .lock()
                 .expect("repository materializer mutex poisoned");
             matching_active(&state, token)?;
+            #[cfg(target_os = "linux")]
+            {
+                claim_domain = state.claim_domain.clone();
+            }
             state.active.take().expect("matching active session exists")
         };
         drop(released);
+        #[cfg(target_os = "linux")]
+        if let Some(domain) = claim_domain {
+            domain.prune_retired_claims();
+        }
         Ok(())
+    }
+
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn claim_inventory_for_test(
+        &self,
+    ) -> Option<reservations::NativeClaimInventory> {
+        let domain = self.state.lock().unwrap().claim_domain.clone()?;
+        Some(domain.claim_inventory_for_test())
     }
 }
 
