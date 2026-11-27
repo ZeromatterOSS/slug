@@ -19,6 +19,9 @@ use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
 mod fixture_support;
 use fixture_support::FixtureWorkspace;
 
+#[path = "../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
+mod local_test_workspace;
+
 mod support;
 use support::INSTALLED_DAEMON;
 use support::daemon::daemon_fixture;
@@ -77,6 +80,24 @@ fn configured_cli_registry_arg(assembly: &std::path::Path) -> String {
         "--registry={}",
         fixture_support::configured_cli_registry_url(assembly)
     )
+}
+
+fn local_cli_workspace(
+    name: &str,
+    module_name: &str,
+    additional_directives: &str,
+) -> (std::path::PathBuf, String) {
+    let workspace = scratch(name).canonicalize().unwrap();
+    local_test_workspace::write(&workspace);
+    let module_path = workspace.join("MODULE.bazel");
+    let module = std::fs::read_to_string(&module_path).unwrap();
+    let (_, local_directives) = module.split_once('\n').unwrap();
+    write(
+        module_path,
+        &format!("module(name = \"{module_name}\")\n{local_directives}{additional_directives}"),
+    );
+    let registry = format!("--registry=file://{}/empty-registry", workspace.display());
+    (workspace, registry)
 }
 
 fn fixture_workspace(name: &str) -> FixtureWorkspace {
@@ -3362,9 +3383,8 @@ fn executables_rule_capability_fixture_matches_all_thirty_two_non_label_kind_baz
 
 #[test]
 fn output_base_executables_reuses_one_daemon_across_capability_transitions() {
-    let workspace = scratch("executables-capability-workspace");
+    let (workspace, registry) = local_cli_workspace("executables-capability-workspace", "demo", "");
     let (_cleanup, output_base) = daemon_fixture();
-    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     let defs = workspace.join("pkg/defs.bzl");
     let build = workspace.join("pkg/BUILD.bazel");
     let definition = |name: &str, arguments: &str| {
@@ -3380,6 +3400,7 @@ fn output_base_executables_reuses_one_daemon_across_capability_transitions() {
         slug()
             .current_dir(&workspace)
             .args([output_base_arg.as_str(), "query", expression])
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -5206,6 +5227,7 @@ fn explicit_label_output_matches_bazel_and_text_is_rejected() {
 #[test]
 fn aquery_text_keeps_root_order_across_one_shot_and_retained_daemon_restoration() {
     let workspace = scratch("aquery-filewrite-text");
+    let registry = configured_cli_registry_arg(&configured_cli_fixture("aquery-filewrite-registry"));
     write(
         workspace.join("MODULE.bazel"),
         r#"module(name = "aquery_filewrite_text")
@@ -5278,7 +5300,12 @@ root_rule(name = "root", deps = [":left", ":right"])
     let output_base_arg = format!("--output_base={}", output_base.display());
     let run = |args: &[&str]| {
         let mut command = slug();
-        command.current_dir(&workspace).args(args).output().unwrap()
+        command
+            .current_dir(&workspace)
+            .args(args)
+            .arg(&registry)
+            .output()
+            .unwrap()
     };
     let accepted = |output: &std::process::Output| {
         assert!(output.status.success(), "{output:?}");
@@ -5852,51 +5879,78 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
 
 #[test]
 fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
-    let workspace = scratch("command-module-overrides");
-    write(
-        workspace.join("MODULE.bazel"),
-        r#"module(name = "command_overrides")"#,
+    let (workspace, registry) = local_cli_workspace(
+        "command-module-overrides",
+        "command_overrides",
+        r#"bazel_dep(name = "dep", version = "1.0.0")
+local_path_override(module_name = "dep", path = "deps/baseline")
+"#,
     );
     write(
         workspace.join("pkg/BUILD.bazel"),
         r#"filegroup(name = "probe")"#,
     );
-    let workspace = workspace.canonicalize().unwrap();
-
-    let one_shot_build = slug()
-        .current_dir(&workspace)
-        .args([
-            "build",
-            "--override_module=dep=deps/../deps/dep",
-            "//pkg:probe",
-        ])
-        .output()
-        .unwrap();
-    assert_eq!(one_shot_build.status.code(), Some(2), "{one_shot_build:?}");
-    assert!(
-        String::from_utf8_lossy(&one_shot_build.stderr)
-            .contains("\"error\":\"analysis_not_implemented\""),
-        "{one_shot_build:?}"
+    for module in ["baseline", "override"] {
+        write(
+            workspace.join("deps").join(module).join("MODULE.bazel"),
+            r#"module(name = "dep", version = "1.0.0")"#,
+        );
+    }
+    write(
+        workspace.join("deps/baseline/BUILD.bazel"),
+        r#"exports_files(["probe"])"#,
     );
-
-    let one_shot_query = slug()
-        .current_dir(&workspace)
-        .args([
+    write(workspace.join("deps/baseline/probe"), "baseline\n");
+    write(
+        workspace.join("deps/override/BUILD.bazel"),
+        r#"filegroup(name = "probe")"#,
+    );
+    let invoke = |base: Option<&str>, command: &str, policy: Option<&str>, args: &[&str]| {
+        let mut invocation = slug();
+        invocation.current_dir(&workspace).args(base).arg(command);
+        invocation.arg(&registry).args(policy).args(args);
+        invocation.output().unwrap()
+    };
+    let check_build = |base: Option<&str>, policy: Option<&str>| {
+        let output = invoke(base, "build", policy, &["//pkg:probe"]);
+        assert_eq!(output.status.code(), Some(2), "{output:?}");
+        assert!(output.stdout.is_empty(), "{output:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("\"error\":\"analysis_not_implemented\""),
+            "{stderr}"
+        );
+        let mode = if base.is_some() { "daemon" } else { "one-shot" };
+        assert!(
+            stderr.contains(&format!("\"runtime_mode\":\"{mode}\"")),
+            "{stderr}"
+        );
+    };
+    let check_query = |base: Option<&str>, policy: Option<&str>, expected: &str| {
+        let output = invoke(
+            base,
             "query",
-            "--override_module=dep=%workspace%/deps/dep",
-            "//pkg:probe",
-        ])
-        .output()
-        .unwrap();
-    assert!(one_shot_query.status.success(), "{one_shot_query:?}");
-    assert_eq!(one_shot_query.stdout, b"//pkg:probe\n");
-    assert!(one_shot_query.stderr.is_empty(), "{one_shot_query:?}");
+            policy,
+            &["--output=label_kind", "@dep//:probe"],
+        );
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(output.stdout, expected.as_bytes(), "{output:?}");
+        assert!(output.stderr.is_empty(), "{output:?}");
+    };
 
-    let run = slug()
-        .current_dir(&workspace)
-        .args(["run", "--override_module=dep=deps/dep", "//pkg:probe"])
-        .output()
-        .unwrap();
+    check_build(None, Some("--override_module=dep=deps/../deps/override"));
+    let baseline = "source file @dep//:probe\n";
+    let overridden = "filegroup rule @dep//:probe\n";
+    check_query(None, None, baseline);
+    check_query(
+        None,
+        Some("--override_module=dep=%workspace%/deps/override"),
+        overridden,
+    );
+    check_query(None, None, baseline);
+
+    let relative_override = Some("--override_module=dep=deps/override");
+    let run = invoke(None, "run", relative_override, &["//pkg:probe"]);
     assert_eq!(run.status.code(), Some(2), "{run:?}");
     let run_stderr = String::from_utf8(run.stderr).unwrap();
     assert!(
@@ -5907,60 +5961,30 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
 
     let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
-    let cases: &[(&str, &[&str])] = &[
-        ("a-build", &["build", "//pkg:probe"]),
-        (
-            "b-build",
-            &["build", "--override_module=dep=deps/dep", "//pkg:probe"],
-        ),
-        ("a-build-restored", &["build", "//pkg:probe"]),
-        ("a-query", &["query", "//pkg:probe"]),
-        (
-            "b-query",
-            &[
-                "query",
-                "--override_module=dep=/absolute/deps/dep",
-                "//pkg:probe",
-            ],
-        ),
-        ("a-query-restored", &["query", "//pkg:probe"]),
-    ];
-    let mut pid = None;
-    for (name, args) in cases {
-        let output = slug()
-            .current_dir(&workspace)
-            .arg(&output_base_arg)
-            .args(*args)
-            .output()
-            .unwrap();
-        if args[0] == "query" {
-            assert!(output.status.success(), "{name}: {output:?}");
-            assert_eq!(output.stdout, b"//pkg:probe\n", "{name}");
-            assert!(output.stderr.is_empty(), "{name}: {output:?}");
-        } else {
-            assert_eq!(output.status.code(), Some(2), "{name}: {output:?}");
-            assert!(output.stdout.is_empty(), "{name}: {output:?}");
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            assert!(
-                stderr.contains("\"error\":\"analysis_not_implemented\""),
-                "{name}: {stderr}"
-            );
-            assert!(
-                stderr.contains("\"runtime_mode\":\"daemon\""),
-                "{name}: {stderr}"
-            );
-        }
-        let current_pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
-        if let Some(pid) = &pid {
-            assert_eq!(&current_pid, pid, "{name}");
-        } else {
-            pid = Some(current_pid);
-        }
+    let base = Some(output_base_arg.as_str());
+    check_build(base, None);
+    let generation = daemon_generation(&output_base).unwrap();
+    for policy in [relative_override, None] {
+        check_build(base, policy);
+        assert_eq!(daemon_generation(&output_base).unwrap(), generation);
+    }
+    let absolute_override = format!(
+        "--override_module=dep={}",
+        workspace.join("deps/override").display()
+    );
+    for (policy, expected) in [
+        (None, baseline),
+        (Some(absolute_override.as_str()), overridden),
+        (None, baseline),
+    ] {
+        check_query(base, policy, expected);
+        assert_eq!(daemon_generation(&output_base).unwrap(), generation);
     }
 
     let subdirectory = slug()
         .current_dir(workspace.join("pkg"))
         .args(["query", "--override_module=dep=relative/dep", "//pkg:probe"])
+        .arg(registry)
         .output()
         .unwrap();
     assert!(!subdirectory.status.success(), "{subdirectory:?}");
