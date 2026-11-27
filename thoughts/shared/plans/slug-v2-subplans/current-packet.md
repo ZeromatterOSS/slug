@@ -6,38 +6,34 @@ Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS. General production remains Disabled
 
 ## Current result and next step
 
-The original reached 991 computes, 56 roots and 152 records. It adopted
-`local_config_xcode` and serviced more path batches before SourceWorkDeadline.
-The candidate registration revision adopted Xcode at 958 computes with the
-same roots and records. It reached 62,826 validated toolchain rows through the
-candidate path, which now merges only the execution-platform labels while
-keeping all four reads and their precedence. Both runs retired to 168 bytes,
-zero FDs and zero backing. The earlier refusal at compute 859 remains
-unattributed. Full Rust and completed-command latency/RSS remain open.
+The original adopted `local_config_xcode` and reached 998 computes and 57
+roots. It serviced the checksum-pinned `tinyjson` Archive at operation 0,
+decoding 71,168 bytes before the Source deadline. The last sampled epoch held
+152 records before that operation. All 16 shared compute samples agreed with
+the preceding run. Cleanup returned to 168 bytes, zero FDs and zero backing.
+The report used 127,077 bytes with its prefix. Full Rust and completed-command
+latency/RSS remain open. The earlier refusal at compute 859 is still unattributed.
 
-Of 645 observed module-toolchain Need returns, 630 rebuilt a completed prefix,
-totaling 20,656 rows. Loading keeps one ordered label set per attempt and
-captures spelling only for actual ambiguities. The matched accumulator
-comparison processed 8,837,500 rows and emitted 2,187,500 labels in both
-variants, with CPU and wall at 0.580 of baseline. Existing DICE children own
-completed route, package and subtree reuse. Keep parent ordering, first
-conflict, Need validity, events and exact observation custody.
-The ordered-set run stopped at 954 computes, 55 roots and 151 records.
-All 60 shared sampled compute rows and peak credit matched the preceding run.
-Retirement was exact. The report used 129,137 bytes with its prefix.
-Eighty-seven focused tests, five native guards and the 7.93-second six-archive
-gate passed.
+Configuration construction writes nested fields into one buffer. Eight
+complete baseline and candidate encodings and projections match across
+486,703 bytes. Matched target, overlay and Exec construction used CPU 0.262
+and instructions 0.234 of baseline. Two hundred focused tests, five native
+guards and the 7.90-second six-archive gate passed.
+
+Platform candidate preparation reads all four registration sources with their
+existing precedence and merges execution-platform labels. It reached 93,107
+validated toolchain input rows. Of 645 module-toolchain Need returns, 630
+rebuilt a prefix totaling 20,656 rows. Loading uses one ordered set and
+captures spelling for emitted ambiguities. Its matched accumulator CPU ratio
+was 0.580. Complete route, package and subtree reuse belongs to DICE children.
 
 The 920-compute CPU profile attributes 25.77% of cycles to liblzma and 11.62% to
 packed decoding. Fresh rooted comparisons account for 76.03% of decoder cycles.
 The exact literal/back-reference verifier trial on 3.74 GB used CPU 1.049 and
 instructions 1.293 of baseline. The trial was retired.
 Word-at-a-time Unix path comparison preserves standard order for admitted raw
-aliases. Matched Workspace unions used 0.414 CPU and 0.285 instructions of
-baseline. All 218 focused tests, five native guards and the 7.95-second
-six-archive gate passed. The original adopted `local_config_cc` at 935 computes
-with 55 roots and 151 records before the Source deadline. All 45 shared sampled
-compute rows agreed with the preceding run and retirement was exact.
+aliases. Matched Workspace union CPU/instruction ratios were 0.414/0.285.
+The preceding original adopted `local_config_cc` at 935 computes (`c7f70e6a8`).
 
 Prior accepted owner results include pidfd retirement (ABBA wall 0.836),
 sorted union insertion (CPU 0.772, instructions 0.837), and the
@@ -51,6 +47,8 @@ The previous detailed checkpoint is in `ff79543a2`.
 Drive the next actual configured Rust frontier with the existing deadline.
 Compare equal work before attributing runtime differences across stopped
 prefixes. Keep launcher/PID1, rooted comparison, codec and history checks.
+Rooted body reuse requires a writer receipt binding the actual mutation footprint
+to the exclusive root and exact predecessor.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,

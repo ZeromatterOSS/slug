@@ -2305,6 +2305,12 @@ proof. All414 ordinary checks, five native guards and four warm originals pass.
 Both bounded candidate captures reach a reproducible opaque Analysis Message
 error at970 cycles; neither is a successful Rust cquery or proof of its cause.
 
+Configuration construction writes nested fields into one buffer. Record each
+length slot by byte offset and fill its big-endian payload length after the
+append-only writer returns. The complete baseline and candidate encodings and
+projections agree across target, environment, overlay restoration and Exec
+values. The hand-framed control covers nested, empty and sibling fields.
+
 ### Optional expected checksum for General archive acquisition
 
 Frozen actual Rust captures identify `plan_archive_checksum_missing` at970 cycles.

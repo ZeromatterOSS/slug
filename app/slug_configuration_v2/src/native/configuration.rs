@@ -1814,11 +1814,14 @@ impl Encoder {
     }
 
     fn field(&mut self, tag: u16, write: impl FnOnce(&mut Self)) {
-        let mut payload = Self::default();
-        write(&mut payload);
         self.u16(tag);
-        self.u64(u64::try_from(payload.0.len()).expect("payload length fits u64"));
-        self.bytes(&payload.0);
+        // Keep offsets because nested field writers can grow the buffer.
+        let length_start = self.0.len();
+        self.u64(0);
+        let payload_start = self.0.len();
+        write(self);
+        let length = u64::try_from(self.0.len() - payload_start).expect("payload length fits u64");
+        self.0[length_start..payload_start].copy_from_slice(&length.to_be_bytes());
     }
 
     fn option_value(&mut self, value: &OptionValue) {
@@ -2149,6 +2152,38 @@ mod tests {
         );
         assert!(!split.merge_genfiles_directory().unwrap());
         assert_ne!(base, split);
+    }
+
+    #[test]
+    fn canonical_field_lengths_cover_only_their_payload() {
+        let payload = [0x5a; 513];
+        let mut encoder = Encoder::default();
+        encoder.bytes(b"prefix");
+        encoder.field(0x1234, |outer| {
+            outer.bytes(b"A");
+            outer.field(0x1235, |child| child.bytes(&payload));
+            outer.field(0x1236, |_| {});
+            outer.bytes(b"Z");
+        });
+        encoder.field(0x1237, |sibling| sibling.bytes(b"B"));
+
+        let expected = [
+            b"prefix".as_slice(),
+            &0x1234u16.to_be_bytes(),
+            &535u64.to_be_bytes(),
+            b"A",
+            &0x1235u16.to_be_bytes(),
+            &513u64.to_be_bytes(),
+            &payload,
+            &0x1236u16.to_be_bytes(),
+            &0u64.to_be_bytes(),
+            b"Z",
+            &0x1237u16.to_be_bytes(),
+            &1u64.to_be_bytes(),
+            b"B",
+        ]
+        .concat();
+        assert_eq!(encoder.into_bytes(), expected);
     }
 
     #[test]
