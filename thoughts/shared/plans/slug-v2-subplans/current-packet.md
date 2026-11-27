@@ -12,12 +12,12 @@ Native retention stayed within the fixed bank and teardown refunded all credits.
 Scoped HTTPS freshness with an omitted checksum, repeated Workspace publication
 with retained readers, and the native Archive exact/+1 envelope passed.
 
-The protected launcher candidate passed the confinement fixture on unprivileged
-Linux, one-shot and across two requests on one installed daemon. Compare the
-public Rust cquery rows through both routes on the qualifying image.
+The protected launcher candidate passed confinement on unprivileged Linux.
+The [Stage 8 public cquery formatter][stage8] matched all four pinned CrateInfo
+cases on each route, with empty stderr and one daemon generation.
 
-Continue with the [Stage 8 public cquery formatter][stage8], followed by
-public action comparison and Rust REAPI. Keep atomic
+Finish the installed integration sweep and final review before activation.
+Public action comparison and Rust REAPI follow. Keep atomic
 publication, existing readers, native quotas, clocks, launcher/PID1, rooted
 reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
@@ -108,7 +108,7 @@ final review precedes activation.
 
 The bounded six-archive gate and authored General glob cquery are accepted.
 The authentic inactive Rust driver, scoped HTTPS freshness, repeated Workspace
-publication and Archive envelope gates have completed. Public Rust cquery,
+publication and Archive envelope gates have completed. Production activation,
 required public action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. Native credit,
