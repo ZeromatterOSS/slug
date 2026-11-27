@@ -27,6 +27,41 @@ enum Refusal {
 }
 
 #[test]
+fn fallible_unique_rows_admit_storage_before_callbacks_and_stop_on_error() {
+    let count = NO_INDEX_THRESHOLD + 1;
+    let visited = Cell::new(0);
+    let make_rows = || {
+        rows(count).enumerate().map(|(index, row)| {
+            visited.set(visited.get() + 1);
+            if index == 1 {
+                Err(Refusal::Work)
+            } else {
+                Ok(row)
+            }
+        })
+    };
+    let result = SmallMap::try_from_unique_hashed_fallible_rows(count, make_rows(), |_, bytes| {
+        if bytes > 0 {
+            Err(Refusal::Allocation)
+        } else {
+            Ok(())
+        }
+    });
+    assert_eq!(
+        result.unwrap_err(),
+        BoundedMapError::Operation(Refusal::Allocation)
+    );
+    assert_eq!(visited.get(), 0);
+
+    let result = SmallMap::try_from_unique_hashed_fallible_rows(count, make_rows(), |_, _| Ok(()));
+    assert_eq!(
+        result.unwrap_err(),
+        BoundedMapError::Operation(Refusal::Work)
+    );
+    assert_eq!(visited.get(), 2);
+}
+
+#[test]
 fn bounded_rows_admit_exact_work_and_bytes_across_index_threshold() {
     for count in [0, NO_INDEX_THRESHOLD, NO_INDEX_THRESHOLD + 1, 65] {
         let mut work = 0;

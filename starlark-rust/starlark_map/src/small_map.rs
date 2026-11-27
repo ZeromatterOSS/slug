@@ -144,13 +144,26 @@ impl<K, V> SmallMap<K, V> {
     pub fn try_from_unique_hashed_rows<E>(
         count: usize,
         rows: impl IntoIterator<Item = (Hashed<K>, V)>,
+        charge: impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<Self, BoundedMapError<E>> {
+        Self::try_from_unique_hashed_fallible_rows(count, rows.into_iter().map(Ok), charge)
+    }
+
+    /// Admit the ordered map before requesting fallible, prehashed unique rows.
+    /// Stop on the first failed row. Row construction owns its work and payloads.
+    pub fn try_from_unique_hashed_fallible_rows<E>(
+        count: usize,
+        rows: impl IntoIterator<Item = Result<(Hashed<K>, V), E>>,
         mut charge: impl FnMut(usize, usize) -> Result<(), E>,
     ) -> Result<Self, BoundedMapError<E>> {
         let mut map = Self::try_with_capacity_bounded(count, &mut charge)?;
         let mut rows = rows.into_iter();
         for _ in 0..count {
             charge(1, 0).map_err(BoundedMapError::Operation)?;
-            let (key, value) = rows.next().ok_or(BoundedMapError::RowCountMismatch)?;
+            let (key, value) = rows
+                .next()
+                .ok_or(BoundedMapError::RowCountMismatch)?
+                .map_err(BoundedMapError::Operation)?;
             map.push_fresh_hashed_row(key, value, &mut charge)?;
         }
         charge(1, 0).map_err(BoundedMapError::Operation)?;
