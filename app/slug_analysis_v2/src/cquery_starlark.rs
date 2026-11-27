@@ -45,7 +45,7 @@ const PARSE_LIMITS: ParseLimits = ParseLimits::new(CQUERY_STARLARK_SOURCE_MAX_BY
 
 #[derive(Debug)]
 pub enum CqueryStarlarkError {
-    Setup(anyhow::Error),
+    Setup { stderr: String },
     Request(anyhow::Error),
 }
 
@@ -236,13 +236,22 @@ fn render_with_budget<'a>(
 ) -> Result<(String, String), CqueryStarlarkError> {
     let stderr = RefCell::new(BoundedText::new(budget, stream_bytes));
     let printer = DiagnosticPrint(&stderr);
-    let function = compile(name, source, budget, &printer, start).map_err(|error| {
-        if error.is::<ExecutionLimit>() || error.is::<ParseLimit>() {
-            CqueryStarlarkError::Request(error)
-        } else {
-            CqueryStarlarkError::Setup(error)
+    let function = match compile(name, source, budget, &printer, start) {
+        Ok(function) => function,
+        Err(error) if error.is::<ExecutionLimit>() || error.is::<ParseLimit>() => {
+            return Err(CqueryStarlarkError::Request(error));
         }
-    })?;
+        Err(error) => {
+            let mut stderr = stderr.into_inner();
+            writeln!(stderr, "ERROR: invalid --starlark:file: {error}").map_err(|_| {
+                CqueryStarlarkError::Request(budget.refuse(ExecutionLimit::TextFormatting).into())
+            })?;
+            let stderr = stderr
+                .finish()
+                .map_err(|limit| CqueryStarlarkError::Request(limit.into()))?;
+            return Err(CqueryStarlarkError::Setup { stderr });
+        }
+    };
     let stdout = (|| -> anyhow::Result<_> {
         let mut stdout = BoundedText::new(budget, stream_bytes);
         for (index, (target, label)) in targets.enumerate() {
@@ -409,15 +418,51 @@ mod tests {
         ] {
             let error =
                 render_cquery_starlark("format.star", source, std::iter::empty()).unwrap_err();
-            let CqueryStarlarkError::Setup(error) = error else {
+            let CqueryStarlarkError::Setup { stderr } = error else {
                 panic!("expected a setup failure, got {error:?}");
             };
-            assert!(error.to_string().contains(message), "{error}");
+            assert!(stderr.contains(message), "{stderr}");
         }
         let source = "x = 1\n".repeat(80);
         let error = render_cquery_starlark("format.star", &source, std::iter::empty()).unwrap_err();
         assert!(matches!(error, CqueryStarlarkError::Request(error)
             if error.downcast_ref::<ParseLimit>() == Some(&ParseLimit::GrammarTokens)));
+    }
+
+    #[test]
+    fn cquery_formatter_setup_failure_preserves_prints_within_the_stderr_limit() {
+        let source = "print('setup first')\nprint('setup second')\nfail('setup failure')\n";
+        let expected = concat!(
+            "setup first\nsetup second\n",
+            "ERROR: invalid --starlark:file: fail: setup failure\n"
+        );
+        let run = |stream_bytes| {
+            let budget = Arc::new(
+                ExecutionBudget::new(10_000, 1 << 20, STACK_DEPTH).with_closed_formatter_bytecode(),
+            );
+            let error = render_with_budget(
+                "format.star",
+                source,
+                std::iter::from_fn(|| panic!("setup failure must precede target iteration")),
+                &budget,
+                Instant::now(),
+                stream_bytes,
+            )
+            .unwrap_err();
+            (error, budget)
+        };
+
+        let (error, budget) = run(expected.len());
+        let CqueryStarlarkError::Setup { stderr } = error else {
+            panic!("expected a setup failure, got {error:?}");
+        };
+        assert_eq!(stderr, expected);
+        assert_eq!(budget.check(), Ok(()));
+
+        let (error, budget) = run(expected.len() - 1);
+        assert!(matches!(error, CqueryStarlarkError::Request(error)
+            if error.downcast_ref::<ExecutionLimit>() == Some(&ExecutionLimit::TextBytes)));
+        assert_eq!(budget.check(), Err(ExecutionLimit::TextBytes));
     }
 
     #[test]

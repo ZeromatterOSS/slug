@@ -15,15 +15,9 @@ pub(in crate::runtime::dice) fn local_request(
     source_request(workspace, lease, Some(local_root))
 }
 
-fn source_request(
-    workspace: &Path,
-    lease: u64,
-    local_root: Option<&Path>,
-) -> Arc<slug_bzlmod_v2::RepositorySourceSnapshotRequest> {
-    use slug_bzlmod_v2::SourcePreparationOutcome;
-    let mut module = super::configured_test_module("module(name='source_snapshot_fixture')\n");
+pub(super) fn append_local_builtin_modules(workspace: &Path, parent: &str, module: &mut String) {
     for (name, version) in super::general_repository_archive_tests::BUILTIN_MODULE_PREREQUISITES {
-        let relative = format!(".source_test_modules/{name}");
+        let relative = format!("{parent}/{name}");
         let root = workspace.join(&relative);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(
@@ -41,6 +35,16 @@ fn source_request(
             module.push_str(&format!("bazel_dep(name='{name}',version='{version}')\n"));
         }
     }
+}
+
+fn source_request(
+    workspace: &Path,
+    lease: u64,
+    local_root: Option<&Path>,
+) -> Arc<slug_bzlmod_v2::RepositorySourceSnapshotRequest> {
+    use slug_bzlmod_v2::SourcePreparationOutcome;
+    let mut module = super::configured_test_module("module(name='source_snapshot_fixture')\n");
+    append_local_builtin_modules(workspace, ".source_test_modules", &mut module);
     if let Some(local_root) = local_root {
         let relative = local_root
             .strip_prefix(workspace)

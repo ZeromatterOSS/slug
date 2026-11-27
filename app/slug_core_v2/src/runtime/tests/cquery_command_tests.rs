@@ -1047,11 +1047,14 @@ impl CqueryObservedFixture {
         fs::create_dir_all(&stable_parent).unwrap();
         let workspace = tempfile::tempdir_in(stable_parent).unwrap();
         let command_policy = configured_test_command_policy(workspace.path());
-        fs::write(
-            workspace.path().join("MODULE.bazel"),
-            configured_test_module("print(\"MODULE_EVENT\")\nmodule(name = \"observed_cquery\")\n"),
-        )
-        .unwrap();
+        let mut module =
+            configured_test_module("print(\"MODULE_EVENT\")\nmodule(name = \"observed_cquery\")\n");
+        super::source_snapshot_request_fixture::append_local_builtin_modules(
+            workspace.path(),
+            ".slug_test_builtin",
+            &mut module,
+        );
+        fs::write(workspace.path().join("MODULE.bazel"), module).unwrap();
         fs::write(
             workspace.path().join("defs.bzl"),
             r#"print("BZL_EVENT")
@@ -1140,6 +1143,43 @@ fn cquery_observed_cold_warm_events_and_epoch_reuse() {
         assert_eq!(cold_result, warm_result, "{cold_demand:?}");
         assert!(Arc::ptr_eq(cold_result, warm_result));
     }
+}
+
+#[test]
+fn cquery_formatter_setup_failure_follows_accepted_events() {
+    use crate::runtime::format_cquery_starlark_file;
+    use crate::runtime::publish_cquery_starlark_file;
+
+    let fixture = CqueryObservedFixture::new();
+    let accepted = fixture.run("deps(//:root)").unwrap();
+    let events: Vec<_> = accepted_output_text(&accepted)
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    assert!(!events.is_empty());
+    let projected = accepted.project(|terminal| {
+        format_cquery_starlark_file(
+            terminal.as_ref().as_ref().unwrap(),
+            "format.star",
+            "print('formatter setup')\nfail('formatter failure')\n",
+        )
+    });
+    let (_, exit_code, stdout, stderr) = publish_cquery_starlark_file(projected).into_parts();
+    assert_eq!(exit_code, 1);
+    assert!(stdout.is_empty());
+    let stderr = std::str::from_utf8(&stderr).unwrap();
+    let mut lines = stderr.lines();
+    for event in events {
+        let line = lines.next().unwrap();
+        assert!(line.starts_with("DEBUG: "), "{line}");
+        assert!(line.ends_with(&format!(": {event}")), "{line}");
+    }
+    assert_eq!(lines.next(), Some("formatter setup"));
+    assert_eq!(
+        lines.next(),
+        Some("ERROR: invalid --starlark:file: fail: formatter failure")
+    );
+    assert_eq!(lines.next(), None);
 }
 
 #[test]

@@ -113,11 +113,7 @@ pub fn format_cquery_starlark_file(
     let name = name.escape_debug().to_string();
     match render_cquery_starlark(&name, source, evaluation.formatter_rows()) {
         Ok((stdout, stderr)) => TerminalOutput::new(0, stdout, stderr),
-        Err(CqueryStarlarkError::Setup(error)) => TerminalOutput::new(
-            1,
-            String::new(),
-            format!("ERROR: invalid --starlark:file: {error}\n"),
-        ),
+        Err(CqueryStarlarkError::Setup { stderr }) => TerminalOutput::new(1, String::new(), stderr),
         Err(CqueryStarlarkError::Request(error)) => {
             TerminalOutput::new(2, String::new(), format!("ERROR: {error}\n"))
         }

@@ -157,7 +157,8 @@ Share one formatter across the ordinary CLI and daemon terminal owners. Reuse
 Analysis's retained configured targets and native Starlark provider, label,
 depset and artifact values. Compile the formatter once per command, then call
 it over the ordered accepted analyses. Bazel 9.2 runs formatter setup after
-successful analysis. Setup failure exits 1. A per-target error reports and
+successful analysis. Setup failure emits earlier setup prints under the same
+diagnostic cap before the error and exits 1. A per-target error reports and
 skips that row while preserving exit 0. Successful rows use Starlark `str`.
 Publish through the existing accepted terminal outside the DICE graph.
 
