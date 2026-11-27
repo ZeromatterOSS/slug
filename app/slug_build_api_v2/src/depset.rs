@@ -558,6 +558,15 @@ impl<'a, T, M> Iterator for DepsetSuccessors<'a, T, M> {
         })
     }
 
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        if n >= self.len() {
+            self.next = self.end;
+            return None;
+        }
+        self.next += n as u32;
+        self.next()
+    }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = (self.end - self.next) as usize;
         (len, Some(len))

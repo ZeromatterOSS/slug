@@ -122,6 +122,7 @@ pub(crate) fn test_artifact_root() -> slug_build_api_v2::DerivedArtifactRoot {
 #[path = "analysis_value/artifact_root_tests.rs"]
 mod artifact_root_tests;
 
+mod native_depset;
 pub(crate) mod published;
 
 mod empty_instrumented_files;
@@ -576,8 +577,8 @@ pub(crate) struct AnalysisValueMaterializer<'a> {
     containers: HashMap<slug_build_api_v2::analysis_value::AnalysisContainerIdentity, FrozenValue>,
     cc_variables: SmallMap<slug_build_api_v2::cc_variables::CcVariablesOccurrence, FrozenValue>,
     depsets: HashMap<AnalysisDepset, FrozenValue>,
-    file_depsets: HashMap<(usize, u32), FrozenValue>,
-    symlink_depsets: HashMap<(usize, u32), FrozenValue>,
+    file_depsets: native_depset::Memo<String>,
+    symlink_depsets: native_depset::Memo<RunfilesSymlink>,
 }
 
 impl<'a> AnalysisValueMaterializer<'a> {
@@ -654,94 +655,33 @@ impl<'a> AnalysisValueMaterializer<'a> {
     }
 
     fn file_depset(&mut self, value: &Depset<String>) -> FrozenValue {
-        if let Some(found) = self.file_depsets.get(&value.node_key()) {
-            return *found;
-        }
-        let successors = value
-            .successors()
-            .map(|successor| match successor {
-                slug_build_api_v2::DepsetSuccessor::Direct(value) => {
-                    StarlarkDepsetSuccessorGen::Direct(self.heap.alloc_str(value).to_frozen_value())
-                }
-                slug_build_api_v2::DepsetSuccessor::Transitive(value) => {
-                    StarlarkDepsetSuccessorGen::Transitive(self.file_depset(&value))
-                }
-            })
-            .collect();
-        let empty = value
-            .is_empty()
-            .then(|| AnalysisDepset::empty(value.order()));
-        let result = alloc_starlark_depset_parts(
-            self.heap,
-            value.order(),
-            (!value.is_empty()).then(|| CompactString::new("string")),
-            empty
-                .as_ref()
-                .map(AnalysisDepset::occurrence)
-                .unwrap_or_default(),
-            empty,
-            value.depth(),
-            successors,
-        );
-        self.file_depsets.insert(value.node_key(), result);
-        result
+        let heap = self.heap;
+        native_depset::project(
+            heap,
+            value,
+            &mut self.file_depsets,
+            "string",
+            true,
+            |leaf| heap.alloc_str(leaf).to_frozen_value(),
+        )
     }
 
     fn symlink_depset(&mut self, value: &RunfilesSymlinkDepset) -> FrozenValue {
-        let mut stack = vec![(value.clone(), false)];
-        while let Some((current, exiting)) = stack.pop() {
-            if self.symlink_depsets.contains_key(&current.node_key()) {
-                continue;
-            }
-            if !exiting {
-                stack.push((current.clone(), true));
-                for successor in current.successors() {
-                    if let slug_build_api_v2::DepsetSuccessor::Transitive(child) = successor
-                        && !self.symlink_depsets.contains_key(&child.node_key())
-                    {
-                        stack.push((child, false));
-                    }
-                }
-                continue;
-            }
-            let successors = current
-                .successors()
-                .map(|successor| match successor {
-                    slug_build_api_v2::DepsetSuccessor::Direct(value) => {
-                        let entry = self.heap.alloc(StarlarkRunfilesSymlink {
-                            retained: value.clone(),
-                            path: self.heap.alloc_str(&value.path).to_frozen_value(),
-                            target_file: self
-                                .heap
-                                .alloc(AnalysisArtifactValue::new(value.artifact.clone())),
-                        });
-                        StarlarkDepsetSuccessorGen::Direct(entry)
-                    }
-                    slug_build_api_v2::DepsetSuccessor::Transitive(child) => {
-                        StarlarkDepsetSuccessorGen::Transitive(
-                            *self
-                                .symlink_depsets
-                                .get(&child.node_key())
-                                .expect("child materialized first"),
-                        )
-                    }
+        let heap = self.heap;
+        native_depset::project(
+            heap,
+            value,
+            &mut self.symlink_depsets,
+            "SymlinkEntry",
+            false,
+            |leaf| {
+                heap.alloc(StarlarkRunfilesSymlink {
+                    retained: leaf.clone(),
+                    path: heap.alloc_str(&leaf.path).to_frozen_value(),
+                    target_file: heap.alloc(AnalysisArtifactValue::new(leaf.artifact.clone())),
                 })
-                .collect();
-            let result = alloc_starlark_depset_parts(
-                self.heap,
-                current.order(),
-                (!current.is_empty()).then(|| CompactString::new("SymlinkEntry")),
-                Default::default(),
-                None,
-                current.depth(),
-                successors,
-            );
-            self.symlink_depsets.insert(current.node_key(), result);
-        }
-        *self
-            .symlink_depsets
-            .get(&value.node_key())
-            .expect("root materialized")
+            },
+        )
     }
 
     fn runfiles(&mut self, value: &RetainedRunfiles) -> Result<FrozenValue, String> {
