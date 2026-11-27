@@ -1,11 +1,13 @@
 //! Existing artifact owners and scratch borrowing; no path-admission changes.
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::WorkspaceStatusArtifacts;
+use slug_identity_v2::ApparentLabel;
+use slug_identity_v2::RepositoryMapping;
+use slug_identity_v2::RepositoryMappingId;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark::environment::Globals;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
-use starlark::values::FrozenHeap;
 
 use super::*;
 
@@ -49,6 +51,52 @@ fn artifacts() -> Vec<AnalysisArtifact> {
             .map(|status| AnalysisArtifact::WorkspaceStatus(status.clone())),
     );
     result
+}
+
+#[test]
+fn frozen_file_admits_source_clones_and_reuses_shared_owners() {
+    let heap = FrozenHeap::new();
+    let baseline = AnalysisArtifact::Source(CanonicalLabel::parse("@@//:source").unwrap());
+    let object_bytes = (0..8)
+        .find_map(|_| {
+            let (reserved, available) = (heap.allocated_bytes(), heap.available_bytes());
+            heap.alloc(AnalysisArtifactValue::new(baseline.clone()));
+            (heap.allocated_bytes() == reserved).then(|| available - heap.available_bytes())
+        })
+        .expect("a File allocation in an open chunk");
+    let mapping = RepositoryMapping::new(RepositoryMappingId::new("active-map").unwrap());
+    let source = ApparentLabel::parse("@external//pkg/sub:source.雪").unwrap();
+    let mut values = artifacts();
+    values.push(AnalysisArtifact::Source(source.resolve(&mapping)));
+    for artifact in values {
+        let bytes = object_bytes
+            + match &artifact {
+                AnalysisArtifact::Source(label) => label.cloned_text_lengths().iter().sum(),
+                AnalysisArtifact::Derived { .. } | AnalysisArtifact::WorkspaceStatus(_) => 0,
+            };
+        let heap = FrozenHeap::new();
+        let short = ExecutionBudget::new(20_000, bytes - 1, 8);
+        assert_eq!(
+            AnalysisArtifactValue::alloc_frozen_budgeted(&heap, &short, &artifact).unwrap_err(),
+            ExecutionLimit::AllocationBytes
+        );
+        assert_eq!(heap.allocated_bytes(), 0);
+
+        let exact = ExecutionBudget::new(20_000, bytes, 8);
+        let value = AnalysisArtifactValue::alloc_frozen_budgeted(&heap, &exact, &artifact).unwrap();
+        let restored = AnalysisArtifactValue::from_starlark(value.to_value()).unwrap();
+        assert_eq!(restored.artifact(), &artifact);
+        assert_eq!(exact.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+        if let (
+            AnalysisArtifact::Derived { output, .. },
+            AnalysisArtifact::Derived {
+                output: original, ..
+            },
+        ) = (restored.artifact(), &artifact)
+        {
+            assert_eq!(output.path().as_ptr(), original.path().as_ptr());
+        }
+    }
 }
 
 #[test]

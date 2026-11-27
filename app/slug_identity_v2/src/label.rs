@@ -503,6 +503,17 @@ impl CanonicalLabel {
         self.mapping_id.as_ref()
     }
 
+    /// Lengths of the owned strings copied when cloning this label.
+    pub fn cloned_text_lengths(&self) -> [usize; 4] {
+        [
+            self.package.repo().as_str().len(),
+            self.package.package().as_str().len(),
+            self.target.as_str().len(),
+            self.mapping_id()
+                .map_or(0, |mapping| mapping.as_str().len()),
+        ]
+    }
+
     pub fn rebind_provisional_root_repository(
         &self,
         destination: &CanonicalRepoName,

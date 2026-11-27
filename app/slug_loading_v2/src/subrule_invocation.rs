@@ -47,6 +47,7 @@ use starlark::values::Freeze;
 use starlark::values::FreezeError;
 use starlark::values::FreezeResult;
 use starlark::values::Freezer;
+use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
@@ -622,6 +623,21 @@ pub struct AnalysisArtifactValue {
 impl AnalysisArtifactValue {
     pub fn new(artifact: AnalysisArtifact) -> Self {
         Self { artifact }
+    }
+
+    /// Project an artifact without copying text from shared derived or status owners.
+    pub fn alloc_frozen_budgeted(
+        heap: &FrozenHeap,
+        budget: &ExecutionBudget,
+        artifact: &AnalysisArtifact,
+    ) -> Result<FrozenValue, ExecutionLimit> {
+        let lengths = match artifact {
+            AnalysisArtifact::Source(label) => label.cloned_text_lengths(),
+            AnalysisArtifact::Derived { .. } | AnalysisArtifact::WorkspaceStatus(_) => [0; 4],
+        };
+        heap.alloc_budgeted_simple_with_cloned_text(budget, &lengths, || {
+            Self::new(artifact.clone())
+        })
     }
 
     pub fn from_starlark(value: Value<'_>) -> Option<&Self> {

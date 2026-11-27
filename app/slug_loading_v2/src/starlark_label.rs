@@ -80,8 +80,7 @@ pub fn alloc_budgeted_starlark_label<'v>(
     heap: Heap<'v>,
     label: &CanonicalLabel,
 ) -> Result<Value<'v>, ExecutionLimit> {
-    let (lengths, count) = label_clone_lengths(label);
-    heap.alloc_budgeted_simple_with_cloned_text(lengths[..count].iter().copied(), || {
+    heap.alloc_budgeted_simple_with_cloned_text(label.cloned_text_lengths(), || {
         StarlarkLabel::new(label.clone())
     })
 }
@@ -92,24 +91,9 @@ pub fn alloc_budgeted_frozen_starlark_label(
     budget: &ExecutionBudget,
     label: &CanonicalLabel,
 ) -> Result<FrozenValue, ExecutionLimit> {
-    let (lengths, count) = label_clone_lengths(label);
-    heap.alloc_budgeted_simple_with_cloned_text(budget, &lengths[..count], || {
+    heap.alloc_budgeted_simple_with_cloned_text(budget, &label.cloned_text_lengths(), || {
         StarlarkLabel::new(label.clone())
     })
-}
-
-fn label_clone_lengths(label: &CanonicalLabel) -> ([usize; 4], usize) {
-    let package = label.package();
-    let mapping = label.mapping_id();
-    (
-        [
-            package.repo().as_str().len(),
-            package.package().as_str().len(),
-            label.target().as_str().len(),
-            mapping.map_or(0, |mapping| mapping.as_str().len()),
-        ],
-        3 + usize::from(mapping.is_some()),
-    )
 }
 
 #[starlark_value(type = "Label")]
