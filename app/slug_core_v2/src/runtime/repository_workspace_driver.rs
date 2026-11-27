@@ -656,6 +656,17 @@ mod native {
             environment: &slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
             distdirs: &crate::runtime::ArchiveDistdirPolicy,
         ) -> Result<(), NativeDemandSessionError> {
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            use crate::runtime::probe_observer::workspace_progress::Stage;
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let span = |stage| {
+                runtime
+                    .probe_observer
+                    .as_ref()
+                    .and_then(|observer| observer.workspace_progress_span(stage))
+            };
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let preflight = span(Stage::Preflight);
             #[cfg(test)]
             runtime
                 .native_demand_sessions
@@ -727,6 +738,10 @@ mod native {
                     })?;
             }
             drop(comparison);
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if let Some(preflight) = preflight {
+                preflight.finish();
+            }
             let mut advanced = false;
             for demand in needs.workspace_reservations().values() {
                 if self.tickets.contains_key(demand.key()) {
@@ -735,6 +750,8 @@ mod native {
                 if self.tickets.len() >= self.max_roots {
                     return Err(refusal("workspace reservation count exceeds policy"));
                 }
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                let reservation = span(Stage::ReserveAndInitialize);
                 #[cfg(test)]
                 runtime
                     .native_demand_sessions
@@ -770,6 +787,10 @@ mod native {
                 );
                 self.tickets.insert(demand.key().clone(), ticket);
                 advanced = true;
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                if let Some(reservation) = reservation {
+                    reservation.finish();
+                }
             }
             for request in needs.source_snapshots().values() {
                 if self
@@ -780,6 +801,8 @@ mod native {
                 {
                     continue;
                 }
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                let snapshot = span(Stage::SourceSnapshot);
                 let ticket = runtime
                     .repository_materializer
                     .reserve_source_snapshot(token, request.clone(), &self.scope)
@@ -819,8 +842,14 @@ mod native {
                     .map_err(|_| refusal("source snapshot epoch publication refused"))?;
                 self.source_epoch = Arc::new(epoch);
                 advanced = true;
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                if let Some(snapshot) = snapshot {
+                    snapshot.finish();
+                }
             }
             for demand in needs.workspace_operations().values() {
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                let operation = span(Stage::operation(demand.request().operation()));
                 let before = self
                     .command
                     .as_ref()
@@ -906,6 +935,10 @@ mod native {
                     .records()
                     .len()
                     > before;
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                if let Some(operation) = operation {
+                    operation.finish();
+                }
             }
             if !advanced {
                 return Err(refusal("workspace frontier made no progress"));

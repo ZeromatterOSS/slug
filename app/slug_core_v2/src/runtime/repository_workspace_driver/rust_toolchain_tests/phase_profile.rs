@@ -81,6 +81,7 @@ impl InstalledProfile {
         let mut profile = decode(&words);
         profile["scalar_counter_scope"] = scalar_counter_scope();
         profile["dice_family_counts"] = family_counts(counts);
+        profile["workspace_progress"] = observer.workspace_progress_report();
         profile["observation_union_helpers"] =
             union_counts(self.union_before, observation_union_probe::snapshot());
         profile["metadata_path_lookahead"] = lookahead_counts(

@@ -9,6 +9,8 @@ compile_error!("native-probe-observer requires little-endian Linux x86_64 with 6
 #[cfg(test)]
 pub(crate) mod family_counts;
 pub(crate) mod mapping;
+#[cfg(test)]
+pub(crate) mod workspace_progress;
 
 use std::cell::RefCell;
 use std::io;
@@ -86,6 +88,8 @@ impl ProbeGuard {
             mapping,
             #[cfg(test)]
             family_counts: family_counts::FamilyCounts::default(),
+            #[cfg(test)]
+            workspace_progress: Default::default(),
         });
         observer.words()[0].store(MAGIC, Ordering::Relaxed);
         observer.words()[1].store(VERSION, Ordering::Relaxed);
@@ -135,6 +139,8 @@ pub struct Observer {
     mapping: Mapping,
     #[cfg(test)]
     family_counts: family_counts::FamilyCounts,
+    #[cfg(test)]
+    workspace_progress: std::sync::Mutex<workspace_progress::Totals>,
 }
 
 impl Observer {
@@ -350,6 +356,23 @@ impl Observer {
     #[cfg(test)]
     pub(crate) fn family_counts_for_test(&self) -> family_counts::Snapshot {
         self.family_counts.snapshot()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn workspace_progress_span(
+        &self,
+        stage: workspace_progress::Stage,
+    ) -> Option<workspace_progress::Span<'_>> {
+        (self.words()[DISABLED].load(Ordering::Acquire) == 0)
+            .then(|| workspace_progress::Span::start(&self.workspace_progress, stage))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn workspace_progress_report(&self) -> serde_json::Value {
+        self.workspace_progress
+            .lock()
+            .expect("workspace progress sampler poisoned")
+            .report()
     }
 
     #[cfg(test)]
