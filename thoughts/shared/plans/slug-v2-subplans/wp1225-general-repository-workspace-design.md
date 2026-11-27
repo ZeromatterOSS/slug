@@ -319,8 +319,11 @@ inodes and 15,166,862 bytes of history. Reordering those same archives reached
 the history refusal after full decoding, then returned the bank to baseline.
 At most 32,768 entries can be added per Archive record. A 131,072-entry command
 would retain at least 327,680 entry occurrences across four states, exceeding
-16 MiB in entry and path storage alone.
-The standalone entry sampler, body and physical quota evidence remain open.
+16 MiB in entry and path storage alone. Two verified dense archives and a File
+filled 1 GiB in both the complete tree and history, with a 24,982,778-byte peak
+retained charge. A new byte in the complete tree and a distinct retained byte
+in a smaller tree each gave its owning refusal and refunded the bank. The
+standalone entry sampler and raw kernel quotas remain open.
 
 Process snapshot bounds: **8192 entries INCLUDING root**, depth<=64 below root,
 each logical absolute demand/path<=4096 bytes (including display prefix), and

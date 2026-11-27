@@ -4,13 +4,17 @@ use std::time::Instant;
 use slug_bzlmod_v2::GeneratedRepositoryArchiveEffect;
 use slug_bzlmod_v2::GeneratedRepositoryArchiveFormat;
 use slug_bzlmod_v2::RepositoryWorkspaceNode;
+use slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits;
 
 use super::*;
 use crate::runtime::dice::source_service::SourceServiceLimits;
 use crate::runtime::repository_io::ArchiveFailureStage;
+use crate::runtime::repository_physical_root::native_tests::reservation_with_limits;
 
 const MIB: u64 = 1024 * 1024;
 
+#[path = "archive_body_limit_tests.rs"]
+mod bodies;
 #[path = "archive_tree_history_tests.rs"]
 mod tree_history;
 
@@ -38,10 +42,11 @@ struct ArchiveInput {
     decoded: u64,
     name: &'static str,
     len: usize,
+    byte: u8,
 }
 
 impl ArchiveInput {
-    fn new(name: &'static str, len: usize, decoded: u64) -> Self {
+    fn new(name: &'static str, len: usize, decoded: u64, byte: u8) -> Self {
         let mut file = tempfile::NamedTempFile::new().unwrap();
         let gzip = flate2::write::GzEncoder::new(file.as_file_mut(), flate2::Compression::fast());
         let mut tar = tar::Builder::new(gzip);
@@ -52,7 +57,7 @@ impl ArchiveInput {
         header.set_gid(0);
         header.set_mtime(0);
         header.set_cksum();
-        tar.append_data(&mut header, name, std::io::repeat(b'a').take(len as u64))
+        tar.append_data(&mut header, name, std::io::repeat(byte).take(len as u64))
             .unwrap();
         let mut gzip = tar.into_inner().unwrap();
         // One header block, the padded member, and two tar end blocks.
@@ -71,6 +76,7 @@ impl ArchiveInput {
             decoded,
             name,
             len,
+            byte,
         }
     }
 }
@@ -89,9 +95,10 @@ fn command_scope(
     RootIdentity,
 ) {
     let temporary = tempfile::tempdir().unwrap();
-    let selected = reservation(
+    let selected = reservation_with_limits(
         &Path::new(wire::RESERVED_PREFIX).join(temporary.path().file_name().unwrap()),
         id,
+        RepositoryWorkspaceRetentionLimits::new(128, 16 * MIB as usize, 1024 * MIB).unwrap(),
     );
     let runtime = runtime();
     let bank = bank();
@@ -203,7 +210,7 @@ fn run_case(id: u64, inputs: &[&ArchiveInput], overflow: Option<&str>) {
             .unwrap();
         let mut body = Vec::new();
         reader.read_to_end(&mut body).unwrap();
-        assert_eq!(body, vec![b'a'; input.len]);
+        assert_eq!(body, vec![input.byte; input.len]);
     }
     drop((command, sealed, view, scope));
     release(&bank, baseline);
@@ -213,11 +220,11 @@ fn run_case(id: u64, inputs: &[&ArchiveInput], overflow: Option<&str>) {
 #[test]
 #[ignore = "actual compiled CLI and 27+3 second native Archive quota cases; finite supervisor required"]
 fn native_archive_decoded_limits_use_actual_verified_streams() {
-    let first = ArchiveInput::new("first", 4095, 512 * MIB);
-    let second = ArchiveInput::new("second", 4096, 256 * MIB);
-    let third = ArchiveInput::new("third", 4097, 256 * MIB);
-    let plus_call = ArchiveInput::new("first", 4095, 512 * MIB + 1);
-    let plus_total = ArchiveInput::new("third", 4097, 256 * MIB + 1);
+    let first = ArchiveInput::new("first", 4095, 512 * MIB, b'a');
+    let second = ArchiveInput::new("second", 4096, 256 * MIB, b'a');
+    let third = ArchiveInput::new("third", 4097, 256 * MIB, b'a');
+    let plus_call = ArchiveInput::new("first", 4095, 512 * MIB + 1, b'a');
+    let plus_total = ArchiveInput::new("third", 4097, 256 * MIB + 1, b'a');
     run_case(2410, &[&first, &second, &third], None);
     run_case(
         2411,

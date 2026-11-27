@@ -34,7 +34,9 @@ The native Archive launcher verified 512 MiB/call and 1 GiB cumulative decode
 at exact and +1, physical page rounding and link inode charging. Complete-tree
 paths sealed at 4 MiB and refused +1 with full retirement. A matched archive
 reorder sealed 81,921 entries in one order and hit the 16 MiB history limit in
-the other. Eight native Archive checks passed. Maximum-tree evidence is open.
+the other. The body test sealed 1 GiB and independently refused +1 in the
+current tree and retained history. Nine native Archive checks passed. The
+standalone maximum-entry sampler and raw kernel quotas remain open.
 
 Repeated Workspace publication passed cold, warm, changed and restored inputs
 with contained runfiles and alias links. The readonly child verified prior

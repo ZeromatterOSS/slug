@@ -35,6 +35,18 @@ use super::tests::scope;
 use super::*;
 
 pub(super) fn reservation(display: &Path, instance: u64) -> Arc<RepositoryWorkspaceReservation> {
+    reservation_with_limits(
+        display,
+        instance,
+        RepositoryWorkspaceRetentionLimits::new(128, 16 * 1024 * 1024, ARCHIVE_BYTES).unwrap(),
+    )
+}
+
+pub(super) fn reservation_with_limits(
+    display: &Path,
+    instance: u64,
+    limits: RepositoryWorkspaceRetentionLimits,
+) -> Arc<RepositoryWorkspaceReservation> {
     let owner = crate::runtime::dice::physical_root_owner_for_test();
     let repository =
         CanonicalRepoName::new(format!("{}+repo", owner.unique_name().as_str())).unwrap();
@@ -54,7 +66,7 @@ pub(super) fn reservation(display: &Path, instance: u64) -> Arc<RepositoryWorksp
             NormalizedAbsolutePath::new(display).unwrap(),
             PathObservationInstanceId::new(instance),
             711,
-            RepositoryWorkspaceRetentionLimits::new(128, 16 * 1024 * 1024, ARCHIVE_BYTES).unwrap(),
+            limits,
         )
         .unwrap(),
     )
