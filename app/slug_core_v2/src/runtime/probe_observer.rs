@@ -11,6 +11,8 @@ pub(crate) mod family_counts;
 pub(crate) mod mapping;
 #[cfg(test)]
 pub(crate) mod workspace_progress;
+#[cfg(test)]
+pub(crate) mod xz_calls;
 
 use std::cell::RefCell;
 use std::io;

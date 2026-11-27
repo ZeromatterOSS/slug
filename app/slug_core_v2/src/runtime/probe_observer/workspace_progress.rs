@@ -6,6 +6,8 @@ use serde_json::Value;
 use serde_json::json;
 use slug_bzlmod_v2::RepositoryWorkspaceOperation;
 
+use super::xz_calls;
+
 #[derive(Clone, Copy)]
 pub(crate) enum Stage {
     Preflight,
@@ -51,6 +53,7 @@ pub(super) struct Totals {
     // Two independent outcomes per stage. Column pairs are calls and wall ns.
     rows: [[u64; 4]; LABELS.len()],
     invalid: bool,
+    xz: [xz_calls::Work; 2],
 }
 
 impl Totals {
@@ -77,6 +80,13 @@ impl Totals {
             "archive_substages_are_nested_and_exclude_replay": true,
             "overlaps_outer_progress_wall": true,
             "archive_stages_use_probe_thread": true,
+            "xz_calls_within_rooted_extract": {
+                "columns": xz_calls::COLUMNS,
+                "completed_extracts": self.xz[0].row,
+                "aborted_extracts": self.xz[1].row,
+                "invalid_clock_counts_or_buffer_deltas": self.xz.iter().any(|work| work.invalid),
+                "decode_intervals_include_buffer_bookkeeping": true,
+            },
         })
     }
 }
@@ -89,6 +99,7 @@ pub(crate) struct Span<'a> {
     stage: Stage,
     start: Instant,
     completed: bool,
+    xz: Option<xz_calls::Scope>,
 }
 
 impl<'a> Span<'a> {
@@ -98,6 +109,7 @@ impl<'a> Span<'a> {
             stage,
             start: Instant::now(),
             completed: false,
+            xz: matches!(stage, Stage::ArchiveExtract).then(xz_calls::Scope::begin),
         }
     }
 
@@ -111,10 +123,15 @@ impl Drop for Span<'_> {
         let wall_ns = Instant::now()
             .checked_duration_since(self.start)
             .and_then(|duration| u64::try_from(duration.as_nanos()).ok());
-        self.totals
+        let xz_work = self.xz.take().map(xz_calls::Scope::finish);
+        let mut totals = self
+            .totals
             .lock()
-            .expect("workspace progress sampler poisoned")
-            .record(self.stage, self.completed, wall_ns);
+            .expect("workspace progress sampler poisoned");
+        totals.record(self.stage, self.completed, wall_ns);
+        if let Some(work) = xz_work {
+            totals.xz[usize::from(!self.completed)].merge(work);
+        }
     }
 }
 
@@ -142,10 +159,56 @@ fn workspace_progress_spans_distinguish_completion_early_drop_and_invalid_totals
 }
 
 #[test]
+#[cfg(target_pointer_width = "64")]
+fn workspace_progress_folds_only_in_scope_lib_lzma_calls_into_extract_outcomes() {
+    use std::io::Read;
+    use std::io::Write;
+
+    use crate::runtime::dice::source_service::SourceXzDecoder;
+
+    let payload = b"same decoder owner as rooted XZ extraction";
+    let mut encoder = xz2::write::XzEncoder::new(Vec::new(), 1);
+    encoder.write_all(payload).unwrap();
+    let compressed = encoder.finish().unwrap();
+    let decode = |input: &[u8]| {
+        let mut decoded = Vec::new();
+        SourceXzDecoder::new(input, None)?.read_to_end(&mut decoded)?;
+        Ok::<_, std::io::Error>(decoded)
+    };
+
+    let totals = Mutex::new(Totals::default());
+    let capture = Span::start(&totals, Stage::ArchiveCapture);
+    assert_eq!(decode(&compressed).unwrap(), payload);
+    capture.finish();
+    let extract = Span::start(&totals, Stage::ArchiveExtract);
+    assert_eq!(decode(&compressed).unwrap(), payload);
+    extract.finish();
+    let aborted = Span::start(&totals, Stage::ArchiveExtract);
+    assert!(decode(&compressed[..compressed.len() - 1]).is_err());
+    drop(aborted);
+    assert_eq!(decode(&compressed).unwrap(), payload);
+
+    let totals = totals.into_inner().unwrap();
+    let [complete, abort] = totals.xz;
+    assert!(!complete.invalid && !abort.invalid);
+    assert_eq!((complete.row[0], complete.row[2]), (1, 1));
+    assert_eq!((abort.row[0], abort.row[2]), (1, 1));
+    assert!(complete.row[1] > 0 && abort.row[1] > 0);
+    assert_eq!(complete.row[4], compressed.len() as u64);
+    assert_eq!(complete.row[5], payload.len() as u64);
+    let extract = totals.rows[Stage::ArchiveExtract as usize];
+    assert!(complete.row[3] <= extract[1] && abort.row[3] <= extract[3]);
+}
+
+#[test]
 fn workspace_progress_report_is_bounded_at_maximum_counts() {
     let report = Totals {
         rows: [[u64::MAX; 4]; LABELS.len()],
         invalid: false,
+        xz: [xz_calls::Work {
+            row: [u64::MAX; xz_calls::COLUMNS.len()],
+            invalid: false,
+        }; 2],
     }
     .report();
     assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);

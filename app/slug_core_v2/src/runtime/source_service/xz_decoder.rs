@@ -8,6 +8,8 @@ use super::SourceServiceError;
 use super::SourceServiceScope;
 use super::xz_allocator::AllocatorOwner;
 use super::xz_allocator::Failure;
+#[cfg(all(test, feature = "native-probe-observer"))]
+use crate::runtime::probe_observer::xz_calls;
 
 pub(in crate::runtime) const XZ_DECODER_MEMORY_LIMIT: u64 = 136 * 1024 * 1024;
 
@@ -57,6 +59,8 @@ impl<R: Read> SourceXzDecoder<R> {
             _allowance: allowance,
         };
         decoder.check()?;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let sample = xz_calls::start();
         // SAFETY: stream and stable allocator are initialized; no callback
         // state or Context Rust borrow spans this single-threaded C call.
         let status = unsafe {
@@ -66,6 +70,8 @@ impl<R: Read> SourceXzDecoder<R> {
                 lzma_sys::LZMA_CONCATENATED,
             )
         };
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        xz_calls::record(sample, xz_calls::Call::Initialize, None);
         decoder.check()?;
         status_result(status)?;
         Ok(decoder)
@@ -94,6 +100,8 @@ impl<R: Read> Read for SourceXzDecoder<R> {
                 self.eof = self.end == 0;
             }
             self.check()?;
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let sample = xz_calls::start();
             let available = self.end - self.start;
             self.stream.next_in = self.input[self.start..self.end].as_ptr();
             self.stream.avail_in = available;
@@ -117,6 +125,8 @@ impl<R: Read> Read for SourceXzDecoder<R> {
             self.stream.avail_in = 0;
             self.stream.next_out = std::ptr::null_mut();
             self.stream.avail_out = 0;
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            xz_calls::record(sample, xz_calls::Call::Decode, consumed.zip(produced));
             self.check()?;
             let consumed = consumed.ok_or_else(|| io::Error::from(xz2::stream::Error::Program))?;
             let produced = produced.ok_or_else(|| io::Error::from(xz2::stream::Error::Program))?;
@@ -145,9 +155,13 @@ impl<R: Read> Read for SourceXzDecoder<R> {
 }
 impl<R: Read> Drop for SourceXzDecoder<R> {
     fn drop(&mut self) {
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let sample = xz_calls::start();
         // SAFETY: end accepts the zero/partially initialized stream and frees
         // every library block while allocator/context/allowance are still live.
         unsafe { lzma_sys::lzma_end(&mut self.stream) };
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        xz_calls::record(sample, xz_calls::Call::End, None);
     }
 }
 
