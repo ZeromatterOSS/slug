@@ -115,3 +115,12 @@ pub fn feature_flag_info(value: Value<'_>) -> Option<FeatureFlagInfo> {
 pub fn alloc_frozen_feature_flag_info(heap: &FrozenHeap, info: FeatureFlagInfo) -> FrozenValue {
     heap.alloc(FeatureFlagInfoValue(info))
 }
+
+/// Retain the original feature-flag occurrence in the frozen wrapper.
+pub fn alloc_budgeted_frozen_feature_flag_info(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    info: &FeatureFlagInfo,
+) -> Result<FrozenValue, ExecutionLimit> {
+    heap.alloc_budgeted_simple(budget, || FeatureFlagInfoValue(info.dupe()))
+}

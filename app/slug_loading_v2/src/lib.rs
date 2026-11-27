@@ -16,6 +16,8 @@ pub use artifact_root::alloc_artifact_root;
 pub mod build_info_transform;
 pub mod resource_set;
 #[doc(hidden)]
+pub use artifact_root::alloc_budgeted_frozen_artifact_root;
+#[doc(hidden)]
 pub use artifact_root::alloc_frozen_artifact_root;
 #[doc(hidden)]
 pub use artifact_root::artifact_root_value;
@@ -376,6 +378,7 @@ pub use package::TestSuiteMembership;
 #[doc(hidden)]
 pub use path_need_lookahead::file_bytes_lookahead_extended;
 pub use provider::AnalysisBuiltinCallableApi;
+pub use provider::alloc_budgeted_frozen_template_variable_info;
 pub use provider::alloc_frozen_analysis_builtin_callable;
 pub use provider::alloc_frozen_template_variable_info;
 pub use provider::analysis_builtin_callable_api;

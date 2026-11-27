@@ -95,14 +95,17 @@ mod output_group;
 mod run_environment_info;
 mod template_variable_info;
 pub(crate) use feature_flag_info::FeatureFlagInfoConstructor;
+pub use feature_flag_info::alloc_budgeted_frozen_feature_flag_info;
 pub use feature_flag_info::alloc_frozen_feature_flag_info;
 pub use feature_flag_info::feature_flag_info;
 pub use output_group::StarlarkOutputGroupInfo;
 pub(crate) use run_environment_info::RunEnvironmentInfo;
+pub use run_environment_info::alloc_budgeted_frozen_run_environment_info;
 pub use run_environment_info::alloc_frozen_run_environment_info;
 pub use run_environment_info::run_environment_info;
 pub use run_environment_info::run_environment_info_ref;
 pub(crate) use template_variable_info::TemplateVariableInfoConstructor;
+pub use template_variable_info::alloc_budgeted_frozen_template_variable_info;
 pub use template_variable_info::alloc_frozen_template_variable_info;
 pub use template_variable_info::template_variable_info;
 pub use template_variable_info::template_variable_info_ref;
@@ -1075,7 +1078,7 @@ pub fn alloc_budgeted_starlark_user_provider<E: From<ExecutionLimit>>(
     heap: &FrozenHeap,
     budget: &ExecutionBudget,
     occurrence: &ProviderOccurrence,
-    mut materialize: impl FnMut(&AnalysisValue) -> Result<FrozenValue, E>,
+    materialize: impl FnMut(&AnalysisValue) -> Result<FrozenValue, E>,
 ) -> Result<FrozenValue, E> {
     budget.charge(1, 0)?;
     let Some(id) = occurrence
@@ -1091,7 +1094,24 @@ pub fn alloc_budgeted_starlark_user_provider<E: From<ExecutionLimit>>(
             .into());
     };
 
-    let fields = occurrence.fields();
+    let (names, values) = budgeted_native_fields(budget, occurrence.fields().iter(), materialize)?;
+    Ok(
+        heap.alloc_budgeted_simple(budget, || LoadingStarlarkUserProviderGen {
+            id: id.dupe(),
+            fields: LoadingProviderFieldsGen::Schemaless(SchemalessLoadingFieldsGen {
+                names: names.into(),
+                values,
+                has_schema: occurrence.has_schema(),
+            }),
+        })?,
+    )
+}
+
+fn budgeted_native_fields<'a, T: 'a, E: From<ExecutionLimit>>(
+    budget: &ExecutionBudget,
+    fields: impl ExactSizeIterator<Item = (&'a CompactString, &'a T)>,
+    mut materialize: impl FnMut(&'a T) -> Result<FrozenValue, E>,
+) -> Result<(Vec<CompactString>, Vec<FrozenValue>), E> {
     let count = fields.len();
     let overflow = || budget.refuse(ExecutionLimit::AllocationBytes);
     let names_layout = Layout::array::<CompactString>(count).map_err(|_| overflow())?;
@@ -1111,33 +1131,27 @@ pub fn alloc_budgeted_starlark_user_provider<E: From<ExecutionLimit>>(
     let mut values = Vec::new();
     budget.reserve_vec(&mut names, count)?;
     budget.reserve_vec(&mut values, count)?;
-    for (name, value) in fields.iter() {
-        // Copy the spelling from its borrowed slice. CompactString::clone
-        // would allocate based on the retained string's spare capacity.
-        let name = name.as_str();
-        let bytes = field_name_copy_bytes(name.len()).ok_or_else(overflow)?;
-        budget.charge(0, bytes)?;
-        budget.charge_text_work(name.len())?;
-        names.push(
-            CompactString::try_new(name)
-                .map_err(|_| budget.refuse(ExecutionLimit::AllocationFailed))?,
-        );
+    for (name, value) in fields {
+        names.push(copy_budgeted_compact_str(budget, name.as_str())?);
         values.push(materialize(value)?);
     }
-
-    Ok(
-        heap.alloc_budgeted_simple(budget, || LoadingStarlarkUserProviderGen {
-            id: id.dupe(),
-            fields: LoadingProviderFieldsGen::Schemaless(SchemalessLoadingFieldsGen {
-                names: names.into(),
-                values,
-                has_schema: occurrence.has_schema(),
-            }),
-        })?,
-    )
+    Ok((names, values))
 }
 
-fn field_name_copy_bytes(len: usize) -> Option<usize> {
+/// Copy a borrowed spelling into compact storage after admitting fresh bytes
+/// and copy work. The retained source's spare capacity is irrelevant.
+pub fn copy_budgeted_compact_str(
+    budget: &ExecutionBudget,
+    text: &str,
+) -> Result<CompactString, ExecutionLimit> {
+    let bytes = compact_str_copy_bytes(text.len())
+        .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+    budget.charge(1, bytes)?;
+    budget.charge_text_work(text.len())?;
+    CompactString::try_new(text).map_err(|_| budget.refuse(ExecutionLimit::AllocationFailed))
+}
+
+fn compact_str_copy_bytes(len: usize) -> Option<usize> {
     // CompactString 0.8.2 keeps short strings inline. A fresh long string
     // uses at least one word more than that size and can store capacity in
     // a heap header on 32-bit targets.
@@ -1950,6 +1964,35 @@ impl<'v> StarlarkToolchainInfo<'v> {
             names: names.into(),
             values,
         })
+    }
+
+    /// Materialize an original-free ToolchainInfo in its canonical field order.
+    /// The caller admits the child projections and any foreign frozen owners.
+    pub fn alloc_budgeted<E: From<ExecutionLimit>>(
+        heap: &FrozenHeap,
+        budget: &ExecutionBudget,
+        occurrence: &ProviderOccurrence,
+        materialize: impl FnMut(&AnalysisValue) -> Result<FrozenValue, E>,
+    ) -> Result<FrozenValue, E> {
+        budget.charge(1, 0)?;
+        if !occurrence.identity().is_builtin("ToolchainInfo")
+            || occurrence.original_origin().is_some()
+        {
+            return Err(budget
+                .refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "ToolchainInfo materialization",
+                    value_type: occurrence.value_type().as_str(),
+                })
+                .into());
+        }
+        let (names, values) =
+            budgeted_native_fields(budget, occurrence.fields().iter(), materialize)?;
+        Ok(
+            heap.alloc_budgeted_simple(budget, || StarlarkToolchainInfoGen {
+                names: names.into(),
+                values,
+            })?,
+        )
     }
 }
 

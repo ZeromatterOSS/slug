@@ -1,5 +1,7 @@
 //! Output groups retain typed depsets through construction, freeze and analysis.
 
+use slug_build_api_v2::OutputGroupInfo;
+
 use super::*;
 use crate::subrule_invocation::AnalysisArtifactValue;
 
@@ -28,22 +30,26 @@ fn sorted_fields<V>(
 /// Empty depsets are untyped; nonempty depsets must carry Files. Their elements
 /// were validated by the existing depset constructor, so no graph walk is needed.
 fn empty_artifact_depset(value: Value<'_>, name: &str) -> starlark::Result<bool> {
-    let element_type = match StarlarkDepset::from_value(value) {
-        Some(starlark::__macro_refs::Either::Left(value)) => &value.element_type,
-        Some(starlark::__macro_refs::Either::Right(value)) => &value.element_type,
-        None => {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "output group '{name}' must be a sequence or depset of Files"
-            )));
-        }
+    let Some(element_type) = output_group_element_type(value) else {
+        return Err(starlark::Error::new_other(anyhow::anyhow!(
+            "output group '{name}' must be a sequence or depset of Files"
+        )));
     };
-    match element_type.as_deref() {
+    match element_type {
         None => Ok(true),
         Some("File") => Ok(false),
         Some(kind) => Err(starlark::Error::new_other(anyhow::anyhow!(
             "output group '{name}' must contain Files, got {kind}"
         ))),
     }
+}
+
+fn output_group_element_type(value: Value<'_>) -> Option<Option<&str>> {
+    let element_type = match StarlarkDepset::from_value(value)? {
+        starlark::__macro_refs::Either::Left(value) => &value.element_type,
+        starlark::__macro_refs::Either::Right(value) => &value.element_type,
+    };
+    Some(element_type.as_deref())
 }
 
 pub(super) fn construct<'v>(
@@ -152,6 +158,56 @@ impl<'v> StarlarkOutputGroupInfo<'v> {
             ));
         }
         heap.alloc(StarlarkOutputGroupInfoGen { names, values })
+    }
+
+    /// Materialize the checked UTF-16 group order of the retained owner.
+    /// The caller admits each native depset projection and its foreign owners.
+    pub fn alloc_budgeted<E: From<ExecutionLimit>>(
+        heap: &FrozenHeap,
+        budget: &ExecutionBudget,
+        info: &OutputGroupInfo,
+        mut materialize: impl FnMut(&AnalysisDepset) -> Result<FrozenValue, E>,
+    ) -> Result<FrozenValue, E> {
+        let mut all_empty = true;
+        let (names, mut values) = budgeted_native_fields(
+            budget,
+            info.groups().iter(),
+            |files| -> Result<FrozenValue, E> {
+                let value = materialize(files)?;
+                budget.charge(1, 0)?;
+                match output_group_element_type(value.to_value()) {
+                    Some(None) if files.is_empty() => {}
+                    Some(Some("File")) if !files.is_empty() => all_empty = false,
+                    _ => {
+                        return Err(budget
+                            .refuse(ExecutionLimit::UnsupportedOperation {
+                                operation: "OutputGroupInfo materialization",
+                                value_type: value.to_value().get_type(),
+                            })
+                            .into());
+                    }
+                }
+                Ok(value)
+            },
+        )?;
+        if all_empty && let Some((_, empty)) = info.groups().first() {
+            // The owner already canonicalized every empty group to the
+            // Default occurrence. The ordinary VM wrapper gives them one
+            // shared, fresh value.
+            budget.charge(values.len(), 0)?;
+            values.fill(alloc_budgeted_starlark_depset(
+                heap,
+                budget,
+                empty.dupe(),
+                Vec::new(),
+            )?);
+        }
+        Ok(
+            heap.alloc_budgeted_simple(budget, || StarlarkOutputGroupInfoGen {
+                names: names.into(),
+                values,
+            })?,
+        )
     }
 }
 

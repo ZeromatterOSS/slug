@@ -176,5 +176,14 @@ pub fn alloc_frozen_template_variable_info(
     heap.alloc(TemplateVariableInfoValue(info))
 }
 
+/// Retain the existing immutable variables in the frozen wrapper.
+pub fn alloc_budgeted_frozen_template_variable_info(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    info: &TemplateVariableInfo,
+) -> Result<FrozenValue, ExecutionLimit> {
+    heap.alloc_budgeted_simple(budget, || TemplateVariableInfoValue(info.dupe()))
+}
+
 #[cfg(test)]
 mod tests;

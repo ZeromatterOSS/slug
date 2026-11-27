@@ -6,6 +6,8 @@ use allocative::Allocative;
 use slug_build_api_v2::AnalysisArtifactRoot;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::StarlarkHasher;
+use starlark::eval::ExecutionBudget;
+use starlark::eval::ExecutionLimit;
 use starlark::values::Demand;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
@@ -77,6 +79,21 @@ pub fn alloc_artifact_root<'v>(heap: Heap<'v>, root: AnalysisArtifactRoot) -> Va
 
 pub fn alloc_frozen_artifact_root(heap: &FrozenHeap, root: AnalysisArtifactRoot) -> FrozenValue {
     heap.alloc(ArtifactRootValue(root))
+}
+
+/// Admit the root wrapper and the owned spelling of an external source root.
+pub fn alloc_budgeted_frozen_artifact_root(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    root: &AnalysisArtifactRoot,
+) -> Result<FrozenValue, ExecutionLimit> {
+    let source_bytes = match root {
+        AnalysisArtifactRoot::Source(repository) => Some(repository.as_str().len()),
+        AnalysisArtifactRoot::Derived(_) | AnalysisArtifactRoot::WorkspaceStatus(_) => None,
+    };
+    heap.alloc_budgeted_simple_with_cloned_text(budget, source_bytes.as_slice(), || {
+        ArtifactRootValue(root.clone())
+    })
 }
 
 #[cfg(test)]

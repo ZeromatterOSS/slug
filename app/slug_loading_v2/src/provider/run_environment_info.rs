@@ -243,5 +243,14 @@ pub fn alloc_frozen_run_environment_info(
     heap.alloc(StarlarkRunEnvironmentInfo(info))
 }
 
+/// Retain the existing immutable environment in the frozen wrapper.
+pub fn alloc_budgeted_frozen_run_environment_info(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    info: &NativeRunEnvironmentInfo,
+) -> Result<FrozenValue, ExecutionLimit> {
+    heap.alloc_budgeted_simple(budget, || StarlarkRunEnvironmentInfo(info.dupe()))
+}
+
 #[cfg(test)]
 mod tests;
