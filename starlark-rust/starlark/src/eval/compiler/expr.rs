@@ -235,6 +235,8 @@ pub(crate) enum ExprLogicalBinOp {
 #[derive(Clone, Debug, VisitSpanMut)]
 pub(crate) enum ExprCompiled {
     Value(FrozenValue),
+    /// A fixed runtime operand unavailable to compile-time folding.
+    DeferredValue(FrozenValue),
     /// Read local non-captured variable.
     Local(LocalSlotId),
     /// Read local captured variable.
@@ -492,6 +494,7 @@ impl IrSpanned<ExprCompiled> {
         let span = self.span;
         let expr = match &self.node {
             e @ (ExprCompiled::Value(..)
+            | ExprCompiled::DeferredValue(..)
             | ExprCompiled::Local(..)
             | ExprCompiled::LocalCaptured(..)) => e.clone(),
             ExprCompiled::Module(slot) => {
@@ -1215,7 +1218,9 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
 
                 // We can only inline variables if they were assigned once
                 // otherwise we might inline the wrong value.
-                if binding.assign_count == AssignCount::AtMostOnce {
+                if !self.eval.module_env.defer_script_operations
+                    && binding.assign_count == AssignCount::AtMostOnce
+                {
                     if let Some(v) = self.eval.module_env.slots().get_slot(*slot) {
                         // We could inline non-frozen values, but these values
                         // can be garbage-collected, so it is somewhat harder to implement.
@@ -1227,7 +1232,15 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
 
                 ExprCompiled::Module(*slot)
             }
-            ResolvedIdent::Global(v) => ExprCompiled::Value(*v),
+            ResolvedIdent::Global(v) => self.fixed_value(*v),
+        }
+    }
+
+    fn fixed_value(&self, value: FrozenValue) -> ExprCompiled {
+        if self.eval.module_env.defer_script_operations {
+            ExprCompiled::DeferredValue(value)
+        } else {
+            ExprCompiled::Value(value)
         }
     }
 
@@ -1261,7 +1274,11 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
             }
             ExprP::Tuple(exprs) => {
                 let xs = self.exprs(exprs)?;
-                ExprCompiled::tuple(xs, self.eval.module_env.frozen_heap())
+                if self.eval.module_env.defer_script_operations {
+                    ExprCompiled::Tuple(xs)
+                } else {
+                    ExprCompiled::tuple(xs, self.eval.module_env.frozen_heap())
+                }
             }
             ExprP::List(exprs) => {
                 let xs = self.exprs(exprs)?;
@@ -1330,7 +1347,12 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
                 ExprCompiled::un_op(span, &Builtin1::BitNot, expr, &mut self.opt_ctx())
             }
             ExprP::Op(left, op, right) => {
-                if let Some(x) = ExprP::reduces_to_string(*op, left, right) {
+                let reduced_string = if self.eval.module_env.defer_script_operations {
+                    None
+                } else {
+                    ExprP::reduces_to_string(*op, left, right)
+                };
+                if let Some(x) = reduced_string {
                     // Note there's const propagation for `+` on compiled expressions,
                     // but special handling of `+` on AST might be slightly more efficient
                     // (no unnecessary allocations on the heap). So keep it.
@@ -1437,7 +1459,7 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
             }
             ExprP::Literal(x) => {
                 let val = x.compile(self.eval.module_env.frozen_heap());
-                ExprCompiled::Value(val)
+                self.fixed_value(val)
             }
             ExprP::FString(fstring) => {
                 let Spanned {
@@ -1455,7 +1477,7 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
                 let heap = self.eval.module_env.frozen_heap();
 
                 let format = IrSpanned {
-                    node: ExprCompiled::Value(heap.alloc(format.node.as_str())),
+                    node: self.fixed_value(heap.alloc(format.node.as_str())),
                     span: fstring_span,
                 };
                 let method = IrSpanned {

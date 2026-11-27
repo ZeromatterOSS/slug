@@ -103,7 +103,20 @@ enum PreparedModuleError {
     IndexOutOfRange(usize),
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("Deferring script operations requires an untyped dialect without static typechecking")]
+struct DeferredScriptTypecheck;
+
 impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
+    fn check_compilation_mode(&self, types: DialectTypes, typecheck: bool) -> crate::Result<()> {
+        if self.module_env.defer_script_operations
+            && (types != DialectTypes::Disable || typecheck || self.static_typechecking)
+        {
+            return Err(crate::Error::new_other(DeferredScriptTypecheck));
+        }
+        Ok(())
+    }
+
     fn with_module<R>(
         &mut self,
         module: &'v Module,
@@ -130,6 +143,7 @@ impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
     ) -> crate::Result<PreparedModule<'v>> {
         self.with_module(module, false, |eval| {
             let (codemap, statement, dialect, typecheck) = ast.into_parts();
+            eval.check_compilation_mode(dialect.enable_types, typecheck)?;
             let codemap = eval.module_env.frozen_heap().alloc_any(codemap.dupe());
             let globals = eval.module_env.frozen_heap().alloc_any(globals.dupe());
             if let Some(docstring) = DocString::extract_raw_starlark_docstring(&statement) {
@@ -254,6 +268,7 @@ impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
         let start = Instant::now();
 
         let (codemap, statement, dialect, typecheck) = ast.into_parts();
+        self.check_compilation_mode(dialect.enable_types, typecheck)?;
 
         let codemap = self.module_env.frozen_heap().alloc_any(codemap.dupe());
 
@@ -359,6 +374,9 @@ impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
         .map_err(Into::into)
     }
 }
+
+#[cfg(test)]
+mod deferred_script_operations_tests;
 
 #[cfg(test)]
 mod prepared_module_tests {

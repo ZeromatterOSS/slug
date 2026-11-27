@@ -107,6 +107,7 @@ pub(crate) enum StmtCompiled {
 pub(crate) struct StmtCompileContext {
     /// Current function has return type.
     pub(crate) has_return_type: bool,
+    pub(crate) defer_script_operations: bool,
 }
 
 pub(crate) struct OptimizeOnFreezeContext<'v, 'a> {
@@ -643,7 +644,10 @@ pub(crate) fn add_assign<'v>(
 
 impl Compiler<'_, '_, '_, '_> {
     pub(crate) fn compile_context(&self, has_return_type: bool) -> StmtCompileContext {
-        StmtCompileContext { has_return_type }
+        StmtCompileContext {
+            has_return_type,
+            defer_script_operations: self.eval.module_env.defer_script_operations,
+        }
     }
 
     pub(crate) fn stmt(

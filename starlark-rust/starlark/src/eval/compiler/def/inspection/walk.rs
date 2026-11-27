@@ -197,7 +197,9 @@ impl<'v> Walker<'v, '_> {
     ) -> crate::Result<()> {
         let node = self.record(&expression.node, expression.span, depth)?;
         match node {
-            ExprCompiled::Value(value) => self.constant(value.to_value(), depth + 1),
+            ExprCompiled::Value(value) | ExprCompiled::DeferredValue(value) => {
+                self.constant(value.to_value(), depth + 1)
+            }
             ExprCompiled::Local(_) | ExprCompiled::LocalCaptured(_) => Ok(()),
             ExprCompiled::Module(slot) => self.module(*slot, ModuleAccess::Read, depth + 1),
             ExprCompiled::Tuple(values) | ExprCompiled::List(values) => {

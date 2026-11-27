@@ -123,7 +123,7 @@ impl ExprCompiled {
     /// but we don't know about `t` or `f` because one of them was not executed.
     pub(crate) fn mark_definitely_assigned_after(&self, bc: &mut BcWriter) {
         match self {
-            ExprCompiled::Value(_) => {}
+            ExprCompiled::Value(_) | ExprCompiled::DeferredValue(_) => {}
             ExprCompiled::Local(local) => bc.mark_definitely_assigned(*local),
             ExprCompiled::LocalCaptured(_) => {}
             ExprCompiled::Module(_) => {}
@@ -315,7 +315,7 @@ impl IrSpanned<ExprCompiled> {
     pub(crate) fn write_bc(&self, target: BcSlotOut, bc: &mut BcWriter) {
         let span = self.span;
         match &self.node {
-            ExprCompiled::Value(v) => {
+            ExprCompiled::Value(v) | ExprCompiled::DeferredValue(v) => {
                 bc.write_const(span, *v, target);
             }
             ExprCompiled::Local(slot) => {

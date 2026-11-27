@@ -489,11 +489,11 @@ impl Compiler<'_, '_, '_, '_> {
 
         let has_types = return_type.is_some() || params.has_types();
 
-        let inline_def_body = if has_types {
-            // It is harder to inline if a function declares parameter types or return type.
-            None
-        } else {
+        let inline_def_body = if !has_types && !self.eval.module_env.defer_script_operations {
             inline_def_body(&params, &body)
+        } else {
+            // Inlining into another module must preserve the defining module's compilation policy.
+            None
         };
 
         let param_count = params.count_param_variables();
@@ -563,7 +563,8 @@ pub(crate) struct DefGen<V> {
     /// can be accessed from evaluator's module.
     #[allocative(skip)]
     pub(crate) module: AtomicFrozenRefOption<FrozenModuleData>,
-    /// This field is only used in `FrozenDef`. It is populated in `post_freeze`.
+    /// This field is only used in `FrozenDef`. It is populated in `post_freeze`
+    /// when the definition permits eager execution.
     #[derivative(Debug = "ignore")]
     #[allocative(skip)]
     optimized_on_freeze_stmt: StmtCompiledCell,
@@ -726,7 +727,7 @@ where
     Self: DefLike<'v>,
 {
     pub(crate) fn bc(&self) -> &Bc {
-        if Self::FROZEN {
+        if Self::FROZEN && !self.def_info.stmt_compile_context.defer_script_operations {
             self.optimized_on_freeze_stmt.get()
         } else {
             &self.def_info.stmt_compiled
@@ -889,6 +890,10 @@ impl FrozenDef {
             }
             Some(module) => module,
         };
+
+        if self.def_info.stmt_compile_context.defer_script_operations {
+            return;
+        }
 
         // Now perform the optimization of function body with fully frozen module:
         // all module variables are frozen, so we can inline more aggressively.

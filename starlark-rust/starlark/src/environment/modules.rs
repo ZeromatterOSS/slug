@@ -116,6 +116,7 @@ pub(crate) struct FrozenModuleData {
 pub struct Module {
     heap: OwnedHeap,
     frozen_heap: FrozenHeap,
+    pub(crate) defer_script_operations: bool,
     names: MutableNames,
     // Should really be MutableSlots<'v>, where &'v self
     // Values are allocated from heap. Because of variance
@@ -391,9 +392,23 @@ impl Default for Module {
 impl Module {
     /// Create a new module environment with no contents.
     pub fn new() -> Self {
+        Self::new_with_compilation_mode(false)
+    }
+
+    /// Create an empty module that defers operations on script values until execution.
+    ///
+    /// Code compiled for this module uses the original bytecode after freezing.
+    /// Use an untyped dialect without static typechecking. The caller remains
+    /// responsible for bounding parsing, compilation, freezing, and execution.
+    pub fn new_with_deferred_script_operations() -> Self {
+        Self::new_with_compilation_mode(true)
+    }
+
+    fn new_with_compilation_mode(defer_script_operations: bool) -> Self {
         Self {
             heap: OwnedHeap::new(),
             frozen_heap: FrozenHeap::new(),
+            defer_script_operations,
             names: MutableNames::new(),
             slots: MutableSlots::new(),
             docstring: RefCell::new(None),
@@ -500,6 +515,7 @@ impl Module {
             slots,
             frozen_heap,
             heap,
+            defer_script_operations: _,
             docstring,
             eval_duration,
             extra_value,

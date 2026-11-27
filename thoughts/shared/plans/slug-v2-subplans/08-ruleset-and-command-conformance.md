@@ -162,12 +162,12 @@ skips that row while preserving exit 0. Successful rows use Starlark `str`.
 Publish through the existing accepted terminal outside the DICE graph.
 
 Public admission requires a closed evaluator with no loader and finite source,
-heap, work and output admission. Review found native string and collection
-growth beyond the cooperative heap check. Use a request budget in the shared
-interpreter at the native operations and compiler folds that can amplify work
-or allocation. Treat resource outcomes as Slug-native. Pinned Bazel's
-`StarlarkOutputFormatterCallback` and `configured_query_test.sh` own the setup
-and partial-output semantics.
+heap, work and output admission. Use the shared interpreter's untyped module
+mode to defer operations on script values to runtime and preserve original
+bytecode after freeze. Bound parsing and value freeze separately. Runtime
+admission must charge before native string and collection growth, and resource
+outcomes are Slug-native. Pinned Bazel's `StarlarkOutputFormatterCallback` and
+`configured_query_test.sh` own the setup and partial-output semantics.
 
 First prove setup failure, partial output, formatter edit and recovery on real
 custom providers through both command routes. Then run the unchanged Rust

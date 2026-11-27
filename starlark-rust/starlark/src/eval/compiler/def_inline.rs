@@ -91,9 +91,10 @@ impl IsSafeToInlineExpr {
         self.counter += 1;
         match expr {
             ExprCompiled::Value(..) => true,
-            ExprCompiled::LocalCaptured(..) | ExprCompiled::Module(..) | ExprCompiled::Def(..) => {
-                false
-            }
+            ExprCompiled::DeferredValue(..)
+            | ExprCompiled::LocalCaptured(..)
+            | ExprCompiled::Module(..)
+            | ExprCompiled::Def(..) => false,
             ExprCompiled::Local(l) => {
                 // `l >= param_count` should be unreachable, but it is safer this way.
                 l.0 < self.param_count
@@ -354,7 +355,8 @@ impl InlineDefCallSite<'_, '_, '_, '_, '_> {
             ExprCompiled::LocalCaptured(..)
             | ExprCompiled::Module(..)
             | ExprCompiled::Compr(..)
-            | ExprCompiled::Def(..) => return Err(CannotInline),
+            | ExprCompiled::Def(..)
+            | ExprCompiled::DeferredValue(..) => return Err(CannotInline),
         })
     }
 }
