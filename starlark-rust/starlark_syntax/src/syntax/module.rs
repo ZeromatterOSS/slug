@@ -37,6 +37,7 @@ use crate::lexer::LexerStringEncoding;
 use crate::lexer::Token;
 use crate::syntax::AstLoad;
 use crate::syntax::Dialect;
+use crate::syntax::DialectTypes;
 use crate::syntax::ast::ArgumentP;
 use crate::syntax::ast::AstExpr;
 use crate::syntax::ast::AstStmt;
@@ -50,6 +51,53 @@ use crate::syntax::lint_suppressions::LintSuppressions;
 use crate::syntax::lint_suppressions::LintSuppressionsBuilder;
 use crate::syntax::state::ParserState;
 use crate::syntax::validate::validate_module;
+
+// The grammar can build deep trees without nested delimiters. Keep a ceiling on
+// the entire stream that can reach recursive semantic actions, visitors and Drop.
+const MAX_BOUNDED_GRAMMAR_TOKENS: usize = 256;
+const MAX_BOUNDED_SOURCE_BYTES: usize = 64 * 1024;
+const MAX_BOUNDED_INTEGER_DIGITS: usize = 128;
+const MAX_BOUNDED_FILENAME_BYTES: usize = 4 * 1024;
+
+/// Limits for parsing an untyped Starlark module without f-strings.
+#[derive(Clone, Copy, Debug)]
+pub struct ParseLimits {
+    source_bytes: usize,
+    grammar_tokens: usize,
+    integer_digits: usize,
+}
+
+impl ParseLimits {
+    /// Set limits for source bytes, grammar tokens, and digits per integer.
+    ///
+    /// Values are capped at 64 KiB, 256 grammar tokens, and 128 digits.
+    /// Grammar tokens include layout and EOF newline tokens, but exclude comments.
+    pub const fn new(source_bytes: usize, grammar_tokens: usize, integer_digits: usize) -> Self {
+        Self {
+            source_bytes,
+            grammar_tokens,
+            integer_digits,
+        }
+    }
+}
+
+/// A resource refusal during opt-in bounded parsing.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub enum ParseLimit {
+    /// The source exceeded the pre-lexer byte limit.
+    #[error("Starlark parser source byte limit exceeded")]
+    SourceBytes,
+    /// The diagnostic filename exceeded the pre-lexer byte limit.
+    #[error("Starlark parser filename byte limit exceeded")]
+    FilenameBytes,
+    /// A token exceeded the admitted grammar stream.
+    #[error("Starlark parser grammar token limit exceeded")]
+    GrammarTokens,
+    /// An integer literal exceeded the limit before radix conversion.
+    #[error("Starlark parser integer digit limit exceeded")]
+    IntegerDigits,
+}
 
 fn one_of(expected: &[String]) -> String {
     let mut result = String::new();
@@ -212,9 +260,47 @@ impl AstModule {
     /// assert_eq!(span.to_string(), "filename:2:11");
     /// ```
     pub fn parse(filename: &str, content: String, dialect: &Dialect) -> crate::Result<Self> {
+        Self::parse_unicode(filename, content, dialect, None)
+    }
+
+    /// Parse using resource limits before grammar reduction and validation.
+    ///
+    /// The filename is limited to 4 KiB. This entry point requires an untyped
+    /// dialect with f-strings disabled and uses the Unicode source encoding.
+    pub fn parse_with_limits(
+        filename: &str,
+        content: String,
+        dialect: &Dialect,
+        limits: ParseLimits,
+    ) -> crate::Result<Self> {
+        if filename.len() > MAX_BOUNDED_FILENAME_BYTES {
+            return Err(crate::Error::new_other(ParseLimit::FilenameBytes));
+        }
+        if content.len() > limits.source_bytes.min(MAX_BOUNDED_SOURCE_BYTES) {
+            return Err(crate::Error::new_other(ParseLimit::SourceBytes));
+        }
+        if dialect.enable_types != DialectTypes::Disable || dialect.enable_f_strings {
+            return Err(crate::Error::new_other(anyhow::anyhow!(
+                "Bounded Starlark parsing requires an untyped dialect without f-strings"
+            )));
+        }
+        Self::parse_unicode(filename, content, dialect, Some(limits))
+    }
+
+    fn parse_unicode(
+        filename: &str,
+        content: String,
+        dialect: &Dialect,
+        limits: Option<ParseLimits>,
+    ) -> crate::Result<Self> {
         let typecheck = content.contains("@starlark-rust: typecheck");
         let codemap = CodeMap::new(filename.to_owned(), content);
-        let lexer = Lexer::new(codemap.source(), dialect, codemap.dupe());
+        let mut lexer = Lexer::new(codemap.source(), dialect, codemap.dupe());
+        if let Some(limits) = limits {
+            lexer.limit_integer_digits(limits.integer_digits.min(MAX_BOUNDED_INTEGER_DIGITS));
+        }
+        let mut remaining =
+            limits.map(|limits| limits.grammar_tokens.min(MAX_BOUNDED_GRAMMAR_TOKENS));
         // Store lint suppressions found during parsing
         let mut lint_suppressions_builder = LintSuppressionsBuilder::new();
         // Keep track of block of comments, used for accumulating lint suppressions
@@ -226,19 +312,37 @@ impl AstModule {
                 dialect,
                 errors: &mut errors,
             },
-            lexer.filter(|token| match token {
+            lexer.filter_map(|token| match token {
                 // Filter out comment tokens and accumulate lint suppressions
                 Ok((start, Token::Comment(comment), end)) => {
-                    lint_suppressions_builder.parse_comment(&codemap, comment, *start, *end);
+                    lint_suppressions_builder.parse_comment(&codemap, &comment, start, end);
                     in_comment_block = true;
-                    false
+                    None
                 }
-                _ => {
+                token => {
                     if in_comment_block {
                         lint_suppressions_builder.end_of_comment_block(&codemap);
                         in_comment_block = false;
                     }
-                    true
+                    if let (Some(remaining), Ok((start, token, end))) = (&mut remaining, &token) {
+                        let span = Span::new(Pos::new(*start as u32), Pos::new(*end as u32));
+                        if *remaining == 0 {
+                            return Some(Err(EvalException::new_anyhow(
+                                ParseLimit::GrammarTokens.into(),
+                                span,
+                                &codemap,
+                            )));
+                        }
+                        *remaining -= 1;
+                        if matches!(token, Token::FString(_)) {
+                            return Some(Err(EvalException::parser_error(
+                                "Your Starlark dialect must enable f-strings to use them",
+                                span,
+                                &codemap,
+                            )));
+                        }
+                    }
+                    Some(token)
                 }
             }),
         ) {
@@ -445,8 +549,181 @@ impl AstModule {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::slice_vec_ext::SliceExt;
     use crate::syntax::grammar_tests;
+
+    fn assert_parse_limit(result: crate::Result<AstModule>, expected: ParseLimit) {
+        let error = result.unwrap_err();
+        match error.kind() {
+            crate::ErrorKind::Other(error) => {
+                assert_eq!(error.downcast_ref::<ParseLimit>(), Some(&expected));
+            }
+            _ => panic!("expected {expected:?}, got {error}"),
+        }
+    }
+
+    #[test]
+    fn bounded_source_and_grammar_tokens_are_exact() {
+        let source = "# a comment\n1";
+        AstModule::parse_with_limits(
+            "format.star",
+            source.to_owned(),
+            &Dialect::Standard,
+            ParseLimits::new(source.len(), 2, 1),
+        )
+        .unwrap();
+        assert_parse_limit(
+            AstModule::parse_with_limits(
+                "format.star",
+                source.to_owned(),
+                &Dialect::Standard,
+                ParseLimits::new(source.len() - 1, 2, 1),
+            ),
+            ParseLimit::SourceBytes,
+        );
+        assert_parse_limit(
+            AstModule::parse_with_limits(
+                "format.star",
+                source.to_owned(),
+                &Dialect::Standard,
+                ParseLimits::new(source.len(), 1, 1),
+            ),
+            ParseLimit::GrammarTokens,
+        );
+    }
+
+    #[test]
+    fn bounded_integer_admission_precedes_radix_conversion() {
+        for source in ["9999", "0xaaaa", "0o7777", "0b1111"] {
+            AstModule::parse_with_limits(
+                "format.star",
+                source.to_owned(),
+                &Dialect::Standard,
+                ParseLimits::new(32, 8, 4),
+            )
+            .unwrap();
+            assert_parse_limit(
+                AstModule::parse_with_limits(
+                    "format.star",
+                    source.to_owned(),
+                    &Dialect::Standard,
+                    ParseLimits::new(32, 8, 3),
+                ),
+                ParseLimit::IntegerDigits,
+            );
+        }
+        let source = "9".repeat(MAX_BOUNDED_INTEGER_DIGITS + 1);
+        AstModule::parse("ordinary.star", source.clone(), &Dialect::Standard).unwrap();
+        assert_parse_limit(
+            AstModule::parse_with_limits(
+                "format.star",
+                source,
+                &Dialect::Standard,
+                ParseLimits::new(256, 8, usize::MAX),
+            ),
+            ParseLimit::IntegerDigits,
+        );
+    }
+
+    #[test]
+    fn bounded_parser_handles_near_limit_escaped_newline_trivia() {
+        use crate::lexer::TokenInt;
+
+        std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(|| {
+                let trivia = " \\\n  \\\r\n";
+                let repetitions = (MAX_BOUNDED_SOURCE_BYTES - "1+2".len()) / trivia.len();
+                let source = format!("1+{}2", trivia.repeat(repetitions));
+                let source_len = source.len();
+                assert!(MAX_BOUNDED_SOURCE_BYTES - source_len < trivia.len());
+
+                let codemap = CodeMap::new("format.star".to_owned(), source.clone());
+                let mut lexer = Lexer::new(&source, &Dialect::Standard, codemap);
+                assert_eq!(
+                    lexer.next().unwrap().unwrap(),
+                    (0, Token::Int(TokenInt::I32(1)), 1)
+                );
+                assert_eq!(lexer.next().unwrap().unwrap(), (1, Token::Plus, 2));
+                assert_eq!(
+                    lexer.next().unwrap().unwrap(),
+                    (source_len - 1, Token::Int(TokenInt::I32(2)), source_len)
+                );
+                assert_eq!(
+                    lexer.next().unwrap().unwrap(),
+                    (source_len, Token::Newline, source_len)
+                );
+                assert!(lexer.next().is_none());
+
+                AstModule::parse_with_limits(
+                    "format.star",
+                    source,
+                    &Dialect::Standard,
+                    ParseLimits::new(source_len, 4, 1),
+                )
+                .unwrap();
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn bounded_grammar_limits_deep_tree_shapes_before_validation() {
+        std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(|| {
+                let cap = MAX_BOUNDED_GRAMMAR_TOKENS;
+                let limits = ParseLimits::new(4096, usize::MAX, 4);
+                for source in [
+                    format!("{}True", "not ".repeat(cap - 2)),
+                    format!("{}1", "1+".repeat((cap - 2) / 2)),
+                    format!("x{}", ".x".repeat((cap - 2) / 2)),
+                ] {
+                    AstModule::parse_with_limits("format.star", source, &Dialect::Standard, limits)
+                        .unwrap();
+                }
+                assert_parse_limit(
+                    AstModule::parse_with_limits(
+                        "format.star",
+                        format!("{}True", "not ".repeat(cap - 1)),
+                        &Dialect::Standard,
+                        limits,
+                    ),
+                    ParseLimit::GrammarTokens,
+                );
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn bounded_parser_requires_an_untyped_dialect_without_f_strings() {
+        let dialect = Dialect {
+            enable_f_strings: true,
+            ..Dialect::Standard
+        };
+        let limits = ParseLimits::new(64, 16, 4);
+        assert!(
+            AstModule::parse_with_limits("format.star", "1".to_owned(), &dialect, limits)
+                .unwrap_err()
+                .to_string()
+                .contains("requires an untyped dialect without f-strings")
+        );
+        assert!(
+            AstModule::parse_with_limits(
+                "format.star",
+                "f\"{identifier}\"".to_owned(),
+                &Dialect::Standard,
+                limits,
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("must enable f-strings")
+        );
+    }
 
     #[test]
     fn test_locations() {

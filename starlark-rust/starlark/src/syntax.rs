@@ -22,4 +22,6 @@ pub use starlark_syntax::dialect::DialectTypes;
 pub use starlark_syntax::dialect::StringEncoding;
 pub use starlark_syntax::syntax::AstLoad;
 pub use starlark_syntax::syntax::AstModule;
+pub use starlark_syntax::syntax::ParseLimit;
+pub use starlark_syntax::syntax::ParseLimits;
 pub use starlark_syntax::syntax::ast;

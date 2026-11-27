@@ -18,6 +18,8 @@
 //! The AST of Starlark as [`AstModule`], along with a [`parse`](AstModule::parse) function.
 
 pub use module::AstModule;
+pub use module::ParseLimit;
+pub use module::ParseLimits;
 pub use parser::AstLoad;
 
 pub use crate::dialect::Dialect;
