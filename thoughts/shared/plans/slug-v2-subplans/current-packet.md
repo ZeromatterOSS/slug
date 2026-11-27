@@ -6,13 +6,19 @@ Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS. General production remains Disabled
 
 ## Current result and next step
 
-The original adopted `local_config_xcode` and reached 998 computes and 57
-roots. It serviced the checksum-pinned `tinyjson` Archive at operation 0,
-decoding 71,168 bytes before the Source deadline. The last sampled epoch held
-152 records before that operation. All 16 shared compute samples agreed with
-the preceding run. Cleanup returned to 168 bytes, zero FDs and zero backing.
-The report used 127,077 bytes with its prefix. Full Rust and completed-command
-latency/RSS remain open. The earlier refusal at compute 859 is still unattributed.
+The original reached 999 computes, 57 roots and 153 records, with the pinned
+`tinyjson` Archive in the epoch. All 62 shared compute samples agreed with the
+998-compute control. The next need was the immutable `rules_rust+` source.
+It transferred 67,201,371 bytes and refused with `repository_workspace/resource`
+before decoding. Scope had no first error. Cleanup returned to 168 bytes,
+zero FDs and zero backing. The report used 128,271 bytes with its prefix.
+Full Rust and completed-command latency/RSS remain open.
+
+The [Archive writer receipt][archive-writes] preserves rooted reads through EOF
+while removing 380 prior-body comparisons over 2,362,966,940 bytes in the
+original. The native same-length overwrite fixture proved old and new body
+selection and full reads. The six-archive matched CPU/instruction ratios were
+0.926/0.897. Seventy-four focused tests and five native guards passed.
 
 Configuration construction writes nested fields into one buffer. Eight
 complete baseline and candidate encodings and projections match across
@@ -44,11 +50,10 @@ liblzma. Bzlmod dev/test `-O3` passed CPU/wall at 0.936/0.935 (`f33c1690a`).
 XZ and LZ4 `-O3` and the stored observation-map hash fell short of their gates.
 The previous detailed checkpoint is in `ff79543a2`.
 
-Drive the next actual configured Rust frontier with the existing deadline.
-Compare equal work before attributing runtime differences across stopped
-prefixes. Keep launcher/PID1, rooted comparison, codec and history checks.
-Rooted body reuse requires a writer receipt binding the actual mutation footprint
-to the exclusive root and exact predecessor.
+Attribute the immutable `rules_rust+` resource refusal before changing quota
+admission. Keep the existing deadline, launcher/PID1, rooted comparison, codec
+and history checks. Compare equal work before attributing timing differences
+across stopped prefixes. The earlier refusal at compute 859 remains unattributed.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,
@@ -167,6 +172,7 @@ Full chronology is pinned to Git commit
 
 [xz-design]: wp1225-general-repository-workspace-design.md#pinned-single-threaded-xz-library-revision
 [xz-receipt]: wp1225-xz-library-revision-acceptance-2026-11-10.json
+[archive-writes]: wp1225-general-repository-workspace-design.md#complete-framed-body-comparison-without-discarded-digest
 [frontier]: wp1225-general-repository-workspace-design.md#authentic-rust-archive-frontier
 [attribution]: wp1225-general-repository-workspace-design.md#bounded-dice-family-attribution
 [registration]: wp1225-general-repository-workspace-design.md#bounded-typed-registration-failure-projection

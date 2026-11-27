@@ -1411,11 +1411,18 @@ Preserve eager comparison of EVERY delivered chunk even after first mismatch:
 retain bitwise `&=` with one private inline comparison forwarder, never short-
 circuit `&&` or early false. Preserve all reads/callbacks/checks/error positions,
 exact offset/frame/EOF and late error precedence over false or original Resource.
-Only full true permits same-path old-body reuse or exact claimed same-origin
-lease retention. Recovery still has128rows TOTAL/fixed endpoints,4comparisons/
-512MiB full-length predebit before IO, exact payload-ResourceLimit-only entry,
+The comparator permits same-path body reuse or exact claimed same-origin lease
+retention only on full equality. Recovery keeps 128 rows, fixed endpoints and
+4 comparisons/512 MiB full-length predebit before IO, exact payload-ResourceLimit-only entry,
 control/origin/bank/association/lock/cancel/sticky-scope/retirement discipline.
 No lookup, allocation, decoder cache, identity, semantic selection or cap changes.
+
+An Archive writer receipt binds the checked, unused initial mount and exact
+live predecessor to actual rooted regular-file opens. Its bounded bitmap uses
+the idle replay allowance and retires before record completion. Untouched prior
+packed files still stream through EOF with the full FD and name checks. The
+receipt supplies byte continuity for same-path reuse. Opened paths, captures
+without proof, Process snapshots and the final seal retain full comparison.
 
 RED leaves the old hashed caller in place. New real-helper Raw/Packed equal and
 first-byte mismatch cases must finish bool/full reads/frames/old-body lifetime/

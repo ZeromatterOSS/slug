@@ -113,6 +113,40 @@ struct NativeRootSlot {
     body_ledger: Arc<NativeBodyLedger>,
 }
 
+/// The checked predecessor of one write on an exclusively owned Archive root.
+/// Only the consuming command can issue this before any payload uses the seed.
+pub(in crate::runtime::repository_physical_root) struct ArchiveWriteOrigin {
+    root: RootIdentity,
+    backing: Arc<RepositoryRootBacking>,
+    predecessor: Arc<RepositoryWorkspaceState>,
+    index: usize,
+}
+
+impl ArchiveWriteOrigin {
+    pub(in crate::runtime::repository_physical_root) fn predecessor(
+        &self,
+    ) -> &RepositoryWorkspaceState {
+        &self.predecessor
+    }
+
+    pub(in crate::runtime::repository_physical_root) fn matches(
+        &self,
+        builder: &RepositoryPhysicalRootBuilder,
+        predecessor: &RepositoryWorkspaceState,
+        scope: &Arc<SourceServiceScope>,
+    ) -> bool {
+        builder.mode == RepositoryWorkspaceMode::Archive
+            && builder.identity == self.root
+            && Arc::ptr_eq(&builder.backing, &self.backing)
+            && Arc::ptr_eq(&builder.origin_scope, scope)
+            && std::ptr::eq(predecessor, self.predecessor.as_ref())
+    }
+
+    pub(in crate::runtime::repository_physical_root) fn index(&self) -> usize {
+        self.index
+    }
+}
+
 struct NativeSourceSlot {
     reservation: Arc<slug_bzlmod_v2::RepositorySourceSnapshotReservation>,
     #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
@@ -676,8 +710,28 @@ impl RepositoryWorkspaceCommand {
             request.operation(),
             RepositoryWorkspaceOperation::Archive(_)
         ) {
-            progress
-                .apply_archive_with_candidates(request, bodies, runtime, distdirs, scope, active)?
+            let slot = &self.roots[slot];
+            let builder = progress.builder();
+            let prior = progress.transcript().current();
+            let origin = if let Some(initial) = &slot.initial
+                && slot.lease.is_none()
+                && builder.mode == RepositoryWorkspaceMode::Archive
+                && request.index() == progress.transcript().records().len()
+                && Arc::ptr_eq(request.predecessor(), prior)
+                && initial.check_binding(builder, scope, active).is_ok()
+            {
+                Some(ArchiveWriteOrigin {
+                    root: builder.identity,
+                    backing: builder.backing.clone(),
+                    predecessor: prior.clone(),
+                    index: request.index(),
+                })
+            } else {
+                None
+            };
+            progress.apply_archive_with_candidates(
+                request, bodies, runtime, distdirs, scope, active, origin,
+            )?
         } else {
             progress.apply_with_candidates(request, bodies, scope, active)?
         };

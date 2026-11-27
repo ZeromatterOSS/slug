@@ -208,11 +208,12 @@ struct Limits {
     bodies: u64,
     depth: usize,
 }
+pub(super) const ARCHIVE_ENTRY_LIMIT: usize = 131_072;
 impl Limits {
     fn for_mode(mode: RepositoryWorkspaceMode) -> Self {
         match mode {
             RepositoryWorkspaceMode::Archive => Self {
-                entries: 131_072,
+                entries: ARCHIVE_ENTRY_LIMIT,
                 names: 4 * 1024 * 1024,
                 bodies: 1024 * 1024 * 1024,
                 depth: 2048,
@@ -254,7 +255,7 @@ pub(super) fn capture_with_sources<'prior>(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
-    capture_builder(builder, prior, sources, None, scope, active)
+    capture_builder(builder, prior, sources, None, scope, active, None)
 }
 pub(super) fn capture_with_candidates<'prior>(
     builder: &RepositoryPhysicalRootBuilder,
@@ -263,11 +264,20 @@ pub(super) fn capture_with_candidates<'prior>(
     candidates: &mut NativeBodyCandidates,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
+    archive_writes: Option<&archive::ArchiveWriteReceipt<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     candidates
         .ledger()
         .check_origin(&builder.resources, scope, &builder.reservation, active)?;
-    capture_builder(builder, prior, sources, Some(candidates), scope, active)
+    capture_builder(
+        builder,
+        prior,
+        sources,
+        Some(candidates),
+        scope,
+        active,
+        archive_writes,
+    )
 }
 fn capture_builder<'prior>(
     builder: &RepositoryPhysicalRootBuilder,
@@ -276,9 +286,13 @@ fn capture_builder<'prior>(
     candidates: Option<&mut NativeBodyCandidates>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
+    archive_writes: Option<&archive::ArchiveWriteReceipt<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != builder.reservation.as_ref() {
+        return Err(PhysicalRootError::Reservation);
+    }
+    if archive_writes.is_some_and(|writes| !writes.matches(builder, prior, scope)) {
         return Err(PhysicalRootError::Reservation);
     }
     if prior.mode() == RepositoryWorkspaceMode::Process
@@ -306,6 +320,7 @@ fn capture_builder<'prior>(
         Limits::for_mode(builder.mode),
         Some(&sources),
         candidates,
+        archive_writes,
     )?;
     if backing_identity(&builder.file, builder.mode)? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
@@ -339,6 +354,7 @@ fn capture_at<'prior>(
         limits,
         None,
         None,
+        None,
     )
 }
 #[allow(clippy::too_many_arguments)]
@@ -353,6 +369,7 @@ fn capture_at_with_sources<'prior>(
     limits: Limits,
     sources: Option<&SourceLinkSet>,
     mut candidates: Option<&mut NativeBodyCandidates>,
+    archive_writes: Option<&archive::ArchiveWriteReceipt<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != reservation {
@@ -484,6 +501,7 @@ fn capture_at_with_sources<'prior>(
                     prior,
                     &mut capture.credit,
                     candidates.as_deref_mut(),
+                    archive_writes,
                     scope,
                     active,
                 )?;
@@ -628,7 +646,7 @@ fn capture_body(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<RepositoryWorkspaceBody, PhysicalRootError> {
-    capture_body_covered(io, path, framed, prior, credit, None, scope, active)
+    capture_body_covered(io, path, framed, prior, credit, None, None, scope, active)
 }
 fn capture_body_covered(
     io: &RootIo<'_>,
@@ -637,6 +655,7 @@ fn capture_body_covered(
     prior: &RepositoryWorkspaceState,
     credit: &mut resources::ResourceCredit,
     mut candidates: Option<&mut NativeBodyCandidates>,
+    archive_writes: Option<&archive::ArchiveWriteReceipt<'_>>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<RepositoryWorkspaceBody, PhysicalRootError> {
@@ -649,11 +668,21 @@ fn capture_body_covered(
             .map_err(|_| PhysicalRootError::Resource)?;
     }
     let running = || active() && scope.check().is_ok();
-    if let Some(RepositoryWorkspaceNode::File(old)) = prior
-        .entry(path.to_str().ok_or(PhysicalRootError::Snapshot)?)
-        .map(|e| e.node())
+    let text = path.to_str().ok_or(PhysicalRootError::Snapshot)?;
+    let previous = match archive_writes {
+        Some(writes) => writes.prior_body(text),
+        None => match prior.entry(text).map(RepositoryWorkspaceEntry::node) {
+            Some(RepositoryWorkspaceNode::File(body)) => Some((body, false)),
+            _ => None,
+        },
+    };
+    if let Some((old, untouched)) = previous
+        && old.len() == length
     {
-        if old.len() == length {
+        let same = if untouched && old.raw_arc().is_none() {
+            body_recovery::verify_framed_contents(io, path, framed, length, scope, active)?;
+            true
+        } else {
             #[cfg(all(test, feature = "native-probe-observer"))]
             let comparison = {
                 use crate::runtime::probe_observer::snapshot_work::Phase;
@@ -663,12 +692,13 @@ fn capture_body_covered(
             let same = body_recovery::observed_equal(io, path, framed, old, scope, active)?;
             #[cfg(all(test, feature = "native-probe-observer"))]
             drop(comparison);
-            if same {
-                if let Some(candidates) = candidates.as_deref_mut() {
-                    candidates.retain(old, active)?;
-                }
-                return Ok(old.clone());
+            same
+        };
+        if same {
+            if let Some(candidates) = candidates.as_deref_mut() {
+                candidates.retain(old, active)?;
             }
+            return Ok(old.clone());
         }
     }
     if let Some(candidates) = candidates {

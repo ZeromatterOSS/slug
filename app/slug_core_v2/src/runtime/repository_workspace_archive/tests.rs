@@ -130,7 +130,7 @@ fn archive_capture_moves_actual_verified_file_into_rooted_extract_without_host_a
         let _decode = bank.reserve(IO_SCRATCH + DECODE_CONTROL, 4, 0).unwrap();
         assert_eq!(
             capture
-                .extract_at(&root, &mut decoded, &scope, &|| true)
+                .extract_at(&root, &mut decoded, &scope, &|| true, None)
                 .unwrap(),
             RepositoryWorkspaceResult::Archive(sha)
         );
@@ -357,7 +357,7 @@ fn archive_capture_mutation_after_verification_and_foreign_scope_refuse_before_r
     )
     .unwrap();
     assert!(matches!(
-        capture.extract_at(&root, &mut 0, &super::tests::scope(), &|| true),
+        capture.extract_at(&root, &mut 0, &super::tests::scope(), &|| true, None),
         Err(PhysicalRootError::SourceService(
             SourceServiceError::ForeignScope
         ))
@@ -369,7 +369,11 @@ fn archive_capture_mutation_after_verification_and_foreign_scope_refuse_before_r
         .as_file_mut()
         .write_all(b"mutation")
         .unwrap();
-    assert!(capture.extract_at(&root, &mut 0, &scope, &|| true).is_err());
+    assert!(
+        capture
+            .extract_at(&root, &mut 0, &scope, &|| true, None)
+            .is_err()
+    );
     assert_eq!(fs::read_dir(&destination).unwrap().count(), 0);
     drop(capture);
     assert_eq!(
@@ -435,7 +439,11 @@ fn archive_capture_cancellation_at_acquisition_verification_and_decode_retires_o
     )
     .unwrap();
     scope.cancel();
-    assert!(capture.extract_at(&root, &mut 0, &scope, &|| true).is_err());
+    assert!(
+        capture
+            .extract_at(&root, &mut 0, &scope, &|| true, None)
+            .is_err()
+    );
     drop(capture);
     closed(capture_fd);
     assert!(!temp.exists());

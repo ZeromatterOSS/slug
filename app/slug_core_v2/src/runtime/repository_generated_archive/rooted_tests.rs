@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fs::File;
 use std::fs::{self};
 use std::os::unix::fs::MetadataExt;
@@ -38,6 +39,7 @@ fn rooted_archives_replace_on_retained_backing_without_touching_foreign_display_
         fs::create_dir(&display).unwrap();
         fs::write(display.join("untouched"), b"foreign tree").unwrap();
         let root = RootIo::new(&descriptor, limits()).unwrap();
+        let long_path = format!("nested/{}", "long-name".repeat(14));
         let first = archive_with_format(format, |tar| {
             append_entry(
                 tar,
@@ -53,6 +55,14 @@ fn rooted_archives_replace_on_retained_backing_without_touching_foreign_display_
                 0o644,
                 b"retained",
             );
+            let long_body = b"gnu long name";
+            let mut header = tar::Header::new_gnu();
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_mode(0o644);
+            header.set_mtime(1_600_000_000);
+            header.set_size(long_body.len() as u64);
+            tar.append_data(&mut header, format!("prefix/{long_path}"), &long_body[..])
+                .unwrap();
         });
         let second = archive_with_format(format, |tar| {
             append_entry(
@@ -64,6 +74,7 @@ fn rooted_archives_replace_on_retained_backing_without_touching_foreign_display_
             );
         });
         let mut decoded = 0;
+        let opened = RefCell::new(Vec::new());
         for capture in [&first, &second] {
             extract_generated_archive_at(
                 capture.as_file(),
@@ -73,11 +84,20 @@ fn rooted_archives_replace_on_retained_backing_without_touching_foreign_display_
                 &|| true,
                 &mut decoded,
                 None,
+                Some(&|path| opened.borrow_mut().push(path.to_owned())),
             )
             .unwrap();
         }
+        assert_eq!(
+            opened.into_inner(),
+            ["nested/file", "kept", long_path.as_str(), "nested/file"],
+        );
         assert_eq!(fs::read(retained.join("nested/file")).unwrap(), b"new");
         assert_eq!(fs::read(retained.join("kept")).unwrap(), b"retained");
+        assert_eq!(
+            fs::read(retained.join(long_path)).unwrap(),
+            b"gnu long name"
+        );
         // Both lanes request mkdir(0777), leaving process umask in force.
         assert_eq!(
             fs::metadata(retained.join("nested"))
@@ -124,6 +144,7 @@ fn rooted_archive_refuses_symlink_ancestors_and_leaf_without_touching_target() {
                 GeneratedRepositoryArchiveFormat::TarGz,
                 &|| true,
                 &mut 0,
+                None,
                 None
             )
             .is_err()
@@ -151,6 +172,7 @@ fn rooted_archive_admits_file_size_before_truncation_and_shares_decoded_limits()
             GeneratedRepositoryArchiveFormat::TarGz,
             &|| true,
             &mut 0,
+            None,
             None
         )
         .is_err()
@@ -158,10 +180,14 @@ fn rooted_archive_admits_file_size_before_truncation_and_shares_decoded_limits()
     assert_eq!(fs::read(parent.path().join("file")).unwrap(), b"keep");
     small.max_file_bytes = 4;
     let root = RootIo::new(&descriptor, small).unwrap();
+    let destination = RootedDestination {
+        root: &root,
+        record_open: None,
+    };
     let mut exact = 0;
     extract_with_destination_and_limits(
         capture.as_file(),
-        &root,
+        &destination,
         "",
         GeneratedRepositoryArchiveFormat::TarGz,
         &|| true,
@@ -179,7 +205,7 @@ fn rooted_archive_admits_file_size_before_truncation_and_shares_decoded_limits()
     assert!(
         extract_with_destination_and_limits(
             capture.as_file(),
-            &root,
+            &destination,
             "",
             GeneratedRepositoryArchiveFormat::TarGz,
             &|| true,
@@ -213,6 +239,7 @@ fn rooted_archive_cancelled_before_decode_preserves_existing_file() {
             GeneratedRepositoryArchiveFormat::TarGz,
             &|| false,
             &mut decoded,
+            None,
             None
         )
         .is_err()

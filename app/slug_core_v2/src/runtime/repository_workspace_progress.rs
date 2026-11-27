@@ -138,7 +138,9 @@ impl RepositoryWorkspaceProgress {
         // Keep the raw request ahead of candidate destruction even if staging
         // refuses before capture or mutation.
         let candidates = self.body_ledger().candidates()?;
-        self.apply_archive_with_candidates(request, candidates, runtime, distdirs, scope, active)
+        self.apply_archive_with_candidates(
+            request, candidates, runtime, distdirs, scope, active, None,
+        )
     }
     pub(super) fn apply_archive_with_candidates(
         mut self,
@@ -148,6 +150,7 @@ impl RepositoryWorkspaceProgress {
         distdirs: &crate::runtime::ArchiveDistdirPolicy,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
+        write_origin: Option<command::ArchiveWriteOrigin>,
     ) -> Result<Self, PhysicalRootError> {
         let mut incoming = IncomingOperation {
             request,
@@ -168,7 +171,7 @@ impl RepositoryWorkspaceProgress {
         }
         // Admit after the existing scope/origin/declared-source checks, but
         // before replay can compare independent operation/Read-result bodies.
-        let _semantic_working = self.builder.resources.reserve(
+        let semantic_working = self.builder.resources.reserve(
             2 * RepositoryWorkspaceBody::decode_scratch_bytes(),
             0,
             0,
@@ -206,14 +209,24 @@ impl RepositoryWorkspaceProgress {
         }
         #[cfg(all(test, feature = "native-probe-observer"))]
         let extract_span = span(Stage::ArchiveExtract);
-        let result = capture.extract(&self.builder, &mut self.decoded, scope, active)?;
+        // Replay is complete. Extraction and capture carry their own scratch.
+        // The receipt borrows the idle allowance through capture and drops
+        // before transcript completion uses it again.
+        let (result, writes) = capture.extract(
+            &self.builder,
+            &mut self.decoded,
+            scope,
+            active,
+            write_origin,
+            &semantic_working,
+        )?;
         #[cfg(all(test, feature = "native-probe-observer"))]
         if let Some(span) = extract_span {
             span.finish();
         }
         #[cfg(all(test, feature = "native-probe-observer"))]
         let snapshot_span = span(Stage::ArchiveSnapshot);
-        let progress = self.complete_snapshot(incoming, result, scope, active)?;
+        let progress = self.complete_snapshot(incoming, result, scope, active, writes)?;
         #[cfg(all(test, feature = "native-probe-observer"))]
         if let Some(span) = snapshot_span {
             span.finish();
@@ -227,6 +240,7 @@ impl RepositoryWorkspaceProgress {
         result: RepositoryWorkspaceResult,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
+        archive_writes: Option<archive::ArchiveWriteReceipt<'_>>,
     ) -> Result<Self, PhysicalRootError> {
         // Result (which can own a newly captured body) precedes incoming
         // candidates, including capture refusal before completion is entered.
@@ -253,7 +267,9 @@ impl RepositoryWorkspaceProgress {
             &mut input.incoming.candidates,
             scope,
             active,
+            archive_writes.as_ref(),
         )?;
+        drop(archive_writes);
         #[cfg(all(test, feature = "native-probe-observer"))]
         drop(capture);
         #[cfg(all(test, feature = "native-probe-observer"))]
@@ -307,7 +323,7 @@ impl RepositoryWorkspaceProgress {
             incoming.candidates.absorb(bodies, active)?;
         }
         incoming.cover(active)?;
-        self.complete_snapshot(incoming, result, scope, active)
+        self.complete_snapshot(incoming, result, scope, active, None)
     }
     pub(super) fn admit_link_sources(
         &mut self,
@@ -498,7 +514,7 @@ impl RepositoryWorkspaceProgress {
         }
         #[cfg(all(test, feature = "native-probe-observer"))]
         let snapshot = span(Stage::FilesystemSnapshot);
-        let completed = self.complete_snapshot(incoming, result, scope, active);
+        let completed = self.complete_snapshot(incoming, result, scope, active, None);
         #[cfg(all(test, feature = "native-probe-observer"))]
         if let Some(snapshot) = snapshot
             && completed.is_ok()

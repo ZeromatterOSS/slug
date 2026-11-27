@@ -82,7 +82,7 @@ fn omitted_checksum_observes_same_file_url_a_b_a_and_bypasses_distdir() {
             let _decode = bank.reserve(IO_SCRATCH + DECODE_CONTROL, 4, 0).unwrap();
             assert_eq!(
                 capture
-                    .extract_at(&io, &mut decoded, &scope, &|| true)
+                    .extract_at(&io, &mut decoded, &scope, &|| true, None)
                     .unwrap(),
                 RepositoryWorkspaceResult::Archive(actual)
             );
@@ -174,7 +174,7 @@ fn omitted_expectation_keeps_full_fd_hash_eof_frame_and_cancellation_checks() {
     let mut decoded = 0;
     assert!(
         capture
-            .extract_at(&io, &mut decoded, &live, &|| false)
+            .extract_at(&io, &mut decoded, &live, &|| false, None)
             .is_err()
     );
     assert_eq!(decoded, 0);
@@ -186,7 +186,7 @@ fn omitted_expectation_keeps_full_fd_hash_eof_frame_and_cancellation_checks() {
     let fd = file.as_raw_fd();
     assert!(
         capture
-            .extract_at(&io, &mut decoded, &live, &|| true)
+            .extract_at(&io, &mut decoded, &live, &|| true, None)
             .is_err()
     );
     assert_eq!(decoded, 0);

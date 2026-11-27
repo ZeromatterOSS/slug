@@ -754,6 +754,7 @@ fn covered_snapshot_completion_shares_one_actual_body_allocation_with_history() 
         Limits::for_mode(RepositoryWorkspaceMode::Archive),
         None,
         Some(&mut candidates),
+        None,
     )
     .unwrap();
     let actual = body(captured.entries(), "large").clone();

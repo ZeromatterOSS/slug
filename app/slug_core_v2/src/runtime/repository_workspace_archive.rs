@@ -3,6 +3,7 @@
 //! confined. Workspace mutation uses only the selected RootIo descriptor route.
 //! Trusted capture creation excludes other writers until capture retirement.
 
+use std::cell::Cell;
 use std::fs::Metadata;
 use std::os::unix::fs::FileExt;
 use std::os::unix::fs::MetadataExt;
@@ -10,10 +11,12 @@ use std::os::unix::fs::MetadataExt;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod_v2::GeneratedRepositoryArchiveEffect;
+use slug_bzlmod_v2::RepositoryWorkspaceNode;
 use slug_bzlmod_v2::RepositoryWorkspaceOperation;
 use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceResult;
 
+use super::progress::command::ArchiveWriteOrigin;
 use super::*;
 use crate::runtime::ArchiveDistdirPolicy;
 #[cfg(all(test, feature = "native-probe-observer"))]
@@ -33,6 +36,88 @@ const CAPTURE_SCRATCH: usize = CHUNK_BYTES + 2 * 4096 + 4 * std::mem::size_of::<
 // duplicate-destination set. Prepay old/new table/string peaks conservatively;
 // no new map/hasher or archive policy is introduced by this adapter.
 const DECODE_CONTROL: usize = 4 * 1024 * (256 + std::mem::size_of::<String>() + 32) + 4096;
+
+/// Actual rooted regular-file opens on one exact, exclusively owned predecessor.
+/// The archive producer returns this only after the complete mutation succeeds.
+pub(super) struct ArchiveWriteReceipt<'working> {
+    origin: ArchiveWriteOrigin,
+    opened: Vec<Cell<u64>>,
+    _working: &'working resources::ResourceCredit,
+}
+
+impl<'working> ArchiveWriteReceipt<'working> {
+    fn new(
+        origin: ArchiveWriteOrigin,
+        working: &'working resources::ResourceCredit,
+    ) -> Option<Self> {
+        let prior = origin.predecessor().entries();
+        if prior.len() > snapshot::ARCHIVE_ENTRY_LIMIT
+            || !prior.iter().any(|entry| {
+                matches!(entry.node(), RepositoryWorkspaceNode::File(body)
+                    if !body.is_empty() && body.raw_arc().is_none())
+            })
+        {
+            return None;
+        }
+        let words = prior.len().div_ceil(u64::BITS as usize);
+        let bytes = words
+            .checked_mul(std::mem::size_of::<Cell<u64>>())?
+            .checked_add(std::mem::size_of::<Self>() + 64)?;
+        if bytes > working.bytes.charged_bytes() {
+            return None;
+        }
+        let mut opened = Vec::new();
+        opened.try_reserve_exact(words).ok()?;
+        if opened.capacity() > words {
+            return None;
+        }
+        opened.resize_with(words, Cell::default);
+        Some(Self {
+            origin,
+            opened,
+            _working: working,
+        })
+    }
+
+    pub(super) fn matches(
+        &self,
+        builder: &RepositoryPhysicalRootBuilder,
+        predecessor: &RepositoryWorkspaceState,
+        scope: &Arc<SourceServiceScope>,
+    ) -> bool {
+        self.origin.matches(builder, predecessor, scope)
+    }
+
+    fn prior_index(&self, path: &str) -> Option<usize> {
+        self.origin
+            .predecessor()
+            .entries()
+            .binary_search_by(|entry| entry.path().cmp(path))
+            .ok()
+    }
+
+    fn opened_bit(&self, index: usize) -> (&Cell<u64>, u64) {
+        let bits = u64::BITS as usize;
+        (&self.opened[index / bits], 1 << (index % bits))
+    }
+
+    fn record_open(&self, path: &str) {
+        if let Some(index) = self.prior_index(path) {
+            let (word, bit) = self.opened_bit(index);
+            word.set(word.get() | bit);
+        }
+    }
+
+    pub(super) fn prior_body(&self, path: &str) -> Option<(&RepositoryWorkspaceBody, bool)> {
+        let index = self.prior_index(path)?;
+        let RepositoryWorkspaceNode::File(body) = self.origin.predecessor().entries()[index].node()
+        else {
+            return None;
+        };
+        let (word, bit) = self.opened_bit(index);
+        Some((body, word.get() & bit == 0))
+    }
+}
 
 /// A capability minted only by the actual full-FD verifying producer below.
 /// No path/File/writer/unchecked digest constructor escapes this leaf. The
@@ -188,13 +273,21 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
         Ok(owner)
     }
 
-    pub(super) fn extract(
+    pub(super) fn extract<'working>(
         mut self,
         builder: &RepositoryPhysicalRootBuilder,
         aggregate_decoded: &mut u64,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
-    ) -> Result<RepositoryWorkspaceResult, PhysicalRootError> {
+        write_origin: Option<ArchiveWriteOrigin>,
+        semantic_working: &'working resources::ResourceCredit,
+    ) -> Result<
+        (
+            RepositoryWorkspaceResult,
+            Option<ArchiveWriteReceipt<'working>>,
+        ),
+        PhysicalRootError,
+    > {
         self.check_scope(scope, active)?;
         if self.request.reservation().as_ref() != builder.reservation.as_ref() {
             return Err(PhysicalRootError::Reservation);
@@ -208,15 +301,36 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
         if backing_identity(&builder.file, builder.mode)? != builder.identity {
             return Err(PhysicalRootError::RootIdentity);
         }
+        let receipt = if let Some(origin) = write_origin {
+            if origin.index() != self.request.index()
+                || !origin.matches(builder, self.request.predecessor(), scope)
+            {
+                return Err(PhysicalRootError::Reservation);
+            }
+            ArchiveWriteReceipt::new(origin, semantic_working)
+        } else {
+            None
+        };
         let io = RootIo::new(&builder.file, io_limits(builder.mode, &builder.reservation))?;
-        let result = self.extract_at(&io, aggregate_decoded, scope, active)?;
+        let record_open = |path: &str| {
+            if let Some(receipt) = &receipt {
+                receipt.record_open(path);
+            }
+        };
+        let result = self.extract_at(
+            &io,
+            aggregate_decoded,
+            scope,
+            active,
+            receipt.as_ref().map(|_| &record_open as &dyn Fn(&str)),
+        )?;
         if backing_identity(&builder.file, builder.mode)? != builder.identity {
             return Err(PhysicalRootError::RootIdentity);
         }
         self.check_scope(scope, active)?;
         self.close_capture()?;
         check(scope, active)?;
-        Ok(result)
+        Ok((result, receipt))
     }
 
     fn archive(&self) -> &GeneratedRepositoryArchiveEffect {
@@ -243,6 +357,7 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
         aggregate_decoded: &mut u64,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
+        record_open: Option<&dyn Fn(&str)>,
     ) -> Result<RepositoryWorkspaceResult, PhysicalRootError> {
         self.check_scope(scope, active)?;
         let file = self
@@ -263,6 +378,7 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
             &running,
             aggregate_decoded,
             Some(scope),
+            record_open,
         )
         .map_err(PhysicalRootError::Mutation)?;
         self.check_scope(scope, active)?;

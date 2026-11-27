@@ -56,6 +56,7 @@ fn covered_new_path_reuses_pending_bytes_but_mismatch_and_sticky_scope_stay_clos
             initial.current(),
             &mut scratch,
             Some(&mut candidates),
+            None,
             &scope,
             &|| true,
         );

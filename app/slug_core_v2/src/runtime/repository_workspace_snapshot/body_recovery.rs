@@ -40,17 +40,9 @@ pub(super) fn observed_equal(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<bool, PhysicalRootError> {
-    let mut offset = 0usize;
     let mut same = true;
-    let running = || active() && scope.check().is_ok();
-    let captured = old.with_range_comparison(|compare| {
-        io.read_file_contents(path, &running, |chunk| {
-            let end = offset
-                .checked_add(chunk.len())
-                .ok_or_else(|| io::Error::other("workspace compare overflow"))?;
-            if end > old.len() {
-                return Err(io::Error::other("workspace comparison grew"));
-            }
+    old.with_range_comparison(|compare| {
+        read_framed_contents(io, path, framed, old.len(), scope, active, |offset, chunk| {
             #[cfg(all(test, feature = "native-probe-observer"))]
             if !offset.is_multiple_of(slug_bzlmod_v2::REPOSITORY_WORKSPACE_BODY_CHUNK_BYTES) {
                 crate::runtime::probe_observer::snapshot_work::record_unaligned_comparison_chunk();
@@ -58,16 +50,50 @@ pub(super) fn observed_equal(
             // Complete the framed contents stream even after mismatch, preserving
             // every comparison, exact EOF and opened/named-frame validation.
             same &= compare_chunk(compare, offset, chunk);
-            offset = end;
-            Ok(())
         })
+    })?;
+    Ok(same)
+}
+
+pub(super) fn verify_framed_contents(
+    io: &RootIo<'_>,
+    path: &Path,
+    framed: &libc::stat,
+    length: usize,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<(), PhysicalRootError> {
+    read_framed_contents(io, path, framed, length, scope, active, |_, _| {})
+}
+
+fn read_framed_contents(
+    io: &RootIo<'_>,
+    path: &Path,
+    framed: &libc::stat,
+    length: usize,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+    mut consume: impl FnMut(usize, &[u8]),
+) -> Result<(), PhysicalRootError> {
+    let mut offset = 0usize;
+    let running = || active() && scope.check().is_ok();
+    let captured = io.read_file_contents(path, &running, |chunk| {
+        let end = offset
+            .checked_add(chunk.len())
+            .ok_or_else(|| io::Error::other("workspace compare overflow"))?;
+        if end > length {
+            return Err(io::Error::other("workspace comparison grew"));
+        }
+        consume(offset, chunk);
+        offset = end;
+        Ok(())
     });
     check(scope, active)?;
     let captured = captured?;
-    if !seal::unchanged(framed, &captured) || offset != old.len() {
+    if !seal::unchanged(framed, &captured) || offset != length {
         return Err(PhysicalRootError::Snapshot);
     }
-    Ok(same)
+    Ok(())
 }
 
 #[inline]

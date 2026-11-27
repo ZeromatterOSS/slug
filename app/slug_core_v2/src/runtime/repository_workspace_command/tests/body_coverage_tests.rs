@@ -1,5 +1,6 @@
 //! Actual command/archive/seal lifecycle. The fixture authors arbitrary input
 //! archives; native factory, capture, completion and seal remain ordinary owners.
+use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::time::Duration;
@@ -70,25 +71,34 @@ fn archive_input_from_reader(
     length: usize,
     body: impl Read,
 ) -> (tempfile::NamedTempFile, RepositoryWorkspaceOperation) {
+    archive_input_with_entries(directory, "", |tar| {
+        // Stream the fixture to avoid a second 48MiB producer allocation.
+        append_archive_file(tar, large_path, length, body);
+        append_archive_file(tar, "kept", KEPT.len(), KEPT);
+    })
+}
+fn append_archive_file(
+    tar: &mut tar::Builder<impl Write>,
+    path: &str,
+    length: usize,
+    body: impl Read,
+) {
+    let mut header = tar::Header::new_gnu();
+    header.set_size(length as u64);
+    header.set_mode(0o644);
+    header.set_mtime(1_600_000_000);
+    tar.append_data(&mut header, path, body).unwrap();
+}
+fn archive_input_with_entries(
+    directory: &Path,
+    strip_prefix: &str,
+    append: impl FnOnce(&mut tar::Builder<flate2::write::GzEncoder<&mut File>>),
+) -> (tempfile::NamedTempFile, RepositoryWorkspaceOperation) {
     let mut source = tempfile::NamedTempFile::new_in(directory).unwrap();
     {
         let gzip = flate2::write::GzEncoder::new(source.as_file_mut(), flate2::Compression::fast());
         let mut tar = tar::Builder::new(gzip);
-        // Stream the fixture to avoid a second 48MiB producer allocation.
-        let mut header = tar::Header::new_gnu();
-        header.set_path(large_path).unwrap();
-        header.set_size(length as u64);
-        header.set_mode(0o644);
-        header.set_mtime(1_600_000_000);
-        header.set_cksum();
-        tar.append(&header, body).unwrap();
-        let mut header = tar::Header::new_gnu();
-        header.set_path("kept").unwrap();
-        header.set_size(KEPT.len() as u64);
-        header.set_mode(0o644);
-        header.set_mtime(1_600_000_000);
-        header.set_cksum();
-        tar.append(&header, KEPT).unwrap();
+        append(&mut tar);
         tar.into_inner().unwrap().finish().unwrap();
     }
     source.flush().unwrap();
@@ -107,7 +117,7 @@ fn archive_input_from_reader(
         GeneratedRepositoryArchiveEffect::new(
             Arc::from([url.into()]),
             Some(hash.finalize().into()),
-            "".into(),
+            strip_prefix.into(),
             GeneratedRepositoryArchiveFormat::TarGz,
             "".into(),
             "".into(),
@@ -157,6 +167,128 @@ fn final_request(
             transcript.realize(transcript.records().len()).unwrap(),
         ),
     })
+}
+
+#[test]
+#[ignore = "requires trusted Rust physical Archive factory and rooted native capture"]
+fn native_archive_rereads_untouched_packed_body_without_comparing_it() {
+    use slug_bzlmod_v2::REPOSITORY_WORKSPACE_BODY_CHUNK_BYTES as BLOCK;
+
+    use crate::runtime::repository_root_io::read_work_for_test;
+    use crate::runtime::repository_workspace_comparison_work_for_test;
+
+    let fixture = tempfile::Builder::new()
+        .prefix("slug-wp425-rolling-")
+        .tempdir()
+        .unwrap();
+    let display = fixture.path().join("root");
+    std::fs::create_dir(&display).unwrap();
+    let selected = reservation(&display, 1904);
+    let bank = bank();
+    let baseline = bank.snapshot().retained_bytes;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let changed_path = format!("nested/{}", "long-name".repeat(14));
+    let changed_entry = format!("prefix/{changed_path}");
+    let before = vec![b'a'; 2 * BLOCK + 13];
+    let after = vec![b'b'; before.len()];
+    let kept = vec![b'c'; 2 * BLOCK + 37];
+    let (source_initial, initial) = archive_input_with_entries(fixture.path(), "prefix", |tar| {
+        append_archive_file(tar, &changed_entry, before.len(), before.as_slice());
+        append_archive_file(tar, "prefix/kept", kept.len(), kept.as_slice());
+    });
+    let (source_replacement, replacement) =
+        archive_input_with_entries(fixture.path(), "prefix", |tar| {
+            append_archive_file(tar, &changed_entry, after.len(), after.as_slice());
+        });
+    let RepositoryWorkspaceOperation::Archive(archive) = &replacement else {
+        panic!("expected archive replacement");
+    };
+    let replacement_digest = archive.expected_sha256().unwrap();
+
+    let scope = command_scope(&selected);
+    let (command, fd) = start(selected.clone(), bank.clone(), scope.clone());
+    let command = apply(command, &selected, initial, &runtime, &scope);
+    let native = command.roots[0].progress.as_ref().unwrap();
+    let identity = native.builder().identity;
+    let prior = native.transcript().current();
+    let RepositoryWorkspaceNode::File(old_changed) = prior.entry(&changed_path).unwrap().node()
+    else {
+        panic!("expected original replacement target");
+    };
+    let RepositoryWorkspaceNode::File(old_kept) = prior.entry("kept").unwrap().node() else {
+        panic!("expected untouched original file");
+    };
+    assert!(old_changed.equals_slice(&before));
+    assert!(old_kept.equals_slice(&kept));
+    for body in [old_changed, old_kept] {
+        assert!(body.raw_arc().is_none());
+        assert!(body.len() > 2 * BLOCK && body.native_storage_bytes() < body.len());
+    }
+    let old_changed = old_changed.downgrade();
+    let old_kept = old_kept.downgrade();
+
+    let (command, reads, comparisons) = {
+        let reads = read_work_for_test::begin();
+        let comparisons = repository_workspace_comparison_work_for_test::begin();
+        let command = apply(command, &selected, replacement, &runtime, &scope);
+        (command, reads.snapshot(), comparisons.snapshot())
+    };
+    assert_eq!(
+        reads,
+        read_work_for_test::Snapshot {
+            contents_payload: (2 * after.len() + kept.len()) as u64,
+            ..Default::default()
+        },
+        "read both paths fully and read the changed bytes again for fresh packing"
+    );
+    let transcript = &command.epoch().transcripts().unwrap()[0];
+    assert_eq!(transcript.records().len(), 2);
+    assert_eq!(
+        transcript.records().last().unwrap().result(),
+        &RepositoryWorkspaceResult::Archive(replacement_digest)
+    );
+    let current = transcript.current();
+    let changed = current.entry(&changed_path).unwrap();
+    assert_eq!(changed.mode(), 0o644);
+    assert!(matches!(changed.node(), RepositoryWorkspaceNode::File(body)
+        if body.equals_slice(&after) && !body.ptr_eq(&old_changed.upgrade().unwrap())));
+    assert!(
+        matches!(current.entry("kept").unwrap().node(), RepositoryWorkspaceNode::File(body)
+        if body.equals_slice(&kept) && body.ptr_eq(&old_kept.upgrade().unwrap()))
+    );
+
+    let request = final_request(&command, &selected);
+    let (command, sealed) = command
+        .seal_for_materialization(request, &scope, &|| true)
+        .unwrap();
+    let (request, root, history) = sealed.into_parts();
+    assert_eq!(root.identity, identity);
+    let weak_root = Arc::downgrade(&root);
+    let mut reader = root.open_member("kept", &scope, &|| true).unwrap();
+    drop((command, request, root));
+    assert!(old_changed.upgrade().is_some());
+    drop(history);
+    assert!(old_changed.upgrade().is_none());
+    assert!(weak_root.upgrade().is_some());
+    assert!(old_kept.upgrade().is_some());
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes).unwrap();
+    assert_eq!(bytes, kept);
+    drop(reader);
+    assert!(weak_root.upgrade().is_none());
+    assert!(old_kept.upgrade().is_none());
+    release(&bank, baseline, fd);
+    drop((source_initial, source_replacement));
+
+    assert_eq!(
+        comparisons.comparison_bytes,
+        after.len() as u64,
+        "only the written prior file needs a packed range comparison"
+    );
 }
 
 #[test]

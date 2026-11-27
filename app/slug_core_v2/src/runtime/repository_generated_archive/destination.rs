@@ -69,15 +69,23 @@ impl ArchiveDestination for PathDestination<'_> {
 }
 
 #[cfg(target_os = "linux")]
-impl ArchiveDestination for crate::runtime::repository_root_io::RootIo<'_> {
+pub(super) struct RootedDestination<'a, 'root> {
+    pub(super) root: &'a crate::runtime::repository_root_io::RootIo<'root>,
+    pub(super) record_open: Option<&'a dyn Fn(&str)>,
+}
+
+#[cfg(target_os = "linux")]
+impl ArchiveDestination for RootedDestination<'_, '_> {
     fn validate_root(&self) -> Result<(), ArchiveMaterializationError> {
-        self.lstat(Path::new(""))
+        self.root
+            .lstat(Path::new(""))
             .map(|_| ())
             .map_err(|error| materialization(format!("inspecting rooted archive root: {error}")))
     }
 
     fn ensure_directory(&self, relative: &str) -> Result<(), ArchiveMaterializationError> {
-        self.ensure_directory(Path::new(relative), 0o777)
+        self.root
+            .ensure_directory(Path::new(relative), 0o777)
             .map_err(|error| {
                 materialization(format!(
                     "creating rooted archive directory {relative}: {error}"
@@ -91,19 +99,25 @@ impl ArchiveDestination for crate::runtime::repository_root_io::RootIo<'_> {
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
         {
-            self.ensure_directory(parent, 0o777).map_err(|error| {
+            self.root.ensure_directory(parent, 0o777).map_err(|error| {
                 materialization(format!(
                     "creating rooted archive parent {relative}: {error}"
                 ))
             })?;
         }
-        self.open_write_regular(
-            path,
-            crate::runtime::repository_root_io::WriteMode::ReplaceRegular,
-        )
-        .map_err(|error| {
-            materialization(format!("opening rooted archive file {relative}: {error}"))
-        })
+        let file = self
+            .root
+            .open_write_regular(
+                path,
+                crate::runtime::repository_root_io::WriteMode::ReplaceRegular,
+            )
+            .map_err(|error| {
+                materialization(format!("opening rooted archive file {relative}: {error}"))
+            })?;
+        if let Some(record_open) = self.record_open {
+            record_open(relative);
+        }
+        Ok(file)
     }
 
     fn set_mode(
@@ -112,13 +126,14 @@ impl ArchiveDestination for crate::runtime::repository_root_io::RootIo<'_> {
         file: &File,
         mode: u32,
     ) -> Result<(), ArchiveMaterializationError> {
-        self.chmod_regular(file, mode).map_err(|error| {
+        self.root.chmod_regular(file, mode).map_err(|error| {
             materialization(format!("setting rooted archive mode {relative}: {error}"))
         })
     }
 
     fn admit_file_size(&self, size: u64) -> Result<(), ArchiveMaterializationError> {
-        self.admit_file_size(size)
+        self.root
+            .admit_file_size(size)
             .map_err(|error| materialization(format!("rooted archive file size: {error}")))
     }
 }

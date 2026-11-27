@@ -45,6 +45,7 @@ fn fresh_raw_and_packed_contents_streams_preserve_identity_frames_and_retirement
             Limits::for_mode(RepositoryWorkspaceMode::Archive),
             None,
             candidates.as_mut(),
+            None,
         )
         .unwrap();
         observations.push(witness.snapshot());
@@ -156,6 +157,7 @@ fn fresh_raw_and_packed_contents_streams_preserve_identity_frames_and_retirement
                 initial.current(),
                 &mut credit,
                 failed_candidates.as_mut(),
+                None,
                 &scope,
                 &|| true,
             ),

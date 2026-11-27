@@ -50,6 +50,8 @@ use crate::runtime::dice::source_service::SourceXzDecoder;
 mod destination;
 use destination::ArchiveDestination;
 use destination::PathDestination;
+#[cfg(target_os = "linux")]
+use destination::RootedDestination;
 
 const BLOCK: usize = 512;
 const CALL_DECODED_LIMIT: u64 = 512 * 1024 * 1024;
@@ -171,6 +173,8 @@ fn extract_with_format_and_limits(
 
 /// The decoder and decoded-byte limits are shared with the legacy archive lane.
 /// This entrypoint never interprets a display path as ambient Host authority.
+/// The optional recorder receives the destination spelling after each regular
+/// file is opened for replacement. Its observations are usable on success.
 #[cfg(target_os = "linux")]
 #[allow(dead_code)] // Activated only with the complete general-workspace owner.
 pub(super) fn extract_generated_archive_at(
@@ -181,10 +185,11 @@ pub(super) fn extract_generated_archive_at(
     active: &dyn Fn() -> bool,
     aggregate_decoded: &mut u64,
     scope: Option<&Arc<SourceServiceScope>>,
+    record_open: Option<&dyn Fn(&str)>,
 ) -> Result<(), ArchiveMaterializationError> {
     extract_with_destination_and_limits(
         capture,
-        root,
+        &RootedDestination { root, record_open },
         strip_prefix,
         format,
         active,
