@@ -3257,6 +3257,8 @@ ext=module_extension(implementation=impl)
                 .expect("workspace fixture source"),
             PathBuf::from("/registry-leaf/entry.bzl")
         );
+        assert_eq!(package.reachable_loads.len(), 2);
+        assert_eq!(package.reachable_loads[0], package.direct_load_roots[0]);
         assert_eq!(
             package.reachable_loads[1].label,
             CanonicalLabel::parse("@@mapped+//:defs.bzl").unwrap()

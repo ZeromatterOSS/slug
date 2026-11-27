@@ -884,18 +884,17 @@ fn evaluate_host_package_attempt_with_call_sources(
     match (evaluation, control) {
         (Ok(()), None) => {
             let direct_load_roots = first_seen_direct_roots(input.loaded_modules);
+            let reachable_loads = package_load_provenance(input.loaded_modules)
+                .map(|source| source.identity.clone())
+                .collect();
             let retained_bzl_modules = flattened_lifetime_closure(input.loaded_modules);
-            let reachable_loads = retained_bzl_modules
-                .iter()
-                .map(|entry| entry.identity.clone())
-                .collect::<Vec<_>>();
             let load_fingerprint = package_load_fingerprint(input.loaded_modules);
             host_package_terminal(
                 Ok(recorder.finish(
                     input.package_dir.clone(),
                     input.build_file.clone(),
                     direct_load_roots.into(),
-                    reachable_loads.into(),
+                    reachable_loads,
                     load_fingerprint,
                     retained_bzl_modules.into(),
                 )),
@@ -8050,17 +8049,16 @@ impl Key for PackageLoadKey {
                     evaluation.map_err(|error| LoadingError::new(error.to_string()))?;
                 }
                 let direct_load_roots = first_seen_direct_roots(&loaded_modules);
+                let reachable_loads = package_load_provenance(&loaded_modules)
+                    .map(|source| source.identity.clone())
+                    .collect();
                 let retained_bzl_modules = flattened_lifetime_closure(&loaded_modules);
-                let reachable_loads = retained_bzl_modules
-                    .iter()
-                    .map(|entry| entry.identity.clone())
-                    .collect::<Vec<_>>();
                 let load_fingerprint = package_load_fingerprint(&loaded_modules);
                 Ok(recorder.finish_legacy(
                     self.package.clone(),
                     build_file,
                     direct_load_roots.into(),
-                    reachable_loads.into(),
+                    reachable_loads,
                     load_fingerprint,
                     retained_bzl_modules.into(),
                 ))
@@ -8362,14 +8360,21 @@ fn first_seen_direct_roots(loaded_modules: &[(String, FrozenBzlModule)]) -> Vec<
         .collect()
 }
 
+// Each direct module's raw manifest is already in lexical DFS order.
+fn package_load_provenance(
+    loaded_modules: &[(String, FrozenBzlModule)],
+) -> impl Iterator<Item = &BzlModuleSourceProvenance> {
+    let mut seen_labels = SmallSet::new();
+    loaded_modules
+        .iter()
+        .flat_map(|(_, module)| module.manifest.reachable.iter())
+        .filter(move |&source| seen_labels.insert(&source.identity.label))
+}
+
 fn package_bzl_call_sources(
     loaded_modules: &[(String, FrozenBzlModule)],
 ) -> Option<Arc<[(CompactString, BzlModuleSourceProvenance)]>> {
-    let mut seen_labels = SmallSet::new();
-    let sources = loaded_modules
-        .iter()
-        .flat_map(|(_, module)| module.manifest.reachable.iter())
-        .filter(|identity| seen_labels.insert(&identity.identity.label))
+    let sources = package_load_provenance(loaded_modules)
         .map(|identity| {
             let source = starlark_source_name(identity.identity.source.diagnostic_path().as_ref())
                 .expect("manifest paths were accepted as Starlark source names");

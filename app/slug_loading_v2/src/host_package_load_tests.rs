@@ -786,6 +786,22 @@ fn assert_complete_module_identities<'a>(
     }
 }
 
+fn assert_single_package_load_and_builtin_lifetimes(loaded: &crate::PackageEvaluation) {
+    let [source] = loaded.reachable_loads.as_ref() else {
+        panic!(
+            "expected one lexical load, got {:?}",
+            loaded.reachable_loads
+        );
+    };
+    assert_eq!(source.label.to_string(), "@@dep+//:defs.bzl");
+    assert!(source.source.workspace_path().is_some());
+    assert_eq!(
+        loaded.direct_load_roots.as_ref(),
+        loaded.reachable_loads.as_ref()
+    );
+    assert_eq!(loaded.retained_bzl_module_count(), 1 + BUILTIN_LABELS.len());
+}
+
 fn event_texts(batch: &EventBatch) -> Vec<&str> {
     batch
         .events()
@@ -37419,16 +37435,7 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
             .collect::<Vec<_>>(),
         ["macro_files"]
     );
-    assert_eq!(
-        loaded
-            .direct_load_roots
-            .iter()
-            .map(|identity| identity.label.to_string())
-            .collect::<Vec<_>>(),
-        ["@@dep+//:defs.bzl"]
-    );
-    assert_complete_module_identities(loaded.reachable_loads.iter(), &["@@dep+//:defs.bzl"], 1);
-    assert_eq!(loaded.retained_bzl_module_count(), 1 + BUILTIN_LABELS.len());
+    assert_single_package_load_and_builtin_lifetimes(loaded);
     assert_ne!(loaded.load_fingerprint, [0; 32]);
     assert!(RepositoryPackageLoadKey::validity(&cold_value));
     assert!(RepositoryPackageLoadKey::equality(&cold_value, &cold_value));
@@ -38207,19 +38214,7 @@ async fn observed_repository_package_load_replays_a_b_a() {
             ));
         }
     }
-    assert_eq!(
-        cold_loaded.direct_load_roots[0].label.to_string(),
-        "@@dep+//:defs.bzl"
-    );
-    assert_complete_module_identities(
-        cold_loaded.reachable_loads.iter(),
-        &["@@dep+//:defs.bzl"],
-        1,
-    );
-    assert_eq!(
-        cold_loaded.retained_bzl_module_count(),
-        1 + BUILTIN_LABELS.len()
-    );
+    assert_single_package_load_and_builtin_lifetimes(cold_loaded);
 }
 
 #[tokio::test]
@@ -38507,8 +38502,7 @@ async fn repository_package_load_accepts_dependency_free_public_starlark_rule_sh
     assert_eq!(capability.rule_class, "probe");
     assert!(!capability.executable);
     assert!(capability.test_kind.is_none());
-    assert_complete_module_identities(loaded.reachable_loads.iter(), &["@@dep+//:defs.bzl"], 1);
-    assert_eq!(loaded.retained_bzl_module_count(), 1 + BUILTIN_LABELS.len());
+    assert_single_package_load_and_builtin_lifetimes(loaded);
     let batches = tracker.take();
     assert_eq!(
         event_texts(
