@@ -1,9 +1,19 @@
 //! Allocation certificates for the private optional lookup index.
 
+use std::alloc;
+use std::alloc::Layout;
 use std::mem;
+use std::ptr::NonNull;
 
 use allocative::Allocative;
 use hashbrown::HashTable;
+use hashbrown::TryReserveError;
+
+use super::BoundedMapError;
+
+// Pinned hashbrown 0.14.5 raw generic/SSE2/NEON group implementations.
+const MIN_GROUP_WIDTH: usize = 4;
+const MAX_GROUP_WIDTH: usize = 16;
 
 #[derive(Clone, Allocative)]
 pub(super) struct Index {
@@ -29,6 +39,77 @@ impl Index {
             full_capacity_high_water: table.capacity(),
             table,
         }
+    }
+
+    /// Work to initialize a fresh table and requested bytes for it and its box.
+    pub(super) fn fresh_allocation(capacity: usize) -> Option<(usize, usize)> {
+        // Match hashbrown 0.14.5 RawTableInner::capacity_to_buckets for a
+        // requested capacity. The retained-storage certificate below starts
+        // from a different fact, the effective capacity observed after allocation.
+        let buckets = match capacity {
+            0 => return Some((0, mem::size_of::<Self>())),
+            1..=3 => 4,
+            4..=7 => 8,
+            n => (n.checked_mul(8)? / 7).checked_next_power_of_two()?,
+        };
+        let control_len = buckets.checked_add(MAX_GROUP_WIDTH)?;
+        let controls = Layout::from_size_align(control_len, MAX_GROUP_WIDTH).ok()?;
+        let (layout, _) = Layout::array::<usize>(buckets)
+            .ok()?
+            .extend(controls)
+            .ok()?;
+        Some((
+            control_len,
+            layout.size().checked_add(mem::size_of::<Self>())?,
+        ))
+    }
+
+    /// Allocate a fresh table after the caller pays its layout.
+    pub(super) fn try_with_capacity<E>(capacity: usize) -> Result<Box<Self>, BoundedMapError<E>> {
+        let mut table = HashTable::new();
+        table
+            .try_reserve(capacity, |_: &usize| {
+                unreachable!("fresh table has no entries")
+            })
+            .map_err(|error| match error {
+                TryReserveError::CapacityOverflow => BoundedMapError::SizeOverflow,
+                TryReserveError::AllocError { .. } => BoundedMapError::AllocationFailed,
+            })?;
+        let index = Self {
+            full_capacity_high_water: table.capacity(),
+            table,
+        };
+        // SAFETY: Allocate the exact nonzero Box<Self> layout with the global
+        // allocator, verify its pointer, and initialize it before taking ownership.
+        let ptr = NonNull::new(unsafe { alloc::alloc(Layout::new::<Self>()) })
+            .ok_or(BoundedMapError::AllocationFailed)?
+            .cast::<Self>();
+        unsafe {
+            ptr.as_ptr().write(index);
+            Ok(Box::from_raw(ptr.as_ptr()))
+        }
+    }
+
+    /// Insert into a fully reserved table that has no deletions or tombstones.
+    pub(super) fn insert_fresh<E>(
+        &mut self,
+        hash: u64,
+        value: usize,
+        charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<(), BoundedMapError<E>> {
+        let occupied = self.table.len();
+        assert!(
+            occupied < self.table.capacity(),
+            "fresh index must have spare capacity"
+        );
+        // Pinned hashbrown 0.14.5's triangular probe visits disjoint control
+        // groups until finding a vacant bucket. Each failed group contains
+        // at least MIN_GROUP_WIDTH live entries. Include the successful
+        // group and the possible extra small-table fixup load.
+        charge(occupied / MIN_GROUP_WIDTH + 2, 0).map_err(BoundedMapError::Operation)?;
+        self.table
+            .insert_unique(hash, value, |_| unreachable!("fresh index must not grow"));
+        Ok(())
     }
 
     pub(super) fn len(&self) -> usize {

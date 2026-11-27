@@ -21,6 +21,7 @@ use std::marker::PhantomData;
 use std::mem;
 
 use super::simple::AValueSimple;
+use crate::eval::ExecutionLimit;
 use crate::eval::compiler::def::FrozenDef;
 use crate::private::Private;
 use crate::values::ComplexValue;
@@ -34,6 +35,8 @@ use crate::values::StarlarkValue;
 use crate::values::Trace;
 use crate::values::Tracer;
 use crate::values::Value;
+use crate::values::dict::Dict;
+use crate::values::dict::value::MutableDict;
 use crate::values::layout::avalue::AValue;
 use crate::values::layout::avalue::AValueImpl;
 use crate::values::layout::avalue::heap_copy_deferred;
@@ -135,6 +138,16 @@ where
 }
 
 impl<'v> Heap<'v> {
+    /// Admit the exact mutable dictionary arena object before moving its backing map.
+    /// The caller accounts for the row and index allocations.
+    pub(crate) fn alloc_budgeted_dict(self, dict: Dict<'v>) -> Result<Value<'v>, ExecutionLimit> {
+        if let Some(budget) = self.execution_budget() {
+            let bytes = AValueComplex::<MutableDict<'v>>::alloc_size_for_extra_len(0).bytes();
+            budget.charge(1, bytes as usize)?;
+        }
+        Ok(self.alloc(dict))
+    }
+
     /// Allocate a [`ComplexValue`] on the [`Heap`].
     pub fn alloc_complex<T>(self, x: T) -> Value<'v>
     where

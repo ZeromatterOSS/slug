@@ -83,15 +83,20 @@ impl<A, B> Vec2Layout<A, B> {
         })
     }
 
-    unsafe fn alloc(&self) -> NonNull<B> {
-        unsafe {
-            let ptr: *mut u8 = alloc::alloc(self.layout);
-            let bbb_ptr: *mut B = ptr.add(self.offset_of_bbb).cast();
-            NonNull::new_unchecked(bbb_ptr)
+    fn try_alloc(&self) -> Option<NonNull<B>> {
+        if self.layout.size() == 0 {
+            return Some(NonNull::<(A, B)>::dangling().cast());
         }
+        // SAFETY: The nonempty layout was checked above. Offset into the
+        // allocation only after proving the allocator returned a pointer.
+        let ptr = NonNull::new(unsafe { alloc::alloc(self.layout) })?;
+        Some(unsafe { ptr.add(self.offset_of_bbb).cast() })
     }
 
     unsafe fn dealloc(&self, bbb_ptr: NonNull<B>) {
+        if self.layout.size() == 0 {
+            return;
+        }
         unsafe {
             let ptr: *mut u8 = bbb_ptr.as_ptr().cast::<u8>().sub(self.offset_of_bbb);
             alloc::dealloc(ptr, self.layout)
@@ -107,6 +112,11 @@ pub struct Vec2<A, B> {
     len: usize,
     cap: usize,
     _marker: PhantomData<(A, B)>,
+}
+
+pub(crate) enum Vec2AllocationError {
+    SizeOverflow,
+    AllocationFailed,
 }
 
 unsafe impl<A: Send, B: Send> Send for Vec2<A, B> {}
@@ -243,13 +253,40 @@ impl<A, B> Vec2<A, B> {
         if cap == 0 {
             Vec2::new()
         } else {
-            let bbb_ptr = unsafe { Vec2Layout::<A, B>::new(cap).alloc() };
-            Vec2 {
-                bbb_ptr,
-                len: 0,
-                cap,
-                _marker: PhantomData,
-            }
+            let layout = Vec2Layout::<A, B>::new(cap);
+            let bbb_ptr = layout
+                .try_alloc()
+                .unwrap_or_else(|| alloc::handle_alloc_error(layout.layout));
+            Self::empty_allocation(bbb_ptr, cap)
+        }
+    }
+
+    pub(crate) fn checked_backing_bytes(cap: usize) -> Option<usize> {
+        if cap == 0 {
+            Some(0)
+        } else {
+            Some(Vec2Layout::<A, B>::new_checked(cap).ok()?.layout.size())
+        }
+    }
+
+    pub(crate) fn try_with_capacity(cap: usize) -> Result<Self, Vec2AllocationError> {
+        if cap == 0 {
+            return Ok(Self::new());
+        }
+        let layout =
+            Vec2Layout::<A, B>::new_checked(cap).map_err(|_| Vec2AllocationError::SizeOverflow)?;
+        let bbb_ptr = layout
+            .try_alloc()
+            .ok_or(Vec2AllocationError::AllocationFailed)?;
+        Ok(Self::empty_allocation(bbb_ptr, cap))
+    }
+
+    fn empty_allocation(bbb_ptr: NonNull<B>, cap: usize) -> Self {
+        Self {
+            bbb_ptr,
+            len: 0,
+            cap,
+            _marker: PhantomData,
         }
     }
 
@@ -747,7 +784,7 @@ mod tests {
     fn test_alloc_dealloc() {
         unsafe {
             let layout = Vec2Layout::<[u8; 3], u32>::new(100);
-            let data = layout.alloc();
+            let data = layout.try_alloc().unwrap();
             layout.dealloc(data);
         }
     }

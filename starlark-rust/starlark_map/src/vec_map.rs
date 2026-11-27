@@ -42,6 +42,7 @@ pub(crate) use crate::vec_map::iter::Values;
 pub(crate) use crate::vec_map::iter::ValuesMut;
 use crate::vec_map::simd::find_hash_in_array;
 pub(crate) use crate::vec2::Vec2;
+use crate::vec2::Vec2AllocationError;
 
 #[derive(Debug, Clone, Allocative)]
 #[cfg_attr(feature = "pagable", derive(Pagable))]
@@ -69,6 +70,16 @@ impl<K, V> VecMap<K, V> {
         VecMap {
             buckets: Vec2::with_capacity(n),
         }
+    }
+
+    pub(crate) fn checked_backing_bytes(capacity: usize) -> Option<usize> {
+        Vec2::<(K, V), StarlarkHashValue>::checked_backing_bytes(capacity)
+    }
+
+    pub(crate) fn try_with_capacity(capacity: usize) -> Result<Self, Vec2AllocationError> {
+        Ok(Self {
+            buckets: Vec2::try_with_capacity(capacity)?,
+        })
     }
 
     pub(crate) fn reserve(&mut self, additional: usize) {

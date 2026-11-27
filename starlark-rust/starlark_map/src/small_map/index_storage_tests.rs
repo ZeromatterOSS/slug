@@ -1,10 +1,58 @@
 use std::alloc::Layout;
 use std::mem;
 
+use hashbrown::raw::RawTable;
+
 use super::Index;
 use crate::StarlarkHashValue;
+use crate::small_map::BoundedMapError;
 use crate::small_map::SmallMap;
 use crate::small_set::SmallSet;
+
+#[test]
+fn fresh_index_forecast_covers_the_pinned_requested_capacity_layout() {
+    for count in [1, 3, 7, 8, 17, 29, 56, 57, 65, 128] {
+        let actual = RawTable::<usize>::try_with_capacity(count).unwrap();
+        let (_, layout) = actual.allocation_info();
+        let (_, forecast) = Index::fresh_allocation(count).unwrap();
+        assert!(
+            forecast >= layout.size() + mem::size_of::<Index>(),
+            "{count}"
+        );
+    }
+}
+
+#[test]
+fn collision_probe_refusal_precedes_inserting_the_fresh_slot() {
+    let count = 29;
+    let mut index = Index::try_with_capacity::<()>(count).unwrap();
+    for i in 0..count - 1 {
+        index
+            .insert_fresh(0, i, &mut |_, _| Ok::<_, ()>(()))
+            .unwrap();
+    }
+
+    let charge = (count - 1) / 4 + 2;
+    assert_eq!(
+        index.insert_fresh(0, count - 1, &mut |work, bytes| {
+            assert_eq!((work, bytes), (charge, 0));
+            Err(())
+        }),
+        Err(BoundedMapError::Operation(())),
+    );
+    assert_eq!(index.len(), count - 1);
+    assert_eq!(index.find(0, |value| *value == count - 1), None);
+    index
+        .insert_fresh(0, count - 1, &mut |work, bytes| {
+            assert_eq!((work, bytes), (charge, 0));
+            Ok::<_, ()>(())
+        })
+        .unwrap();
+    assert_eq!(
+        index.find(0, |value| *value == count - 1),
+        Some(&(count - 1))
+    );
+}
 
 #[test]
 fn empty_reserved_clone_keeps_hidden_index_storage_certificate() {

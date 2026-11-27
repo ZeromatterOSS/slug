@@ -20,7 +20,6 @@
 //! * no index is created for small maps
 //! * short hashes are stored next to keys
 
-use std::alloc::Layout;
 use std::fmt;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -53,6 +52,7 @@ pub use crate::small_map::iter::Keys;
 pub use crate::small_map::iter::Values;
 pub use crate::small_map::iter::ValuesMut;
 use crate::vec_map::VecMap;
+use crate::vec2::Vec2AllocationError;
 
 mod index;
 mod iter;
@@ -66,6 +66,19 @@ use index::Index;
 const NO_INDEX_THRESHOLD: usize = 32;
 #[cfg(not(rust_nightly))]
 const NO_INDEX_THRESHOLD: usize = 16;
+
+/// A bounded construction failure. No partial map is returned.
+#[derive(Debug, PartialEq, Eq)]
+pub enum BoundedMapError<E> {
+    /// The caller's work or allocation budget refused.
+    Operation(E),
+    /// The requested layout or cumulative allocation size overflowed.
+    SizeOverflow,
+    /// A fallible host allocation failed.
+    AllocationFailed,
+    /// The input produced a different number of rows than declared.
+    RowCountMismatch,
+}
 
 /// A map with deterministic iteration order.
 ///
@@ -119,6 +132,51 @@ impl<K, V> SmallMap<K, V> {
                 index: Some(Box::new(Index::with_capacity(n))),
             }
         }
+    }
+
+    /// Build an ordinary insertion-ordered map from validated unique rows.
+    ///
+    /// Each key must be unique and carry its existing canonical hash. Row
+    /// production and payloads must already be admitted by the caller.
+    /// `charge` receives work units and requested host allocation bytes
+    /// before either is used. A failure drops all local entries and storage.
+    pub fn try_from_unique_hashed_rows<E>(
+        count: usize,
+        rows: impl IntoIterator<Item = (Hashed<K>, V)>,
+        mut charge: impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<Self, BoundedMapError<E>> {
+        let indexed = count > NO_INDEX_THRESHOLD;
+        let (index_work, index_bytes) = if indexed {
+            Index::fresh_allocation(count).ok_or(BoundedMapError::SizeOverflow)?
+        } else {
+            (0, 0)
+        };
+        let bytes = VecMap::<K, V>::checked_backing_bytes(count)
+            .and_then(|entry_bytes| entry_bytes.checked_add(index_bytes))
+            .ok_or(BoundedMapError::SizeOverflow)?;
+        charge(index_work, bytes).map_err(BoundedMapError::Operation)?;
+
+        let mut entries = VecMap::try_with_capacity(count).map_err(|error| match error {
+            Vec2AllocationError::SizeOverflow => BoundedMapError::SizeOverflow,
+            Vec2AllocationError::AllocationFailed => BoundedMapError::AllocationFailed,
+        })?;
+        let mut index = indexed
+            .then(|| Index::try_with_capacity::<E>(count))
+            .transpose()?;
+        let mut rows = rows.into_iter();
+        for i in 0..count {
+            charge(1, 0).map_err(BoundedMapError::Operation)?;
+            let (key, value) = rows.next().ok_or(BoundedMapError::RowCountMismatch)?;
+            if let Some(index) = &mut index {
+                index.insert_fresh(key.hash().promote(), i, &mut charge)?;
+            }
+            entries.insert_hashed_unique_unchecked(key, value);
+        }
+        charge(1, 0).map_err(BoundedMapError::Operation)?;
+        if rows.next().is_some() {
+            return Err(BoundedMapError::RowCountMismatch);
+        }
+        Ok(Self { entries, index })
     }
 
     /// Verify that the map is internally consistent.
@@ -427,14 +485,7 @@ impl<K, V> SmallMap<K, V> {
     /// This borrowed query allocates nothing; arithmetic/layout overflow is
     /// reported as `None`.
     pub fn retained_storage_bytes_upper_bound(&self) -> Option<usize> {
-        let capacity = self.entries.capacity();
-        let entries = if capacity == 0 {
-            0
-        } else {
-            let values = Layout::array::<(K, V)>(capacity).ok()?;
-            let hashes = Layout::array::<StarlarkHashValue>(capacity).ok()?;
-            values.extend(hashes).ok()?.0.size()
-        };
+        let entries = VecMap::<K, V>::checked_backing_bytes(self.entries.capacity())?;
         entries.checked_add(match &self.index {
             Some(index) => index.retained_storage_bytes_upper_bound()?,
             None => 0,
@@ -1148,6 +1199,10 @@ where
         deserializer.deserialize_map(visitor)
     }
 }
+
+#[cfg(test)]
+#[path = "small_map/bounded_construction_tests.rs"]
+mod bounded_construction_tests;
 
 #[cfg(test)]
 mod tests {

@@ -55,8 +55,12 @@ pub fn parse_positional_kwargs_alloc<'v, 'a, const R: usize, const O: usize>(
     heap: Heap<'v>,
 ) -> crate::Result<([Value<'v>; R], [Option<Value<'v>>; O], Value<'v>)> {
     let (required, optional) = args.optional(heap)?;
-    let kwargs = args.names_map()?;
-    let kwargs = heap.alloc(kwargs);
+    let kwargs = if let Some(budget) = heap.execution_budget() {
+        args.bounded_format_names(budget)?
+            .alloc_dict(heap, budget)?
+    } else {
+        heap.alloc(args.names_map()?)
+    };
     Ok((required, optional, kwargs))
 }
 
@@ -118,9 +122,13 @@ mod tests {
     use crate::eval::compiler::def::FrozenDef;
     use crate::syntax::AstModule;
     use crate::syntax::Dialect;
+    use crate::values::Heap;
     use crate::values::Value;
     use crate::values::ValueLike;
     use crate::values::dict::AllocDict;
+    use crate::values::dict::Dict;
+    use crate::values::dict::DictMut;
+    use crate::values::dict::DictRef;
 
     #[starlark_module]
     fn globals(builder: &mut GlobalsBuilder) {
@@ -132,10 +140,10 @@ mod tests {
         }
 
         fn collect_named<'v>(
-            #[starlark(require = pos)] first: Value<'v>,
-            #[starlark(kwargs)] _kwargs: Value<'v>,
+            #[starlark(require = pos)] _first: Value<'v>,
+            #[starlark(kwargs)] kwargs: Value<'v>,
         ) -> anyhow::Result<Value<'v>> {
-            Ok(first)
+            Ok(kwargs)
         }
     }
 
@@ -238,5 +246,170 @@ mod tests {
         module.set("kwargs", kwargs);
         assert!(eval(&module, "choose(0, **kwargs)").is_err());
         assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
+    }
+
+    #[test]
+    fn generated_kwargs_capture_preserves_order_and_uses_fresh_mutable_dict() {
+        let budget = Arc::new(ExecutionBudget::new(1000, 4096, 16));
+        let caller = Module::new_with_execution_budget(budget.clone());
+        let tail = caller.heap().alloc(AllocDict([("z", 2), ("a", 3)]));
+        caller.set("tail", tail);
+        let direct = eval(&caller, "collect_named(0, head=1, **tail)").unwrap();
+
+        let producer = Module::new();
+        eval(
+            &producer,
+            "def call(tail): return collect_named(0, head=1, **tail)",
+        )
+        .unwrap();
+        let producer = producer.freeze().unwrap();
+        let program = producer.get("call").unwrap();
+        let bytecode = program
+            .value()
+            .downcast_ref::<FrozenDef>()
+            .unwrap()
+            .dump_debug();
+        assert!(bytecode.contains("CallFrozenNative"), "{bytecode}");
+        let program = program.owned_value(caller.frozen_heap());
+        let frozen_call = Evaluator::new(&caller)
+            .eval_function(program, &[tail], &[])
+            .unwrap();
+
+        for result in [direct, frozen_call] {
+            assert!(!result.ptr_eq(tail));
+            assert!(DictMut::from_value(result).is_ok());
+            let captured = DictRef::from_value(result).unwrap();
+            let rows: Vec<_> = captured
+                .iter()
+                .map(|(key, value)| (key.unpack_str().unwrap(), value.unpack_i32().unwrap()))
+                .collect();
+            assert_eq!(rows, [("head", 1), ("z", 2), ("a", 3)]);
+            let original = DictRef::from_value(tail).unwrap();
+            for (new, old) in captured.keys().skip(1).zip(original.keys()) {
+                assert!(new.ptr_eq(old));
+            }
+        }
+        assert!(budget.check().is_ok());
+    }
+
+    #[test]
+    fn generated_kwargs_capture_preserves_collision_diagnostic_order_and_budget() {
+        for module in [
+            Module::new(),
+            Module::new_with_execution_budget(Arc::new(ExecutionBudget::new(1000, 4096, 16))),
+        ] {
+            let heap = module.heap();
+            let repeated = (heap.alloc("repeated"), 1);
+            let malformed = (heap.alloc(0), 2);
+            module.set(
+                "duplicate_first",
+                heap.alloc(AllocDict([repeated, malformed])),
+            );
+            module.set(
+                "malformed_first",
+                heap.alloc(AllocDict([malformed, repeated])),
+            );
+            for (name, message) in [
+                (
+                    "duplicate_first",
+                    "Argument `repeated` occurs more than once",
+                ),
+                (
+                    "malformed_first",
+                    "The argument provided for *args is not an identifier",
+                ),
+            ] {
+                let result = eval(&module, &format!("collect_named(0, repeated=0, **{name})"));
+                assert_eq!(
+                    result.unwrap_err().without_diagnostic().to_string(),
+                    message
+                );
+            }
+        }
+
+        let budget = Arc::new(ExecutionBudget::new(1000, 0, 16));
+        let module = Module::new_with_execution_budget(budget.clone());
+        let repeated = module.heap().alloc(AllocDict([("repeated", 1)]));
+        module.set("tail", repeated);
+        assert!(eval(&module, "collect_named(0, repeated=0, **tail)").is_err());
+        assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
+    }
+
+    #[test]
+    fn generated_kwargs_capture_admits_exact_empty_dict_arena_object() {
+        let bytes = Heap::temp(|heap| {
+            heap.alloc(Dict::default())
+                .get_ref()
+                .total_memory_for_profile()
+        });
+        for allowance in [bytes - 1, bytes] {
+            let budget = Arc::new(ExecutionBudget::new(1000, allowance, 16));
+            let module = Module::new_with_execution_budget(budget.clone());
+            let result = eval(&module, "collect_named(0)");
+            let summary = module.heap().allocated_summary().summary();
+            if allowance == bytes {
+                assert!(DictRef::from_value(result.unwrap()).unwrap().is_empty());
+                assert_eq!(summary.get(Dict::TYPE), Some(&(1, bytes)));
+                assert!(budget.check().is_ok());
+            } else {
+                assert!(result.is_err());
+                assert!(!summary.contains_key(Dict::TYPE));
+                assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
+            }
+        }
+    }
+
+    #[cfg(all(target_endian = "little", target_pointer_width = "64"))]
+    #[test]
+    fn generated_kwargs_capture_budgets_indexed_collisions() {
+        use std::collections::BTreeMap;
+
+        use crate::collections::StarlarkHashValue;
+
+        // Identical low bytes in a single FxHash word give many genuine collisions.
+        // Forty distinct keys require the indexed SmallMap path on all toolchains.
+        let mut groups = BTreeMap::<u32, Vec<String>>::new();
+        let keys = (0..4096)
+            .find_map(|i| {
+                let key = format!("key-{i:04}");
+                let hash = StarlarkHashValue::new(key.as_str()).get();
+                let group = groups.entry(hash).or_default();
+                group.push(key);
+                (group.len() == 40).then(|| std::mem::take(group))
+            })
+            .unwrap();
+
+        for (work, bytes, expected) in [
+            (10000, 65536, Ok(())),
+            // Enough for validation, control initialization, and copying rows.
+            (220, 65536, Err(ExecutionLimit::Work)),
+            (10000, 8, Err(ExecutionLimit::AllocationBytes)),
+        ] {
+            let budget = Arc::new(ExecutionBudget::new(work, bytes, 16));
+            let module = Module::new_with_execution_budget(budget.clone());
+            let rows = keys
+                .iter()
+                .enumerate()
+                .map(|(index, key)| (key.as_str(), index as i32));
+            module.set("tail", module.heap().alloc(AllocDict(rows)));
+            let result = eval(&module, "collect_named(0, **tail)");
+            assert_eq!(budget.check(), expected);
+            if expected.is_ok() {
+                let captured = DictRef::from_value(result.unwrap()).unwrap();
+                assert_eq!(captured.len(), keys.len());
+                for (index, ((key, value), expected)) in captured.iter().zip(&keys).enumerate() {
+                    assert_eq!(key.unpack_str(), Some(expected.as_str()));
+                    assert_eq!(value.unpack_i32(), Some(index as i32));
+                    assert_eq!(
+                        captured.get_str(expected).unwrap().unpack_i32(),
+                        Some(index as i32)
+                    );
+                }
+            } else {
+                assert!(result.is_err());
+                let summary = module.heap().allocated_summary().summary();
+                assert_eq!(summary.get(Dict::TYPE).unwrap().0, 1);
+            }
+        }
     }
 }

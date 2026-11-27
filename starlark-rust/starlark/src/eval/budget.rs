@@ -26,7 +26,7 @@ pub enum ExecutionLimit {
     #[error("Starlark structural identity encountered a value cycle")]
     StructuralCycle,
     /// A fallible allocation refused an admitted request.
-    #[error("Starlark text allocation failed")]
+    #[error("Starlark execution allocation failed")]
     AllocationFailed,
     /// No admitted renderer exists for this value type.
     #[error("bounded Starlark text is unsupported for type {0}")]

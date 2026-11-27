@@ -1,5 +1,9 @@
+use starlark_map::small_map::BoundedMapError;
+
 use super::Arguments;
 use super::FunctionError;
+use crate::collections::Hashed;
+use crate::collections::SmallMap;
 use crate::collections::symbol::symbol::Symbol;
 use crate::eval::ExecutionBudget;
 use crate::eval::ExecutionLimit;
@@ -8,6 +12,8 @@ use crate::values::Heap;
 use crate::values::StringValue;
 use crate::values::StringValueLike;
 use crate::values::Value;
+use crate::values::ValueLike;
+use crate::values::dict::Dict;
 use crate::values::dict::DictRef;
 
 /// Borrowed, validated named arguments. Lookups pay for scanned keys instead of
@@ -38,6 +44,50 @@ impl<'v> BoundedFormatNames<'v, '_> {
             })
         });
         Ok(find_name(self.explicit().chain(kwargs), name, budget)?)
+    }
+
+    /// Materialize unique validated names in call order, reusing their stored hashes.
+    pub(crate) fn alloc_dict(
+        self,
+        heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Value<'v>> {
+        let count = self
+            .explicit
+            .len()
+            .checked_add(self.kwargs.as_ref().map_or(0, |kwargs| kwargs.len()))
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        let explicit = self
+            .explicit
+            .iter()
+            .zip(self.values)
+            .map(|((symbol, name), value)| {
+                (
+                    Hashed::new_unchecked(symbol.small_hash(), name.to_value()),
+                    *value,
+                )
+            });
+        let kwargs = self.kwargs.iter().flat_map(|kwargs| kwargs.iter_hashed());
+        let rows =
+            SmallMap::try_from_unique_hashed_rows(count, explicit.chain(kwargs), |work, bytes| {
+                budget.charge(work, bytes)
+            });
+        let rows = match rows {
+            Ok(rows) => rows,
+            Err(BoundedMapError::Operation(limit)) => return Err(limit.into()),
+            Err(BoundedMapError::SizeOverflow) => {
+                return Err(budget.refuse(ExecutionLimit::AllocationBytes).into());
+            }
+            Err(BoundedMapError::AllocationFailed) => {
+                return Err(budget.refuse(ExecutionLimit::AllocationFailed).into());
+            }
+            Err(BoundedMapError::RowCountMismatch) => {
+                return Err(crate::Error::new_kind(crate::ErrorKind::Internal(
+                    anyhow::anyhow!("validated kwargs row count changed",),
+                )));
+            }
+        };
+        Ok(heap.alloc_budgeted_dict(Dict::new(rows))?)
     }
 }
 
