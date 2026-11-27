@@ -15,9 +15,8 @@ use crate::values::StarlarkValue;
 
 fn limited(heap: &FrozenHeap, work: usize, scratch: usize) -> Freezer<'_> {
     Freezer {
-        heap,
-        frozen_defs: RefCell::new(Vec::new()),
         traversal: FreezeTraversalState::new(work, scratch),
+        ..Freezer::new(heap)
     }
 }
 

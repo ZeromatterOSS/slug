@@ -152,7 +152,7 @@ where
     A: AValue<'v, ExtraElem = ()>,
 {
     unsafe {
-        let (fv, r) = freezer.reserve::<A>();
+        let (fv, r) = freezer.reserve::<A>()?;
         let x = AValueHeader::overwrite_with_forward::<A::StarlarkValue>(
             me,
             ForwardPtr::new_frozen(fv),

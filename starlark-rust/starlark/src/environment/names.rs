@@ -18,11 +18,16 @@
 use std::cell::RefCell;
 
 use allocative::Allocative;
+use starlark_map::small_map::BoundedMapError;
 use starlark_syntax::syntax::ast::Visibility;
 
 use crate::collections::Hashed;
 use crate::collections::SmallMap;
 use crate::environment::slots::ModuleSlotId;
+use crate::eval::ExecutionLimit;
+use crate::values::FreezeError;
+use crate::values::FreezeResult;
+use crate::values::Freezer;
 use crate::values::FrozenStringValue;
 
 /// MutableNames are how we allocate slots (index-based) to variables
@@ -161,6 +166,30 @@ impl MutableNames {
                 .map(|(name, (slot, vis))| (name, (slot, vis, assigned[slot.0 as usize])))
                 .collect(),
         )
+    }
+
+    pub(crate) fn freeze_bounded(self, freezer: &Freezer) -> FreezeResult<FrozenNames> {
+        let assigned = self.assigned.into_inner();
+        let names = self.names.into_inner();
+        let count = names.len();
+        let rows = names
+            .into_iter_hashed()
+            .map(|(name, (slot, vis))| (name, (slot, vis, assigned[slot.0 as usize])));
+        match SmallMap::try_from_unique_hashed_rows(count, rows, |work, bytes| {
+            freezer.charge_execution(work, bytes)
+        }) {
+            Ok(names) => Ok(FrozenNames(names)),
+            Err(BoundedMapError::Operation(error)) => Err(error),
+            Err(BoundedMapError::SizeOverflow) => {
+                Err(freezer.refuse_execution(ExecutionLimit::AllocationBytes))
+            }
+            Err(BoundedMapError::AllocationFailed) => {
+                Err(freezer.refuse_execution(ExecutionLimit::AllocationFailed))
+            }
+            Err(BoundedMapError::RowCountMismatch) => Err(FreezeError::new(
+                "module freeze name row count changed".to_owned(),
+            )),
+        }
     }
 }
 

@@ -136,6 +136,9 @@ where
     type Frozen = Vec<T::Frozen>;
 
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Vec<T::Frozen>> {
+        if freezer.execution_budget().is_some() {
+            return freezer.collect_exact_vec(self.into_iter().map(|v| v.freeze(freezer)));
+        }
         self.into_try_map(|v| v.freeze(freezer))
     }
 }
@@ -191,6 +194,10 @@ where
     type Frozen = Box<[T::Frozen]>;
 
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        if freezer.execution_budget().is_some() {
+            return freezer
+                .collect_exact_boxed(self.into_vec().into_iter().map(|v| v.freeze(freezer)));
+        }
         self.into_vec()
             .into_try_map(|v| v.freeze(freezer))
             .map(|v| v.into_boxed_slice())

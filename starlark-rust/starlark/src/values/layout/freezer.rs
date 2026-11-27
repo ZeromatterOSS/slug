@@ -15,18 +15,29 @@
  * limitations under the License.
  */
 
+use std::alloc::Layout;
+use std::cell::Cell;
 use std::cell::RefCell;
+use std::fmt::Debug;
+use std::mem;
 
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
+use crate::eval::compiler::def::Def;
 use crate::eval::compiler::def::FrozenDef;
 use crate::values::AllocFrozenValue;
+use crate::values::FreezeError;
 use crate::values::FreezeResult;
 use crate::values::FrozenHeap;
 use crate::values::FrozenRef;
 use crate::values::layout::avalue::AValue;
+use crate::values::layout::avalues::simple::AValueSimple;
 use crate::values::layout::heap::arena::Reservation;
 use crate::values::layout::heap::repr::AValueOrForwardUnpack;
 use crate::values::layout::value::FrozenValue;
 use crate::values::layout::value::Value;
+use crate::values::layout::value_captured::ValueCaptured;
+use crate::values::types::any::StarlarkAny;
 
 mod traversal;
 
@@ -35,6 +46,17 @@ mod traversal_tests;
 
 use traversal::FreezeTraversalState;
 
+// Only a new live object increases native recursion depth.
+const MAX_FREEZE_DEPTH: usize = 64;
+
+struct RestoreDepth<'a>(&'a Cell<usize>, usize);
+
+impl Drop for RestoreDepth<'_> {
+    fn drop(&mut self) {
+        self.0.set(self.1);
+    }
+}
+
 /// Used to `freeze` values by [`Freeze::freeze`](crate::values::Freeze::freeze).
 pub struct Freezer<'fv> {
     /// Freezing into this heap.
@@ -42,15 +64,114 @@ pub struct Freezer<'fv> {
     /// Defs frozen by this freezer.
     pub(crate) frozen_defs: RefCell<Vec<FrozenRef<'static, FrozenDef>>>,
     traversal: FreezeTraversalState,
+    budget: Option<&'fv ExecutionBudget>,
+    depth: Cell<usize>,
 }
 
 impl<'fv> Freezer<'fv> {
     pub(crate) fn new(heap: &'fv FrozenHeap) -> Self {
+        Self::with_execution_budget(heap, None)
+    }
+
+    pub(crate) fn with_execution_budget(
+        heap: &'fv FrozenHeap,
+        budget: Option<&'fv ExecutionBudget>,
+    ) -> Self {
         Freezer {
             heap,
             frozen_defs: RefCell::new(Vec::new()),
             traversal: FreezeTraversalState::default(),
+            budget,
+            depth: Cell::new(0),
         }
+    }
+
+    pub(crate) fn execution_budget(&self) -> Option<&ExecutionBudget> {
+        self.budget
+    }
+
+    // The bounded module entry point recovers the typed cause from the ledger.
+    pub(crate) fn execution_error(_limit: ExecutionLimit) -> FreezeError {
+        FreezeError::new("bounded Starlark freeze refused".to_owned())
+    }
+
+    pub(crate) fn refuse_execution(&self, limit: ExecutionLimit) -> FreezeError {
+        Self::execution_error(self.budget.expect("bounded freezer").refuse(limit))
+    }
+
+    pub(crate) fn charge_execution(&self, work: usize, bytes: usize) -> FreezeResult<()> {
+        if let Some(budget) = self.budget {
+            budget.charge(work, bytes).map_err(Self::execution_error)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn collect_exact_vec<T>(
+        &self,
+        values: impl ExactSizeIterator<Item = FreezeResult<T>>,
+    ) -> FreezeResult<Vec<T>> {
+        let count = values.len();
+        let layout = Layout::array::<T>(count)
+            .map_err(|_| self.refuse_execution(ExecutionLimit::AllocationBytes))?;
+        self.charge_execution(
+            count.max(ExecutionBudget::text_work(layout.size())),
+            layout.size(),
+        )?;
+        let mut result = Vec::new();
+        result
+            .try_reserve_exact(count)
+            .map_err(|_| self.refuse_execution(ExecutionLimit::AllocationFailed))?;
+        for value in values {
+            result.push(value?);
+        }
+        Ok(result)
+    }
+
+    pub(crate) fn collect_exact_boxed<T>(
+        &self,
+        values: impl ExactSizeIterator<Item = FreezeResult<T>>,
+    ) -> FreezeResult<Box<[T]>> {
+        let result = self.collect_exact_vec(values)?;
+        if mem::size_of::<T>() != 0 && result.capacity() != result.len() {
+            // The pinned allocator normally reports exact capacity. Admit a
+            // possible boxed-slice shrink and relocation before it runs.
+            let bytes = mem::size_of_val(result.as_slice());
+            self.charge_execution(result.len().max(ExecutionBudget::text_work(bytes)), bytes)?;
+        }
+        Ok(result.into_boxed_slice())
+    }
+
+    pub(crate) fn alloc_module_data<T: Debug + Send + Sync + 'static>(
+        &self,
+        value: T,
+    ) -> FreezeResult<FrozenRef<'static, T>> {
+        self.admit_arena_object::<AValueSimple<StarlarkAny<T>>>()?;
+        Ok(self.heap.alloc_any(value))
+    }
+
+    fn admit_arena_object<'v, T: AValue<'v, ExtraElem = ()>>(&self) -> FreezeResult<()> {
+        if self.budget.is_some() {
+            let bytes = T::checked_alloc_size_for_extra_len(0)
+                .ok_or_else(|| self.refuse_execution(ExecutionLimit::AllocationBytes))?
+                .bytes() as usize;
+            self.charge_execution(1 + ExecutionBudget::text_work(bytes), bytes)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn register_frozen_def(
+        &self,
+        def: FrozenRef<'static, FrozenDef>,
+    ) -> FreezeResult<()> {
+        let mut defs = self.frozen_defs.borrow_mut();
+        if let Some(budget) = self.budget {
+            budget
+                .push_vec(&mut defs, def)
+                .map_err(Self::execution_error)?;
+        } else {
+            defs.push(def);
+        }
+        Ok(())
     }
 
     /// Allocate a new value while freezing. Usually not a great idea.
@@ -60,11 +181,12 @@ impl<'fv> Freezer<'fv> {
 
     pub(crate) fn reserve<'v, 'v2, T: AValue<'v2, ExtraElem = ()>>(
         &'v self,
-    ) -> (FrozenValue, Reservation<'v2, T>) {
+    ) -> FreezeResult<(FrozenValue, Reservation<'v2, T>)> {
+        self.admit_arena_object::<T>()?;
         let (fv, r, extra) = self.heap.reserve_with_extra::<T>(0);
         let extra = unsafe { &mut *extra };
         debug_assert!(extra.is_empty());
-        (fv, r)
+        Ok((fv, r))
     }
 
     /// Test whether a value is frozen or has a freeze forwarding header.
@@ -118,6 +240,7 @@ impl<'fv> Freezer<'fv> {
     /// After an error this freezer is unusable, including for forwarded values.
     pub fn freeze(&self, value: Value) -> FreezeResult<FrozenValue> {
         self.with_traversal(|| {
+            self.charge_execution(1, 0)?;
             if let Some(x) = value.unpack_frozen() {
                 return Ok(x);
             }
@@ -126,7 +249,34 @@ impl<'fv> Freezer<'fv> {
                 AValueOrForwardUnpack::Forward(x) => {
                     Ok(unsafe { x.forward_ptr().unpack_frozen_value() })
                 }
-                AValueOrForwardUnpack::Header(v) => unsafe { v.unpack().heap_freeze(self) },
+                AValueOrForwardUnpack::Header(v) => {
+                    let value = v.unpack();
+                    let _depth = if let Some(budget) = self.budget {
+                        // Only these concrete owners have audited freeze work and
+                        // allocations. Check before virtual Freeze/direct-freeze.
+                        let admitted = value
+                            .downcast_ref::<Def>()
+                            .is_some_and(Def::deferred_for_freeze)
+                            || value.downcast_ref::<ValueCaptured>().is_some();
+                        if !admitted {
+                            return Err(self.refuse_execution(
+                                ExecutionLimit::UnsupportedOperation {
+                                    operation: "freeze",
+                                    value_type: value.vtable().type_name,
+                                },
+                            ));
+                        }
+                        let depth = self.depth.get();
+                        if depth >= budget.text_depth().min(MAX_FREEZE_DEPTH) {
+                            return Err(self.refuse_execution(ExecutionLimit::FreezeDepth));
+                        }
+                        self.depth.set(depth + 1);
+                        Some(RestoreDepth(&self.depth, depth))
+                    } else {
+                        None
+                    };
+                    unsafe { value.heap_freeze(self) }
+                }
             }
         })
     }

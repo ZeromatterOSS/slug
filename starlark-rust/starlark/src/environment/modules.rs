@@ -46,6 +46,7 @@ use crate::environment::slots::ModuleSlotId;
 use crate::environment::slots::MutableSlots;
 use crate::errors::did_you_mean::did_you_mean;
 use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::ProfileData;
 use crate::eval::runtime::profile::heap::RetainedHeapProfileMode;
 use crate::values::Freeze;
@@ -74,6 +75,8 @@ enum ModuleError {
     ExtraValueAlreadySet(&'static str),
     #[error("Client data already set to a value of type `{}`", .0)]
     ClientDataAlreadySet(&'static str),
+    #[error("Bounded freezing requires a module with an execution budget")]
+    BoundedFreezeRequiresBudget,
 }
 
 /// The result of freezing a [`Module`], making it and its contained values immutable.
@@ -518,6 +521,25 @@ impl Module {
 
     /// Freeze the environment, all its value will become immutable afterwards.
     pub fn freeze(self) -> FreezeResult<FrozenModule> {
+        self.freeze_impl(None)
+    }
+
+    /// Freeze using this module's execution budget. The module is consumed even
+    /// on refusal. Live deferred definitions and capture cells are admitted;
+    /// already-frozen values transfer by reference, and other live types refuse.
+    pub fn freeze_bounded(self) -> crate::Result<FrozenModule> {
+        let budget = self
+            .heap
+            .execution_budget()
+            .cloned()
+            .ok_or_else(|| crate::Error::new_other(ModuleError::BoundedFreezeRequiresBudget))?;
+        budget.check()?;
+        let result = self.freeze_impl(Some(&budget));
+        budget.check()?;
+        Ok(result?)
+    }
+
+    fn freeze_impl(self, budget: Option<&ExecutionBudget>) -> FreezeResult<FrozenModule> {
         let Module {
             names,
             slots,
@@ -535,7 +557,18 @@ impl Module {
         // Note that we even freeze anonymous slots, since they are accessed by
         // slot-index in the code, and we don't walk into them, so don't know if
         // they are used.
-        let freezer = Freezer::new(&frozen_heap);
+        let freezer = match budget {
+            Some(budget) => Freezer::with_execution_budget(&frozen_heap, Some(budget)),
+            None => Freezer::new(&frozen_heap),
+        };
+        if budget.is_some() && heap_profile_on_freeze.get().is_some() {
+            return Err(
+                freezer.refuse_execution(ExecutionLimit::UnsupportedOperation {
+                    operation: "freeze heap profiling",
+                    value_type: "module",
+                }),
+            );
+        }
         let slots = slots.freeze(&freezer)?;
         let extra_value = extra_value.into_inner().freeze(&freezer)?;
         let client_data = client_data.into_inner().freeze(&freezer)?;
@@ -552,14 +585,19 @@ impl Module {
             None
         };
         let rest = FrozenModuleData {
-            names: names.freeze(),
+            names: if budget.is_some() {
+                names.freeze_bounded(&freezer)?
+            } else {
+                names.freeze()
+            },
             slots,
             client_data,
             docstring: docstring.into_inner(),
             heap_profile: stacks,
         };
-        let frozen_module_ref = freezer.heap.alloc_any(rest);
+        let frozen_module_ref = freezer.alloc_module_data(rest)?;
         for frozen_def in freezer.frozen_defs.borrow().as_slice() {
+            freezer.charge_execution(1, 0)?;
             frozen_def.post_freeze(frozen_module_ref, heap.as_ref(), &freezer.heap);
         }
         // The values MUST be alive up until this point (as the above line uses them),
@@ -567,7 +605,12 @@ impl Module {
         mem::drop(heap);
 
         Ok(FrozenModule {
-            heap: frozen_heap.into_ref(),
+            heap: match budget {
+                Some(budget) => frozen_heap
+                    .into_ref_after_bounded_freeze(budget)
+                    .map_err(Freezer::execution_error)?,
+                None => frozen_heap.into_ref(),
+            },
             module: frozen_module_ref,
             extra_value,
             eval_duration: start.elapsed() + eval_duration.get(),
@@ -869,3 +912,7 @@ modified += 1
 #[cfg(test)]
 #[path = "modules/assigned_value_tests.rs"]
 mod assigned_value_tests;
+
+#[cfg(test)]
+#[path = "modules/bounded_freeze_tests.rs"]
+mod bounded_freeze_tests;

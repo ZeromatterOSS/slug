@@ -593,6 +593,10 @@ pub(crate) type FrozenDef = DefGen<FrozenValue>;
 starlark_complex_values!(Def);
 
 impl<'v> Def<'v> {
+    pub(crate) fn deferred_for_freeze(&self) -> bool {
+        self.def_info.stmt_compile_context.defer_script_operations
+    }
+
     pub(crate) fn new(
         parameters: ParametersSpec<Value<'v>>,
         parameter_types: Vec<(LocalSlotId, String, TypeCompiled<FrozenValue>)>,
@@ -628,7 +632,11 @@ impl<'v> Freeze for Def<'v> {
         let parameters = self.parameters.freeze(freezer)?;
         let parameter_types = self.parameter_types.freeze(freezer)?;
         let return_type = self.return_type.freeze(freezer)?;
-        let captured = self.captured.try_map(|x| x.freeze(freezer))?;
+        let captured = if freezer.execution_budget().is_some() {
+            self.captured.freeze(freezer)?
+        } else {
+            self.captured.try_map(|x| x.freeze(freezer))?
+        };
         let module = AtomicFrozenRefOption::new(self.module.load_relaxed());
         Ok(FrozenDef {
             symbol: self.symbol,

@@ -87,7 +87,7 @@ where
                 return f;
             }
 
-            let (fv, r) = freezer.reserve::<AValueSimple<T::Frozen>>();
+            let (fv, r) = freezer.reserve::<AValueSimple<T::Frozen>>()?;
             let x = AValueHeader::overwrite_with_forward::<Self::StarlarkValue>(
                 me,
                 ForwardPtr::new_frozen(fv),
@@ -96,7 +96,7 @@ where
             r.fill(res);
             if TypeId::of::<T::Frozen>() == TypeId::of::<FrozenDef>() {
                 let frozen_def = fv.downcast_frozen_ref().unwrap();
-                freezer.frozen_defs.borrow_mut().push(frozen_def);
+                freezer.register_frozen_def(frozen_def)?;
             }
             Ok(fv)
         }

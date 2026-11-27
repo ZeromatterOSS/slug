@@ -25,6 +25,9 @@ pub enum ExecutionLimit {
     /// Structural identity encountered an active value cycle.
     #[error("Starlark structural identity encountered a value cycle")]
     StructuralCycle,
+    /// Freezing a live value would exceed the admitted nesting depth.
+    #[error("Starlark freeze depth limit exceeded")]
+    FreezeDepth,
     /// A fallible allocation refused an admitted request.
     #[error("Starlark execution allocation failed")]
     AllocationFailed,

@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+use std::alloc::Layout;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::cell::RefMut;
@@ -30,6 +31,7 @@ use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::ptr;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 
 use allocative::Allocative;
 use bumpalo::Bump;
@@ -40,6 +42,7 @@ use crate::cast;
 use crate::cast::transmute;
 use crate::collections::StarlarkHashValue;
 use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::runtime::profile::instant::ProfilerInstant;
 use crate::values::AllocFrozenValue;
 use crate::values::AllocValue;
@@ -125,6 +128,10 @@ impl OwnedHeap {
     /// Get access to the underlying [`Heap`].
     pub fn as_ref<'v>(&'v self) -> Heap<'v> {
         Heap(self, PhantomData)
+    }
+
+    pub(crate) fn execution_budget(&self) -> Option<&Arc<ExecutionBudget>> {
+        self.execution_budget.as_ref()
     }
 }
 
@@ -307,6 +314,45 @@ impl FrozenHeap {
                 refs: refs.into_iter().collect(),
             })))
         }
+    }
+
+    /// Publish a heap containing a bounded freeze's already allocated module object.
+    pub(crate) fn into_ref_after_bounded_freeze(
+        self,
+        budget: &ExecutionBudget,
+    ) -> Result<FrozenHeapRef, ExecutionLimit> {
+        let FrozenHeap {
+            mut arena, refs, ..
+        } = self;
+        let refs = refs.into_inner();
+        let count = refs.len();
+        let dependencies = Layout::array::<FrozenHeapRef>(count)
+            .map_err(|_| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        // The pinned std ArcInner has two atomic counters before its payload.
+        let owner = Layout::new::<[AtomicUsize; 2]>()
+            .extend(Layout::new::<FrozenFrozenHeap>())
+            .map_err(|_| budget.refuse(ExecutionLimit::AllocationBytes))?
+            .0
+            .pad_to_align();
+        let bytes = dependencies
+            .size()
+            .checked_add(owner.size())
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        budget.charge(1 + count.max(ExecutionBudget::text_work(bytes)), bytes)?;
+        let mut retained = Vec::new();
+        retained
+            .try_reserve_exact(count)
+            .map_err(|_| budget.refuse(ExecutionLimit::AllocationFailed))?;
+        retained.extend(refs);
+        if retained.capacity() != count {
+            budget.charge(count, dependencies.size())?;
+        }
+        let refs = retained.into_boxed_slice();
+        arena.finish();
+        Ok(FrozenHeapRef(Some(Arc::new(FrozenFrozenHeap {
+            arena,
+            refs,
+        }))))
     }
 
     /// Keep the argument [`FrozenHeapRef`] alive as long as this [`FrozenHeap`]
