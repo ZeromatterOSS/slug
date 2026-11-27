@@ -339,6 +339,10 @@ lto = "off"
 opt-level = 1
 panic = "abort"
 
+# Bzlmod emits the packed workspace codec kernels used by native snapshots.
+[profile.dev.package.slug_bzlmod_v2]
+opt-level = 3
+
 [profile.test]
 incremental = true
 

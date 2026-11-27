@@ -24,12 +24,21 @@ assembles fragments under the same scratch admission. Matched runs of the
 relocatable six-archive gate preserved bytes, peak credit and last-reader
 retirement with effectively flat elapsed time and instructions. The [authentic
 Rust frontier][frontier] attributed 4.09 of 4.23 rooted extraction seconds to
-liblzma intervals. The XZ `-O3` trial fell short of the six-archive CPU gate.
-Six later snapshots took 3.57 seconds, including 2.06 in builder append, 1.27
-in prior-body comparison and 0.17 in record completion and replacement.
-That run reached 832 computes, 55 roots and 115 records, then refused File 6
-at SourceWorkDeadline with exact cleanup. Evaluate builder cost first while
-preserving every codec roundtrip, rooted comparison and history check.
+liblzma. Six snapshots took 3.57 seconds, including 2.06 in builder append,
+1.27 in prior-body comparison and 0.17 in record completion and replacement.
+The XZ and LZ4 package `-O3` trials fell short of the six-archive CPU gate.
+The Bzlmod package `-O3` Cargo dev/test profile passed matched warm ABBA.
+Mean CPU fell 6.4% and wall time fell 6.5% with identical per-archive decoded
+bytes, logical body bytes, peak native credit and exact last-reader retirement.
+The pinned default build passed 129 focused tests, five native guards and the
+six-archive gate in 9.38 seconds. Core/Bzlmod test and CLI builds took 37.51
+and 95.06 seconds. The 5.07-second offline Bazel repin changed only the catalog
+checksum across 503 identical records. The fresh no-repin check took 1.00 second.
+The next authentic run reached 834 computes, 55 roots and 117 records, including
+File 7, before SourceWorkDeadline, then retired to the exact baseline.
+Measure the remaining acquisition, capture and repeated request work before
+selecting another change. Preserve codec roundtrips, rooted comparisons and
+history checks.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,
