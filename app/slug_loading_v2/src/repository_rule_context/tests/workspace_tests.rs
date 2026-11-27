@@ -547,6 +547,43 @@ def implementation(ctx):
 }
 
 #[tokio::test]
+async fn general_host_paths_observe_and_render_the_lexically_normalized_path() {
+    let (epoch, demand) = binding(7).await;
+    let source = r#"
+def implementation(ctx):
+    include = ctx.path("/usr/lib/gcc/version/../../../include/./c++")
+    if str(include) != "/usr/include/c++" or not include.exists:
+        fail("expected a normalized host path")
+"#;
+    let expected = NormalizedAbsolutePath::new("/usr/include/c++").unwrap();
+    assert!(matches!(
+        attempt(source, &epoch, &demand).result,
+        Err(RepositoryRuleInvocationError::HostPathNeed(path)) if path == expected
+    ));
+    let (_module, implementation) = implementation(source);
+    let prepared = SmallMap::from_iter([(expected, true)]);
+    let replayed = invoke_repository_rule_with_host_paths(
+        implementation,
+        &invocation_manifest(),
+        &SmallMap::new(),
+        &SmallMap::new(),
+        &SmallMap::new(),
+        &prepared,
+        workspace_input(&epoch, &demand).unwrap(),
+        RepositoryPlatform::new("linux", "x86_64"),
+        RepositoryEnvironmentSnapshot::empty(),
+        None,
+    );
+    assert!(replayed.result.is_ok());
+
+    let write = "def implementation(ctx):\n    ctx.file('/usr/lib/../include/file', 'data')\n";
+    assert!(matches!(
+        attempt(write, &epoch, &demand).result,
+        Err(RepositoryRuleInvocationError::WorkspaceUnsupported)
+    ));
+}
+
+#[tokio::test]
 async fn general_normalized_foreign_displays_refuse_before_host_lookup_or_need() {
     let (epoch, demand) = binding(7).await;
     for expression in [

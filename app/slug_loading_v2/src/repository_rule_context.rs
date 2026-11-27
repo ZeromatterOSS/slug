@@ -574,16 +574,20 @@ impl RepositoryRuleInvocationState {
     pub(crate) fn bzl(&self) -> &BzlEvaluationContext { &self.bzl }
     fn generated_path(&self, input: &str) -> Result<RepositoryStarlarkPath, RepositoryRuleInvocationError> { if self.workspace.is_some() { return workspace::path(self, input); } let relative = normalized_generated_path("", input).ok_or(RepositoryRuleInvocationError::LabelPathArgument)?; Ok(RepositoryStarlarkPath::Generated { repository: self.generated_repository.clone(), relative, present: self.generated_present.clone() }) }
     fn host_path(&self, input: &str) -> Result<RepositoryStarlarkPath, RepositoryRuleInvocationError> {
+        if input.contains('\0') {
+            return Err(RepositoryRuleInvocationError::PathArgument);
+        }
         if self.workspace.is_some() {
             if let Ok(path) = workspace::path(self, input) { return Ok(path); }
         }
         let raw = Path::new(input);
         let normalized = NormalizedAbsolutePath::new(raw)
             .map_err(|_| RepositoryRuleInvocationError::PathArgument)?;
-        if self.workspace.is_some() && normalized.as_path().starts_with("/__slug_repositories__") {
-            return Err(RepositoryRuleInvocationError::WorkspaceUnsupported);
-        }
-        if normalized.as_path() != raw {
+        if self.workspace.is_some() {
+            if normalized.as_path().starts_with("/__slug_repositories__") {
+                return Err(RepositoryRuleInvocationError::WorkspaceUnsupported);
+            }
+        } else if normalized.as_path() != raw {
             return Err(RepositoryRuleInvocationError::PathArgument);
         }
         let exists = self.prepared_host_paths.get(&normalized).copied()

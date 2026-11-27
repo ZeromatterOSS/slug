@@ -1479,7 +1479,7 @@ fn terminal_repository_rule_invocation_error(
             HostSelectedRepositoryFileEffectError::Invocation {
                 certificate: certificate.clone(),
                 ordinal,
-                message: "repository_ctx.file path must be a string".into(),
+                message: "repository_ctx path argument is invalid".into(),
             }
         }
         RepositoryRuleInvocationError::LabelPathArgument => {
