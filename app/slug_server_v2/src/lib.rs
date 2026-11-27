@@ -26,6 +26,9 @@ use slug_core_v2::runtime::ArchiveDistdirPolicy;
 use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::WorkspaceRuntime;
+use slug_core_v2::runtime::format_cquery_starlark_file;
+use slug_core_v2::runtime::publish_cquery_starlark_file;
+use slug_core_v2::runtime::validate_cquery_starlark_source;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::AqueryScope;
 use slug_query_v2::QueryOrder;
@@ -637,6 +640,11 @@ impl Daemon {
         configuration_overlay: CommandConfigurationOverlay,
         raw_distdirs: &[String],
     ) -> QueryResult {
+        if let crate::server::CqueryOutput::StarlarkFile { name, source } = &output {
+            if let Err(error) = validate_cquery_starlark_source(name, source) {
+                return cquery_error_result(&error, 0);
+            }
+        }
         let archive_distdirs =
             match ArchiveDistdirPolicy::from_request(&self.workspace, raw_distdirs) {
                 Ok(policy) => policy,
@@ -678,39 +686,44 @@ impl Daemon {
             Ok(accepted) => accepted,
             Err(error) => return cquery_error_result_for_terminal(&error, invalidated),
         };
-        let published = accepted
-            .project(|terminal| match terminal.as_ref() {
-                Ok(evaluation) => match output {
-                    crate::server::CqueryOutput::Label => {
-                        TerminalOutput::new(0, evaluation.label_stdout(), String::new())
-                    }
-                    crate::server::CqueryOutput::LabelKind => {
-                        match evaluation.label_kind_stdout() {
-                            Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
-                            Err(error) => TerminalOutput::new(
-                                error.exit_code(),
-                                String::new(),
-                                cquery_error_json(&error, invalidated),
-                            ),
-                        }
-                    }
-                    crate::server::CqueryOutput::StarlarkLabel => {
-                        TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
-                    }
-                    crate::server::CqueryOutput::Graph => {
-                        TerminalOutput::new(0, evaluation.graph_stdout(), String::new())
-                    }
-                },
-                Err(error) => match error.missing_stderr() {
-                    Some(stderr) => TerminalOutput::new(error.exit_code(), String::new(), stderr),
-                    None => TerminalOutput::new(
+        let formatter = matches!(&output, crate::server::CqueryOutput::StarlarkFile { .. });
+        let projected = accepted.project(|terminal| match terminal.as_ref() {
+            Ok(evaluation) => match output {
+                crate::server::CqueryOutput::Label => {
+                    TerminalOutput::new(0, evaluation.label_stdout(), String::new())
+                }
+                crate::server::CqueryOutput::LabelKind => match evaluation.label_kind_stdout() {
+                    Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
+                    Err(error) => TerminalOutput::new(
                         error.exit_code(),
                         String::new(),
-                        cquery_error_json(error, invalidated),
+                        cquery_error_json(&error, invalidated),
                     ),
                 },
-            })
-            .publish();
+                crate::server::CqueryOutput::StarlarkLabel => {
+                    TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
+                }
+                crate::server::CqueryOutput::StarlarkFile { name, source } => {
+                    format_cquery_starlark_file(evaluation, &name, &source)
+                }
+                crate::server::CqueryOutput::Graph => {
+                    TerminalOutput::new(0, evaluation.graph_stdout(), String::new())
+                }
+            },
+            Err(error) => match error.missing_stderr() {
+                Some(stderr) => TerminalOutput::new(error.exit_code(), String::new(), stderr),
+                None => TerminalOutput::new(
+                    error.exit_code(),
+                    String::new(),
+                    cquery_error_json(error, invalidated),
+                ),
+            },
+        });
+        let published = if formatter {
+            publish_cquery_starlark_file(projected)
+        } else {
+            projected.publish()
+        };
         let (_terminal, exit_code, stdout, stderr) = published.into_parts();
         QueryResult {
             exit_code,

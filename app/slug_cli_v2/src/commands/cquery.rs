@@ -7,6 +7,8 @@
  * You may select, at your option, one of the above-listed licenses.
  */
 
+use std::path::Path;
+
 use slug_commands_v2::CommandKind;
 use slug_commands_v2::cquery::CqueryOutputMode;
 use slug_commands_v2::cquery::CqueryRequest;
@@ -15,7 +17,11 @@ use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::ArchiveDistdirPolicy;
 use slug_core_v2::runtime::CqueryCommandError;
 use slug_core_v2::runtime::TerminalOutput;
+use slug_core_v2::runtime::capture_cquery_starlark_file;
 use slug_core_v2::runtime::evaluate_workspace_cquery_command_with_repository_environment_and_distdirs;
+use slug_core_v2::runtime::format_cquery_starlark_file;
+use slug_core_v2::runtime::publish_cquery_starlark_file;
+use slug_server_v2::CqueryOutput;
 
 pub fn run(argv: Vec<String>) -> i32 {
     let workspace = match std::env::current_dir() {
@@ -25,6 +31,17 @@ pub fn run(argv: Vec<String>) -> i32 {
     let request = match CqueryRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Cquery, argv, Err(error)),
+    };
+    let output = match capture_output(&request.output_mode) {
+        Ok(output) => output,
+        Err(error) => {
+            let runtime_mode = if request.output_base.is_some() {
+                "daemon"
+            } else {
+                "one-shot"
+            };
+            return emit_error(&error, runtime_mode);
+        }
     };
     let repository_environment = match super::repository_environment::capture_repository_environment(
         &workspace,
@@ -53,13 +70,18 @@ pub fn run(argv: Vec<String>) -> i32 {
             slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
                 &repository_environment,
             );
-        return run_daemon(&output_base, request, bzlmod, repository_environment);
+        return run_daemon(
+            &output_base,
+            request,
+            output,
+            bzlmod,
+            repository_environment,
+        );
     }
     let archive_distdirs = match ArchiveDistdirPolicy::from_request(&workspace, &request.distdirs) {
         Ok(policy) => policy,
         Err(error) => return emit_error(&error, "one-shot"),
     };
-    let output_mode = request.output_mode;
     let accepted = match evaluate_workspace_cquery_command_with_repository_environment_and_distdirs(
         &workspace,
         &request.expression,
@@ -83,26 +105,29 @@ pub fn run(argv: Vec<String>) -> i32 {
             return error.exit_code();
         }
     };
-    let published = accepted
-        .project(|terminal| match terminal.as_ref() {
-            Ok(evaluation) => match output_mode {
-                CqueryOutputMode::Label => {
-                    TerminalOutput::new(0, evaluation.label_stdout(), String::new())
-                }
-                CqueryOutputMode::LabelKind => match evaluation.label_kind_stdout() {
-                    Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
-                    Err(error) => terminal_error(&error, "one-shot"),
-                },
-                CqueryOutputMode::StarlarkLabel => {
-                    TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
-                }
-                CqueryOutputMode::Graph => {
-                    TerminalOutput::new(0, evaluation.graph_stdout(), String::new())
-                }
+    let formatter = matches!(&output, CqueryOutput::StarlarkFile { .. });
+    let projected = accepted.project(|terminal| match terminal.as_ref() {
+        Ok(evaluation) => match output {
+            CqueryOutput::Label => TerminalOutput::new(0, evaluation.label_stdout(), String::new()),
+            CqueryOutput::LabelKind => match evaluation.label_kind_stdout() {
+                Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
+                Err(error) => terminal_error(&error, "one-shot"),
             },
-            Err(error) => terminal_error(error, "one-shot"),
-        })
-        .publish();
+            CqueryOutput::StarlarkLabel => {
+                TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
+            }
+            CqueryOutput::StarlarkFile { name, source } => {
+                format_cquery_starlark_file(evaluation, &name, &source)
+            }
+            CqueryOutput::Graph => TerminalOutput::new(0, evaluation.graph_stdout(), String::new()),
+        },
+        Err(error) => terminal_error(error, "one-shot"),
+    });
+    let published = if formatter {
+        publish_cquery_starlark_file(projected)
+    } else {
+        projected.publish()
+    };
     let (_terminal, exit_code, stdout, stderr) = published.into_parts();
     print!("{stdout}");
     if super::write_stderr(&stderr).is_err() {
@@ -111,9 +136,23 @@ pub fn run(argv: Vec<String>) -> i32 {
     exit_code
 }
 
+fn capture_output(mode: &CqueryOutputMode) -> Result<CqueryOutput, String> {
+    Ok(match mode {
+        CqueryOutputMode::Label => CqueryOutput::Label,
+        CqueryOutputMode::LabelKind => CqueryOutput::LabelKind,
+        CqueryOutputMode::StarlarkLabel => CqueryOutput::StarlarkLabel,
+        CqueryOutputMode::StarlarkFile(path) => {
+            let (name, source) = capture_cquery_starlark_file(Path::new(path))?;
+            CqueryOutput::StarlarkFile { name, source }
+        }
+        CqueryOutputMode::Graph => CqueryOutput::Graph,
+    })
+}
+
 fn run_daemon(
     output_base: &str,
     request: CqueryRequest,
+    output: CqueryOutput,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
 ) -> i32 {
@@ -133,12 +172,7 @@ fn run_daemon(
             expression: request.expression,
             include_implicit: request.include_implicit,
             include_tool: request.include_tool,
-            output: match request.output_mode {
-                CqueryOutputMode::Label => slug_server_v2::CqueryOutput::Label,
-                CqueryOutputMode::LabelKind => slug_server_v2::CqueryOutput::LabelKind,
-                CqueryOutputMode::StarlarkLabel => slug_server_v2::CqueryOutput::StarlarkLabel,
-                CqueryOutputMode::Graph => slug_server_v2::CqueryOutput::Graph,
-            },
+            output,
             configuration_overlay: request.configuration_overlay,
             distdirs: request.distdirs,
             bzlmod,

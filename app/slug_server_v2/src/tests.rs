@@ -233,6 +233,16 @@ fn write_configured_module(workspace: &Path, source: &str) {
     );
 }
 
+fn configured_cli_registry(root: &Path) -> String {
+    let assembly = root.join("fixture");
+    fixture_support::assemble_configured_cli_fixture(
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        &assembly,
+    )
+    .unwrap();
+    fixture_support::configured_cli_registry_url(&assembly)
+}
+
 fn remote_disabled() -> RemoteConfig {
     RemoteConfig {
         executor: None,
@@ -1430,14 +1440,16 @@ fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
 #[test]
 fn tagged_cquery_protocol_is_narrow_and_round_trips() {
     for (output, wire_name) in [
+        (CqueryOutput::Label, "label"),
         (CqueryOutput::Graph, "graph"),
         (CqueryOutput::LabelKind, "label_kind"),
+        (CqueryOutput::StarlarkLabel, "starlark_label"),
     ] {
         let request = DaemonRequest::Cquery(CqueryRequest {
             expression: "//pkg:probe".to_owned(),
             include_implicit: false,
             include_tool: false,
-            output,
+            output: output.clone(),
             distdirs: Vec::new(),
             configuration_overlay: root_setting_overlay(Some("Gr\u{00fc}\u{00df}e")),
             bzlmod: BzlmodRequestInputs::default(),
@@ -1478,6 +1490,14 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     )
     .unwrap_err();
     assert!(unknown.to_string().contains("unknown variant `unknown`"));
+    let missing_source =
+        serde_json::from_str::<CqueryOutput>(r#"{"starlark_file":{"name":"format.bzl"}}"#)
+            .unwrap_err();
+    assert!(
+        missing_source
+            .to_string()
+            .contains("missing field `source`")
+    );
     let old_shape = serde_json::from_str::<DaemonRequest>(
         r#"{"kind":"cquery","request":{"target":"//pkg:probe","output":"label"}}"#,
     )
@@ -1720,6 +1740,70 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
                 "{expression} {output}: {filtered:?}"
             );
         }
+    }
+}
+
+#[test]
+fn cquery_starlark_file_uses_supplied_source_on_the_retained_daemon() {
+    let root = scratch("cquery-starlark-file");
+    let registry = configured_cli_registry(&root);
+    let workspace = root.join("workspace");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let name = "cquery_format.bzl";
+    assert!(!workspace.join(name).exists());
+    let run = |daemon: &mut Daemon, source: &str| {
+        let request = DaemonRequest::Cquery(CqueryRequest {
+            expression: "//pkg:probe".to_owned(),
+            include_implicit: true,
+            include_tool: true,
+            output: CqueryOutput::StarlarkFile {
+                name: name.to_owned(),
+                source: source.to_owned(),
+            },
+            configuration_overlay: Default::default(),
+            bzlmod: BzlmodRequestInputs {
+                registry_urls: vec![registry.clone()],
+                ..Default::default()
+            },
+            repository_environment: Default::default(),
+            distdirs: Vec::new(),
+        });
+        let wire = serde_json::to_value(&request).unwrap();
+        assert_eq!(
+            wire["request"]["output"],
+            serde_json::json!({"starlark_file": {"name": name, "source": source}})
+        );
+        handle_request(daemon, &wire.to_string())
+    };
+
+    let oversized = "a".repeat(slug_core_v2::runtime::CQUERY_STARLARK_SOURCE_MAX_BYTES + 1);
+    let refused = run(&mut daemon, &oversized);
+    assert_eq!(refused.exit_code, 2, "{refused:?}");
+    assert!(refused.stdout.is_empty());
+    assert!(stderr_text(&refused.stderr).contains("source byte limit"));
+    assert_eq!(refused.invalidated_files, 0);
+    assert!(daemon.take_forwarded_bzlmod_inputs_for_test().is_empty());
+
+    let invalid = run(&mut daemon, "def format(target):\n    return (\n");
+    assert_eq!(invalid.exit_code, 1, "{invalid:?}");
+    assert!(invalid.stdout.is_empty());
+    assert!(stderr_text(&invalid.stderr).contains("invalid --starlark:file"));
+
+    for prefix in ["initial", "warm"] {
+        let source = format!("def format(target):\n    return '{prefix}=%s' % target.label\n");
+        let result = run(&mut daemon, &source);
+        assert_eq!(result.exit_code, 0, "{result:?}");
+        assert_eq!(result.stdout, format!("{prefix}=@@//pkg:probe\n"));
+        assert!(result.stderr.is_empty());
     }
 }
 
@@ -2334,7 +2418,9 @@ fn retained_cquery_missing_executable_recovers_after_rule_edit() {
 
 #[test]
 fn retained_cquery_starlark_formats_ordered_sets() {
-    let workspace = scratch("cquery-starlark-sets");
+    let root = scratch("cquery-starlark-sets");
+    let registry = configured_cli_registry(&root);
+    let workspace = root.join("workspace");
     write_configured_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
@@ -2353,7 +2439,7 @@ fn retained_cquery_starlark_formats_ordered_sets() {
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
-        Vec::new(),
+        vec![registry.clone()],
         root_setting_overlay(None),
     );
     assert_eq!(result.exit_code, 0, "{result:?}");
@@ -2369,7 +2455,7 @@ fn retained_cquery_starlark_formats_ordered_sets() {
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
-        Vec::new(),
+        vec![registry],
         root_setting_overlay(None),
     );
     assert_eq!(filtered.exit_code, 0, "{filtered:?}");

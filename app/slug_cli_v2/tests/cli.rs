@@ -67,21 +67,19 @@ fn assert_slug_cquery_label(stdout: &[u8], label: &str) -> String {
 // fixtures. The smoke's authored MODULE/BUILD files remain its semantic input.
 fn configured_cli_fixture(name: &str) -> std::path::PathBuf {
     let destination = scratch(name).join("fixture");
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tools/v2_oracle/configured_cli_fixture.py");
-    let output = Command::new("python3")
-        .arg(script)
-        .arg("assemble")
-        .arg("--output")
-        .arg(&destination)
-        .output()
-        .unwrap();
-    assert!(output.status.success(), "{output:?}");
+    fixture_support::assemble_configured_cli_fixture(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")),
+        &destination,
+    )
+    .unwrap();
     destination
 }
 
 fn configured_cli_registry_arg(assembly: &std::path::Path) -> String {
-    format!("--registry=file://{}", assembly.join("registry").display())
+    format!(
+        "--registry={}",
+        fixture_support::configured_cli_registry_url(assembly)
+    )
 }
 
 fn fixture_workspace(name: &str) -> FixtureWorkspace {
@@ -1038,6 +1036,148 @@ fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
             "ERROR: Skipping '//parent:missing': {message}\nERROR: {message}\nERROR: Build did NOT complete successfully\n"
         )
     );
+}
+
+#[test]
+fn cquery_starlark_file_projects_providers_and_recovers_in_both_routes() {
+    let assembly = configured_cli_fixture("cquery-starlark-file-registry");
+    let registry = configured_cli_registry_arg(&assembly);
+    let root = scratch("cquery-starlark-file");
+    let workspace = root.join("workspace");
+    let caller = root.join("caller");
+    std::fs::create_dir(&caller).unwrap();
+    write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"fixture\")\n",
+    );
+    write(
+        workspace.join("pkg/defs.bzl"),
+        r#"ProbeInfo = provider(fields = ["message", "data"])
+
+def _impl(ctx):
+    data = depset(ctx.files.srcs)
+    return [DefaultInfo(files = data), ProbeInfo(message = ctx.attr.message, data = data)]
+
+probe = rule(implementation = _impl, attrs = {"message": attr.string(), "srcs": attr.label_list(allow_files = True)})
+"#,
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        r#"load(":defs.bzl", "probe")
+exports_files(["data.txt"])
+probe(name = "bin", message = "binary", srcs = ["data.txt"])
+probe(name = "lib", message = "library", srcs = ["data.txt"])
+"#,
+    );
+    write(workspace.join("pkg/data.txt"), "fixture\n");
+
+    let output_base = root.join("daemon");
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let expression = "set(//pkg:bin //pkg:lib)";
+    let run = |cwd: &std::path::Path, output_base_arg: Option<&str>, expression: &str| {
+        let mut command = slug();
+        command.current_dir(cwd);
+        if let Some(output_base_arg) = output_base_arg {
+            command.arg(output_base_arg);
+        }
+        command
+            .args([
+                "cquery",
+                expression,
+                "--output=starlark",
+                "--starlark:file=format.star",
+                "--noshow_progress",
+            ])
+            .arg(&registry)
+            .output()
+            .unwrap()
+    };
+
+    let provider_projection = r#"def render(target):
+    for key, info in providers(target).items():
+        if key.endswith("%ProbeInfo"):
+            data = sorted([file.short_path for file in info.data.to_list()])
+            return str(target.label) + ":" + info.message + ":" + str(data)
+    fail("ProbeInfo missing")
+"#;
+
+    let check_formatter = |cwd: &std::path::Path, output_base_arg| {
+        let formatter = cwd.join("format.star");
+        write(
+            &formatter,
+            &format!("{provider_projection}\ndef format(target):\n    return render(target)\n"),
+        );
+        let first = run(cwd, output_base_arg, expression);
+        assert!(first.status.success(), "{first:?}");
+        assert!(first.stderr.is_empty(), "{first:?}");
+        assert_eq!(
+            first.stdout,
+            b"@@//pkg:bin:binary:[\"pkg/data.txt\"]\n@@//pkg:lib:library:[\"pkg/data.txt\"]\n"
+        );
+
+        write(&formatter, "fail(\"formatter setup failure\")\n");
+        let setup = run(cwd, output_base_arg, "//pkg:lib");
+        assert_eq!(setup.status.code(), Some(1), "{setup:?}");
+        assert!(setup.stdout.is_empty(), "{setup:?}");
+        let stderr = std::str::from_utf8(&setup.stderr).unwrap();
+        assert!(stderr.contains("formatter setup failure"), "{stderr}");
+        let mixed = run(cwd, output_base_arg, "//pkg:missing");
+        assert_eq!(mixed.status.code(), Some(1), "{mixed:?}");
+        assert!(mixed.stdout.is_empty(), "{mixed:?}");
+        let stderr = std::str::from_utf8(&mixed.stderr).unwrap();
+        assert!(stderr.contains("no such target"), "{stderr}");
+        assert!(!stderr.contains("formatter setup failure"), "{stderr}");
+
+        write(
+            &formatter,
+            &format!(
+                "{provider_projection}\ndef format(target):\n    if str(target.label).endswith(\":bin\"):\n        fail(\"formatter row failure\")\n    return render(target)\n"
+            ),
+        );
+        let partial = run(cwd, output_base_arg, expression);
+        assert!(partial.status.success(), "{partial:?}");
+        assert_eq!(partial.stdout, b"@@//pkg:lib:library:[\"pkg/data.txt\"]\n");
+        let stderr = std::str::from_utf8(&partial.stderr).unwrap();
+        assert!(stderr.contains("formatter row failure"), "{stderr}");
+        assert!(
+            stderr.contains("ERROR: Starlark evaluation error for //pkg:bin:"),
+            "{stderr}"
+        );
+
+        write(
+            &formatter,
+            &format!(
+                "{provider_projection}\ndef format(target):\n    return \"edited:\" + render(target)\n"
+            ),
+        );
+        let recovered = run(cwd, output_base_arg, expression);
+        assert!(recovered.status.success(), "{recovered:?}");
+        assert!(recovered.stderr.is_empty(), "{recovered:?}");
+        assert_eq!(
+            recovered.stdout,
+            b"edited:@@//pkg:bin:binary:[\"pkg/data.txt\"]\nedited:@@//pkg:lib:library:[\"pkg/data.txt\"]\n"
+        );
+        std::fs::remove_file(formatter).unwrap();
+    };
+    check_formatter(&workspace, None);
+
+    let missing = run(&caller, Some(output_base_arg.as_str()), expression);
+    assert_eq!(missing.status.code(), Some(2), "{missing:?}");
+    assert!(missing.stdout.is_empty(), "{missing:?}");
+    assert!(!output_base.exists());
+
+    let launch = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "cquery", "//pkg:bin"])
+        .arg(&registry)
+        .output()
+        .unwrap();
+    assert!(launch.status.success(), "{launch:?}");
+    let pid_path = slug_server_v2::pid_path(&output_base);
+    let daemon_pid = std::fs::read_to_string(&pid_path).unwrap();
+    check_formatter(&caller, Some(output_base_arg.as_str()));
+    assert_eq!(std::fs::read_to_string(pid_path).unwrap(), daemon_pid);
 }
 
 #[test]
