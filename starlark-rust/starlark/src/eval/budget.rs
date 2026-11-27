@@ -42,6 +42,12 @@ pub enum ExecutionLimit {
         /// The runtime type that needs an admitted implementation.
         value_type: &'static str,
     },
+    /// A bytecode instruction is outside the closed formatter profile.
+    #[error("bounded Starlark formatter does not support bytecode instruction {opcode}")]
+    UnsupportedBytecode {
+        /// Static name of the denied instruction.
+        opcode: &'static str,
+    },
     /// An admitted writer failed without a more specific refusal.
     #[error("bounded Starlark text formatting failed")]
     TextFormatting,
@@ -67,6 +73,7 @@ pub struct ExecutionBudget {
     state: Mutex<Result<Credits, ExecutionLimit>>,
     text_depth: usize,
     bounded_operations: bool,
+    closed_formatter_bytecode: bool,
 }
 
 impl ExecutionBudget {
@@ -80,6 +87,7 @@ impl ExecutionBudget {
             })),
             text_depth,
             bounded_operations: false,
+            closed_formatter_bytecode: false,
         }
     }
 
@@ -95,6 +103,18 @@ impl ExecutionBudget {
 
     pub(crate) fn bounds_operations(&self) -> bool {
         self.bounded_operations
+    }
+
+    /// Require the closed formatter bytecode profile and bounded operations.
+    /// Hosts provide the formatter's admitted callable surface.
+    pub fn with_closed_formatter_bytecode(self) -> Self {
+        let mut budget = self.with_bounded_operations();
+        budget.closed_formatter_bytecode = true;
+        budget
+    }
+
+    pub(crate) fn bounds_formatter_bytecode(&self) -> bool {
+        self.closed_formatter_bytecode
     }
 
     /// Admit work and the full requested allocation before either occurs.

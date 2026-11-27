@@ -103,6 +103,10 @@ enum EvaluatorError {
     CoverageNotEnabled,
     #[error("Local variable `{0}` referenced before assignment")]
     LocalVariableReferencedBeforeAssignment(String),
+    #[error("Local variable referenced before assignment")]
+    UnassignedLocalVariable,
+    #[error("Module variable referenced before assignment")]
+    UnassignedModuleVariable,
     #[error("Max callstack size is already set")]
     CallstackSizeAlreadySet,
     #[error("Max callstack size cannot be zero")]
@@ -776,11 +780,22 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
         self.module_env.frozen_heap()
     }
 
+    // Diagnose a closed-profile miss without resolving or copying a slot name.
+    fn closed_slot_error(&self, error: EvaluatorError) -> Option<crate::Error> {
+        self.heap()
+            .execution_budget()
+            .filter(|budget| budget.bounds_formatter_bytecode())
+            .map(|_| crate::Error::new_other(error))
+    }
+
     pub(crate) fn get_slot_module(&self, slot: ModuleSlotId) -> crate::Result<Value<'v>> {
         // Make sure the error-path doesn't get inlined into the normal-path execution
         #[cold]
         #[inline(never)]
         fn error<'v>(eval: &Evaluator<'v, '_, '_>, slot: ModuleSlotId) -> crate::Error {
+            if let Some(error) = eval.closed_slot_error(EvaluatorError::UnassignedModuleVariable) {
+                return error;
+            }
             let name = match eval.top_frame_def_frozen_module(false) {
                 Err(e) => Some(format!("<internal error: {e}>")),
                 Ok(None) => eval
@@ -807,6 +822,9 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     #[cold]
     #[inline(never)]
     pub(crate) fn local_var_referenced_before_assignment(&self, slot: LocalSlotId) -> crate::Error {
+        if let Some(error) = self.closed_slot_error(EvaluatorError::UnassignedLocalVariable) {
+            return error;
+        }
         let def_info = match self.top_frame_def_info() {
             Ok(def_info) => def_info,
             Err(e) => return e,
@@ -1331,6 +1349,9 @@ mod bounded_predicates_tests;
 
 #[cfg(test)]
 mod bounded_module_runtime_tests;
+
+#[cfg(test)]
+mod closed_slot_diagnostic_tests;
 
 #[cfg(test)]
 mod refusal_tests;

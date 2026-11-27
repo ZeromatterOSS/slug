@@ -917,7 +917,26 @@ where
         me: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> crate::Result<Value<'v>> {
-        // println!("invoking {}", self.def.stmt.name.node);
+        if let Some(budget) = eval
+            .heap()
+            .execution_budget()
+            .filter(|budget| budget.bounds_formatter_bytecode())
+        {
+            budget.check()?;
+            if !self.parameter_types.is_empty()
+                || self.return_type.is_some()
+                || !self.parameter_captures.is_empty()
+                || !self.captured.is_empty()
+                || !self.def_info.parent.is_empty()
+            {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "function invocation",
+                        value_type: FUNCTION_TYPE,
+                    })
+                    .into());
+            }
+        }
 
         if !self.parameter_types.is_empty() {
             self.check_parameter_types(eval)?;

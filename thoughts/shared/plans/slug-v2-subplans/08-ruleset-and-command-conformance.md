@@ -172,10 +172,10 @@ provider fields. String `endswith` and `format` and depset `to_list` use
 admitted native methods. Collection reads, destructuring, string operators,
 predicates, and admitted container construction use checked work and storage.
 Calls check concrete callables. Setup meters definition storage, preserves
-checkpoints, and refuses native export hooks. Bounded freeze preserves
-deferred definitions and captures. `print` and `fail` use bounded
-text. Close execution, target materialization, and diagnostics before
-activation.
+checkpoints, and refuses native export hooks. Closed bytecode rejects
+unmodeled instructions and uses fixed missing-binding diagnostics. Bounded
+freeze preserves deferred definitions and captures. `print` and `fail` use
+bounded text. Close target materialization and diagnostics before activation.
 Resource outcomes are Slug-native.
 Bazel 9.2's `StarlarkOutputFormatterCallback` and `configured_query_test.sh`
 define setup and partial-output semantics.

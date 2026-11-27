@@ -4,6 +4,7 @@ use super::Bc;
 use super::dispatch;
 use crate::eval::Evaluator;
 use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::bc::addr::BcPtrAddr;
 use crate::eval::bc::frame::BcFramePtr;
 use crate::eval::bc::instr::InstrControl;
@@ -17,7 +18,40 @@ use crate::eval::runtime::evaluator::EvaluationCallbacks;
 use crate::values::Value;
 
 #[cfg(test)]
+mod formatter_tests;
+#[cfg(test)]
 mod tests;
+
+const fn formatter_allows(opcode: BcOpcode) -> bool {
+    use BcOpcode::*;
+
+    match opcode {
+        // Frame state and deferred module setup.
+        Const | LoadLocal | LoadModule | Mov | StoreModule | StoreModuleAndExport | Def
+        | PossibleGc => true,
+        // Checked field and index reads, tuple unpacking, and bounded locals
+        // for tuple values and list comprehensions.
+        ObjectField | ArrayIndex | Unpack | Len | TupleNPop | ListNew | ComprListAppend => true,
+        Eq | EqConst | EqPtr | EqStr | EqInt | Not => true,
+        // The bounded arithmetic paths only admit modeled string operations.
+        Add | Percent | PercentSOne | FormatOne => true,
+        Br | IfBr | IfNotBr | Iter | Continue | Break | IterStop | Return | ReturnConst => true,
+        // Callable and method admission still applies at these entry points.
+        Call
+        | CallPos
+        | CallFrozenDef
+        | CallFrozenDefPos
+        | CallFrozenNative
+        | CallFrozenNativePos
+        | CallFrozen
+        | CallFrozenPos
+        | CallMethod
+        | CallMethodPos
+        | CallMaybeKnownMethod
+        | CallMaybeKnownMethodPos => true,
+        _ => false,
+    }
+}
 
 /// Slots are reserved while their iterator is live. A return expression can
 /// open another iteration after stopping its outer loops.
@@ -80,6 +114,7 @@ pub(super) fn run_block<'v, EC: EvaluationCallbacks>(
     budget
         .reserve_vec(&mut loops.slots, bc.max_loop_depth.0 as usize)
         .map_err(|limit| EvalException::new_unknown_span(limit.into()))?;
+    let closed_formatter = budget.bounds_formatter_bytecode();
     let mut ip = bc.instrs.start_ptr();
     loop {
         budget
@@ -88,6 +123,13 @@ pub(super) fn run_block<'v, EC: EvaluationCallbacks>(
         let opcode = ip.get_opcode();
         let admission = ec.before_instr(eval, ip, opcode).and_then(|()| {
             budget.check()?;
+            if closed_formatter && !formatter_allows(opcode) {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedBytecode {
+                        opcode: opcode.name(),
+                    })
+                    .into());
+            }
             if opcode == BcOpcode::Iter {
                 // Hooks can edit locals. Inspect the actual operand after the
                 // hook and pay for unwind before the iterator can acquire a lock.

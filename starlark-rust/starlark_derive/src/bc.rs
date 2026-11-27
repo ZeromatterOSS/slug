@@ -106,6 +106,25 @@ impl BcOpcodeEnum {
             }
         }
     }
+
+    fn render_names(&self) -> TokenStream {
+        let names = self.variants.iter().map(|name| {
+            quote_spanned! {
+                name.span()=>
+                Self::#name => stringify!(#name),
+            }
+        });
+        quote_spanned! {
+            self.span=>
+            impl BcOpcode {
+                pub(crate) const fn name(self) -> &'static str {
+                    match self {
+                        #(#names)*
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub(crate) fn starlark_internal_bc(
@@ -118,10 +137,12 @@ pub(crate) fn starlark_internal_bc(
     let input = TokenStream::from(input);
     let dispatch = bc_opcode_enum.render_dispatch();
     let dispatch_all = bc_opcode_enum.render_dispatch_all();
+    let names = bc_opcode_enum.render_names();
     proc_macro::TokenStream::from(quote_spanned! {
         input.span()=>
         #input
         #dispatch
         #dispatch_all
+        #names
     })
 }
