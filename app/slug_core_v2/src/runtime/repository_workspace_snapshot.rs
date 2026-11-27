@@ -654,7 +654,16 @@ fn capture_body_covered(
         .map(|e| e.node())
     {
         if old.len() == length {
-            if body_recovery::observed_equal(io, path, framed, old, scope, active)? {
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let comparison = {
+                use crate::runtime::probe_observer::snapshot_work::Phase;
+                use crate::runtime::probe_observer::snapshot_work::span;
+                span(Phase::PriorCompare, length)
+            };
+            let same = body_recovery::observed_equal(io, path, framed, old, scope, active)?;
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            drop(comparison);
+            if same {
                 if let Some(candidates) = candidates.as_deref_mut() {
                     candidates.retain(old, active)?;
                 }

@@ -23,11 +23,13 @@ Packed capture forwards full aligned RootIo blocks to the existing encoder and
 assembles fragments under the same scratch admission. Matched runs of the
 relocatable six-archive gate preserved bytes, peak credit and last-reader
 retirement with effectively flat elapsed time and instructions. The [authentic
-Rust frontier][frontier] spent 4.09 of 4.23 rooted extraction seconds inside the
-measured liblzma intervals across all six archives. It reached 833 computes,
-55 roots and 116 records, then refused File 7 at SourceWorkDeadline with exact
-cleanup. The Cargo package `-O3` trial fell short of the six-archive CPU gate.
-Next attribute snapshot and record work before selecting an optimization.
+Rust frontier][frontier] attributed 4.09 of 4.23 rooted extraction seconds to
+liblzma intervals. The XZ `-O3` trial fell short of the six-archive CPU gate.
+Six later snapshots took 3.57 seconds, including 2.06 in builder append, 1.27
+in prior-body comparison and 0.17 in record completion and replacement.
+That run reached 832 computes, 55 roots and 115 records, then refused File 6
+at SourceWorkDeadline with exact cleanup. Evaluate builder cost first while
+preserving every codec roundtrip, rooted comparison and history check.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,

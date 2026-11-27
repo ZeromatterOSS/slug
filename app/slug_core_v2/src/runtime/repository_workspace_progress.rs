@@ -240,6 +240,12 @@ impl RepositoryWorkspaceProgress {
             Some(sources) => sources.clone(),
             None => SourceLinkSet::empty(&self.builder.resources, scope, active)?,
         };
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        use crate::runtime::probe_observer::snapshot_work::Phase;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        use crate::runtime::probe_observer::snapshot_work::span;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let capture = span(Phase::Capture, 0);
         let snapshot = snapshot::capture_with_candidates(
             &self.builder,
             self.transcript().current(),
@@ -248,6 +254,10 @@ impl RepositoryWorkspaceProgress {
             scope,
             active,
         )?;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        drop(capture);
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let _record = span(Phase::Record, 0);
         let next = snapshot
             .with_body_candidates(input.incoming.candidates)
             .complete_active(

@@ -6,6 +6,7 @@ use serde_json::Value;
 use serde_json::json;
 use slug_bzlmod_v2::RepositoryWorkspaceOperation;
 
+use super::snapshot_work;
 use super::xz_calls;
 
 #[derive(Clone, Copy)]
@@ -54,6 +55,7 @@ pub(super) struct Totals {
     rows: [[u64; 4]; LABELS.len()],
     invalid: bool,
     xz: [xz_calls::Work; 2],
+    snapshot: [snapshot_work::Work; 2],
 }
 
 impl Totals {
@@ -87,6 +89,14 @@ impl Totals {
                 "invalid_clock_counts_or_buffer_deltas": self.xz.iter().any(|work| work.invalid),
                 "decode_intervals_include_buffer_bookkeeping": true,
             },
+            "archive_snapshot_work": {
+                "phases": snapshot_work::LABELS,
+                "columns": ["calls", "wall_ns", "requested_bytes"],
+                "completed_snapshots": self.snapshot[0].rows,
+                "aborted_snapshots": self.snapshot[1].rows,
+                "invalid_clock_or_overflow": self.snapshot.iter().any(|work| work.invalid),
+                "compare_and_append_nested_in_capture": true,
+            },
         })
     }
 }
@@ -100,6 +110,7 @@ pub(crate) struct Span<'a> {
     start: Instant,
     completed: bool,
     xz: Option<xz_calls::Scope>,
+    snapshot: Option<snapshot_work::Scope>,
 }
 
 impl<'a> Span<'a> {
@@ -110,6 +121,7 @@ impl<'a> Span<'a> {
             start: Instant::now(),
             completed: false,
             xz: matches!(stage, Stage::ArchiveExtract).then(xz_calls::Scope::begin),
+            snapshot: matches!(stage, Stage::ArchiveSnapshot).then(snapshot_work::Scope::begin),
         }
     }
 
@@ -124,6 +136,7 @@ impl Drop for Span<'_> {
             .checked_duration_since(self.start)
             .and_then(|duration| u64::try_from(duration.as_nanos()).ok());
         let xz_work = self.xz.take().map(xz_calls::Scope::finish);
+        let snapshot_work = self.snapshot.take().map(snapshot_work::Scope::finish);
         let mut totals = self
             .totals
             .lock()
@@ -131,6 +144,9 @@ impl Drop for Span<'_> {
         totals.record(self.stage, self.completed, wall_ns);
         if let Some(work) = xz_work {
             totals.xz[usize::from(!self.completed)].merge(work);
+        }
+        if let Some(work) = snapshot_work {
+            totals.snapshot[usize::from(!self.completed)].merge(work);
         }
     }
 }
@@ -201,6 +217,44 @@ fn workspace_progress_folds_only_in_scope_lib_lzma_calls_into_extract_outcomes()
 }
 
 #[test]
+fn workspace_progress_snapshot_work_stays_in_the_archive_and_outcome_that_started_it() {
+    use snapshot_work::Phase;
+    use snapshot_work::span;
+
+    let totals = Mutex::new(Totals::default());
+    let filesystem = Span::start(&totals, Stage::Filesystem);
+    assert!(span(Phase::Capture, 0).is_none());
+    filesystem.finish();
+    let snapshot = Span::start(&totals, Stage::ArchiveSnapshot);
+    {
+        let _capture = span(Phase::Capture, 0).unwrap();
+        drop(span(Phase::PriorCompare, 12).unwrap());
+        drop(span(Phase::BuilderAppend, 34).unwrap());
+    }
+    drop(span(Phase::Record, 0).unwrap());
+    snapshot.finish();
+    {
+        let _snapshot = Span::start(&totals, Stage::ArchiveSnapshot);
+        let _capture = span(Phase::Capture, 0).unwrap();
+        drop(span(Phase::BuilderAppend, 56).unwrap());
+    }
+    assert!(span(Phase::Capture, 0).is_none());
+
+    let totals = totals.into_inner().unwrap();
+    let [complete, abort] = totals.snapshot;
+    assert!(!complete.invalid && !abort.invalid);
+    let calls_and_bytes = |rows: [[u64; 3]; 4]| rows.map(|[calls, _, bytes]| (calls, bytes));
+    assert_eq!(
+        calls_and_bytes(complete.rows),
+        [(1, 0), (1, 0), (1, 12), (1, 34)]
+    );
+    assert_eq!(
+        calls_and_bytes(abort.rows),
+        [(1, 0), (0, 0), (0, 0), (1, 56)]
+    );
+}
+
+#[test]
 fn workspace_progress_report_is_bounded_at_maximum_counts() {
     let report = Totals {
         rows: [[u64::MAX; 4]; LABELS.len()],
@@ -209,9 +263,13 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
             row: [u64::MAX; xz_calls::COLUMNS.len()],
             invalid: false,
         }; 2],
+        snapshot: [snapshot_work::Work {
+            rows: [[u64::MAX; 3]; snapshot_work::LABELS.len()],
+            invalid: false,
+        }; 2],
     }
     .report();
     assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);
 }
 
-pub(crate) const REPORT_BYTES: usize = 2 * 1024;
+pub(crate) const REPORT_BYTES: usize = 3 * 1024;

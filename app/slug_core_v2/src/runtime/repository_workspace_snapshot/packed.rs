@@ -27,6 +27,12 @@ fn append(
 ) -> Result<(), PhysicalRootError> {
     check(scope, active)?;
     let pending = construction.pending.as_mut().unwrap();
+    #[cfg(all(test, feature = "native-probe-observer"))]
+    let append = {
+        use crate::runtime::probe_observer::snapshot_work::Phase;
+        use crate::runtime::probe_observer::snapshot_work::span;
+        span(Phase::BuilderAppend, bytes.len())
+    };
     construction
         .builder
         .as_mut()
@@ -35,6 +41,8 @@ fn append(
             pending.admit_packed_arc(layout, active)
         })
         .map_err(build_error)?;
+    #[cfg(all(test, feature = "native-probe-observer"))]
+    drop(append);
     check(scope, active)
 }
 

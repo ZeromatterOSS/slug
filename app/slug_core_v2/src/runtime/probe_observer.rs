@@ -10,6 +10,8 @@ compile_error!("native-probe-observer requires little-endian Linux x86_64 with 6
 pub(crate) mod family_counts;
 pub(crate) mod mapping;
 #[cfg(test)]
+pub(crate) mod snapshot_work;
+#[cfg(test)]
 pub(crate) mod workspace_progress;
 #[cfg(test)]
 pub(crate) mod xz_calls;
