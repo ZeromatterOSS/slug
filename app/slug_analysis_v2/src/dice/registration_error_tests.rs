@@ -232,6 +232,21 @@ async fn registration_error_natural_production_handoffs() {
                 Arc::strong_count(expected.labels_with_shared_error().unwrap_err()),
                 count
             );
+            let LoadingPreparationOutcome::Complete(Ok(Err(error))) =
+                configured_candidate_execution_platforms(
+                    &mut tx,
+                    mode,
+                    &workspace,
+                    &configuration,
+                    false,
+                    true,
+                )
+                .await
+            else {
+                panic!("full candidate preparation lost the registration failure")
+            };
+            assert_registration_cause(&error, &expected);
+            drop(error);
             if first < 2 {
                 let LoadingPreparationOutcome::Complete(Ok(Err(error))) =
                     prepare_execution_platform_registrations(
@@ -277,6 +292,84 @@ async fn registration_error_natural_production_handoffs() {
             }
         }
     }
+}
+
+#[tokio::test]
+async fn candidate_preparation_keeps_toolchain_need_and_outer_failure() {
+    use slug_configuration_v2::CommandConfigurationOccurrence;
+    use slug_configuration_v2::CommandConfigurationOverlay;
+    use slug_configuration_v2::SlugConfiguration;
+    use slug_configuration_v2::StarlarkOptions;
+    use slug_configuration_v2::native::host::AutoCpuToken;
+    use slug_configuration_v2::native::host::HostConversionInputs;
+    use slug_configuration_v2::native::host::HostPathFlavor;
+    use slug_workspace_v2::PathObservationDemand;
+    use slug_workspace_v2::PathObservationEpochError;
+    use slug_workspace_v2::PathObservationNamespace;
+    use slug_workspace_v2::PathObservationOperation;
+
+    let workspace = NormalizedAbsolutePath::new("/registration-errors").unwrap();
+    let configuration = ConfigurationKey::from_slug(
+        SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .with_command_configuration(
+            StarlarkOptions::default(),
+            &CommandConfigurationOverlay::from(vec![
+                CommandConfigurationOccurrence::extra_execution_platforms("@bad//:command"),
+            ]),
+        )
+        .unwrap(),
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut tx = registration_transaction(
+        &dice,
+        "module(name='bazel_tools')\nregister_toolchains('//missing:tc')\n".into(),
+    )
+    .await;
+    let key = ModuleRegistrationExpansionObservationKey::toolchains(workspace.clone());
+    let LoadingPreparationOutcome::Need(expected) = tx.compute(&key).await.unwrap() else {
+        panic!("fixture requires a toolchain-only Need")
+    };
+    let mode = ConfiguredAnalysisMode::Observed;
+    assert!(matches!(
+        configured_candidate_execution_platforms(
+            &mut tx, mode, &workspace, &configuration, false, true
+        ).await,
+        LoadingPreparationOutcome::Need(need) if need == expected
+    ));
+
+    let outer = ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            workspace.clone(),
+            PathObservationOperation::Lstat,
+        ),
+    ));
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to(vec![(
+            key,
+            LoadingPreparationOutcome::Complete(Err(
+                ModuleRegistrationExpansionObservationError::Frontier(outer.clone()),
+            )),
+        )])
+        .unwrap();
+    let mut tx = updater.commit().await;
+    assert!(matches!(
+        configured_candidate_execution_platforms(
+            &mut tx, mode, &workspace, &configuration, false, true
+        ).await,
+        LoadingPreparationOutcome::Complete(Err(error)) if error == outer
+    ));
 }
 
 #[tokio::test]

@@ -3130,6 +3130,29 @@ struct PreparedRegistrations {
     toolchains: Arc<[CanonicalLabel]>,
 }
 
+struct RegistrationInputs {
+    command_platforms: Arc<ModuleRegistrationExpansion>,
+    module_platforms: Arc<ModuleRegistrationExpansion>,
+    command_toolchains: Arc<ModuleRegistrationExpansion>,
+    module_toolchains: Arc<ModuleRegistrationExpansion>,
+}
+
+impl RegistrationInputs {
+    fn execution_platforms(&self) -> Result<Arc<[CanonicalLabel]>, AnalysisError> {
+        merge_registration_labels(&self.command_platforms, &self.module_platforms)
+    }
+
+    fn materialize(self) -> Result<PreparedRegistrations, AnalysisError> {
+        let execution_platforms = self.execution_platforms()?;
+        let toolchains =
+            merge_registration_labels(&self.command_toolchains, &self.module_toolchains)?;
+        Ok(PreparedRegistrations {
+            execution_platforms,
+            toolchains,
+        })
+    }
+}
+
 fn toolchain_outcome(result: Result<PreparedToolchain, AnalysisError>) -> PreparedToolchainOutcome {
     analysis_semantic_complete(result)
 }
@@ -3255,20 +3278,9 @@ fn merge_registration_labels(
     command: &ModuleRegistrationExpansion,
     module: &ModuleRegistrationExpansion,
 ) -> Result<Arc<[CanonicalLabel]>, AnalysisError> {
-    let command = command
-        .labels_with_shared_error()
-        .map_err(AnalysisError::from_registration)?;
-    let module = module
-        .labels_with_shared_error()
-        .map_err(AnalysisError::from_registration)?;
-    let mut seen = SmallSet::with_capacity(command.len() + module.len());
-    let mut labels = Vec::with_capacity(command.len() + module.len());
-    for label in command.iter().chain(module.iter()) {
-        if seen.insert(label.clone()) {
-            labels.push(label.clone());
-        }
-    }
-    Ok(labels.into())
+    command
+        .merge_labels(module)
+        .map_err(AnalysisError::from_registration)
 }
 
 async fn prepare_registrations(
@@ -3282,6 +3294,17 @@ async fn prepare_registrations(
     if !has_toolchain_requirement && !has_local_declarations {
         return analysis_semantic_complete(Ok(None));
     }
+    let inputs =
+        analysis_value!(load_full_registration_inputs(ctx, mode, workspace, configuration).await);
+    analysis_semantic_complete(inputs.materialize().map(Some))
+}
+
+async fn load_full_registration_inputs(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
+) -> AnalysisSemanticOutcome<RegistrationInputs> {
     let Some(structural) = configuration.slug_configuration() else {
         return analysis_semantic_complete(Err(AnalysisError::new(
             "registration preparation requires a structural Slug configuration",
@@ -3395,21 +3418,12 @@ async fn prepare_registrations(
     else {
         unreachable!("complete registration preparation retains all source/family values")
     };
-    let execution_platforms = match merge_registration_labels(
-        &command_execution_platforms,
-        &module_execution_platforms,
-    ) {
-        Ok(labels) => labels,
-        Err(error) => return analysis_semantic_complete(Err(error)),
-    };
-    let toolchains = match merge_registration_labels(&command_toolchains, &module_toolchains) {
-        Ok(labels) => labels,
-        Err(error) => return analysis_semantic_complete(Err(error)),
-    };
-    analysis_semantic_complete(Ok(Some(PreparedRegistrations {
-        execution_platforms,
-        toolchains,
-    })))
+    analysis_semantic_complete(Ok(RegistrationInputs {
+        command_platforms: command_execution_platforms,
+        module_platforms: module_execution_platforms,
+        command_toolchains,
+        module_toolchains,
+    }))
 }
 
 fn local_toolchain_declarations(
@@ -4163,15 +4177,7 @@ async fn configured_candidate_execution_platforms(
     #[cfg(feature = "native-probe-observer")]
     toolchain_resolution_probe::candidate_preparation_entered();
     let labels = if has_requirements || has_local_declarations {
-        match prepare_registrations(
-            ctx,
-            mode,
-            workspace,
-            configuration,
-            has_requirements,
-            has_local_declarations,
-        )
-        .await
+        let inputs = match load_full_registration_inputs(ctx, mode, workspace, configuration).await
         {
             LoadingPreparationOutcome::Need(need) => {
                 #[cfg(feature = "native-probe-observer")]
@@ -4186,8 +4192,24 @@ async fn configured_candidate_execution_platforms(
             LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
                 return analysis_semantic_complete(Err(error));
             }
-            LoadingPreparationOutcome::Complete(Ok(Ok(Some(value)))) => value.execution_platforms,
-            LoadingPreparationOutcome::Complete(Ok(Ok(None))) => Arc::from([]),
+            LoadingPreparationOutcome::Complete(Ok(Ok(inputs))) => inputs,
+        };
+        // Full candidate preparation still validates every registration family.
+        // Only the full resolver needs the merged toolchain labels.
+        match inputs.execution_platforms() {
+            Ok(labels) => {
+                #[cfg(feature = "native-probe-observer")]
+                toolchain_resolution_probe::candidate_toolchain_rows(
+                    inputs
+                        .command_toolchains
+                        .labels()
+                        .unwrap()
+                        .len()
+                        .saturating_add(inputs.module_toolchains.labels().unwrap().len()),
+                );
+                labels
+            }
+            Err(error) => return analysis_semantic_complete(Err(error)),
         }
     } else {
         match prepare_execution_platform_registrations(ctx, mode, workspace, configuration).await {
@@ -4210,18 +4232,17 @@ async fn configured_candidate_execution_platforms(
     let structural = configuration
         .slug_configuration()
         .expect("candidate preparation validates structural configuration");
-    let mut labels = labels.to_vec();
-    labels.push(match structural.host_platform_label() {
+    let host = match structural.host_platform_label() {
         Some(label) => label,
         None => {
             return analysis_semantic_complete(Err(AnalysisError::message(
                 "configuration has no canonical host platform",
             )));
         }
-    });
-    let mut candidates = Vec::with_capacity(labels.len());
-    let mut seen = SmallSet::with_capacity(labels.len());
-    for (index, label) in labels.iter().enumerate() {
+    };
+    let mut candidates = Vec::with_capacity(labels.len() + 1);
+    let mut seen = SmallSet::with_capacity(labels.len() + 1);
+    for (index, label) in labels.iter().chain(std::iter::once(&host)).enumerate() {
         let exec = match structural.to_exec_for_platform(label) {
             Ok(value) => ConfigurationKey::from_slug(value),
             Err(error) => {
@@ -4237,7 +4258,7 @@ async fn configured_candidate_execution_platforms(
             .await
         );
         if !seen.insert(platform.actual().clone()) {
-            if index + 1 == labels.len() {
+            if index == labels.len() {
                 continue;
             }
             return analysis_semantic_complete(Err(AnalysisError::message(format!(

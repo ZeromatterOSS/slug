@@ -51,17 +51,20 @@ pub(super) enum NeedStage {
 pub struct ToolchainResolutionProbeSnapshot {
     pub counts: [u64; 17],
     pub overflow_mask: u64,
+    pub candidate_toolchain_rows: u64,
 }
 
 struct Counters {
     counts: [AtomicU64; 17],
     overflow: AtomicU64,
+    candidate_toolchain_rows: AtomicU64,
 }
 impl Counters {
     const fn new() -> Self {
         Self {
             counts: [const { AtomicU64::new(0) }; 17],
             overflow: AtomicU64::new(0),
+            candidate_toolchain_rows: AtomicU64::new(0),
         }
     }
 
@@ -83,6 +86,7 @@ impl Counters {
         ToolchainResolutionProbeSnapshot {
             counts: std::array::from_fn(|i| self.counts[i].load(Ordering::Relaxed)),
             overflow_mask: self.overflow.load(Ordering::Relaxed),
+            candidate_toolchain_rows: self.candidate_toolchain_rows.load(Ordering::Relaxed),
         }
     }
 }
@@ -101,6 +105,18 @@ pub(super) fn candidate_preparation_entered() {
     COUNTERS.add(14, 1);
 }
 
+pub(super) fn candidate_toolchain_rows(rows: usize) {
+    let rows = u64::try_from(rows).unwrap_or(u64::MAX);
+    if rows != 0 {
+        COUNTERS
+            .candidate_toolchain_rows
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                Some(count.saturating_add(rows))
+            })
+            .expect("the saturating update always returns Some");
+    }
+}
+
 pub fn toolchain_resolution_probe_snapshot() -> ToolchainResolutionProbeSnapshot {
     COUNTERS.snapshot()
 }
@@ -112,7 +128,7 @@ mod tests {
     #[test]
     fn fixed_stage_cells_saturate_with_complete_masks_without_global_reset() {
         let counts = Counters::new();
-        assert_eq!(std::mem::size_of::<Counters>(), 144);
+        assert_eq!(std::mem::size_of::<Counters>(), 152);
         assert_eq!(TOOLCHAIN_RESOLUTION_PROBE_LABELS.len(), 17);
         for metric in 0..17 {
             counts.add(metric, u64::MAX - 1);

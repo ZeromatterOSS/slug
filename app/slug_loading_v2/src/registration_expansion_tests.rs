@@ -784,6 +784,109 @@ async fn command_rows_apply_signed_order_and_family_specific_reversal() {
 }
 
 #[tokio::test]
+async fn observed_registration_label_merge_preserves_order_errors_and_shared_labels() {
+    let module = concat!(
+        "module(name = 'bazel_tools')\n",
+        "register_execution_platforms('//pkg:pa', '//pkg:pd', '//pkg:pd', '//pkg:pc')\n",
+    );
+    let build = concat!(
+        "platform(name = 'pa')\n",
+        "platform(name = 'pb')\n",
+        "platform(name = 'pc')\n",
+        "platform(name = 'pd')\n",
+    );
+    let mut tx = transaction(module, EpochBuilder::root_package(module, build, 54)).await;
+    let module_key = ModuleRegistrationExpansionObservationKey::execution_platforms(workspace());
+    let LoadingPreparationOutcome::Complete(Ok(module_value)) =
+        tx.compute(&module_key).await.unwrap()
+    else {
+        panic!("module registrations must complete");
+    };
+    let command_key = |configuration| {
+        CommandRegistrationExpansionObservationKey::execution_platforms(workspace(), configuration)
+    };
+    let LoadingPreparationOutcome::Complete(Ok(empty)) = tx
+        .compute(&command_key(default_configuration()))
+        .await
+        .unwrap()
+    else {
+        panic!("empty command registrations must complete");
+    };
+    assert!(empty.result().labels().unwrap().is_empty());
+    assert_eq!(
+        labels(module_value.result()),
+        ["@@//pkg:pa", "@@//pkg:pd", "@@//pkg:pc"]
+    );
+
+    let configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "//pkg:pa,//pkg:pb,-//pkg:pa,//pkg:pc,//pkg:pa",
+        )]);
+    let LoadingPreparationOutcome::Complete(Ok(command)) =
+        tx.compute(&command_key(configuration)).await.unwrap()
+    else {
+        panic!("signed command registrations must complete");
+    };
+    let merged = command
+        .result()
+        .merge_labels(module_value.result())
+        .unwrap();
+    let expected = ["@@//pkg:pb", "@@//pkg:pc", "@@//pkg:pa", "@@//pkg:pd"]
+        .map(|label| CanonicalLabel::parse(label).unwrap());
+    assert_eq!(merged.as_ref(), &expected);
+
+    let bad_configuration =
+        command_configuration([CommandConfigurationOccurrence::extra_execution_platforms(
+            "//pkg:missing_command",
+        )]);
+    let LoadingPreparationOutcome::Complete(Ok(bad_command)) =
+        tx.compute(&command_key(bad_configuration)).await.unwrap()
+    else {
+        panic!("missing command target must produce a semantic error");
+    };
+    let bad_module = concat!(
+        "module(name = 'bazel_tools')\n",
+        "register_execution_platforms('//pkg:missing_module')\n",
+    );
+    let mut tx = update_module_epoch(
+        tx,
+        bad_module,
+        EpochBuilder::root_package(bad_module, build, 54),
+    )
+    .await;
+    let LoadingPreparationOutcome::Complete(Ok(bad_module)) =
+        tx.compute(&module_key).await.unwrap()
+    else {
+        panic!("missing module target must produce a semantic error");
+    };
+    let command_error = bad_command.result().labels_with_shared_error().unwrap_err();
+    let module_error = bad_module.result().labels_with_shared_error().unwrap_err();
+    assert_ne!(command_error, module_error);
+    for (preferred, fallback, expected) in [
+        (bad_command.result(), bad_module.result(), command_error),
+        (bad_module.result(), bad_command.result(), module_error),
+        (empty.result(), bad_module.result(), module_error),
+        (bad_command.result(), empty.result(), command_error),
+    ] {
+        assert!(Arc::ptr_eq(
+            preferred.merge_labels(fallback).unwrap_err(),
+            expected
+        ));
+    }
+
+    for nonempty in [module_value.result(), command.result()] {
+        let expected = nonempty.labels().unwrap();
+        for merged in [
+            empty.result().merge_labels(nonempty).unwrap(),
+            nonempty.merge_labels(empty.result()).unwrap(),
+        ] {
+            assert_eq!(&merged, expected);
+            assert!(Arc::ptr_eq(&merged, expected));
+        }
+    }
+}
+
+#[tokio::test]
 async fn command_recursive_negative_removal_and_reinsertion_reuse_package_walker() {
     let module = "module(name = 'bazel_tools')\n";
     let build = "platform(name = 'platform')\n";

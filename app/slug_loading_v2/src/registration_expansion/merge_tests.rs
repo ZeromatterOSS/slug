@@ -6,6 +6,31 @@ use slug_workspace_v2::PathOperationResult;
 
 use super::*;
 
+#[test]
+fn registration_label_merge_keeps_complete_mapping_identity() {
+    use slug_identity_v2::RepositoryMapping;
+    use slug_identity_v2::RepositoryMappingId;
+
+    let mapping = RepositoryMapping::new(RepositoryMappingId::new("root-map").unwrap());
+    let mapped = slug_identity_v2::ApparentLabel::parse("//pkg:platform")
+        .unwrap()
+        .resolve(&mapping);
+    let plain = CanonicalLabel::parse("@@//pkg:platform").unwrap();
+    assert_eq!(mapped.to_string(), plain.to_string());
+    assert_ne!(mapped, plain);
+
+    let source = |label| ModuleRegistrationExpansion {
+        labels: Ok(Arc::from([label])),
+        ambiguities: Arc::from([]),
+    };
+    let preferred = source(mapped.clone());
+    let fallback = source(plain.clone());
+    assert_eq!(
+        preferred.merge_labels(&fallback).unwrap().as_ref(),
+        &[mapped, plain],
+    );
+}
+
 fn scratch() -> ExpansionScratch {
     ExpansionScratch::new(
         NormalizedAbsolutePath::new("/workspace").unwrap(),

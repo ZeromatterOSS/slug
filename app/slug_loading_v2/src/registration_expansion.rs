@@ -224,6 +224,32 @@ impl ModuleRegistrationExpansion {
         self.labels.as_ref()
     }
 
+    /// Combine successful registrations in source precedence order, keeping
+    /// the first occurrence of each complete label identity.
+    pub fn merge_labels<'a>(
+        &'a self,
+        fallback: &'a Self,
+    ) -> Result<Arc<[CanonicalLabel]>, &'a Arc<ModuleRegistrationExpansionError>> {
+        let preferred = self.labels_with_shared_error()?;
+        let fallback = fallback.labels_with_shared_error()?;
+        // ExpansionScratch publishes each source's ordered and unique labels.
+        if preferred.is_empty() {
+            return Ok(fallback.dupe());
+        }
+        if fallback.is_empty() {
+            return Ok(preferred.dupe());
+        }
+        let capacity = preferred.len() + fallback.len();
+        let mut seen = SmallSet::with_capacity(capacity);
+        let mut labels = Vec::with_capacity(capacity);
+        for label in preferred.iter().chain(fallback.iter()) {
+            if seen.insert(label) {
+                labels.push(label.clone());
+            }
+        }
+        Ok(labels.into())
+    }
+
     pub fn ambiguities(&self) -> &Arc<[ModuleRegistrationAmbiguity]> {
         &self.ambiguities
     }

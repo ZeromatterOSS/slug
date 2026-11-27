@@ -34,6 +34,15 @@ backing. The trace used 126,905 of 524,288 bytes.
 The earlier unclassified refusal at attempt 859 remains unattributed. Full Rust
 and completed-command latency/RSS remain open.
 
+Candidate preparation keeps the four registration reads and their precedence,
+then merges only execution-platform labels. Loading shares single-input label
+slices. The original reached 62,826 validated toolchain input rows on this path
+before Xcode adoption at 958 computes, 56 roots and 152 records. The Source work
+deadline followed adoption. Retirement was exact and the report used 129,467
+bytes including its prefix. Eighty-seven focused tests, five native guards and
+the 7.92-second six-archive gate passed. Compare equal work before attributing
+elapsed changes across different stopped prefixes.
+
 Packed capture forwards full aligned RootIo blocks to the existing encoder and
 assembles fragments under the same scratch admission. Matched runs of the
 relocatable six-archive gate preserved bytes, peak credit and last-reader

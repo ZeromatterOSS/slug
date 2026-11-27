@@ -1837,15 +1837,20 @@ fold; three macro-return sites bind the existing outcome once before marking
 and preserve the original return. No child evaluation, Need iteration or union
 is introduced. Abandoned futures are not recorded as returned Needs.
 
-The existing feature-only Core report samples seventeen fixed Analysis counters
-and one overflow mask, totaling 144 bytes. The first fourteen are resolver entry
+The feature-only Core report samples seventeen fixed Analysis counters,
+one overflow mask and one row counter, totaling 152 bytes. The first fourteen are resolver entry
 and the thirteen selected Need stages. Three appended cells record caller-side
 candidate preparation entry and its full/execution-only registration Need exits.
 That caller-side stage follows the joined resolver outcome fold in the inspected
 node block; it is not a universal pre-resolver stage. Its later platform loop
-may also return Need and is outside the three-cell extension.
+may also return Need and is outside the three-cell extension. Both consumers
+of full registrations keep all four reads and outer/Need/semantic precedence.
+Candidate preparation merges only execution-platform labels and scans the host
+last. The resolver merges both families. Loading shares the original label
+slice when one input is empty. The row counter records the validated toolchain
+inputs to the candidate path after execution-platform label projection.
 No keys, labels, paths, Need values, clocks or callbacks are retained. Counts are
-process-wide, non-atomic and not request-isolated; nested resolvers count
+process-wide and sampled without an atomic snapshot; nested resolvers count
 independently. Entry minus Need counts is neither success nor cancellation.
 Keep null deltas on overflow, MAX or reversal and preserve the 16 KiB report
 reservation and 512 KiB combined ceiling. Actual owner tests must distinguish

@@ -92,9 +92,12 @@ impl InstalledProfile {
             self.path_before,
             slug_loading_v2::path_lookahead_probe_snapshot(),
         );
-        profile["toolchain_resolution_returns"] = toolchain_counts(
-            self.toolchain_before,
-            slug_analysis_v2::toolchain_resolution_probe_snapshot(),
+        let toolchain_after = slug_analysis_v2::toolchain_resolution_probe_snapshot();
+        profile["toolchain_resolution_returns"] =
+            toolchain_counts(self.toolchain_before, toolchain_after);
+        profile["candidate_toolchain_rows"] = candidate_toolchain_rows(
+            self.toolchain_before.candidate_toolchain_rows,
+            toolchain_after.candidate_toolchain_rows,
         );
         profile["repository_package_child_needs"] = package_child_counts(
             self.package_children_before,
@@ -199,6 +202,11 @@ fn module_toolchain_need_prefix(
         after.overflow_mask,
     );
     json!(delta)
+}
+
+fn candidate_toolchain_rows(before: u64, after: u64) -> Value {
+    let (delta, _, _, _) = scalar_deltas([before], [after], 0, 0);
+    json!(delta[0])
 }
 
 fn lookahead_counts(
@@ -524,10 +532,12 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
         ToolchainResolutionProbeSnapshot {
             counts: [10_000_000_000_000_000_000; 17],
             overflow_mask: 0,
+            candidate_toolchain_rows: 0,
         },
         ToolchainResolutionProbeSnapshot {
             counts: [u64::MAX - 1; 17],
             overflow_mask: 0,
+            candidate_toolchain_rows: 0,
         },
     );
     profile["repository_package_child_needs"] = package_child_counts(
@@ -555,6 +565,8 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
         profile["observed_module_toolchain_need_prefix"],
         json!([u64::MAX - 1, u64::MAX - 1, u64::MAX - 1]),
     );
+    profile["candidate_toolchain_rows"] = candidate_toolchain_rows(0, u64::MAX - 1);
+    assert_eq!(profile["candidate_toolchain_rows"], json!(u64::MAX - 1));
     for name in [
         "observation_union_helpers",
         "metadata_path_lookahead",
@@ -628,10 +640,12 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
         ToolchainResolutionProbeSnapshot {
             counts: [u64::MAX; 17],
             overflow_mask: u64::MAX,
+            candidate_toolchain_rows: 0,
         },
         ToolchainResolutionProbeSnapshot {
             counts: [u64::MAX; 17],
             overflow_mask: u64::MAX,
+            candidate_toolchain_rows: 0,
         },
     );
     masked_profile["repository_package_child_needs"] = package_child_counts(
@@ -658,6 +672,9 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
         masked_profile["observed_module_toolchain_need_prefix"],
         json!([null, null, null]),
     );
+    assert_eq!(candidate_toolchain_rows(1, 0), Value::Null);
+    masked_profile["candidate_toolchain_rows"] = candidate_toolchain_rows(0, u64::MAX);
+    assert_eq!(masked_profile["candidate_toolchain_rows"], Value::Null);
     let masked = json!({"phase_profile":masked_profile,"progress_wall":timing.summary()});
     assert!(
         masked.to_string().len() + 1024 < REPORT_BYTES,
@@ -775,10 +792,12 @@ fn toolchain_stage_probe_preserves_masks_and_return_only_qualifications() {
     let mut before = ToolchainResolutionProbeSnapshot {
         counts: [10; 17],
         overflow_mask: 8,
+        candidate_toolchain_rows: 0,
     };
     let mut after = ToolchainResolutionProbeSnapshot {
         counts: [15; 17],
         overflow_mask: 1 << 63,
+        candidate_toolchain_rows: 0,
     };
     after.counts[1] = 9;
     before.counts[2] = u64::MAX;
@@ -811,10 +830,12 @@ fn toolchain_stage_probe_preserves_masks_and_return_only_qualifications() {
         ToolchainResolutionProbeSnapshot {
             counts: [0; 17],
             overflow_mask: 0,
+            candidate_toolchain_rows: 0,
         },
         ToolchainResolutionProbeSnapshot {
             counts: [1; 17],
             overflow_mask: 0,
+            candidate_toolchain_rows: 0,
         },
     );
     assert_eq!(
