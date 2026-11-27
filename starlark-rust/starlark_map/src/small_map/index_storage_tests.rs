@@ -90,6 +90,12 @@ fn tombstones_growth_clear_and_rebuild_preserve_index_certificate() {
         index.insert_unique(0, value, |_| 0);
     }
     let initial_bound = index.retained_storage_bytes_upper_bound().unwrap();
+    index
+        .charge_lookup_probe(&mut |work, bytes| {
+            assert_eq!((work, bytes), (index.len() / 4 + 2, 0));
+            Ok::<_, ()>(())
+        })
+        .unwrap();
     // A long collision run forces deleted control bytes rather than releasing
     // backing storage, so the current capacity ceases to certify that storage.
     for value in 0..initial_capacity / 2 {
@@ -100,6 +106,12 @@ fn tombstones_growth_clear_and_rebuild_preserve_index_certificate() {
     }
     assert!(index.table.capacity() < initial_capacity);
     assert_eq!(index.full_capacity_high_water, initial_capacity);
+    index
+        .charge_lookup_probe(&mut |work, bytes| {
+            assert_eq!((work, bytes), (2 * (initial_capacity + 1) / 4 + 2, 0));
+            Ok::<_, ()>(())
+        })
+        .unwrap();
     assert_eq!(
         index.retained_storage_bytes_upper_bound(),
         Some(initial_bound)

@@ -96,6 +96,22 @@ impl Index {
             .map_err(BoundedMapError::Operation)
     }
 
+    pub(super) fn charge_lookup_probe<E>(
+        &self,
+        charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<(), BoundedMapError<E>> {
+        // Capacity is live entries plus growth credit. Tombstones reduce it
+        // below the full capacity witnessed at allocation or completed growth.
+        if self.table.capacity() == self.full_capacity_high_water {
+            return self.charge_fresh_probe(charge);
+        }
+        let buckets = self
+            .max_bucket_count()
+            .ok_or(BoundedMapError::SizeOverflow)?;
+        charge(hashbrown_table::lookup_work_upper_bound(buckets), 0)
+            .map_err(BoundedMapError::Operation)
+    }
+
     pub(super) fn len(&self) -> usize {
         self.table.len()
     }

@@ -588,8 +588,8 @@ impl<'a> AnalysisValueMaterializer<'a> {
             containers: HashMap::new(),
             cc_variables: SmallMap::new(),
             depsets: HashMap::default(),
-            file_depsets: HashMap::default(),
-            symlink_depsets: HashMap::default(),
+            file_depsets: SmallMap::new(),
+            symlink_depsets: SmallMap::new(),
         }
     }
 

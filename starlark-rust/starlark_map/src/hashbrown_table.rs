@@ -27,3 +27,8 @@ pub fn fresh_insert_work(occupied: usize) -> usize {
     // possible extra control load when inserting into a small table.
     occupied / MIN_GROUP_WIDTH + 2
 }
+
+/// Probe work when deleted rows can extend a lookup beyond the live occupancy.
+pub(crate) fn lookup_work_upper_bound(buckets: usize) -> usize {
+    buckets / MIN_GROUP_WIDTH + 2
+}

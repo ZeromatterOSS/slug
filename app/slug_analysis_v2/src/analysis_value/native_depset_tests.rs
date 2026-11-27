@@ -1,10 +1,14 @@
 use std::hash::Hash;
+use std::mem::size_of;
+use std::sync::atomic::AtomicUsize;
 
 use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::AnalysisDepsetOccurrence;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::RunfilesSymlink;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::provider::StarlarkDepset;
+use slug_loading_v2::provider::alloc_budgeted_starlark_depset_parts;
 use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
@@ -176,4 +180,88 @@ fn native_file_depset_projection_walks_a_deep_chain_on_a_small_stack() {
             .unwrap();
     });
     while sources.pop().is_some() {}
+}
+
+#[test]
+fn bounded_native_projection_keeps_owned_aliases_and_admits_rows_before_callbacks() {
+    let heap = FrozenHeap::new();
+    let (root, shared) = diamond(str::to_owned);
+    let mut memo = Memo::new();
+    let budget = ExecutionBudget::new(100_000, 1 << 20, 16);
+    let project = |node: &Depset<String>, row: Successors| {
+        // The pinned ArcInner<()> has two atomic counters and no payload.
+        budget.charge(1, size_of::<[AtomicUsize; 2]>())?;
+        alloc_budgeted_starlark_depset_parts(
+            &heap,
+            &budget,
+            node.order(),
+            Some("string"),
+            AnalysisDepsetOccurrence::new(),
+            None,
+            node.depth(),
+            row,
+        )
+    };
+    let value = try_project(
+        &root,
+        &mut memo,
+        Some(&budget),
+        |text| Ok(heap.alloc_budgeted_str(&budget, text)?.to_frozen_value()),
+        project,
+    )
+    .unwrap();
+    assert_eq!(memo.len(), 4);
+    let shared = memo.get(&shared.node_key()).unwrap().1;
+    assert_diamond(
+        value.to_value(),
+        shared.to_value(),
+        "string",
+        root.depth(),
+        |value| value.unpack_str().unwrap(),
+    );
+    let cached = memo
+        .iter()
+        .map(|(key, (_, value))| (*key, *value))
+        .collect::<Vec<_>>();
+
+    // A zero-allocation cache hit pays one hash, four unindexed rows, and
+    // at least the matching candidate. It must never enter either callback.
+    let short_lookup = ExecutionBudget::new(5, 0, 16);
+    assert!(matches!(
+        try_project(
+            &root,
+            &mut memo,
+            Some(&short_lookup),
+            |_| panic!("ran a leaf callback on a refused cache hit"),
+            |_, _| panic!("ran a node callback on a refused cache hit"),
+        ),
+        Err(ExecutionLimit::Work)
+    ));
+    assert_eq!(short_lookup.check(), Err(ExecutionLimit::Work));
+
+    let next = Depset::from_direct(root.order(), vec!["new row".to_owned()]).unwrap();
+    let short_row = ExecutionBudget::new(1000, size_of::<Frame<String>>(), 16);
+    assert!(matches!(
+        try_project(
+            &next,
+            &mut memo,
+            Some(&short_row),
+            |_| panic!("ran a leaf callback before admitting row storage"),
+            |_, _| panic!("ran a node callback before admitting row storage"),
+        ),
+        Err(ExecutionLimit::AllocationBytes)
+    ));
+    assert_eq!(short_row.check(), Err(ExecutionLimit::AllocationBytes));
+    assert_eq!(memo.len(), 4);
+    assert!(memo.get(&next.node_key()).is_none());
+    for (key, previous) in cached {
+        assert!(
+            memo.get(&key)
+                .unwrap()
+                .1
+                .to_value()
+                .ptr_eq(previous.to_value())
+        );
+    }
+    assert_eq!(budget.check(), Ok(()));
 }

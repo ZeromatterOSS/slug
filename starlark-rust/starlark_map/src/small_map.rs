@@ -160,7 +160,10 @@ impl<K, V> SmallMap<K, V> {
         Ok(map)
     }
 
-    pub(crate) fn try_insert_unique_hashed_bounded<E>(
+    /// Append an absent key with its canonical hash after admitting storage and
+    /// probe work. Failed admission leaves existing entries and storage intact.
+    /// The caller must establish absence and admit production of the new row.
+    pub fn try_insert_unique_hashed_bounded<E>(
         &mut self,
         key: Hashed<K>,
         value: V,
@@ -228,7 +231,12 @@ impl<K, V> SmallMap<K, V> {
                 .next()
                 .ok_or(BoundedMapError::RowCountMismatch)?
                 .map_err(BoundedMapError::Operation)?;
-            if let Some(i) = map.find_fresh_hashed_row(&key, &mut keys_equal, &mut charge)? {
+            let existing = map.find_hashed_bounded(
+                key.hash(),
+                |existing| keys_equal(existing, key.key()),
+                &mut charge,
+            )?;
+            if let Some(i) = existing {
                 // SAFETY: The lookup returned a live row of this map.
                 *unsafe { map.entries.get_unchecked_mut(i).1 } = value;
             } else {
@@ -285,20 +293,20 @@ impl<K, V> SmallMap<K, V> {
         Ok(())
     }
 
-    fn find_fresh_hashed_row<E>(
+    fn find_hashed_bounded<E>(
         &self,
-        key: &Hashed<K>,
-        keys_equal: &mut impl FnMut(&K, &K) -> Result<bool, E>,
+        hash: StarlarkHashValue,
+        mut keys_equal: impl FnMut(&K) -> Result<bool, E>,
         charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
     ) -> Result<Option<usize>, BoundedMapError<E>> {
         if let Some(index) = &self.index {
-            index.charge_fresh_probe(charge)?;
+            index.charge_lookup_probe(charge)?;
         } else {
             charge(self.entries.len(), 0).map_err(BoundedMapError::Operation)?;
         }
         let mut failure = None;
-        let slot = self.get_index_of_hashed_raw(key.hash(), |existing| {
-            match charge(1, 0).and_then(|()| keys_equal(existing, key.key())) {
+        let slot = self.get_index_of_hashed_raw(hash, |existing| {
+            match charge(1, 0).and_then(|()| keys_equal(existing)) {
                 Ok(equal) => equal,
                 Err(error) => {
                     // Stop the underlying bool-only lookup immediately and
@@ -312,6 +320,19 @@ impl<K, V> SmallMap<K, V> {
             Some(error) => Err(BoundedMapError::Operation(error)),
             None => Ok(slot),
         }
+    }
+
+    /// Find a prehashed key after admitting control scans and candidate checks.
+    /// Key hashing and any input-dependent equality work are caller-owned.
+    pub fn get_hashed_bounded<E>(
+        &self,
+        hash: StarlarkHashValue,
+        keys_equal: impl FnMut(&K) -> Result<bool, E>,
+        mut charge: impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<Option<&V>, BoundedMapError<E>> {
+        let slot = self.find_hashed_bounded(hash, keys_equal, &mut charge)?;
+        // SAFETY: The lookup returned a live row of this map.
+        Ok(slot.map(|index| unsafe { self.entries.get_unchecked(index).1 }))
     }
 
     /// Verify that the map is internally consistent.
