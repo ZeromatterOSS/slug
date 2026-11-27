@@ -19,6 +19,7 @@ use std::convert::Infallible;
 use std::mem;
 
 use crate::collections::maybe_uninit_backport::maybe_uninit_write_slice;
+use crate::eval::ExecutionBudget;
 use crate::eval::ExecutionLimit;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
@@ -140,6 +141,24 @@ impl<'v> AValue<'v> for AValueFrozenList {
 }
 
 impl FrozenHeap {
+    /// Admit the aligned frozen list and its element copies. Attach the
+    /// owners of any values from other heaps before calling this method.
+    pub fn alloc_budgeted_list(
+        &self,
+        budget: &ExecutionBudget,
+        elems: &[FrozenValue],
+    ) -> Result<FrozenValue, ExecutionLimit> {
+        let bytes = if elems.is_empty() {
+            0
+        } else {
+            Self::checked_chunk_value_size::<AValueFrozenList>(elems.len())
+                .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?
+                .bytes() as usize
+        };
+        budget.charge(1 + elems.len(), bytes)?;
+        Ok(self.alloc_list(elems))
+    }
+
     /// Allocate a list with the given elements on this heap.
     pub(crate) fn alloc_list(&self, elems: &[FrozenValue]) -> FrozenValue {
         if elems.is_empty() {
@@ -245,5 +264,30 @@ impl<'v> Heap<'v> {
         array.extend_from_slice(a);
         array.extend_from_slice(b);
         self.alloc_raw(list_avalue(array)).to_value()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::values::list::FrozenListRef;
+
+    #[test]
+    fn budgeted_frozen_list_admits_the_aligned_slice() {
+        let elems = [FrozenValue::new_bool(true), FrozenValue::new_none()];
+        let bytes = AValueFrozenList::alloc_size_for_extra_len(elems.len()).bytes() as usize;
+        let heap = FrozenHeap::new();
+        let short = ExecutionBudget::new(3, bytes - 1, 8);
+        assert_eq!(
+            heap.alloc_budgeted_list(&short, &elems).err(),
+            Some(ExecutionLimit::AllocationBytes)
+        );
+        assert_eq!(heap.allocated_bytes(), 0);
+        let exact = ExecutionBudget::new(3, bytes, 8);
+        let list = heap.alloc_budgeted_list(&exact, &elems).unwrap();
+        let list = FrozenListRef::from_frozen_value(list).unwrap();
+        assert!(list[0].to_value().ptr_eq(elems[0].to_value()));
+        assert!(list[1].to_value().ptr_eq(elems[1].to_value()));
+        assert_eq!(exact.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
     }
 }

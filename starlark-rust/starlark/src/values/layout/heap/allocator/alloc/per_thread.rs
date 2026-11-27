@@ -74,7 +74,7 @@ fn next_chunk_size(filled_bytes_in_bump: usize) -> AlignedSize {
     // Grow geometrically from filled bytes: cached fragments can add many
     // chain parts without filling the corresponding full-sized chunks.
     // This is a preference; a larger immediate allocation still takes precedence.
-    const MAX_PREFERRED: usize = 1 << 31;
+    const MAX_PREFERRED: usize = if usize::BITS == 32 { 1 << 30 } else { 1 << 31 };
     let size = filled_bytes_in_bump
         .saturating_add(512)
         .checked_next_power_of_two()

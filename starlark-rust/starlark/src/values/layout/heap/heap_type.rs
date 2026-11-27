@@ -36,6 +36,8 @@ use std::sync::atomic::AtomicUsize;
 use allocative::Allocative;
 use bumpalo::Bump;
 use dupe::Dupe;
+use starlark_map::Hashed;
+use starlark_map::small_map::BoundedMapError;
 use starlark_map::small_set::SmallSet;
 
 use crate::cast;
@@ -292,6 +294,13 @@ impl FrozenHeapRef {
 }
 
 impl FrozenHeap {
+    pub(crate) fn checked_chunk_value_size<A: AValue<'static>>(
+        extra_len: usize,
+    ) -> Option<crate::values::layout::value_alloc_size::ValueAllocSize> {
+        A::checked_alloc_size_for_extra_len(extra_len)
+            .filter(|size| ChunkAllocator::fits_fresh_chunk(size.size()))
+    }
+
     /// Create a new [`FrozenHeap`].
     pub fn new() -> Self {
         Self::default()
@@ -367,6 +376,35 @@ impl FrozenHeap {
         if !refs.contains(heap) {
             refs.insert(heap.dupe());
         }
+    }
+
+    /// Retain the original frozen heap after admitting lookup and any growth.
+    pub fn add_reference_budgeted(
+        &self,
+        heap: &FrozenHeapRef,
+        budget: &ExecutionBudget,
+    ) -> Result<(), ExecutionLimit> {
+        budget.charge(1, 0)?;
+        if heap.0.is_none() {
+            return Ok(());
+        }
+
+        let mut refs = self.refs.borrow_mut();
+        budget.charge(refs.len(), 0)?;
+        // Owner equality compares pointers. Pay for the complete linear walk
+        // without invoking the ordinary hash-based membership lookup.
+        if refs.iter().any(|retained| retained == heap) {
+            return Ok(());
+        }
+        refs.try_insert_unique_hashed_bounded(Hashed::new(heap.dupe()), |work, bytes| {
+            budget.charge(work, bytes)
+        })
+        .map_err(|error| match error {
+            BoundedMapError::Operation(limit) => limit,
+            BoundedMapError::SizeOverflow => budget.refuse(ExecutionLimit::AllocationBytes),
+            BoundedMapError::AllocationFailed => budget.refuse(ExecutionLimit::AllocationFailed),
+            BoundedMapError::RowCountMismatch => unreachable!("bounded insert adds one row"),
+        })
     }
 
     pub(in crate::values::layout) fn string_interner(
@@ -733,12 +771,17 @@ impl<'v> Tracer<'v> {
 #[cfg(test)]
 mod tests {
     use starlark_derive::starlark_module;
+    use starlark_map::small_set::SmallSet;
 
+    use super::FrozenHeap;
     use super::FrozenHeapRef;
     use super::Heap;
     use crate as starlark;
     use crate::assert::Assert;
     use crate::environment::GlobalsBuilder;
+    use crate::eval::ExecutionBudget;
+    use crate::eval::ExecutionLimit;
+    use crate::values::OwnedFrozenValue;
     use crate::values::StringValue;
 
     #[test]
@@ -746,6 +789,83 @@ mod tests {
     where
         FrozenHeapRef: Send + Sync,
     {
+    }
+
+    #[test]
+    fn budgeted_owner_attachment_retains_the_exact_original() {
+        let original = OwnedFrozenValue::alloc("published original");
+        let destination = FrozenHeap::new();
+        let bytes = SmallSet::<FrozenHeapRef>::with_capacity(1)
+            .retained_storage_bytes_upper_bound()
+            .unwrap();
+
+        let short = ExecutionBudget::new(2, bytes - 1, 8);
+        assert_eq!(
+            original.owned_value_budgeted(&destination, &short).err(),
+            Some(ExecutionLimit::AllocationBytes)
+        );
+        assert!(destination.refs.borrow().is_empty());
+
+        let exact = ExecutionBudget::new(2, bytes, 8);
+        let value = original.owned_value_budgeted(&destination, &exact).unwrap();
+        assert!(value.ptr_eq(original.value()));
+        assert_eq!(exact.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+
+        let duplicate = ExecutionBudget::new(2, 0, 8);
+        destination
+            .add_reference_budgeted(original.owner(), &duplicate)
+            .unwrap();
+        assert_eq!(duplicate.check(), Ok(()));
+        assert_eq!(destination.refs.borrow().len(), 1);
+        drop(original);
+        assert_eq!(value.unpack_str(), Some("published original"));
+    }
+
+    #[test]
+    fn budgeted_owner_growth_and_index_probe_refusals_preserve_guards() {
+        let originals = std::array::from_fn::<_, 66, _>(|_| {
+            OwnedFrozenValue::alloc("independently owned original")
+        });
+        let destination = FrozenHeap::new();
+        let room = ExecutionBudget::new(1 << 20, 1 << 20, 8);
+        for original in &originals[..64] {
+            destination
+                .add_reference_budgeted(original.owner(), &room)
+                .unwrap();
+        }
+        let assert_retained_prefix = |count| {
+            let refs = destination.refs.borrow();
+            assert_eq!(refs.len(), count);
+            assert!(
+                refs.iter()
+                    .eq(originals[..count].iter().map(OwnedFrozenValue::owner))
+            );
+        };
+        let short = ExecutionBudget::new(1 << 20, 0, 8);
+        assert_eq!(
+            destination.add_reference_budgeted(originals[64].owner(), &short),
+            Err(ExecutionLimit::AllocationBytes)
+        );
+        assert_retained_prefix(64);
+        destination
+            .add_reference_budgeted(originals[64].owner(), &room)
+            .unwrap();
+        assert_retained_prefix(65);
+
+        // Admit membership and row production, with no remaining index probe work.
+        let short = ExecutionBudget::new(1 + 65 + 1, 0, 8);
+        assert_eq!(
+            destination.add_reference_budgeted(originals[65].owner(), &short),
+            Err(ExecutionLimit::Work)
+        );
+        assert_retained_prefix(65);
+
+        let no_growth = ExecutionBudget::new(1 << 20, 0, 8);
+        destination
+            .add_reference_budgeted(originals[65].owner(), &no_growth)
+            .unwrap();
+        assert_retained_prefix(66);
+        assert!(destination.refs.borrow().contains(originals[65].owner()));
     }
 
     #[test]

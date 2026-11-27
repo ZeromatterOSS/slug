@@ -18,6 +18,7 @@
 use starlark_syntax::slice_vec_ext::SliceExt;
 
 use crate::collections::maybe_uninit_backport::maybe_uninit_write_slice;
+use crate::eval::ExecutionBudget;
 use crate::eval::ExecutionLimit;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
@@ -154,6 +155,24 @@ impl<'v> AValue<'v> for AValueFrozenTuple {
 }
 
 impl FrozenHeap {
+    /// Admit the aligned frozen tuple and its element copies. Attach the
+    /// owners of any values from other heaps before calling this method.
+    pub fn alloc_budgeted_tuple(
+        &self,
+        budget: &ExecutionBudget,
+        elems: &[FrozenValue],
+    ) -> Result<FrozenValue, ExecutionLimit> {
+        let bytes = if elems.is_empty() {
+            0
+        } else {
+            Self::checked_chunk_value_size::<AValueFrozenTuple>(elems.len())
+                .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?
+                .bytes() as usize
+        };
+        budget.charge(1 + elems.len(), bytes)?;
+        Ok(self.alloc_tuple(elems))
+    }
+
     /// Allocate a tuple with the given elements on this heap.
     pub(crate) fn alloc_tuple(&self, elems: &[FrozenValue]) -> FrozenValue {
         if elems.is_empty() {
@@ -242,5 +261,30 @@ impl<'v> Heap<'v> {
         } else {
             self.alloc_tuple(&elems.collect::<Vec<_>>())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::values::tuple::TupleRef;
+
+    #[test]
+    fn budgeted_frozen_tuple_admits_the_aligned_slice() {
+        let elems = [FrozenValue::new_bool(true), FrozenValue::new_none()];
+        let bytes = AValueFrozenTuple::alloc_size_for_extra_len(elems.len()).bytes() as usize;
+        let heap = FrozenHeap::new();
+        let short = ExecutionBudget::new(3, bytes - 1, 8);
+        assert_eq!(
+            heap.alloc_budgeted_tuple(&short, &elems).err(),
+            Some(ExecutionLimit::AllocationBytes)
+        );
+        assert_eq!(heap.allocated_bytes(), 0);
+        let exact = ExecutionBudget::new(3, bytes, 8);
+        let tuple = heap.alloc_budgeted_tuple(&exact, &elems).unwrap();
+        let tuple = TupleRef::from_frozen_value(tuple).unwrap();
+        assert!(tuple.content()[0].ptr_eq(elems[0].to_value()));
+        assert!(tuple.content()[1].ptr_eq(elems[1].to_value()));
+        assert_eq!(exact.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
     }
 }

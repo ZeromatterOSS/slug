@@ -39,6 +39,7 @@ use crate::values::layout::avalue::heap_freeze_simple_impl;
 use crate::values::layout::avalue::try_freeze_directly;
 use crate::values::layout::heap::repr::AValueRepr;
 use crate::values::layout::heap::send::HeapSyncable;
+use crate::values::layout::value_alloc_size::ValueAllocSize;
 
 pub(crate) fn simple<'v, T: StarlarkValue<'v> + Send + Sync + 'static>(
     x: T,
@@ -48,6 +49,26 @@ pub(crate) fn simple<'v, T: StarlarkValue<'v> + Send + Sync + 'static>(
 }
 
 pub(crate) struct AValueSimple<T>(PhantomData<T>);
+
+fn admit_simple_with_cloned_text(
+    budget: &ExecutionBudget,
+    arena: Option<ValueAllocSize>,
+    cloned_text_lengths: impl IntoIterator<Item = usize>,
+) -> Result<(), ExecutionLimit> {
+    let mut bytes = arena
+        .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?
+        .bytes() as usize;
+    let mut work = 1 + ExecutionBudget::text_work(bytes);
+    for length in cloned_text_lengths {
+        bytes = bytes
+            .checked_add(length)
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        work = work
+            .checked_add(1 + ExecutionBudget::text_work(length))
+            .ok_or_else(|| budget.refuse(ExecutionLimit::Work))?;
+    }
+    budget.charge(work, bytes)
+}
 
 impl<'v, T: StarlarkValue<'v>> AValue<'v> for AValueSimple<T> {
     type StarlarkValue = T;
@@ -108,6 +129,42 @@ impl FrozenHeap {
     ) -> FrozenValue {
         self.alloc_simple_typed(val).to_frozen_value()
     }
+
+    /// Admit one aligned simple value before calling its trusted constructor.
+    /// Admit any allocator work inside `build` with the same budget.
+    pub fn alloc_budgeted_simple<
+        T: StarlarkValue<'static> + HeapSendable<'static> + HeapSyncable<'static> + Send + Sync,
+    >(
+        &self,
+        budget: &ExecutionBudget,
+        build: impl FnOnce() -> T,
+    ) -> Result<FrozenValue, ExecutionLimit> {
+        self.alloc_budgeted_simple_with_cloned_text(budget, &[], build)
+    }
+
+    /// Admit a simple value and the requested bytes of each text copy before
+    /// calling its trusted constructor. Other allocations in `build` must be
+    /// admitted separately.
+    pub fn alloc_budgeted_simple_with_cloned_text<
+        T: StarlarkValue<'static> + HeapSendable<'static> + HeapSyncable<'static> + Send + Sync,
+    >(
+        &self,
+        budget: &ExecutionBudget,
+        cloned_text_lengths: &[usize],
+        build: impl FnOnce() -> T,
+    ) -> Result<FrozenValue, ExecutionLimit> {
+        if !cloned_text_lengths.is_empty() {
+            budget.charge(cloned_text_lengths.len(), 0)?;
+        }
+        admit_simple_with_cloned_text(
+            budget,
+            Self::checked_chunk_value_size::<AValueSimple<T>>(0),
+            cloned_text_lengths.iter().copied(),
+        )?;
+        let value = build();
+        budget.check()?;
+        Ok(self.alloc_simple(value))
+    }
 }
 
 impl<'v> Heap<'v> {
@@ -121,20 +178,19 @@ impl<'v> Heap<'v> {
         cloned_text_lengths: impl IntoIterator<Item = usize>,
         build: impl FnOnce() -> T,
     ) -> Result<Value<'v>, ExecutionLimit> {
-        if let Some(budget) = self.execution_budget() {
-            let mut bytes = AValueSimple::<T>::alloc_size_for_extra_len(0).bytes() as usize;
-            let mut work = 1 + ExecutionBudget::text_work(bytes);
-            for length in cloned_text_lengths {
-                bytes = bytes
-                    .checked_add(length)
-                    .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
-                work = work
-                    .checked_add(1 + ExecutionBudget::text_work(length))
-                    .ok_or_else(|| budget.refuse(ExecutionLimit::Work))?;
-            }
-            budget.charge(work, bytes)?;
+        let budget = self.execution_budget();
+        if let Some(budget) = budget {
+            admit_simple_with_cloned_text(
+                budget,
+                AValueSimple::<T>::checked_alloc_size_for_extra_len(0),
+                cloned_text_lengths,
+            )?;
         }
-        Ok(self.alloc_simple(build()))
+        let value = build();
+        if let Some(budget) = budget {
+            budget.check()?;
+        }
+        Ok(self.alloc_simple(value))
     }
 
     /// Allocate a simple [`StarlarkValue`] on this heap.
@@ -204,5 +260,52 @@ mod tests {
             assert_eq!(built.get(), expected.is_ok());
             assert_eq!(result.map(|_| ()), expected);
         }
+    }
+
+    #[test]
+    fn budgeted_frozen_simple_text_refuses_before_its_constructor() {
+        let text = "雪".repeat(86);
+        let arena_bytes = AValueSimple::<OwnedText>::alloc_size_for_extra_len(0).bytes() as usize;
+        let bytes = arena_bytes + text.len();
+        let work =
+            3 + ExecutionBudget::text_work(arena_bytes) + ExecutionBudget::text_work(text.len());
+        for (work, bytes, expected) in [
+            (work, bytes, Ok(())),
+            (work, bytes - 1, Err(ExecutionLimit::AllocationBytes)),
+            (work - 1, bytes, Err(ExecutionLimit::Work)),
+        ] {
+            let budget = ExecutionBudget::new(work, bytes, 8);
+            let heap = FrozenHeap::new();
+            let built = Cell::new(false);
+            let result =
+                heap.alloc_budgeted_simple_with_cloned_text(&budget, &[text.len()], || {
+                    built.set(true);
+                    OwnedText(text.clone())
+                });
+            assert_eq!(built.get(), expected.is_ok());
+            assert_eq!(budget.check(), expected);
+            match result {
+                Ok(value) => {
+                    assert_eq!(value.downcast_frozen_ref::<OwnedText>().unwrap().0, text);
+                    assert_eq!(budget.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+                }
+                Err(error) => {
+                    assert_eq!(Err(error), expected);
+                    assert_eq!(heap.allocated_bytes(), 0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn budgeted_frozen_simple_keeps_constructor_refusal_without_publishing() {
+        let budget = ExecutionBudget::new(100, 1024, 8);
+        let heap = FrozenHeap::new();
+        let result = heap.alloc_budgeted_simple(&budget, || {
+            budget.refuse(ExecutionLimit::Work);
+            OwnedText(String::new())
+        });
+        assert!(matches!(result, Err(ExecutionLimit::Work)));
+        assert_eq!(heap.allocated_bytes(), 0);
     }
 }

@@ -121,6 +121,31 @@ impl FrozenHeap {
         self.alloc_str_intern(x)
     }
 
+    /// Admit one direct frozen string copy before allocation. This path uses
+    /// the static short strings and avoids an interner probe or allocation.
+    pub fn alloc_budgeted_str(
+        &self,
+        budget: &ExecutionBudget,
+        text: &str,
+    ) -> Result<FrozenStringValue, ExecutionLimit> {
+        budget.charge(1, 0)?;
+        if let Some(value) = constant_string(text) {
+            return Ok(value);
+        }
+        let payload = StarlarkStr::payload_len_for_len(text.len());
+        let bytes = Self::checked_chunk_value_size::<StarlarkStrAValue>(payload)
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?
+            .bytes() as usize;
+        budget.charge(ExecutionBudget::text_work(text.len()), bytes)?;
+        Ok(
+            self.alloc_str_init(text.len(), StarlarkStr::UNINIT_HASH, |dest| {
+                // SAFETY: The fresh allocation has space for exactly this UTF-8
+                // slice and cannot overlap it.
+                unsafe { copy_nonoverlapping(text.as_ptr(), dest, text.len()) }
+            }),
+        )
+    }
+
     /// Intern string.
     pub(crate) fn alloc_str_intern(&self, s: &str) -> FrozenStringValue {
         self.alloc_str_hashed(Hashed::new(s))
@@ -140,6 +165,16 @@ impl FrozenHeap {
     }
 }
 
+fn checked_string_allocation(
+    len: usize,
+    budget: &ExecutionBudget,
+) -> Result<usize, ExecutionLimit> {
+    let payload = StarlarkStr::payload_len_for_len(len);
+    StarlarkStrAValue::checked_alloc_size_for_extra_len(payload)
+        .map(|size| size.bytes() as usize)
+        .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))
+}
+
 impl<'v> Heap<'v> {
     /// Charge the work and aligned object bytes for a native result string
     /// before copying it to this heap.
@@ -151,10 +186,7 @@ impl<'v> Heap<'v> {
         if let Some(value) = constant_string(text) {
             return Ok(value.to_string_value());
         }
-        let payload = StarlarkStr::payload_len_for_len(text.len());
-        let bytes = StarlarkStrAValue::checked_alloc_size_for_extra_len(payload)
-            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?
-            .bytes() as usize;
+        let bytes = checked_string_allocation(text.len(), budget)?;
         budget.charge(1 + ExecutionBudget::text_work(text.len()), bytes)?;
         Ok(self.alloc_str(text))
     }
@@ -329,5 +361,45 @@ mod tests {
             );
         }
         assert_eq!(budget.charge(1, 0), Err(ExecutionLimit::Work));
+    }
+
+    #[test]
+    fn budgeted_frozen_string_admits_copy_and_uses_static_short_strings() {
+        let text = "雪\0".repeat(65);
+        let work = 1 + ExecutionBudget::text_work(text.len());
+        let bytes = StarlarkStrAValue::alloc_size_for_extra_len(StarlarkStr::payload_len_for_len(
+            text.len(),
+        ))
+        .bytes() as usize;
+        for (work, bytes, expected) in [
+            (work, bytes, Ok(())),
+            (work, bytes - 1, Err(ExecutionLimit::AllocationBytes)),
+            (work - 1, bytes, Err(ExecutionLimit::Work)),
+        ] {
+            let heap = FrozenHeap::new();
+            let budget = ExecutionBudget::new(work, bytes, 8);
+            let result = heap.alloc_budgeted_str(&budget, &text);
+            assert_eq!(budget.check(), expected);
+            match result {
+                Ok(value) => {
+                    assert_eq!(value.as_str(), text);
+                    assert_eq!(budget.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+                }
+                Err(error) => {
+                    assert_eq!(Err(error), expected);
+                    assert_eq!(heap.allocated_bytes(), 0);
+                }
+            }
+        }
+        let heap = FrozenHeap::new();
+        let budget = ExecutionBudget::new(2, 0, 8);
+        for text in ["", "\0"] {
+            let value = heap.alloc_budgeted_str(&budget, text).unwrap();
+            assert!(std::ptr::eq(
+                value.as_str(),
+                constant_string(text).unwrap().as_str()
+            ));
+        }
+        assert_eq!(heap.allocated_bytes(), 0);
     }
 }

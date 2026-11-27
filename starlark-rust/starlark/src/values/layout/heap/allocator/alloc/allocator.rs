@@ -27,6 +27,7 @@ use std::slice;
 use crate::values::layout::aligned_size::AlignedSize;
 use crate::values::layout::heap::allocator::alloc::chain::ChunkChain;
 use crate::values::layout::heap::allocator::alloc::chain::ChunkChainIterator;
+use crate::values::layout::heap::allocator::alloc::chunk::Chunk;
 use crate::values::layout::heap::allocator::alloc::per_thread::thread_local_alloc_at_least;
 use crate::values::layout::heap::allocator::alloc::per_thread::thread_local_release;
 use crate::values::layout::heap::allocator::api::ArenaAllocator;
@@ -73,6 +74,14 @@ impl Drop for ChunkAllocator {
 }
 
 impl ChunkAllocator {
+    pub(crate) fn fits_fresh_chunk(len: AlignedSize) -> bool {
+        len.bytes()
+            .checked_add(ChunkChain::HEADER_SIZE.bytes())
+            .map(|bytes| AlignedSize::new_bytes(bytes as usize))
+            .and_then(Chunk::checked_rounded_allocation_size)
+            .is_some()
+    }
+
     fn replace_chain(&self, chain: ChunkChain) -> (ChunkChain, NonNull<usize>) {
         unsafe {
             let current_ptr = self.current_ptr.replace(chain.begin());
@@ -211,9 +220,25 @@ mod tests {
     use crate::values::FrozenHeap;
     use crate::values::layout::aligned_size::AlignedSize;
     use crate::values::layout::heap::allocator::alloc::allocator::ChunkAllocator;
+    use crate::values::layout::heap::allocator::alloc::chain::ChunkChain;
     use crate::values::layout::heap::allocator::alloc::chunk::Chunk;
     use crate::values::layout::heap::allocator::api::ArenaAllocator;
     use crate::values::layout::heap::repr::AValueHeader;
+
+    #[test]
+    fn frozen_object_forecast_includes_both_chunk_headers_before_rounding() {
+        let backing = if usize::BITS == 32 { 1 << 30 } else { 1 << 31 };
+        let max_payload = backing
+            - Chunk::HEADER_SIZE.bytes() as usize
+            - ChunkChain::HEADER_SIZE.bytes() as usize;
+        assert!(ChunkAllocator::fits_fresh_chunk(AlignedSize::new_bytes(
+            max_payload
+        )));
+        assert!(!ChunkAllocator::fits_fresh_chunk(AlignedSize::new_bytes(
+            max_payload + AValueHeader::ALIGN
+        )));
+        assert!(!ChunkAllocator::fits_fresh_chunk(AlignedSize::MAX_SIZE));
+    }
     use crate::values::layout::value_alloc_size::ValueAllocSize;
 
     #[test]

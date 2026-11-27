@@ -140,6 +140,13 @@ impl fmt::Debug for Chunk {
 impl Chunk {
     pub(crate) const HEADER_SIZE: AlignedSize = AlignedSize::of::<ChunkData>();
 
+    /// The fresh backing layout includes its header and size-class rounding.
+    pub(crate) fn checked_rounded_allocation_size(len: AlignedSize) -> Option<AlignedSize> {
+        let required = len.bytes().checked_add(Self::HEADER_SIZE.bytes())?;
+        let rounded = AlignedSize::new_bytes(required as usize).checked_next_power_of_two()?;
+        (rounded.bytes() as usize <= isize::MAX as usize).then_some(rounded)
+    }
+
     /// Allocate chunk which can hold at least `len_words` words.
     #[inline]
     pub(crate) fn alloc_at_least(len: AlignedSize) -> Chunk {
@@ -155,13 +162,12 @@ impl Chunk {
     fn alloc_at_least_not_empty(len: AlignedSize) -> Chunk {
         debug_assert!(len > AlignedSize::ZERO);
 
-        let alloc_len = Chunk::HEADER_SIZE + len;
         // Round up to power of two to avoid spacing in allocation.
         // We don't have to use power of two according to jemalloc docs
         // (https://jemalloc.net/jemalloc.3.html, see "Size classes")
         // but power of two is easier to compute,
         // and it is OK to allocate larger chunk than requested.
-        let alloc_len = alloc_len.checked_next_power_of_two().unwrap();
+        let alloc_len = Self::checked_rounded_allocation_size(len).unwrap();
         let len = alloc_len - Chunk::HEADER_SIZE;
         Chunk {
             ptr: ChunkData::alloc_ref_count_1(len),

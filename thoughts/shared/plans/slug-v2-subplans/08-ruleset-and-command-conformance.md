@@ -173,9 +173,11 @@ admitted native methods. Collection reads, destructuring, string operators,
 predicates, and admitted container construction use checked work and storage.
 Calls check concrete callables. Setup meters definition storage, preserves
 checkpoints, and refuses native export hooks. Closed bytecode rejects
-unmodeled instructions and uses fixed missing-binding diagnostics. Bounded
-freeze preserves deferred definitions and captures. `print` and `fail` use
-bounded text. Close target materialization and diagnostics before activation.
+unmodeled instructions and skips eager error frames. Bounded freeze preserves
+deferred definitions and captures. `print` and `fail` use bounded text and
+admitted locations. Native file and symlink depsets use iterative projection.
+Frozen allocations and owner attachment have admission primitives. Wire the
+shared materialization budget and verify terminal diagnostics before activation.
 Resource outcomes are Slug-native.
 Bazel 9.2's `StarlarkOutputFormatterCallback` and `configured_query_test.sh`
 define setup and partial-output semantics.

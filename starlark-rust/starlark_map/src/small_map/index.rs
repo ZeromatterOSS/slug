@@ -144,14 +144,40 @@ impl Index {
         self.table.clear();
     }
 
-    pub(super) fn retained_storage_bytes_upper_bound(&self) -> Option<usize> {
+    pub(super) fn has_spare_capacity(&self) -> bool {
+        self.table.len() < self.table.capacity()
+    }
+
+    pub(super) fn insert_reserved_bounded<E>(
+        &mut self,
+        hash: u64,
+        value: usize,
+        charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<(), BoundedMapError<E>> {
+        assert!(self.has_spare_capacity());
+        // A previously used table can contain tombstones. Admit a full
+        // probe even if few rows remain, plus the small-table fixup load.
+        let work = self
+            .max_bucket_count()
+            .and_then(|buckets| buckets.checked_add(2))
+            .ok_or(BoundedMapError::SizeOverflow)?;
+        charge(work, 0).map_err(BoundedMapError::Operation)?;
+        // Effective capacity exceeds occupancy, so even insertion into an
+        // empty bucket has the required growth credit and cannot rehash.
+        self.table
+            .insert_unique(hash, value, |_| unreachable!("reserved index cannot grow"));
+        Ok(())
+    }
+
+    fn max_bucket_count(&self) -> Option<usize> {
         // Pinned hashbrown 0.14: full capacity c implies buckets <= 2*(c+1).
+        self.full_capacity_high_water.checked_add(1)?.checked_mul(2)
+    }
+
+    pub(super) fn retained_storage_bytes_upper_bound(&self) -> Option<usize> {
         // Its usize table has one control byte/bucket, <=16 replicated control
         // bytes, and at most max(alignof(usize),16)-1 alignment padding.
-        let buckets = self
-            .full_capacity_high_water
-            .checked_add(1)?
-            .checked_mul(2)?;
+        let buckets = self.max_bucket_count()?;
         let payload = buckets.checked_mul(mem::size_of::<usize>().checked_add(1)?)?;
         mem::size_of::<Self>()
             .checked_add(payload)?

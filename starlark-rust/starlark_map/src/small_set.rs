@@ -26,6 +26,7 @@ use std::hash::Hasher;
 use std::marker::PhantomData;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use equivalent::Equivalent;
 #[cfg(feature = "pagable")]
 use pagable::Pagable;
@@ -33,6 +34,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::hashed::Hashed;
+use crate::small_map::BoundedMapError;
 use crate::small_map::SmallMap;
 pub use crate::small_set::iter::IntoIter;
 pub use crate::small_set::iter::IntoIterHashed;
@@ -166,6 +168,20 @@ impl<T> SmallSet<T> {
         T: Hash,
     {
         self.0.insert_unique_unchecked(key, ());
+    }
+
+    /// Append a validated unique key using its canonical hash. The caller
+    /// admits key production and establishes absence. Failed admission
+    /// leaves all existing keys and the set's storage intact.
+    pub fn try_insert_unique_hashed_bounded<E>(
+        &mut self,
+        key: Hashed<T>,
+        charge: impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<(), BoundedMapError<E>>
+    where
+        T: Dupe,
+    {
+        self.0.try_insert_unique_hashed_bounded(key, (), charge)
     }
 
     /// Insert the element into the set.

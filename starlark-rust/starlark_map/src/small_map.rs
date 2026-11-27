@@ -28,6 +28,7 @@ use std::marker::PhantomData;
 use std::mem;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use equivalent::Equivalent;
 #[cfg(feature = "pagable")]
 use pagable::Pagable;
@@ -157,6 +158,53 @@ impl<K, V> SmallMap<K, V> {
             return Err(BoundedMapError::RowCountMismatch);
         }
         Ok(map)
+    }
+
+    pub(crate) fn try_insert_unique_hashed_bounded<E>(
+        &mut self,
+        key: Hashed<K>,
+        value: V,
+        mut charge: impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<(), BoundedMapError<E>>
+    where
+        K: Dupe,
+        V: Dupe,
+    {
+        let len = self.len();
+        let next_len = len.checked_add(1).ok_or(BoundedMapError::SizeOverflow)?;
+        let capacity = self.entries.capacity();
+        let index_has_room = self
+            .index
+            .as_ref()
+            .map_or(next_len <= NO_INDEX_THRESHOLD, |index| {
+                index.has_spare_capacity()
+            });
+        charge(1, 0).map_err(BoundedMapError::Operation)?;
+        if next_len <= capacity && index_has_room {
+            if let Some(index) = &mut self.index {
+                index.insert_reserved_bounded(key.hash().promote(), len, &mut charge)?;
+            }
+            self.entries.insert_hashed_unique_unchecked(key, value);
+            return Ok(());
+        }
+
+        let capacity = if next_len > capacity {
+            capacity
+                .checked_mul(2)
+                .ok_or(BoundedMapError::SizeOverflow)?
+                .max(next_len)
+        } else {
+            capacity
+        };
+        // Walk, copy and retire guard handles using their existing canonical hashes.
+        charge(len, 0).map_err(BoundedMapError::Operation)?;
+        let mut grown = Self::try_with_capacity_bounded(capacity, &mut charge)?;
+        for (existing, value) in self.iter_hashed() {
+            grown.push_fresh_hashed_row(existing.cloned(), value.dupe(), &mut charge)?;
+        }
+        grown.push_fresh_hashed_row(key, value, &mut charge)?;
+        *self = grown;
+        Ok(())
     }
 
     /// Build an insertion-ordered map from fallible rows with canonical hashes.

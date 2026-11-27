@@ -25,6 +25,8 @@ use dupe::Dupe;
 use dupe::Dupe_;
 
 use crate::cast::transmute;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::typing::Ty;
 use crate::values::AllocFrozenValue;
 use crate::values::FrozenHeap;
@@ -164,6 +166,16 @@ impl OwnedFrozenValue {
     pub fn owned_value<'v>(&self, heap: &'v FrozenHeap) -> Value<'v> {
         // Safe because we convert it to a value which is tied to the owning heap
         unsafe { self.owned_frozen_value(heap).to_value() }
+    }
+
+    /// Extract the original value after admitting the owner reference.
+    pub fn owned_value_budgeted<'v>(
+        &self,
+        heap: &'v FrozenHeap,
+        budget: &ExecutionBudget,
+    ) -> Result<Value<'v>, ExecutionLimit> {
+        heap.add_reference_budgeted(&self.owner, budget)?;
+        Ok(self.value.to_value())
     }
 
     /// Operate on the [`FrozenValue`] stored inside.
