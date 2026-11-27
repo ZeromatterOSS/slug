@@ -88,6 +88,7 @@ use crate::ModuleRegistrationExpansionObservationKey;
 use crate::ModuleRegistrationFamily;
 use crate::cycle_detector::bzl_load_cycle_detector;
 use crate::registration_expansion::package_postorder;
+use crate::registration_expansion::prefix_probe::TestWitness;
 
 #[path = "registration_expansion_tests/path_prerequisite_tests.rs"]
 mod path_prerequisite_tests;
@@ -280,6 +281,7 @@ struct TrackedActivation {
 struct ExpansionTracker {
     dependencies: Mutex<Vec<(String, Vec<String>)>>,
     activations: Mutex<Vec<TrackedActivation>>,
+    prefix: TestWitness,
 }
 
 impl ExpansionTracker {
@@ -507,9 +509,12 @@ async fn transaction_on(
 ) -> DiceTransaction {
     let mut data = UserComputationData {
         cycle_detector: Some(bzl_load_cycle_detector()),
-        activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
         ..Default::default()
     };
+    if let Some(tracker) = tracker {
+        data.data.set(tracker.prefix.clone());
+        data.activation_tracker = Some(tracker);
+    }
     if capture_events {
         data.data.set(CaptureEvaluationEvents);
     }

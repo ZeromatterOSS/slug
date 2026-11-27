@@ -98,6 +98,7 @@ async fn observed_independent_literal_rows_union_lstat_prerequisites_and_recover
     let value = tx.compute(&key).await.unwrap();
     pending(&value, &omitted);
     no_family_batch(&tracker, &key);
+    assert_eq!(tracker.prefix.counts(), [1, 0, 0]);
 
     let mut tx = update_module_epoch(tx, module, complete.dupe()).await;
     let value = tx.compute(&key).await.unwrap();
@@ -130,6 +131,98 @@ async fn observed_independent_literal_rows_union_lstat_prerequisites_and_recover
             .is_empty()
     );
     assert!(ModuleRegistrationExpansionObservationKey::validity(&value));
+    assert_eq!(tracker.prefix.counts(), [1, 0, 0]);
+}
+
+#[tokio::test]
+async fn observed_module_toolchain_need_rebuilds_complete_prefix_only() {
+    use crate::RootPackageLoadObservationKey;
+
+    let module = "module(name='bazel_tools')\nregister_toolchains('//a:all','//b:tc','//c:tc')\n";
+    let mut fixture = packages(module, &["a", "b", "c"]);
+    fixture.file(
+        "/workspace/a/BUILD.bazel",
+        format!("{BUILD}toolchain(name='all',toolchain_type=':type',toolchain=':impl')\n"),
+        61,
+    );
+    fixture.missing("/workspace/unrelated");
+    let complete = fixture.build();
+    let missing = lstat("b");
+    let tracker = Arc::new(ExpansionTracker::default());
+    let mut tx = transaction_with_tracker(
+        module,
+        without(&complete, &[missing.dupe(), lstat("unrelated")]),
+        true,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let key = ModuleRegistrationExpansionObservationKey::toolchains(workspace());
+    let a_key = RootPackageLoadObservationKey::new(workspace(), PackagePath::parse("a").unwrap());
+    let c_key = RootPackageLoadObservationKey::new(workspace(), PackagePath::parse("c").unwrap());
+
+    let first = tx.compute(&key).await.unwrap();
+    pending(&first, std::slice::from_ref(&missing));
+    assert_eq!(tracker.prefix.counts(), [1, 1, 1]);
+    let activations = tracker.take();
+    assert!(activation_for(&activations, &key).batch.is_none());
+    assert_eq!(
+        activation_for(&activations, &c_key).kind,
+        ActivationKind::Evaluated
+    );
+    let LoadingPreparationOutcome::Complete(Ok(a_first)) = tx.compute(&a_key).await.unwrap() else {
+        panic!("earlier package must already be complete");
+    };
+    tracker.take();
+
+    let mut tx = update_module_epoch(
+        tx,
+        module,
+        without(&complete, std::slice::from_ref(&missing)),
+    )
+    .await;
+    let second = tx.compute(&key).await.unwrap();
+    pending(&second, std::slice::from_ref(&missing));
+    assert_eq!(tracker.prefix.counts(), [2, 2, 2]);
+    no_family_batch(&tracker, &key);
+    let LoadingPreparationOutcome::Complete(Ok(a_second)) = tx.compute(&a_key).await.unwrap()
+    else {
+        panic!("earlier package must stay complete");
+    };
+    assert!(Arc::ptr_eq(a_first.result(), a_second.result()));
+    assert!(std::ptr::eq(
+        a_first.observations().observations(),
+        a_second.observations().observations(),
+    ));
+    tracker.take();
+
+    let mut tx = update_module_epoch(tx, module, complete.dupe()).await;
+    let LoadingPreparationOutcome::Complete(Ok(observed)) = tx.compute(&key).await.unwrap() else {
+        panic!("supplying B must complete registration");
+    };
+    assert_eq!(
+        labels(observed.result()),
+        ["@@//a:all", "@@//b:tc", "@@//c:tc"]
+    );
+    assert_eq!(tracker.prefix.counts(), [2, 2, 2]);
+    for name in ["a", "b", "c"] {
+        let demand = lstat(name);
+        assert!(Arc::ptr_eq(
+            observed.observations().get(&demand).unwrap(),
+            complete.get(&demand).unwrap(),
+        ));
+    }
+    for (demand, result) in observed.observations().observations() {
+        assert!(Arc::ptr_eq(result, complete.get(demand).unwrap()));
+    }
+    let activations = tracker.take();
+    let batch = activation_for(&activations, &key).batch.as_ref().unwrap();
+    assert!(matches!(
+        batch.events(),
+        [EvaluationEvent::Diagnostic {
+            level: EvaluationDiagnosticLevel::Warning,
+            text,
+        }] if text == "target pattern `//a:all` is ambiguous; using explicit target @@//a:all"
+    ));
 }
 
 #[tokio::test]

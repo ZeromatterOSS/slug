@@ -101,6 +101,7 @@ impl Totals {
             "columns": ["calls", "wall_ns", "requested_bytes"],
             "completed_snapshots": completed.rows,
             "aborted_snapshots": aborted.rows,
+            "unaligned_chunks": [completed.unaligned_chunks, aborted.unaligned_chunks],
             "invalid_clock_or_overflow": completed.invalid || aborted.invalid,
             "compare_and_append_nested_in_capture": true,
         })
@@ -259,6 +260,7 @@ fn workspace_progress_snapshot_work_stays_in_the_operation_and_outcome_that_star
     let totals = Mutex::new(Totals::default());
     let filesystem = Span::start(&totals, Stage::Filesystem);
     assert!(span(Phase::Capture, 0).is_none());
+    snapshot_work::record_unaligned_comparison_chunk();
     filesystem.finish();
     let snapshot = Span::start(&totals, Stage::ArchiveSnapshot);
     {
@@ -284,12 +286,19 @@ fn workspace_progress_snapshot_work_stays_in_the_operation_and_outcome_that_star
         let _snapshot = Span::start(&totals, Stage::FilesystemSnapshot);
         let _capture = span(Phase::Capture, 0).unwrap();
         drop(span(Phase::PriorCompare, 90).unwrap());
+        snapshot_work::record_unaligned_comparison_chunk();
     }
     assert!(span(Phase::Capture, 0).is_none());
 
     let totals = totals.into_inner().unwrap();
     let [[archive, archive_abort], [filesystem, filesystem_abort]] = totals.snapshots;
     assert!(totals.snapshots.iter().flatten().all(|work| !work.invalid));
+    assert_eq!(
+        totals
+            .snapshots
+            .map(|family| family.map(|work| work.unaligned_chunks)),
+        [[0, 0], [0, 1]]
+    );
     let calls_and_bytes = |rows: [[u64; 3]; 4]| rows.map(|[calls, _, bytes]| (calls, bytes));
     assert_eq!(
         calls_and_bytes(archive.rows),
@@ -320,6 +329,7 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
         }; 2],
         snapshots: [[snapshot_work::Work {
             rows: [[u64::MAX; 3]; snapshot_work::LABELS.len()],
+            unaligned_chunks: u64::MAX,
             invalid: false,
         }; 2]; 2],
     }

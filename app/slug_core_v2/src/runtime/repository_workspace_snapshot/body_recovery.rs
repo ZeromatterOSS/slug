@@ -51,6 +51,10 @@ pub(super) fn observed_equal(
             if end > old.len() {
                 return Err(io::Error::other("workspace comparison grew"));
             }
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if !offset.is_multiple_of(slug_bzlmod_v2::REPOSITORY_WORKSPACE_BODY_CHUNK_BYTES) {
+                crate::runtime::probe_observer::snapshot_work::record_unaligned_comparison_chunk();
+            }
             // Complete the framed contents stream even after mismatch, preserving
             // every comparison, exact EOF and opened/named-frame validation.
             same &= compare_chunk(compare, offset, chunk);

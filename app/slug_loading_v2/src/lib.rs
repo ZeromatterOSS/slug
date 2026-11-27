@@ -403,6 +403,12 @@ pub use registration_expansion::PathLookaheadProbeSnapshot;
 #[cfg(feature = "native-probe-observer")]
 #[doc(hidden)]
 pub use registration_expansion::path_lookahead_probe_snapshot;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use registration_expansion::prefix_probe::ModuleToolchainNeedPrefixSnapshot;
+#[cfg(feature = "native-probe-observer")]
+#[doc(hidden)]
+pub use registration_expansion::prefix_probe::module_toolchain_need_prefix_snapshot;
 #[doc(hidden)]
 pub use root_repository_load_route::HostRootRepositoryLoadRoute;
 #[doc(hidden)]

@@ -59,6 +59,8 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 mod path_lookahead;
+#[cfg(any(test, feature = "native-probe-observer"))]
+pub(crate) mod prefix_probe;
 #[cfg(feature = "native-probe-observer")]
 pub use path_lookahead::PathLookaheadProbeSnapshot;
 #[cfg(feature = "native-probe-observer")]
@@ -482,6 +484,8 @@ struct ExpansionScratch {
     packages: SmallMap<PackageIdentifier, PackageCarrier>,
     subtrees: SmallMap<PackageIdentifier, Arc<[CompactString]>>,
     observations: PathObservationEpoch,
+    #[cfg(any(test, feature = "native-probe-observer"))]
+    completed_prefix_rows: u64,
 }
 
 #[derive(Clone, Copy)]
@@ -507,6 +511,8 @@ impl ExpansionScratch {
             packages: SmallMap::new(),
             subtrees: SmallMap::new(),
             observations: PathObservationEpoch::empty(),
+            #[cfg(any(test, feature = "native-probe-observer"))]
+            completed_prefix_rows: 0,
         }
     }
 
@@ -1149,6 +1155,12 @@ async fn expand_module_rows<'a>(
             .await
         }
         .await;
+        // A gap keeps later lookahead successes out of the completed prefix.
+        // A successful row already passed the u32 ordinal check above.
+        #[cfg(any(test, feature = "native-probe-observer"))]
+        if result.is_ok() && u64::try_from(ordinal).ok() == Some(scratch.completed_prefix_rows) {
+            scratch.completed_prefix_rows += 1;
+        }
         let observation = lookahead.observe(ctx, result);
         #[cfg(test)]
         crate::path_need_lookahead::assert_observer_layout(&observation);
@@ -1187,6 +1199,24 @@ async fn drive_module_registration_expansion(
         }
     }
     .await;
+    #[cfg(any(test, feature = "native-probe-observer"))]
+    if mode == ObservationMode::Observed
+        && key.family == ModuleRegistrationFamily::Toolchains
+        && matches!(&result, Err(DriverBreak::Need(_)))
+    {
+        let rows = scratch.completed_prefix_rows;
+        let counts = [1, u64::from(rows != 0), rows];
+        #[cfg(feature = "native-probe-observer")]
+        prefix_probe::record(counts);
+        #[cfg(test)]
+        if let Ok(witness) = ctx
+            .per_transaction_data()
+            .data
+            .get::<prefix_probe::TestWitness>()
+        {
+            witness.record(counts);
+        }
+    }
     finish_driver(scratch, result)
 }
 

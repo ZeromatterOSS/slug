@@ -17,12 +17,22 @@ pub(super) const LABELS: [&str; 4] = ["capture", "record", "prior_compare", "bui
 #[derive(Clone, Copy, Default)]
 pub(super) struct Work {
     pub(super) rows: [[u64; 3]; LABELS.len()],
+    pub(super) unaligned_chunks: u64,
     pub(super) invalid: bool,
 }
 
 impl Work {
+    fn add_unaligned(&mut self, count: u64) {
+        if let Some(total) = self.unaligned_chunks.checked_add(count) {
+            self.unaligned_chunks = total;
+        } else {
+            self.invalid = true;
+        }
+    }
+
     pub(super) fn merge(&mut self, other: Self) {
         self.invalid |= other.invalid;
+        self.add_unaligned(other.unaligned_chunks);
         for (total, delta) in self
             .rows
             .iter_mut()
@@ -40,6 +50,15 @@ impl Work {
 
 thread_local! {
     static WORK: Cell<Option<Work>> = const { Cell::new(None) };
+}
+
+pub(crate) fn record_unaligned_comparison_chunk() {
+    WORK.with(|work| {
+        if let Some(mut totals) = work.get() {
+            totals.add_unaligned(1);
+            work.set(Some(totals));
+        }
+    });
 }
 
 pub(super) struct Scope(PhantomData<Rc<()>>);

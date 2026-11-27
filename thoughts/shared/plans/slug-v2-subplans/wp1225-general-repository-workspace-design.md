@@ -1248,6 +1248,7 @@ Start filesystem operation and snapshot spans after exact replay. Separate
 completed and aborted snapshots for both owners, with prior comparison and
 builder append nested in capture and record completion measured separately.
 Requested bytes describe the work presented to each owner, including refusals.
+Off-boundary actual comparison callbacks share those outcome buckets.
 
 The [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json)
 joins attribution, the selected causal regression and the semantic cutoff below.
@@ -1844,6 +1845,9 @@ reservation and 512 KiB combined ceiling. Actual owner tests must distinguish
 stages before the original Rust workload chooses the next causal discriminator.
 A reached stage establishes provenance, not cost or an optimization decision.
 Instrumentation remains coupled to the subsequently selected semantic proof.
+The observed Loading module-toolchain driver folds a fixed delta for each
+returned Need, tracking whether and how many complete rows preceded the first
+gap. Later speculative successes do not extend that contiguous prefix.
 
 A separate 48-byte feature-only package BUILD-child collector counts entries
 and the actual returned whole singleton-Lstat, singleton-FileBytes or other

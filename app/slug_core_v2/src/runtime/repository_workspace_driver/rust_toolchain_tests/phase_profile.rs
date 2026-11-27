@@ -10,6 +10,7 @@ use std::time::Instant;
 use serde_json::Value;
 use serde_json::json;
 use slug_analysis_v2::ToolchainResolutionProbeSnapshot;
+use slug_loading_v2::ModuleToolchainNeedPrefixSnapshot;
 use slug_loading_v2::PathLookaheadProbeSnapshot;
 use slug_loading_v2::RepositoryPackageChildProbeSnapshot;
 use slug_loading_v2::observation_union_probe;
@@ -33,6 +34,7 @@ pub(super) struct InstalledProfile {
     path_before: PathLookaheadProbeSnapshot,
     toolchain_before: ToolchainResolutionProbeSnapshot,
     package_children_before: RepositoryPackageChildProbeSnapshot,
+    module_toolchain_prefix_before: ModuleToolchainNeedPrefixSnapshot,
 }
 impl InstalledProfile {
     pub(super) fn attach(runtime: &mut WorkspaceRuntime) -> io::Result<Self> {
@@ -40,6 +42,8 @@ impl InstalledProfile {
         let path_before = slug_loading_v2::path_lookahead_probe_snapshot();
         let toolchain_before = slug_analysis_v2::toolchain_resolution_probe_snapshot();
         let package_children_before = slug_loading_v2::repository_package_child_probe_snapshot();
+        let module_toolchain_prefix_before =
+            slug_loading_v2::module_toolchain_need_prefix_snapshot();
         let raw = unsafe {
             libc::memfd_create(
                 c"slug-rust-phase-profile".as_ptr(),
@@ -69,6 +73,7 @@ impl InstalledProfile {
             path_before,
             toolchain_before,
             package_children_before,
+            module_toolchain_prefix_before,
         })
     }
     /// Called only after the outcome and runtime have dropped and native owners
@@ -94,6 +99,10 @@ impl InstalledProfile {
         profile["repository_package_child_needs"] = package_child_counts(
             self.package_children_before,
             slug_loading_v2::repository_package_child_probe_snapshot(),
+        );
+        profile["observed_module_toolchain_need_prefix"] = module_toolchain_need_prefix(
+            self.module_toolchain_prefix_before,
+            slug_loading_v2::module_toolchain_need_prefix_snapshot(),
         );
         (profile, observer.workspace_progress_report())
     }
@@ -175,6 +184,21 @@ fn scalar_deltas<const N: usize>(
         }
     });
     (delta, saturated, reversed, overflow)
+}
+
+// Uses scalar_counter_scope. The three deltas are Need returns, Need returns
+// following a complete prefix, and complete prefix rows discarded on Need.
+fn module_toolchain_need_prefix(
+    before: ModuleToolchainNeedPrefixSnapshot,
+    after: ModuleToolchainNeedPrefixSnapshot,
+) -> Value {
+    let (delta, _, _, _) = scalar_deltas(
+        before.counts,
+        after.counts,
+        before.overflow_mask,
+        after.overflow_mask,
+    );
+    json!(delta)
 }
 
 fn lookahead_counts(
@@ -516,6 +540,21 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
             overflow_mask: 0,
         },
     );
+    let prefix_before = ModuleToolchainNeedPrefixSnapshot {
+        counts: [0; 3],
+        overflow_mask: 0,
+    };
+    profile["observed_module_toolchain_need_prefix"] = module_toolchain_need_prefix(
+        prefix_before,
+        ModuleToolchainNeedPrefixSnapshot {
+            counts: [u64::MAX - 1; 3],
+            overflow_mask: 0,
+        },
+    );
+    assert_eq!(
+        profile["observed_module_toolchain_need_prefix"],
+        json!([u64::MAX - 1, u64::MAX - 1, u64::MAX - 1]),
+    );
     for name in [
         "observation_union_helpers",
         "metadata_path_lookahead",
@@ -604,6 +643,20 @@ fn phase_profile_family_report_is_static_and_bounded_at_maximum_counts() {
             counts: [u64::MAX; 5],
             overflow_mask: u64::MAX,
         },
+    );
+    masked_profile["observed_module_toolchain_need_prefix"] = module_toolchain_need_prefix(
+        ModuleToolchainNeedPrefixSnapshot {
+            counts: [100, 0, 0],
+            overflow_mask: 0,
+        },
+        ModuleToolchainNeedPrefixSnapshot {
+            counts: [99, 200, u64::MAX],
+            overflow_mask: 0b010,
+        },
+    );
+    assert_eq!(
+        masked_profile["observed_module_toolchain_need_prefix"],
+        json!([null, null, null]),
     );
     let masked = json!({"phase_profile":masked_profile,"progress_wall":timing.summary()});
     assert!(

@@ -42,9 +42,16 @@ of 0.770 seconds comparing prior bodies after 0.004 seconds in operations.
 The follow-up Core build took 69.51 seconds. All 28 focused tests and five native
 guards passed, and the 27.12-second original retired to 168 retained bytes,
 zero FDs and zero backing. The report used 130,095 of 524,288 bytes.
-Discriminate repeated full-block decoding and registration row work before
-selecting another change. Preserve exact rooted comparisons, codec roundtrips
-and history checks.
+All six source-checked XZ streams have one Block. The LZ4 overlap loop
+accounted for 1.75% of sampled cycles in the six-archive gate. Reached rooted
+comparisons in the sampled original had no unaligned callbacks. That original
+stopped during Archive 5 at 831 computes, 55 roots and 114 records, then
+retired exactly. Of 645 observed module-toolchain Need returns, 630 discarded
+a completed prefix, totaling 20,656 rows. A focused DICE fixture repeats the
+same completed row across Need retries with stable child and fact owners.
+Choose a complete registration reuse boundary that preserves parent ordering,
+first conflict, Need validity, selected events and exact observation custody.
+Keep rooted comparisons, codec roundtrips and history checks.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,
