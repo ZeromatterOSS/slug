@@ -115,11 +115,12 @@ publication and Archive envelope gates have completed. Production activation,
 required public action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. One cold pinned
-CrateInfo case matched output and sampled 609,524 KiB for Slug and 720,972 KiB
-for Bazel in 23.55s and 10.64s. Direct retained process-tree samples were 1.230×,
-1.884× and 0.957× Bazel for warm, edition change and restoration. Attribute the
-edition-change descendant peak before activation. A new ownership, compatibility
-or resource prerequisite requires root reassessment under the orchestration skill.
+CrateInfo row and three retained rows matched in the latest paired resource run.
+Sampled RSS was 0.872×, 1.234×, 1.024× and 0.943× Bazel. An earlier edition change
+reached 1.884× raw RSS. Descendant sampling caught a matching spike at the
+bubblewrap exec, and a trace confirmed `CLONE_VM | CLONE_VFORK`. Preserve raw samples
+and count verified shared address spaces once. Reassess new ownership,
+compatibility or resource prerequisites under the orchestration skill.
 
 ## Evidence and history
 
