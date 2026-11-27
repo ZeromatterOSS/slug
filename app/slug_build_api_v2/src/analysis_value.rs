@@ -7,6 +7,7 @@
  * may select, at your option, one of the above-listed licenses.
  */
 
+use std::alloc::Layout;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
@@ -14,6 +15,8 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 use std::sync::LazyLock;
+use std::sync::Once;
+use std::sync::atomic::AtomicUsize;
 
 use allocative::Allocative;
 use compact_str::CompactString;
@@ -300,6 +303,24 @@ impl AnalysisConfiguredTargetKey {
         self
     }
 
+    /// Admit the owned label and new identity owner before copying a borrowed key.
+    pub fn try_from_borrowed<E>(
+        label: &CanonicalLabel,
+        configuration: Arc<[u8]>,
+        platform: Option<&Arc<CanonicalLabel>>,
+        admit: impl FnOnce(usize, [usize; 4]) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        admit(
+            arc_allocation_bytes::<AnalysisConfiguredTargetKeyData>(),
+            label.cloned_text_lengths(),
+        )?;
+        Ok(Self(Arc::new(AnalysisConfiguredTargetKeyData {
+            label: label.clone(),
+            configuration,
+            toolchain_execution_platform: platform.cloned(),
+        })))
+    }
+
     pub fn label(&self) -> &CanonicalLabel {
         &self.0.label
     }
@@ -330,6 +351,17 @@ impl AnalysisTargetIdentity {
         Self::Null(Arc::new(label))
     }
 
+    pub fn try_null_from_borrowed<E>(
+        label: &CanonicalLabel,
+        admit: impl FnOnce(usize, [usize; 4]) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        admit(
+            arc_allocation_bytes::<CanonicalLabel>(),
+            label.cloned_text_lengths(),
+        )?;
+        Ok(Self::null(label.clone()))
+    }
+
     pub fn label(&self) -> &CanonicalLabel {
         match self {
             Self::Configured(key) => key.label(),
@@ -343,6 +375,16 @@ impl AnalysisTargetIdentity {
             Self::Null(_) => None,
         }
     }
+}
+
+fn arc_allocation_bytes<T>() -> usize {
+    // The pinned standard Arc representation prefixes the value with two counters.
+    Layout::new::<[AtomicUsize; 2]>()
+        .extend(Layout::new::<T>())
+        .expect("layout for a fixed-size identity owner")
+        .0
+        .pad_to_align()
+        .size()
 }
 
 impl From<AnalysisConfiguredTargetKey> for AnalysisTargetIdentity {
@@ -793,6 +835,21 @@ impl AnalysisDepsetGraphNode {
 }
 
 impl AnalysisDepset {
+    /// Initialize all process-global empty owners before bounded projections.
+    pub fn prepare_canonical_empties() {
+        static PREPARE: Once = Once::new();
+        PREPARE.call_once(|| {
+            for order in [
+                DepsetOrder::Default,
+                DepsetOrder::Postorder,
+                DepsetOrder::Preorder,
+                DepsetOrder::Topological,
+            ] {
+                let _ = Self::empty(order);
+            }
+        });
+    }
+
     pub fn empty(order: DepsetOrder) -> Self {
         static DEFAULT: LazyLock<AnalysisDepset> =
             LazyLock::new(|| AnalysisDepset::empty_owned(DepsetOrder::Default));

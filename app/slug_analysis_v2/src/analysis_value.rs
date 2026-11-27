@@ -61,8 +61,10 @@ use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::eval::ExecutionBudget;
+use starlark::eval::ExecutionLimit;
 use starlark::starlark_module;
 use starlark::values::FrozenHeap;
+use starlark::values::FrozenStringValue;
 use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
@@ -82,6 +84,8 @@ use starlark::values::structs::AllocStruct;
 use starlark::values::structs::StructRef;
 use starlark::values::tuple::AllocTuple;
 use starlark::values::tuple::TupleRef;
+use starlark_map::Hashed;
+use starlark_map::small_map::BoundedMapError;
 use starlark_map::small_map::SmallMap;
 
 use crate::key::ConfiguredNodeKey;
@@ -125,6 +129,10 @@ mod artifact_root_tests;
 
 mod native_depset;
 pub(crate) mod published;
+
+#[cfg(test)]
+#[path = "analysis_value/budgeted_projection_tests.rs"]
+mod budgeted_projection_tests;
 
 mod empty_instrumented_files;
 use empty_instrumented_files::EmptyInstrumentedFiles;
@@ -179,6 +187,30 @@ impl<'v> StarlarkValue<'v> for BuiltinProviderView {
 
     fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         self.fields.get(name).map(|value| value.to_value())
+    }
+
+    fn get_attr_bounded(
+        &self,
+        name: &str,
+        _heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> starlark::Result<Option<Value<'v>>> {
+        budget.charge_text_work(name.len())?;
+        let name = Hashed::new(name);
+        self.fields
+            .get_hashed_bounded(
+                name.hash(),
+                |candidate| {
+                    if candidate.len() != name.key().len() {
+                        return Ok(false);
+                    }
+                    budget.charge_text_work(candidate.len())?;
+                    Ok(candidate.as_str() == *name.key())
+                },
+                |work, bytes| budget.charge(work, bytes),
+            )
+            .map(|value| value.map(|value| value.to_value()))
+            .map_err(|error| projection_map_error(budget, error))
     }
 
     fn dir_attr(&self) -> Vec<String> {
@@ -464,6 +496,14 @@ pub(crate) struct AnalysisConfiguredTargetValue {
 }
 
 impl AnalysisConfiguredTargetValue {
+    pub(crate) fn providers(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&ProviderIdentity, FrozenValue)> {
+        self.providers
+            .iter()
+            .map(|(identity, value)| (identity, *value))
+    }
+
     fn files(&self) -> Option<FrozenValue> {
         let default = self
             .providers
@@ -573,9 +613,11 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
 
 pub(crate) struct AnalysisValueMaterializer<'a> {
     heap: &'a FrozenHeap,
+    budget: Option<&'a ExecutionBudget>,
+    depth: usize,
     // Owning keys are phase scratch: aliases survive all roots handled by this
     // materializer, and temporary native allocations cannot cause pointer ABA.
-    containers: HashMap<slug_build_api_v2::analysis_value::AnalysisContainerIdentity, FrozenValue>,
+    containers: SmallMap<slug_build_api_v2::analysis_value::AnalysisContainerIdentity, FrozenValue>,
     cc_variables: SmallMap<slug_build_api_v2::cc_variables::CcVariablesOccurrence, FrozenValue>,
     depsets: native_depset::RetainedMemo,
     file_depsets: native_depset::Memo<String>,
@@ -584,9 +626,18 @@ pub(crate) struct AnalysisValueMaterializer<'a> {
 
 impl<'a> AnalysisValueMaterializer<'a> {
     pub(crate) fn new(heap: &'a FrozenHeap) -> Self {
+        Self::new_with_budget(heap, None)
+    }
+
+    pub(crate) fn new_with_budget(
+        heap: &'a FrozenHeap,
+        budget: Option<&'a ExecutionBudget>,
+    ) -> Self {
         Self {
             heap,
-            containers: HashMap::new(),
+            budget,
+            depth: 0,
+            containers: SmallMap::new(),
             cc_variables: SmallMap::new(),
             depsets: SmallMap::new(),
             file_depsets: SmallMap::new(),
@@ -594,35 +645,174 @@ impl<'a> AnalysisValueMaterializer<'a> {
         }
     }
 
-    fn output_group_info(&mut self, info: &OutputGroupInfo) -> Result<FrozenValue, String> {
+    fn project_original(
+        &self,
+        original: &slug_build_api_v2::PublishedValueRef,
+    ) -> starlark::Result<FrozenValue> {
+        if let Some(budget) = self.budget {
+            budget.charge(1, 0)?;
+            let root = published::owned_original_root(original).map_err(projection_error)?;
+            // The admitted attachment keeps the exact publication root and its heap alive.
+            Ok(root
+                .owned_value_budgeted(self.heap, budget)?
+                .unpack_frozen()
+                .expect("an owned publication root is frozen"))
+        } else {
+            published::materialize_original(original, self.heap).map_err(projection_error)
+        }
+    }
+
+    fn project_string(&self, text: &str) -> starlark::Result<FrozenStringValue> {
+        Ok(match self.budget {
+            Some(budget) => self.heap.alloc_budgeted_str(budget, text)?,
+            None => self.heap.alloc_str(text),
+        })
+    }
+
+    fn project_artifact(&self, artifact: &AnalysisArtifact) -> starlark::Result<FrozenValue> {
+        Ok(match self.budget {
+            Some(budget) => {
+                AnalysisArtifactValue::alloc_frozen_budgeted(self.heap, budget, artifact)?
+            }
+            None => self
+                .heap
+                .alloc(AnalysisArtifactValue::new(artifact.clone())),
+        })
+    }
+
+    fn project_label(
+        &self,
+        label: &slug_identity_v2::CanonicalLabel,
+    ) -> starlark::Result<FrozenValue> {
+        Ok(match self.budget {
+            Some(budget) => slug_loading_v2::provider::alloc_budgeted_frozen_starlark_label(
+                self.heap, budget, label,
+            )?,
+            None => alloc_frozen_starlark_label(self.heap, label.clone()),
+        })
+    }
+
+    fn project_simple<T>(&self, build: impl FnOnce() -> T) -> starlark::Result<FrozenValue>
+    where
+        T: StarlarkValue<'static> + ProvidesStaticType<'static, StaticType = T> + Send + Sync,
+    {
+        Ok(match self.budget {
+            Some(budget) => self.heap.alloc_budgeted_simple(budget, build)?,
+            None => self.heap.alloc_simple(build()),
+        })
+    }
+
+    fn project_output_group_info(
+        &mut self,
+        info: &OutputGroupInfo,
+    ) -> starlark::Result<FrozenValue> {
+        if let Some(budget) = self.budget {
+            return StarlarkOutputGroupInfo::alloc_budgeted(self.heap, budget, info, |files| {
+                self.project_depset(files)
+            });
+        }
         let fields = info
             .groups()
             .iter()
-            .map(|(name, files)| Ok((CompactString::new(name.as_str()), self.depset(files)?)))
-            .collect::<Result<Vec<_>, String>>()?;
+            .map(|(name, files)| {
+                Ok((
+                    CompactString::new(name.as_str()),
+                    self.project_depset(files)?,
+                ))
+            })
+            .collect::<starlark::Result<Vec<_>>>()?;
         Ok(StarlarkOutputGroupInfo::alloc(self.heap, fields))
     }
 
+    #[cfg(test)]
     fn provider(&mut self, occurrence: &ProviderOccurrence) -> Result<FrozenValue, String> {
+        self.project_provider(occurrence)
+            .map_err(|error| error.without_diagnostic().to_string())
+    }
+
+    fn project_provider(
+        &mut self,
+        occurrence: &ProviderOccurrence,
+    ) -> starlark::Result<FrozenValue> {
         if let Some(original) = occurrence.original_origin() {
-            return published::materialize_original(original, self.heap);
+            return self.project_original(original);
+        }
+        if let Some(value) = FilesToRunProvider::borrow_from_occurrence(occurrence) {
+            return self.files_to_run(value);
+        }
+        if let Some(budget) = self.budget {
+            let heap = self.heap;
+            if occurrence.identity().user_id().is_some() {
+                return slug_loading_v2::provider::alloc_budgeted_starlark_user_provider(
+                    heap,
+                    budget,
+                    occurrence,
+                    |value| self.project_value(value),
+                );
+            }
+            if occurrence.identity().is_builtin("ToolchainInfo") {
+                return StarlarkToolchainInfo::alloc_budgeted(heap, budget, occurrence, |value| {
+                    self.project_value(value)
+                });
+            }
+            if occurrence.identity().is_builtin("InstrumentedFilesInfo") {
+                // This class has exactly two statically named empty depset fields.
+                budget.charge(9, 0)?;
+                EmptyInstrumentedFiles::validate(occurrence).map_err(projection_error)?;
+                let [first, second] = empty_instrumented_files::FIELDS;
+                let fields = occurrence.fields();
+                let first = self.project_value(
+                    fields
+                        .get(first)
+                        .expect("checked InstrumentedFilesInfo fields"),
+                )?;
+                let second = self.project_value(
+                    fields
+                        .get(second)
+                        .expect("checked InstrumentedFilesInfo fields"),
+                )?;
+                return self
+                    .project_simple(|| EmptyInstrumentedFiles::from_fields([first, second]));
+            }
+            if occurrence.identity().is_builtin("OutputGroupInfo") {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "provider materialization",
+                        value_type: occurrence.value_type().as_str(),
+                    })
+                    .into());
+            }
+            let fields = occurrence.fields();
+            let rows = fields.iter_hashed().map(|(name, value)| {
+                let name_copy =
+                    slug_loading_v2::provider::copy_budgeted_compact_str(budget, name.key())?;
+                Ok((
+                    Hashed::new_unchecked(name.hash(), name_copy),
+                    self.project_value(value)?,
+                ))
+            });
+            let fields = SmallMap::try_from_unique_hashed_fallible_rows(
+                fields.len(),
+                rows,
+                |work, bytes| Ok::<_, starlark::Error>(budget.charge(work, bytes)?),
+            )
+            .map_err(|error| projection_map_error(budget, error))?;
+            let identity = self.project_provider_identity(occurrence.identity())?;
+            return self.project_simple(|| BuiltinProviderView { identity, fields });
         }
         if occurrence.identity().is_builtin("InstrumentedFilesInfo") {
-            EmptyInstrumentedFiles::validate(occurrence)?;
+            EmptyInstrumentedFiles::validate(occurrence).map_err(projection_error)?;
         }
         if occurrence.identity().is_builtin("OutputGroupInfo") {
-            let info =
-                OutputGroupInfo::from_occurrence(occurrence).map_err(|error| error.to_string())?;
-            return self.output_group_info(&info);
-        }
-        if let Some(value) = FilesToRunProvider::from_occurrence(occurrence) {
-            return Ok(self.files_to_run(&value));
+            let info = OutputGroupInfo::from_occurrence(occurrence)
+                .map_err(|error| projection_error(error.to_string()))?;
+            return self.project_output_group_info(&info);
         }
         let fields = occurrence
             .fields()
             .iter()
-            .map(|(name, value)| Ok((name.clone(), self.value(value)?)))
-            .collect::<Result<Vec<_>, String>>()?;
+            .map(|(name, value)| Ok((name.clone(), self.project_value(value)?)))
+            .collect::<starlark::Result<Vec<_>>>()?;
         Ok(
             if occurrence.identity().is_builtin("InstrumentedFilesInfo") {
                 EmptyInstrumentedFiles::alloc(self.heap, fields)
@@ -639,20 +829,37 @@ impl<'a> AnalysisValueMaterializer<'a> {
         )
     }
 
-    fn artifact_option(&self, value: Option<&AnalysisArtifact>) -> FrozenValue {
-        value
-            .map(|value| self.heap.alloc(AnalysisArtifactValue::new(value.clone())))
-            .unwrap_or_else(FrozenValue::new_none)
+    fn artifact_option(&self, value: Option<&AnalysisArtifact>) -> starlark::Result<FrozenValue> {
+        value.map_or_else(
+            || Ok(FrozenValue::new_none()),
+            |value| self.project_artifact(value),
+        )
     }
 
-    fn string_map(&self, values: impl IntoIterator<Item = (String, String)>) -> FrozenValue {
-        self.heap
-            .alloc(AllocDict(values.into_iter().map(|(key, value)| {
-                (
-                    self.heap.alloc_str(&key).to_frozen_value(),
-                    self.heap.alloc_str(&value).to_frozen_value(),
-                )
-            })))
+    fn string_map(
+        &self,
+        values: &std::collections::BTreeMap<String, String>,
+    ) -> starlark::Result<FrozenValue> {
+        if let Some(budget) = self.budget {
+            let rows = values.iter().map(|(key, value)| {
+                Ok((
+                    self.project_string(key)?.to_frozen_value(),
+                    self.project_string(value)?.to_frozen_value(),
+                ))
+            });
+            return slug_loading_v2::provider::alloc_budgeted_analysis_dict(
+                self.heap,
+                budget,
+                values.len(),
+                rows,
+            );
+        }
+        Ok(self.heap.alloc(AllocDict(values.iter().map(|(key, value)| {
+            (
+                self.heap.alloc_str(key).to_frozen_value(),
+                self.heap.alloc_str(value).to_frozen_value(),
+            )
+        }))))
     }
 
     fn file_depset(&mut self, value: &Depset<String>) -> FrozenValue {
@@ -686,97 +893,258 @@ impl<'a> AnalysisValueMaterializer<'a> {
     }
 
     fn runfiles(&mut self, value: &RetainedRunfiles) -> Result<FrozenValue, String> {
-        Ok(self.heap.alloc(StarlarkRunfiles {
-            occurrence: slug_build_api_v2::RunfilesOccurrence::new(),
-            retained: value.clone(),
-            files: self.depset(&value.files)?,
-            symlinks: self.symlink_depset(&value.symlinks),
-            root_symlinks: self.symlink_depset(&value.root_symlinks),
-            empty_filenames: self.file_depset(&value.empty_filenames),
-        }))
+        self.project_runfiles(value, None)
+            .map_err(|error| error.without_diagnostic().to_string())
     }
 
-    fn files_to_run(&self, value: &FilesToRunProvider) -> FrozenValue {
-        self.heap.alloc(StarlarkFilesToRunProvider {
-            retained: value.clone(),
-            executable: self.artifact_option(value.executable.as_ref()),
-            runfiles_manifest: self.artifact_option(value.runfiles_manifest()),
-            repo_mapping_manifest: self.artifact_option(value.repo_mapping_manifest()),
+    fn project_runfiles(
+        &mut self,
+        value: &RetainedRunfiles,
+        occurrence: Option<&slug_build_api_v2::RunfilesOccurrence>,
+    ) -> starlark::Result<FrozenValue> {
+        let files = self.project_depset(&value.files)?;
+        let heap = self.heap;
+        let (retained, symlinks, root_symlinks, empty_filenames) = if let Some(budget) = self.budget
+        {
+            let retained = RetainedRunfiles {
+                files: value.files.dupe(),
+                symlinks: value.symlinks.dupe(),
+                root_symlinks: value.root_symlinks.dupe(),
+                empty_filenames: value.empty_filenames.dupe(),
+                conflict_policy: value.conflict_policy,
+                repository_prefix: slug_loading_v2::provider::copy_budgeted_compact_str(
+                    budget,
+                    &value.repository_prefix,
+                )?,
+            };
+            let symlink = |leaf: &RunfilesSymlink| -> Result<FrozenValue, ExecutionLimit> {
+                let path = heap
+                    .alloc_budgeted_str(budget, &leaf.path)?
+                    .to_frozen_value();
+                let target_file =
+                    AnalysisArtifactValue::alloc_frozen_budgeted(heap, budget, &leaf.artifact)?;
+                if let AnalysisArtifact::Source(label) = &leaf.artifact {
+                    for bytes in label.cloned_text_lengths() {
+                        budget.charge(1, bytes)?;
+                        budget.charge_text_work(bytes)?;
+                    }
+                }
+                let retained = leaf.try_clone_with_path(|text| {
+                    slug_loading_v2::provider::copy_budgeted_compact_str(budget, text)
+                })?;
+                heap.alloc_budgeted_simple(budget, || StarlarkRunfilesSymlink {
+                    retained,
+                    path,
+                    target_file,
+                })
+            };
+            let symlink_node = |node: &RunfilesSymlinkDepset, row| {
+                native_depset::alloc_budgeted_native_node(
+                    heap,
+                    budget,
+                    node,
+                    "SymlinkEntry",
+                    false,
+                    row,
+                )
+            };
+            let symlinks = native_depset::try_project(
+                &value.symlinks,
+                &mut self.symlink_depsets,
+                Some(budget),
+                symlink,
+                symlink_node,
+            )?;
+            let root_symlinks = native_depset::try_project(
+                &value.root_symlinks,
+                &mut self.symlink_depsets,
+                Some(budget),
+                symlink,
+                symlink_node,
+            )?;
+            let empty_filenames = native_depset::try_project(
+                &value.empty_filenames,
+                &mut self.file_depsets,
+                Some(budget),
+                |text| Ok(heap.alloc_budgeted_str(budget, text)?.to_frozen_value()),
+                |node, row| {
+                    native_depset::alloc_budgeted_native_node(
+                        heap, budget, node, "string", true, row,
+                    )
+                },
+            )?;
+            (retained, symlinks, root_symlinks, empty_filenames)
+        } else {
+            (
+                value.clone(),
+                self.symlink_depset(&value.symlinks),
+                self.symlink_depset(&value.root_symlinks),
+                self.file_depset(&value.empty_filenames),
+            )
+        };
+        let occurrence = if let Some(occurrence) = occurrence {
+            occurrence.clone()
+        } else {
+            if let Some(budget) = self.budget {
+                budget.charge(1, size_of::<[std::sync::atomic::AtomicUsize; 2]>())?;
+            }
+            slug_build_api_v2::RunfilesOccurrence::new()
+        };
+        self.project_simple(|| StarlarkRunfiles {
+            occurrence,
+            retained,
+            files,
+            symlinks,
+            root_symlinks,
+            empty_filenames,
         })
     }
 
-    fn builtin(
+    fn files_to_run(&self, value: &FilesToRunProvider) -> starlark::Result<FrozenValue> {
+        let executable = self.artifact_option(value.executable.as_ref())?;
+        let runfiles_manifest = self.artifact_option(value.runfiles_manifest())?;
+        let repo_mapping_manifest = self.artifact_option(value.repo_mapping_manifest())?;
+        if let (Some(budget), Some(AnalysisArtifact::Source(label))) =
+            (self.budget, value.executable.as_ref())
+        {
+            for bytes in label.cloned_text_lengths() {
+                budget.charge(1, bytes)?;
+                budget.charge_text_work(bytes)?;
+            }
+        }
+        self.project_simple(|| StarlarkFilesToRunProvider {
+            retained: value.clone(),
+            executable,
+            runfiles_manifest,
+            repo_mapping_manifest,
+        })
+    }
+
+    fn project_builtin(
         &mut self,
         identity: &ProviderIdentity,
         value: &ProviderValue,
-    ) -> Result<FrozenValue, String> {
-        let mut fields = SmallMap::new();
-        match value {
+    ) -> starlark::Result<FrozenValue> {
+        let fields = match value {
             ProviderValue::FeatureFlagInfo(info) => {
-                return Ok(slug_loading_v2::provider::alloc_frozen_feature_flag_info(
-                    self.heap,
-                    info.dupe(),
-                ));
-            }
-            ProviderValue::DefaultInfo(info) => {
-                fields.insert("files".into(), self.depset(info.files())?);
-                fields.insert(
-                    "default_runfiles".into(),
-                    self.runfiles(&info.default_runfiles)?,
-                );
-                fields.insert("data_runfiles".into(), self.runfiles(&info.data_runfiles)?);
-                fields.insert("files_to_run".into(), self.files_to_run(&info.files_to_run));
-            }
-            ProviderValue::OutputGroupInfo(info) => return self.output_group_info(info),
-            ProviderValue::PackageSpecificationInfo(info) => {
-                return Ok(crate::package_specification::alloc(self.heap, info.clone()));
-            }
-            ProviderValue::TemplateVariableInfo(info) => {
-                return Ok(slug_loading_v2::alloc_frozen_template_variable_info(
-                    self.heap,
-                    info.dupe(),
-                ));
-            }
-            ProviderValue::RunEnvironmentInfo(info) => {
-                return Ok(
-                    slug_loading_v2::provider::alloc_frozen_run_environment_info(
+                return Ok(match self.budget {
+                    Some(budget) => {
+                        slug_loading_v2::provider::alloc_budgeted_frozen_feature_flag_info(
+                            self.heap, budget, info,
+                        )?
+                    }
+                    None => slug_loading_v2::provider::alloc_frozen_feature_flag_info(
                         self.heap,
                         info.dupe(),
                     ),
-                );
+                });
             }
-            ProviderValue::FilesToRunProvider(info) => {
-                return Ok(self.files_to_run(info));
+            ProviderValue::DefaultInfo(info) => self.project_fixed_fields(
+                ["files", "default_runfiles", "data_runfiles", "files_to_run"],
+                |state, name| match name {
+                    "files" => state.project_depset(info.files()),
+                    "default_runfiles" => state.project_runfiles(&info.default_runfiles, None),
+                    "data_runfiles" => state.project_runfiles(&info.data_runfiles, None),
+                    "files_to_run" => state.files_to_run(&info.files_to_run),
+                    _ => unreachable!("fixed DefaultInfo field table"),
+                },
+            )?,
+            ProviderValue::OutputGroupInfo(info) => return self.project_output_group_info(info),
+            ProviderValue::PackageSpecificationInfo(info) => {
+                return Ok(crate::package_specification::alloc_with_budget(
+                    self.heap,
+                    self.budget,
+                    info,
+                )?);
             }
-            ProviderValue::PlatformInfo(info) => {
-                fields.insert(
-                    "label".into(),
-                    self.heap.alloc_str(&info.label).to_frozen_value(),
-                );
-                fields.insert(
-                    "constraints".into(),
-                    self.string_map(info.constraints.clone()),
-                );
-                fields.insert(
-                    "exec_properties".into(),
-                    self.string_map(info.exec_properties.clone()),
-                );
+            ProviderValue::TemplateVariableInfo(info) => {
+                return Ok(match self.budget {
+                    Some(budget) => {
+                        slug_loading_v2::provider::alloc_budgeted_frozen_template_variable_info(
+                            self.heap, budget, info,
+                        )?
+                    }
+                    None => {
+                        slug_loading_v2::alloc_frozen_template_variable_info(self.heap, info.dupe())
+                    }
+                });
             }
+            ProviderValue::RunEnvironmentInfo(info) => {
+                return Ok(match self.budget {
+                    Some(budget) => {
+                        slug_loading_v2::provider::alloc_budgeted_frozen_run_environment_info(
+                            self.heap, budget, info,
+                        )?
+                    }
+                    None => slug_loading_v2::provider::alloc_frozen_run_environment_info(
+                        self.heap,
+                        info.dupe(),
+                    ),
+                });
+            }
+            ProviderValue::FilesToRunProvider(info) => return self.files_to_run(info),
+            ProviderValue::PlatformInfo(info) => self.project_fixed_fields(
+                ["label", "constraints", "exec_properties"],
+                |state, name| match name {
+                    "label" => Ok(state.project_string(&info.label)?.to_frozen_value()),
+                    "constraints" => state.string_map(&info.constraints),
+                    "exec_properties" => state.string_map(&info.exec_properties),
+                    _ => unreachable!("fixed PlatformInfo field table"),
+                },
+            )?,
             ProviderValue::Occurrence(_) => unreachable!("occurrences use the shared classes"),
+        };
+        let identity = self.project_provider_identity(identity)?;
+        self.project_simple(|| BuiltinProviderView { identity, fields })
+    }
+
+    fn project_fixed_fields<const N: usize>(
+        &mut self,
+        names: [&'static str; N],
+        mut project: impl FnMut(&mut Self, &str) -> starlark::Result<FrozenValue>,
+    ) -> starlark::Result<SmallMap<CompactString, FrozenValue>> {
+        let budget = self.budget;
+        let rows = names.into_iter().map(|name| {
+            let value = project(self, name)?;
+            Ok((Hashed::new(CompactString::const_new(name)), value))
+        });
+        if let Some(budget) = budget {
+            SmallMap::try_from_unique_hashed_fallible_rows(N, rows, |work, bytes| {
+                Ok::<_, starlark::Error>(budget.charge(work, bytes)?)
+            })
+            .map_err(|error| projection_map_error(budget, error))
+        } else {
+            rows.collect()
         }
-        Ok(self.heap.alloc(BuiltinProviderView {
-            identity: identity.clone(),
-            fields,
-        }))
     }
 
     fn target(&mut self, target: &ConfiguredTargetValue) -> Result<FrozenValue, String> {
+        self.project_target(target)
+            .map_err(|error| error.without_diagnostic().to_string())
+    }
+
+    fn project_target(&mut self, target: &ConfiguredTargetValue) -> starlark::Result<FrozenValue> {
+        if let Some(budget) = self.budget {
+            let providers = target.providers();
+            let rows = providers.iter_hashed().map(|(key, value)| {
+                let identity = self.project_provider_identity(key.key())?;
+                let value = self.project_provider_row(key.key(), value)?;
+                Ok((Hashed::new_unchecked(key.hash(), identity), value))
+            });
+            let providers = SmallMap::try_from_unique_hashed_fallible_rows(
+                providers.len(),
+                rows,
+                |work, bytes| Ok::<_, starlark::Error>(budget.charge(work, bytes)?),
+            )
+            .map_err(|error| projection_map_error(budget, error))?;
+            return self.project_simple(|| AnalysisConfiguredTargetValue {
+                retained: target.clone(),
+                providers,
+            });
+        }
         let mut providers = SmallMap::new();
         for (identity, provider) in target.providers().iter() {
-            let value = match provider {
-                ProviderValue::Occurrence(occurrence) => self.provider(occurrence)?,
-                provider => self.builtin(identity, provider)?,
-            };
+            let value = self.project_provider_row(identity, provider)?;
             providers.insert(identity.clone(), value);
         }
         Ok(self.heap.alloc(AnalysisConfiguredTargetValue {
@@ -785,55 +1153,128 @@ impl<'a> AnalysisValueMaterializer<'a> {
         }))
     }
 
-    fn depset(&mut self, value: &AnalysisDepset) -> Result<FrozenValue, String> {
+    fn project_provider_identity(
+        &self,
+        identity: &ProviderIdentity,
+    ) -> starlark::Result<ProviderIdentity> {
+        Ok(match (self.budget, identity) {
+            (Some(budget), ProviderIdentity::Builtin(name)) => ProviderIdentity::Builtin(
+                slug_loading_v2::provider::copy_budgeted_compact_str(budget, name)?,
+            ),
+            _ => identity.clone(),
+        })
+    }
+
+    fn project_provider_row(
+        &mut self,
+        identity: &ProviderIdentity,
+        value: &ProviderValue,
+    ) -> starlark::Result<FrozenValue> {
+        match value {
+            ProviderValue::Occurrence(value) => self.project_provider(value),
+            value => self.project_builtin(identity, value),
+        }
+    }
+
+    fn project_depset(&mut self, value: &AnalysisDepset) -> starlark::Result<FrozenValue> {
+        let budget = self.budget;
         native_depset::try_project_retained(
             self,
             value,
-            None,
+            budget,
             |state| &mut state.depsets,
-            |state, value| state.value(value).map_err(anyhow::Error::msg),
+            Self::project_value,
             |state, node, successors| {
-                Ok(alloc_starlark_depset(state.heap, node.dupe(), successors))
+                Ok(match budget {
+                    Some(budget) => slug_loading_v2::provider::alloc_budgeted_starlark_depset(
+                        state.heap,
+                        budget,
+                        node.dupe(),
+                        successors,
+                    )?,
+                    None => alloc_starlark_depset(state.heap, node.dupe(), successors),
+                })
             },
         )
-        .map_err(|error: anyhow::Error| error.to_string())
     }
 
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
+        self.project_value(value)
+            .map_err(|error| error.without_diagnostic().to_string())
+    }
+
+    fn project_value(&mut self, value: &AnalysisValue) -> starlark::Result<FrozenValue> {
+        if let Some(budget) = self.budget {
+            budget.charge(1, 0)?;
+            if self.depth >= budget.text_depth() {
+                return Err(budget.refuse(ExecutionLimit::StructuralDepth).into());
+            }
+        }
         if let Some(original) = value.original_origin() {
-            return published::materialize_original(original, self.heap);
+            return self.project_original(original);
         }
-        let key = value.container_identity();
-        if let Some(key) = &key
-            && let Some(frozen) = self.containers.get(key)
-        {
-            return Ok(*frozen);
+        let key = value.container_identity().map(Hashed::new);
+        if let Some(key) = &key {
+            let cached = if let Some(budget) = self.budget {
+                self.containers
+                    .get_hashed_bounded(
+                        key.hash(),
+                        |existing| Ok(key.key() == existing),
+                        |work, bytes| budget.charge(work, bytes),
+                    )
+                    .map_err(|error| projection_map_error(budget, error))?
+            } else {
+                self.containers.get_hashed(key.as_ref())
+            };
+            if let Some(frozen) = cached {
+                return Ok(*frozen);
+            }
         }
-        let frozen = self.value_unmemoized(value)?;
+        self.depth += 1;
+        let result = self.value_unmemoized(value);
+        self.depth -= 1;
+        let frozen = result?;
         if let Some(key) = key {
-            self.containers.insert(key, frozen);
+            if let Some(budget) = self.budget {
+                self.containers
+                    .try_insert_unique_hashed_bounded(key, frozen, |work, bytes| {
+                        budget.charge(work, bytes)
+                    })
+                    .map_err(|error| projection_map_error(budget, error))?;
+            } else {
+                self.containers.insert_hashed_unique_unchecked(key, frozen);
+            }
         }
         Ok(frozen)
     }
 
-    fn value_unmemoized(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
+    fn value_unmemoized(&mut self, value: &AnalysisValue) -> starlark::Result<FrozenValue> {
         Ok(match value.kind() {
+            AnalysisValueKind::CppFragment(_)
+            | AnalysisValueKind::DottedVersion(_)
+            | AnalysisValueKind::CcToolchainVariables(_)
+            | AnalysisValueKind::CcHeaderInfo(_)
+            | AnalysisValueKind::CcToolchainFeatures(_)
+            | AnalysisValueKind::CcFeatureConfiguration(_)
+                if self.budget.is_some() =>
+            {
+                let budget = self.budget.expect("guarded request budget");
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "value materialization",
+                        value_type: value.value_type().as_str(),
+                    })
+                    .into());
+            }
             AnalysisValueKind::Function(_)
             | AnalysisValueKind::ProviderConstructor(_)
             | AnalysisValueKind::RawProviderConstructor(_) => {
-                return Err("callable projection has no original Starlark binding".into());
+                return Err(projection_error(
+                    "callable projection has no original Starlark binding",
+                ));
             }
             AnalysisValueKind::Runfiles(runfiles) => {
-                // Plain native reconstruction preserves the actual occurrence
-                // supplied by the trusted retained model.
-                self.heap.alloc(StarlarkRunfiles {
-                    occurrence: runfiles.occurrence().clone(),
-                    retained: runfiles.retained().clone(),
-                    files: self.depset(&runfiles.retained().files)?,
-                    symlinks: self.symlink_depset(&runfiles.retained().symlinks),
-                    root_symlinks: self.symlink_depset(&runfiles.retained().root_symlinks),
-                    empty_filenames: self.file_depset(&runfiles.retained().empty_filenames),
-                })
+                self.project_runfiles(runfiles.retained(), Some(runfiles.occurrence()))?
             }
             AnalysisValueKind::CppFragment(fragment) => {
                 slug_loading_v2::analysis_fragments::alloc_frozen_cpp_fragment(
@@ -844,19 +1285,36 @@ impl<'a> AnalysisValueMaterializer<'a> {
             AnalysisValueKind::DottedVersion(version) => {
                 slug_loading_v2::alloc_frozen_dotted_version(self.heap, version.clone())
             }
-            AnalysisValueKind::CcToolchainVariables(value) => self.cc_variables(value)?,
+            AnalysisValueKind::CcToolchainVariables(value) => {
+                self.cc_variables(value).map_err(projection_error)?
+            }
             AnalysisValueKind::CcHeaderInfo(info) => {
                 slug_loading_v2::alloc_frozen_cc_header_info(self.heap, info.clone())
             }
             AnalysisValueKind::PackageSpecificationInfo(info) => {
-                crate::package_specification::alloc(self.heap, info.clone())
+                crate::package_specification::alloc_with_budget(self.heap, self.budget, info)?
             }
-            AnalysisValueKind::TemplateVariableInfo(info) => {
-                slug_loading_v2::alloc_frozen_template_variable_info(self.heap, info.dupe())
-            }
-            AnalysisValueKind::RunEnvironmentInfo(info) => {
-                slug_loading_v2::provider::alloc_frozen_run_environment_info(self.heap, info.dupe())
-            }
+            AnalysisValueKind::TemplateVariableInfo(info) => match self.budget {
+                Some(budget) => {
+                    slug_loading_v2::provider::alloc_budgeted_frozen_template_variable_info(
+                        self.heap, budget, info,
+                    )?
+                }
+                None => {
+                    slug_loading_v2::alloc_frozen_template_variable_info(self.heap, info.dupe())
+                }
+            },
+            AnalysisValueKind::RunEnvironmentInfo(info) => match self.budget {
+                Some(budget) => {
+                    slug_loading_v2::provider::alloc_budgeted_frozen_run_environment_info(
+                        self.heap, budget, info,
+                    )?
+                }
+                None => slug_loading_v2::provider::alloc_frozen_run_environment_info(
+                    self.heap,
+                    info.dupe(),
+                ),
+            },
             AnalysisValueKind::CcToolchainFeatures(value) => {
                 slug_loading_v2::alloc_frozen_cc_toolchain_features(self.heap, value.clone())
             }
@@ -866,6 +1324,13 @@ impl<'a> AnalysisValueMaterializer<'a> {
             AnalysisValueKind::None => FrozenValue::new_none(),
             AnalysisValueKind::Boolean(value) => FrozenValue::new_bool(value),
             AnalysisValueKind::Number(AnalysisNumber::Integer(value)) => {
+                if let Some(budget) = self.budget {
+                    return Ok(self.heap.alloc_budgeted_integer_be(
+                        budget,
+                        value.is_negative(),
+                        value.magnitude(),
+                    )?);
+                }
                 self.heap.alloc(BigInt::from_bytes_be(
                     if value.is_negative() {
                         Sign::Minus
@@ -876,45 +1341,78 @@ impl<'a> AnalysisValueMaterializer<'a> {
                 ))
             }
             AnalysisValueKind::Number(AnalysisNumber::Float(bits)) => {
-                self.heap.alloc(f64::from_bits(*bits))
+                self.project_simple(|| StarlarkFloat(f64::from_bits(*bits)))?
             }
-            AnalysisValueKind::String(value) => self.heap.alloc_str(value).to_frozen_value(),
-            AnalysisValueKind::Label(value) => {
-                alloc_frozen_starlark_label(self.heap, value.clone())
+            AnalysisValueKind::String(value) => self.project_string(value)?.to_frozen_value(),
+            AnalysisValueKind::Label(value) => self.project_label(value)?,
+            AnalysisValueKind::ConfiguredTarget(value) => self.project_target(value)?,
+            AnalysisValueKind::Artifact(value) => self.project_artifact(value)?,
+            AnalysisValueKind::ArtifactRoot(value) => match self.budget {
+                Some(budget) => {
+                    slug_loading_v2::alloc_budgeted_frozen_artifact_root(self.heap, budget, value)?
+                }
+                None => slug_loading_v2::alloc_frozen_artifact_root(self.heap, value.clone()),
+            },
+            AnalysisValueKind::List(values) => self.project_sequence(values, false)?,
+            AnalysisValueKind::Tuple(values) => self.project_sequence(values, true)?,
+            AnalysisValueKind::Dictionary(values) => {
+                let heap = self.heap;
+                let budget = self.budget;
+                let rows = values
+                    .iter()
+                    .map(|(key, value)| Ok((self.project_value(key)?, self.project_value(value)?)));
+                if let Some(budget) = budget {
+                    slug_loading_v2::provider::alloc_budgeted_analysis_dict(
+                        heap,
+                        budget,
+                        values.len(),
+                        rows,
+                    )?
+                } else {
+                    heap.alloc(AllocDict(rows.collect::<starlark::Result<Vec<_>>>()?))
+                }
             }
-            AnalysisValueKind::ConfiguredTarget(value) => self.target(value)?,
-            AnalysisValueKind::Artifact(value) => {
-                self.heap.alloc(AnalysisArtifactValue::new(value.clone()))
+            AnalysisValueKind::Struct(fields) => {
+                let heap = self.heap;
+                if let Some(budget) = self.budget {
+                    let rows = fields.iter().map(|(name, value)| {
+                        Ok((self.project_string(name)?, self.project_value(value)?))
+                    });
+                    heap.alloc_budgeted_struct_from_rows(budget, fields.len(), rows)?
+                } else {
+                    let rows = fields
+                        .iter()
+                        .map(|(name, value)| Ok((name.to_string(), self.project_value(value)?)));
+                    heap.alloc(AllocStruct(rows.collect::<starlark::Result<Vec<_>>>()?))
+                }
             }
-            AnalysisValueKind::ArtifactRoot(value) => {
-                slug_loading_v2::alloc_frozen_artifact_root(self.heap, value.clone())
-            }
-            AnalysisValueKind::List(values) => self.heap.alloc(AllocImmutableList(
-                values
-                    .iter()
-                    .map(|value| self.value(value))
-                    .collect::<Result<Vec<_>, _>>()?,
-            )),
-            AnalysisValueKind::Tuple(values) => self.heap.alloc(AllocTuple(
-                values
-                    .iter()
-                    .map(|value| self.value(value))
-                    .collect::<Result<Vec<_>, _>>()?,
-            )),
-            AnalysisValueKind::Dictionary(values) => self.heap.alloc(AllocDict(
-                values
-                    .iter()
-                    .map(|(key, value)| Ok((self.value(key)?, self.value(value)?)))
-                    .collect::<Result<Vec<_>, String>>()?,
-            )),
-            AnalysisValueKind::Struct(fields) => self.heap.alloc(AllocStruct(
-                fields
-                    .iter()
-                    .map(|(name, value)| Ok((name.to_string(), self.value(value)?)))
-                    .collect::<Result<Vec<_>, String>>()?,
-            )),
-            AnalysisValueKind::Provider(value) => self.provider(value)?,
-            AnalysisValueKind::Depset(value) => self.depset(value)?,
+            AnalysisValueKind::Provider(value) => self.project_provider(value)?,
+            AnalysisValueKind::Depset(value) => self.project_depset(value)?,
+        })
+    }
+
+    fn project_sequence(
+        &mut self,
+        values: &[AnalysisValue],
+        tuple: bool,
+    ) -> starlark::Result<FrozenValue> {
+        let mut materialized = if let Some(budget) = self.budget {
+            let mut values_out = Vec::new();
+            budget.reserve_vec(&mut values_out, values.len())?;
+            values_out
+        } else {
+            Vec::with_capacity(values.len())
+        };
+        for value in values {
+            materialized.push(self.project_value(value)?);
+        }
+        Ok(match (self.budget, tuple) {
+            (Some(budget), true) => self.heap.alloc_budgeted_tuple(budget, &materialized)?,
+            (Some(budget), false) => self
+                .heap
+                .alloc_budgeted_immutable_list(budget, &materialized)?,
+            (None, true) => self.heap.alloc(AllocTuple(materialized)),
+            (None, false) => self.heap.alloc(AllocImmutableList(materialized)),
         })
     }
 
@@ -928,6 +1426,59 @@ impl<'a> AnalysisValueMaterializer<'a> {
             |configured| analysis_configured_key(configured).into(),
         );
         self.target(&ConfiguredTargetValue::new(identity, providers))
+    }
+
+    pub(crate) fn budgeted_cquery_target(
+        &mut self,
+        key: &ConfiguredNodeKey,
+        providers: &ProviderCollection,
+    ) -> starlark::Result<FrozenValue> {
+        let budget = self
+            .budget
+            .expect("cquery target projection has request credits");
+        let admit = |owner_bytes, label_bytes| {
+            budget.charge(1, owner_bytes)?;
+            for bytes in label_bytes {
+                budget.charge(1, bytes)?;
+                budget.charge_text_work(bytes)?;
+            }
+            Ok::<_, ExecutionLimit>(())
+        };
+        let identity = if let Some(key) = key.configured_target() {
+            // Public configured nodes already retain the complete canonical bytes.
+            let configuration = key.configuration().slug_configuration().ok_or_else(|| {
+                budget.refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "configured target materialization",
+                    value_type: "legacy configuration",
+                })
+            })?;
+            AnalysisConfiguredTargetKey::try_from_borrowed(
+                key.label(),
+                configuration.shared_canonical_bytes(),
+                key.toolchain_execution_platform(),
+                admit,
+            )?
+            .into()
+        } else {
+            AnalysisTargetIdentity::try_null_from_borrowed(key.label(), admit)?
+        };
+        self.project_target(&ConfiguredTargetValue::new(identity, providers.clone()))
+    }
+}
+
+fn projection_error(message: impl Into<String>) -> starlark::Error {
+    starlark::Error::new_other(anyhow::Error::msg(message.into()))
+}
+
+fn projection_map_error(
+    budget: &ExecutionBudget,
+    error: BoundedMapError<impl Into<starlark::Error>>,
+) -> starlark::Error {
+    match error {
+        BoundedMapError::Operation(limit) => limit.into(),
+        BoundedMapError::SizeOverflow => budget.refuse(ExecutionLimit::AllocationBytes).into(),
+        BoundedMapError::AllocationFailed => budget.refuse(ExecutionLimit::AllocationFailed).into(),
+        BoundedMapError::RowCountMismatch => projection_error("materialization row count changed"),
     }
 }
 

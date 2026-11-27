@@ -89,6 +89,7 @@ use crate::starlark_label::StarlarkLabel;
 pub use crate::starlark_label::alloc_budgeted_frozen_starlark_label;
 
 mod depset_budget;
+pub use depset_budget::alloc_budgeted_analysis_dict;
 mod depset_freeze;
 mod feature_flag_info;
 mod output_group;

@@ -190,11 +190,19 @@ impl ProviderId {
     pub fn exported_name(&self) -> &str {
         &self.0.exported_name
     }
+
+    /// Text components of the canonical name with its source.
+    pub fn display_parts(&self) -> [&str; 3] {
+        [self.source_label(), "%", self.exported_name()]
+    }
 }
 
 impl fmt::Display for ProviderId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}%{}", self.source_label(), self.exported_name())
+        for part in self.display_parts() {
+            f.write_str(part)?;
+        }
+        Ok(())
     }
 }
 
@@ -218,6 +226,19 @@ impl RunfilesSymlink {
             artifact,
             occurrence: Arc::new(()),
         }
+    }
+
+    /// Project a borrowed spelling while preserving the symlink occurrence.
+    /// The artifact clone is separate from the caller-owned path copy.
+    pub fn try_clone_with_path<E>(
+        &self,
+        copy: impl FnOnce(&str) -> Result<CompactString, E>,
+    ) -> Result<Self, E> {
+        Ok(Self {
+            path: copy(&self.path)?,
+            artifact: self.artifact.clone(),
+            occurrence: self.occurrence.dupe(),
+        })
     }
 
     pub(crate) fn publication_eq(&self, other: &Self) -> bool {
@@ -345,10 +366,14 @@ impl FilesToRunProvider {
     }
 
     pub fn from_occurrence(value: &ProviderOccurrence) -> Option<Self> {
+        Self::borrow_from_occurrence(value).cloned()
+    }
+
+    pub fn borrow_from_occurrence(value: &ProviderOccurrence) -> Option<&Self> {
         if !value.identity().is_builtin("FilesToRunProvider") {
             return None;
         }
-        value.files_to_run().map(|value| value.as_ref().clone())
+        value.files_to_run().map(Arc::as_ref)
     }
 
     fn from_files(files: AnalysisDepset) -> Self {
@@ -752,6 +777,13 @@ impl ProviderCollection {
 
     pub fn iter(&self) -> impl Iterator<Item = (&ProviderIdentity, &ProviderValue)> {
         self.0.providers.iter()
+    }
+
+    /// Borrow the canonical hashes of the unique, ordered provider identities.
+    pub fn iter_hashed(
+        &self,
+    ) -> impl Iterator<Item = (starlark_map::Hashed<&ProviderIdentity>, &ProviderValue)> {
+        self.0.providers.iter_hashed()
     }
 
     pub fn names(&self) -> impl Iterator<Item = ProviderName> + '_ {

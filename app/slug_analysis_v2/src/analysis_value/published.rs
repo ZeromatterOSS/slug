@@ -81,6 +81,15 @@ pub(crate) fn materialize_original(
     original: &PublishedValueRef,
     heap: &FrozenHeap,
 ) -> Result<FrozenValue, String> {
+    owned_original_root(original)?
+        .owned_value(heap)
+        .unpack_frozen()
+        .ok_or_else(|| "original publication root is not frozen".into())
+}
+
+pub(super) fn owned_original_root(
+    original: &PublishedValueRef,
+) -> Result<OwnedFrozenValue, String> {
     let binding = original
         .arena()
         .originals()
@@ -90,11 +99,7 @@ pub(crate) fn materialize_original(
     let slot = original
         .original_slot()
         .ok_or("publication node has no original materializable root")?;
-    binding
-        .owned_root(slot.index())?
-        .owned_value(heap)
-        .unpack_frozen()
-        .ok_or_else(|| "original publication root is not frozen".into())
+    binding.owned_root(slot.index())
 }
 
 /// Borrow complete physical views before descriptor traversal allocates rows.

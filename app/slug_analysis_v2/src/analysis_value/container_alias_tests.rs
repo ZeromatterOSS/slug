@@ -65,27 +65,30 @@ fn ordinary_container_aliases_survive_materialization_across_roots_and_calls() {
 
 #[test]
 fn shared_and_split_empty_lists_survive_generic_materialization() {
-    let heap = FrozenHeap::new();
-    let mut materializer = AnalysisValueMaterializer::new(&heap);
-    let shared = AnalysisValue::list(Vec::new());
-    let split = AnalysisValue::list(Vec::new());
-    let a = materializer.value(&shared).unwrap();
-    let alias = materializer.value(&shared.dupe()).unwrap();
-    let b = materializer.value(&split).unwrap();
-    assert_eq!(a.to_value().identity(), alias.to_value().identity());
-    assert_ne!(a.to_value().identity(), b.to_value().identity());
-    let graph = AnalysisValue::tuple(vec![shared.dupe(), shared, split]);
-    let frozen = materializer.value(&graph).unwrap();
-    let restored = AnalysisValueLowerer::default()
-        .lower(frozen.to_value(), "empty lists")
-        .unwrap();
-    assert!(graph.publication_eq(&restored));
-    let merged = AnalysisValue::list(Vec::new());
-    assert!(!graph.publication_eq(&AnalysisValue::tuple(vec![
-        merged.dupe(),
-        merged.dupe(),
-        merged
-    ])));
+    let budget = ExecutionBudget::new(10_000, 1 << 20, 16);
+    for request_budget in [None, Some(&budget)] {
+        let heap = FrozenHeap::new();
+        let mut materializer = AnalysisValueMaterializer::new_with_budget(&heap, request_budget);
+        let shared = AnalysisValue::list(Vec::new());
+        let split = AnalysisValue::list(Vec::new());
+        let a = materializer.value(&shared).unwrap();
+        let alias = materializer.value(&shared.dupe()).unwrap();
+        let b = materializer.value(&split).unwrap();
+        assert_eq!(a.to_value().identity(), alias.to_value().identity());
+        assert_ne!(a.to_value().identity(), b.to_value().identity());
+        let graph = AnalysisValue::tuple(vec![shared.dupe(), shared, split]);
+        let frozen = materializer.value(&graph).unwrap();
+        let restored = AnalysisValueLowerer::default()
+            .lower(frozen.to_value(), "empty lists")
+            .unwrap();
+        assert!(graph.publication_eq(&restored));
+        let merged = AnalysisValue::list(Vec::new());
+        assert!(!graph.publication_eq(&AnalysisValue::tuple(vec![
+            merged.dupe(),
+            merged.dupe(),
+            merged
+        ])));
+    }
 }
 
 #[test]

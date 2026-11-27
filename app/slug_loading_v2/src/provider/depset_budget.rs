@@ -6,6 +6,8 @@ use slug_build_api_v2::depset::traverse_depset_bounded;
 use slug_identity_v2::CanonicalLabel;
 use starlark::eval::ExecutionBudget;
 use starlark::eval::ExecutionLimit;
+use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
 use starlark::values::Value;
 use starlark::values::structs::StructuralIdentity;
 use starlark::values::structs::StructuralIdentityOp;
@@ -16,6 +18,16 @@ use super::StarlarkDepset;
 use super::starlark_label_ref;
 use crate::cc_header_info::cc_header_info_ref;
 use crate::subrule_invocation::AnalysisArtifactValue;
+
+/// Build a frozen dictionary with the same admitted identity as native depset leaves.
+pub fn alloc_budgeted_analysis_dict(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    count: usize,
+    rows: impl IntoIterator<Item = starlark::Result<(FrozenValue, FrozenValue)>>,
+) -> starlark::Result<FrozenValue> {
+    heap.alloc_budgeted_dict_from_rows(budget, count, rows, &NativeIdentity)
+}
 
 pub(super) fn flatten<'v>(
     value: Value<'v>,

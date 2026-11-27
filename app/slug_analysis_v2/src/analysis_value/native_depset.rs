@@ -1,13 +1,16 @@
 use std::hash::Hash;
+use std::sync::atomic::AtomicUsize;
 
 use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisDepsetOccurrence;
 use slug_build_api_v2::AnalysisDepsetSuccessor;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetSuccessor;
 use slug_loading_v2::provider::StarlarkDepsetSuccessorGen;
+use slug_loading_v2::provider::alloc_budgeted_starlark_depset_parts;
 use slug_loading_v2::provider::alloc_starlark_depset_parts;
 use starlark::eval::ExecutionBudget;
 use starlark::eval::ExecutionLimit;
@@ -206,6 +209,34 @@ pub(super) fn try_project<T>(
         |memo| memo,
         |_, value| leaf(value).map_err(|limit| latch(budget, limit)),
         |_, node, row| materialize(node, row).map_err(|limit| latch(budget, limit)),
+    )
+}
+
+pub(super) fn alloc_budgeted_native_node<T>(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    node: &Depset<T>,
+    element_type: &'static str,
+    retain_empty: bool,
+    successors: Successors,
+) -> Result<FrozenValue, ExecutionLimit> {
+    let empty = node.is_empty();
+    let retained = (empty && retain_empty).then(|| AnalysisDepset::empty(node.order()));
+    let occurrence = if let Some(retained) = &retained {
+        retained.occurrence()
+    } else {
+        budget.charge(1, size_of::<[AtomicUsize; 2]>())?;
+        AnalysisDepsetOccurrence::new()
+    };
+    alloc_budgeted_starlark_depset_parts(
+        heap,
+        budget,
+        node.order(),
+        (!empty).then_some(element_type),
+        occurrence,
+        retained,
+        node.depth(),
+        successors,
     )
 }
 

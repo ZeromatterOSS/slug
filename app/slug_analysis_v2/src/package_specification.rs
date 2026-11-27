@@ -4,6 +4,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use slug_build_api_v2::PackageGroupContents;
 use slug_build_api_v2::PackageSpecificationInfo;
 use slug_build_api_v2::ProviderCollection;
@@ -15,6 +16,8 @@ use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
+use starlark::eval::ExecutionBudget;
+use starlark::eval::ExecutionLimit;
 use starlark::starlark_module;
 use starlark::values::Demand;
 use starlark::values::FrozenHeap;
@@ -131,6 +134,18 @@ fn package_specification_methods(builder: &mut MethodsBuilder) {
 
 pub(crate) fn alloc(heap: &FrozenHeap, info: PackageSpecificationInfo) -> FrozenValue {
     heap.alloc(PackageSpecificationValue(info))
+}
+
+pub(crate) fn alloc_with_budget(
+    heap: &FrozenHeap,
+    budget: Option<&ExecutionBudget>,
+    info: &PackageSpecificationInfo,
+) -> Result<FrozenValue, ExecutionLimit> {
+    if let Some(budget) = budget {
+        heap.alloc_budgeted_simple(budget, || PackageSpecificationValue(info.dupe()))
+    } else {
+        Ok(alloc(heap, info.dupe()))
+    }
 }
 
 /// Borrow the complete native model before any retained depset handle clone.

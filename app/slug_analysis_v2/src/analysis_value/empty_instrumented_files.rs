@@ -1,7 +1,7 @@
 //! Native InstrumentedFilesInfo.EMPTY only; coverage collection remains closed.
 use super::*;
 
-const FIELDS: [&str; 2] = ["instrumented_files", "metadata_files"];
+pub(super) const FIELDS: [&str; 2] = ["instrumented_files", "metadata_files"];
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(super) struct EmptyInstrumentedFiles {
@@ -9,6 +9,10 @@ pub(super) struct EmptyInstrumentedFiles {
 }
 
 impl EmptyInstrumentedFiles {
+    pub(super) fn from_fields(fields: [FrozenValue; 2]) -> Self {
+        Self { fields }
+    }
+
     pub(super) fn validate(occurrence: &ProviderOccurrence) -> Result<(), String> {
         if occurrence.fields().len() == FIELDS.len()
             && FIELDS.iter().all(|name| {
@@ -29,9 +33,7 @@ impl EmptyInstrumentedFiles {
         fields: Vec<(CompactString, FrozenValue)>,
     ) -> FrozenValue {
         let field = |name| fields.iter().find(|(key, _)| key == name).unwrap().1;
-        heap.alloc(Self {
-            fields: [field(FIELDS[0]), field(FIELDS[1])],
-        })
+        heap.alloc(Self::from_fields([field(FIELDS[0]), field(FIELDS[1])]))
     }
 
     pub(super) fn visit_fields<'v>(
