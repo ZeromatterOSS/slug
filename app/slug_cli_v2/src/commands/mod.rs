@@ -12,6 +12,12 @@ pub mod aquery;
 pub mod build;
 pub mod cquery;
 pub mod help;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+mod installed_daemon;
 pub mod query;
 mod repository_environment;
 pub mod run;
@@ -73,58 +79,22 @@ impl RuntimeStartup {
         }
     }
 
-    fn daemon_executable(self) -> std::io::Result<PathBuf> {
-        match self {
-            Self::Generic => std::env::current_exe(),
-            #[cfg(all(
-                target_os = "linux",
-                target_arch = "x86_64",
-                target_pointer_width = "64"
-            ))]
-            Self::Installed => Ok(PathBuf::from("/proc/self/exe")),
-        }
-    }
-
-    fn daemon_socket(self, output_base: &Path) -> PathBuf {
+    fn daemon_socket(self, output_base: &Path) -> anyhow::Result<PathBuf> {
         // Keep an existing daemon's authority tied to its startup policy.
         match self {
-            Self::Generic => slug_server_v2::socket_path(output_base),
-            #[cfg(all(
-                target_os = "linux",
-                target_arch = "x86_64",
-                target_pointer_width = "64"
-            ))]
-            Self::Installed => output_base.join("slugd-installed.sock"),
-        }
-    }
-
-    fn daemon_pid(self, output_base: &Path) -> PathBuf {
-        match self {
-            Self::Generic => slug_server_v2::pid_path(output_base),
-            #[cfg(all(
-                target_os = "linux",
-                target_arch = "x86_64",
-                target_pointer_width = "64"
-            ))]
-            Self::Installed => output_base.join("slugd-installed.pid"),
-        }
-    }
-
-    fn serve(self, socket: &Path, workspace: &Path) -> Result<(), String> {
-        match self {
             Self::Generic => {
-                slug_server_v2::serve(socket, workspace).map_err(|error| error.to_string())
+                let socket = slug_server_v2::socket_path(output_base);
+                if std::os::unix::net::UnixStream::connect(&socket).is_err() {
+                    build::start_daemon(output_base)?;
+                }
+                Ok(socket)
             }
             #[cfg(all(
                 target_os = "linux",
                 target_arch = "x86_64",
                 target_pointer_width = "64"
             ))]
-            Self::Installed => {
-                let runtime = self.new_runtime(workspace)?;
-                slug_server_v2::serve_with_runtime(socket, runtime)
-                    .map_err(|error| error.to_string())
-            }
+            Self::Installed => installed_daemon::ensure(output_base),
         }
     }
 }
@@ -138,21 +108,13 @@ impl RuntimeStartup {
 #[test]
 fn daemon_endpoints_are_partitioned_by_startup_policy() {
     let base = Path::new("/output");
-    assert_eq!(
-        RuntimeStartup::Generic.daemon_socket(base),
+    assert_ne!(
+        installed_daemon::socket_path(base),
         slug_server_v2::socket_path(base)
     );
-    assert_eq!(
-        RuntimeStartup::Generic.daemon_pid(base),
+    assert_ne!(
+        installed_daemon::pid_path(base),
         slug_server_v2::pid_path(base)
-    );
-    assert_ne!(
-        RuntimeStartup::Installed.daemon_socket(base),
-        RuntimeStartup::Generic.daemon_socket(base)
-    );
-    assert_ne!(
-        RuntimeStartup::Installed.daemon_pid(base),
-        RuntimeStartup::Generic.daemon_pid(base)
     );
 }
 
@@ -181,6 +143,18 @@ where
     let mut args = args.into_iter().map(Into::into);
     let _program = args.next();
     let all_args: Vec<String> = args.collect();
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    if matches!(startup, RuntimeStartup::Installed)
+        && all_args
+            .first()
+            .is_some_and(|arg| arg == installed_daemon::CHILD_ROLE)
+    {
+        return serve_status(installed_daemon::child(&all_args[1..]));
+    }
     // Collect startup flags (--output_base and its value) that appear before
     // the subcommand, then dispatch the remaining args.
     let mut startup_output_base: Option<String> = None;
@@ -206,7 +180,7 @@ where
         i += 1;
     }
     if rest.first().is_some_and(|f| f == "--serve") {
-        return serve_daemon(&rest[1..], startup);
+        return serve_daemon(&rest[1..]);
     }
     // Extract the command (first non-flag in rest).
     let command = rest.iter().position(|a| !a.starts_with('-'));
@@ -284,7 +258,7 @@ fn parse_error(command: CommandKind, error: CommandParseError) -> i32 {
 
 /// Enter daemon server mode. Parses `--socket` and `--workspace` from the
 /// args, then blocks serving build requests on the Unix socket.
-fn serve_daemon(args: &[String], startup: RuntimeStartup) -> i32 {
+fn serve_daemon(args: &[String]) -> i32 {
     let mut socket = None;
     let mut workspace = None;
     let mut iter = args.iter();
@@ -305,12 +279,16 @@ fn serve_daemon(args: &[String], startup: RuntimeStartup) -> i32 {
         );
         return 2;
     };
-    match startup.serve(Path::new(&socket), Path::new(&workspace)) {
+    serve_status(slug_server_v2::serve(socket, workspace))
+}
+
+fn serve_status(result: anyhow::Result<()>) -> i32 {
+    match result {
         Ok(()) => 0,
         Err(error) => {
             eprintln!(
                 "{{\"error\":\"daemon_serve_error\",\"message\":\"{}\"}}",
-                json_escape(&error)
+                json_escape(&error.to_string())
             );
             2
         }

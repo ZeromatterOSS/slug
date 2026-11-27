@@ -1030,7 +1030,7 @@ pub use server::send_query_request;
 pub use server::send_run_request;
 pub use server::send_shutdown;
 pub use server::serve;
-pub use server::serve_with_runtime;
+pub use server::serve_published_listener;
 pub use server::socket_path;
 
 #[cfg(test)]

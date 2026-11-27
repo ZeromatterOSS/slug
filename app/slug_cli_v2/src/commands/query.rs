@@ -135,12 +135,10 @@ fn run_daemon_query(
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return emit_error(7, &error.to_string(), "daemon");
     }
-    let socket = startup.daemon_socket(output_base);
-    if std::os::unix::net::UnixStream::connect(&socket).is_err() {
-        if let Err(error) = super::build::start_daemon(output_base, startup) {
-            return emit_error(7, &error.to_string(), "daemon");
-        }
-    }
+    let socket = match startup.daemon_socket(output_base) {
+        Ok(socket) => socket,
+        Err(error) => return emit_error(7, &error.to_string(), "daemon"),
+    };
     let request = slug_server_v2::QueryRequest {
         expression: request.expression,
         order_output: request.order.to_string(),

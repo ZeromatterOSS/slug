@@ -45,5 +45,6 @@ closed setup descriptors, and `EPERM` for the same socket creation that
 succeeded on the Host. A successful command goes through the production
 owner’s authenticated bootstrap, lease progression, and reap gates. The
 qualification directory keeps the bounded command output for inspection.
-The daemon needs its own positive run through a fresh private output base
-before qualifying the public Rust comparison.
+Repeat through a fresh, private `--output_base` dedicated to this workspace
+before the public Rust comparison. Use a protected local parent. The daemon
+assumes cooperation from processes running as the invoking user.

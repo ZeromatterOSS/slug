@@ -631,9 +631,18 @@ pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyh
     serve_daemon(socket_path.as_ref(), daemon)
 }
 
+fn serve_daemon(socket_path: &Path, daemon: Daemon) -> anyhow::Result<()> {
+    let _ = std::fs::remove_file(socket_path);
+    let listener = UnixListener::bind(socket_path)
+        .with_context(|| format!("binding daemon socket {}", socket_path.display()))?;
+    serve_listener(listener, socket_path, daemon, true)
+}
+
+/// Serve an already published listener. The caller owns path retirement.
 #[doc(hidden)]
-pub fn serve_with_runtime(
-    socket_path: impl AsRef<Path>,
+pub fn serve_published_listener(
+    listener: UnixListener,
+    socket_path: &Path,
     runtime: slug_core_v2::runtime::WorkspaceRuntime,
 ) -> anyhow::Result<()> {
     let daemon = Daemon::from_runtime(
@@ -641,13 +650,15 @@ pub fn serve_with_runtime(
         #[cfg(test)]
         None,
     );
-    serve_daemon(socket_path.as_ref(), daemon)
+    serve_listener(listener, socket_path, daemon, false)
 }
 
-fn serve_daemon(socket_path: &Path, mut daemon: Daemon) -> anyhow::Result<()> {
-    let _ = std::fs::remove_file(socket_path);
-    let listener = UnixListener::bind(socket_path)
-        .with_context(|| format!("binding daemon socket {}", socket_path.display()))?;
+fn serve_listener(
+    listener: UnixListener,
+    socket_path: &Path,
+    mut daemon: Daemon,
+    unlink_on_shutdown: bool,
+) -> anyhow::Result<()> {
     eprintln!(
         "{{\"daemon\":\"started\",\"socket\":\"{}\"}}",
         socket_path.display()
@@ -662,7 +673,9 @@ fn serve_daemon(socket_path: &Path, mut daemon: Daemon) -> anyhow::Result<()> {
             }
         };
         if line == "shutdown" {
-            let _ = std::fs::remove_file(socket_path);
+            if unlink_on_shutdown {
+                let _ = std::fs::remove_file(socket_path);
+            }
             eprintln!("{{\"daemon\":\"shutdown\"}}");
             return Ok(());
         }

@@ -128,12 +128,10 @@ fn run_daemon(
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return emit_error(2, &error.to_string(), "daemon");
     }
-    let socket = startup.daemon_socket(output_base);
-    if std::os::unix::net::UnixStream::connect(&socket).is_err()
-        && let Err(error) = super::build::start_daemon(output_base, startup)
-    {
-        return emit_error(2, &error.to_string(), "daemon");
-    }
+    let socket = match startup.daemon_socket(output_base) {
+        Ok(socket) => socket,
+        Err(error) => return emit_error(2, &error.to_string(), "daemon"),
+    };
     match slug_server_v2::send_aquery_request(
         &socket,
         &DaemonAqueryRequest {

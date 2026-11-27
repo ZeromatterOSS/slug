@@ -335,18 +335,16 @@ fn run_daemon_build(
 ) -> i32 {
     let output_base_path = std::path::Path::new(output_base);
     let _ = std::fs::create_dir_all(output_base_path);
-    let socket = startup.daemon_socket(output_base_path);
-
-    // Try to connect; if the daemon isn't running, start it.
-    if std::os::unix::net::UnixStream::connect(&socket).is_err() {
-        if let Err(error) = start_daemon(output_base_path, startup) {
+    let socket = match startup.daemon_socket(output_base_path) {
+        Ok(socket) => socket,
+        Err(error) => {
             eprintln!(
                 "{{\"error\":\"daemon_start_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\"}}",
                 json_escape(&error.to_string())
             );
             return 2;
         }
-    }
+    };
 
     let daemon_request = slug_server_v2::BuildRequest {
         targets: request.targets.iter().map(|t| t.to_string()).collect(),
@@ -393,16 +391,12 @@ pub(super) fn capture_bzlmod_allow_yanked_versions() -> Result<Option<String>, C
 
 /// Start the daemon as a background process. The current binary re-execs
 /// itself with `--serve` to enter server mode.
-pub(super) fn start_daemon(
-    output_base: &std::path::Path,
-    startup: RuntimeStartup,
-) -> anyhow::Result<()> {
-    let socket = startup.daemon_socket(output_base);
-    let pid_file = startup.daemon_pid(output_base);
+pub(super) fn start_daemon(output_base: &std::path::Path) -> anyhow::Result<()> {
+    let socket = slug_server_v2::socket_path(output_base);
+    let pid_file = slug_server_v2::pid_path(output_base);
     let workspace = std::env::current_dir()
         .map_err(|e| anyhow::anyhow!("getting current dir for daemon: {e}"))?;
-    let exe = startup
-        .daemon_executable()
+    let exe = std::env::current_exe()
         .map_err(|e| anyhow::anyhow!("getting current exe for daemon: {e}"))?;
     let mut child = std::process::Command::new(&exe)
         .arg("--serve")
@@ -459,7 +453,10 @@ fn wait_for_daemon_ready(
     ))
 }
 
-fn terminate_and_reap(child: &mut std::process::Child, primary: anyhow::Error) -> anyhow::Error {
+pub(super) fn terminate_and_reap(
+    child: &mut std::process::Child,
+    primary: anyhow::Error,
+) -> anyhow::Error {
     let kill_result = child.kill();
     daemon_cleanup_error(primary, kill_result, child.wait())
 }
@@ -504,7 +501,7 @@ mod daemon_readiness_tests {
         std::fs::write(&socket, b"existing socket path").unwrap();
 
         // The libtest image exits on the daemon arguments before binding.
-        let result = start_daemon(&output_base, RuntimeStartup::Generic);
+        let result = start_daemon(&output_base);
         let socket_bytes = std::fs::read(&socket);
         std::fs::remove_dir_all(output_base).unwrap();
         let error = result.unwrap_err();
