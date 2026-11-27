@@ -6,74 +6,15 @@ Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS. General production remains Disabled
 
 ## Current result and next step
 
-The inactive original Rust cquery completed one configured result in 1,025
-attempts, with 57 roots and 155 records. It adopted `rules_rust+`, materialized
-`tinyjson` and passed terminal completion. All 59 shared compute samples matched
-the stopped control. Native cleanup returned to 168 bytes, zero FDs and zero
-backing. The report used 134,190 bytes with its prefix.
+One inactive runtime matched the [pinned Bazel 9.2.0 CrateInfo rows][rust-oracle]
+and typed action projections across cold, warm, edition change and restoration.
+Native retention stayed within the fixed bank and teardown refunded all credits.
+Scoped HTTPS freshness with an omitted checksum, repeated Workspace publication
+with retained readers, and the native Archive exact/+1 envelope passed.
 
-The original fetched five HTTPS toolchain archives with omitted checksums.
-A controlled native A/warm-A/B/restored-A test at one HTTPS URL verified one
-GET per command through Starlark replay, exact SHA/SRI and bytes, and full bank
-refund. Both file and native digest-replay controls passed. The [staged Bazel
-9.2.0 oracle][rust-oracle] completed all 11 commands. Registration and CrateInfo
-stdout matched. The direct edge set matched with one reorder, and three
-stderr rows differed.
-All four action shapes passed. Rustc's key changed with edition and restored,
-while both runfiles keys stayed stable. The inactive Slug edition-2024 result
-matched the target, ordered action names, owners, Rustc host platform and
-selected tool arguments. Its bounded projection adds no raw action text.
-
-One inactive runtime completed initial edition 2024, warm 2024, changed 2021
-and restored 2024 in 94.44 seconds. Attempts were 1,025 then 598 each.
-CrateInfo, typed rows, stable support payloads and Rustc change/restoration
-matched the pinned comparison. Peak backing was 7,747,932,160 bytes, retained
-406,051,206 bytes and FDs 499. Runtime teardown refunded all credits.
-
-The native Archive launcher verified 512 MiB/call and 1 GiB cumulative decode
-at exact and +1, physical page rounding and link inode charging. Complete-tree
-paths sealed at 4 MiB and refused +1 with full retirement. A matched archive
-reorder sealed 81,921 entries in one order and hit the 16 MiB history limit in
-the other. The body test sealed 1 GiB and independently refused +1 in the
-current tree and retained history. The standalone sampler admitted 131,072
-entries and refused one more. Fresh mounts enforced 2 GiB and 262,144 charged
-inodes. Twelve native checks close the Archive envelope.
-
-Repeated Workspace publication passed cold, warm, changed and restored inputs
-with contained runfiles and alias links. The readonly child verified prior
-outputs. A survived runtime shutdown on its original reader and the last drop
-refunded the bank. An authored absolute link refused before transport.
-
-Exact prior accepted body sharing cleared the retained refusal at 493.
-Measured 8 MiB sealed backing cleared Source bootstrap at 574. Accepted backing
-was 1,536 MiB, down 448 MiB. Rollback prunes dead claims after owner retirement
-and accounts separately for reusable table capacity. Seven focused checks, 17
-native guards and the default CLI passed. The edition log used 1,486 bytes.
-
-Matched Source manifests reuse validated entry paths and modes and count closed
-state capacities directly. The 7,935-entry native fixture used 0.886 of control
-instructions and 0.952 of CPU, with identical inode and block facts. Bzlmod 94,
-Core 41 and three native invariants passed. Seventeen extra legacy image tests
-failed identically in the preserved control. The fresh default CLI built.
-
-The preceding original served its last General directory listing at compute
-1,020 before the next compute hit the work deadline. Total path service was
-156 ms versus 10.7 seconds in graph computation. Typed singleton rows preserve
-operation, selected owner and freshness inside the existing report cap.
-
-The [writer receipt][archive-writes] now covers trusted Archive-mode filesystem
-operations. Completed filesystem snapshots went from 520 prior comparisons
-over 2,459,550,860 bytes to 86 over 47,716 bytes while completing two more
-snapshots. Both native receipts verified full rereads and touched writes. The
-fresh default CLI, 81 focused tests, five native guards and the six-archive
-check passed.
-
-Measured sealed quotas brought native backing below the 8 GiB bank. The
-previous immutable Source refusal was a 2,048 MiB bootstrap with 7,937 MiB
-live. The successful Source issued a 256 MiB sealed quota, and peak native
-backing was again 6,301 MiB. Across the three earlier identical compute
-prefixes, Archive acquisition ranged from 3.061 to 3.795 seconds. Preserve
-the [bounded phase and typed scope cause][attribution] for exact attribution.
+Qualify the installed launcher through ordinary one-shot and retained-daemon
+commands before comparing the public Rust cquery rows on both routes. The
+protected launcher and actual confined execution remain activation gates.
 
 Continue with the [Stage 8 public cquery formatter][stage8], followed by
 public action comparison and Rust REAPI. Keep atomic
@@ -176,6 +117,12 @@ bounded gates. A new ownership, compatibility or resource prerequisite
 requires root reassessment under the orchestration skill.
 
 ## Evidence and history
+
+The detailed Rust/runtime, Archive boundary, Workspace publication, and
+bounded tuning receipts from this packet are pinned at
+`7f99dd86762e801b934cb464f2ded4c0d3b20c63`, lines 9–76 of this manifest.
+The owner plan retains the [Archive writer contract][archive-writes] and
+[phase-attribution method][attribution].
 
 - [Repository glob anchor receipt][glob] preserves strict fact custody,
   logical/terminal Source context and actual A/B/A restoration, including the
