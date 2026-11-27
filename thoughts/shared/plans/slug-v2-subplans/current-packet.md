@@ -114,10 +114,10 @@ The authentic inactive Rust driver, scoped HTTPS freshness, repeated Workspace
 publication and Archive envelope gates have completed. Production activation,
 required public action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
-remain open under the [bootstrap readiness matrix][readiness]. Native credit,
-standalone timings and incomplete originals are each evidence for their own
-bounded gates. A new ownership, compatibility or resource prerequisite
-requires root reassessment under the orchestration skill.
+remain open under the [bootstrap readiness matrix][readiness]. One cold pinned
+CrateInfo case matched output and sampled 609,524 KiB for Slug and 720,972 KiB
+for Bazel. Elapsed times were 23.55s and 10.64s. A new ownership, compatibility
+or resource prerequisite requires root reassessment under the orchestration skill.
 
 ## Evidence and history
 
