@@ -200,12 +200,58 @@ impl Ord for NormalizedAbsolutePath {
         if Arc::ptr_eq(path, other_path) {
             return Ordering::Equal;
         }
-        // Pinned alloc/src/sync.rs Arc::cmp dereferences both owners; retain
-        // that exact PathBuf order rather than ordering allocation addresses.
         #[cfg(test)]
         record_path_order_fallback_for_test();
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+
+            if let Some(order) = compare_unix_path_bytes(
+                path.as_os_str().as_bytes(),
+                other_path.as_os_str().as_bytes(),
+            ) {
+                return order;
+            }
+        }
         path.as_ref().cmp(other_path.as_ref())
     }
+}
+
+#[cfg(unix)]
+#[inline]
+fn compare_unix_path_bytes(left: &[u8], right: &[u8]) -> Option<Ordering> {
+    const WORD_BYTES: usize = std::mem::size_of::<u64>();
+    let shared_len = left.len().min(right.len());
+    if shared_len < WORD_BYTES {
+        return None;
+    }
+    let (left_words, left_tail) = left[..shared_len].as_chunks::<WORD_BYTES>();
+    let (right_words, right_tail) = right[..shared_len].as_chunks::<WORD_BYTES>();
+    for (left_word, right_word) in left_words.iter().zip(right_words) {
+        let differing_bits = u64::from_le_bytes(*left_word) ^ u64::from_le_bytes(*right_word);
+        if differing_bits != 0 {
+            let byte_index = (differing_bits.trailing_zeros() / u8::BITS) as usize;
+            return compare_distinct_path_bytes(left_word[byte_index], right_word[byte_index]);
+        }
+    }
+    for (&left_byte, &right_byte) in left_tail.iter().zip(right_tail) {
+        if left_byte != right_byte {
+            return compare_distinct_path_bytes(left_byte, right_byte);
+        }
+    }
+    (left.len() == right.len()).then_some(Ordering::Equal)
+}
+
+#[cfg(unix)]
+#[inline]
+fn compare_distinct_path_bytes(left: u8, right: u8) -> Option<Ordering> {
+    // The shared prefix ends in the same component on both sides. Ordinary
+    // differing bytes make both components normal, with Unix OsStr byte order.
+    // A dot or separator can instead affect component parsing.
+    if matches!(left, b'/' | b'.') || matches!(right, b'/' | b'.') {
+        return None;
+    }
+    Some(left.cmp(&right))
 }
 
 impl PartialOrd for NormalizedAbsolutePath {

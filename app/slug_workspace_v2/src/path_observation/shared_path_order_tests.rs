@@ -151,6 +151,56 @@ fn independent_path_owners_keep_exact_platform_order_and_full_hash_stream() {
     assert!(weak.upgrade().is_none());
 }
 
+#[cfg(unix)]
+#[test]
+fn unix_path_order_preserves_raw_aliases_and_ambiguous_boundaries() {
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::ffi::OsStringExt;
+
+    use Ordering::Equal;
+    use Ordering::Less;
+
+    let cases: &[(&[u8], &[u8], Option<Ordering>)] = &[
+        (b"/a", b"/b", None),
+        (b"/long/a00x_tail", b"/long/a00y_tail", Some(Less)),
+        (
+            b"/workspace/b\xfe/child",
+            b"/workspace/b\xff/child",
+            Some(Less),
+        ),
+        (b"/workspace/ba\0/x", b"/workspace/ba\x01/x", Some(Less)),
+        (b"/workspace/root", b"/workspace/root//.", None),
+        (
+            b"/workspace//./alpha/ordinary",
+            b"/workspace//./alpha/qrdinary",
+            Some(Less),
+        ),
+        (b"/workspace/a/./z", b"/workspace/a/b", None),
+        (b"/workspace/a/x", b"/workspace/a!", None),
+        (
+            b"/workspace/x/./leaf/",
+            b"/workspace/x/./leaf/",
+            Some(Equal),
+        ),
+    ];
+    for &(left, right, expected_fast_order) in cases {
+        let owned = |bytes: &[u8]| {
+            NormalizedAbsolutePath::from_normalized_owned(PathBuf::from(OsString::from_vec(
+                bytes.to_vec(),
+            )))
+        };
+        let left_path = owned(left);
+        let right_path = owned(right);
+        assert_eq!(left_path.as_path().as_os_str().as_bytes(), left);
+        assert_eq!(right_path.as_path().as_os_str().as_bytes(), right);
+        let expected = left_path.as_path().cmp(right_path.as_path());
+        assert_eq!(compare_unix_path_bytes(left, right), expected_fast_order);
+        assert_eq!(left_path.cmp(&right_path), expected);
+        assert_eq!(right_path.cmp(&left_path), expected.reverse());
+        assert_eq!(left_path == right_path, expected == Equal);
+    }
+}
+
 fn image_row(
     bank: &ImageDescriptorBudget,
     target: &NormalizedAbsolutePath,

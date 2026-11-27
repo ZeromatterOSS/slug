@@ -2248,6 +2248,12 @@ The [component receipt](wp1225-shared-path-order-acceptance-2026-11-09.json)
 records the accepted work boundary, preservation audits and native evidence;
 it does not close the unreproduced Registration cause or whole-command gates.
 
+For distinct Unix paths, scan the shared byte prefix in little-endian words.
+An ordinary first differing byte has the same position in a normal component
+on both sides. Compare those bytes directly. Delegate dots, separators, short
+paths and proper prefixes to `Path::cmp`. Raw equality also proves path equality.
+This keeps admitted raw aliases and the generic sorted-map invariant checks.
+
 ### Operational configuration-key hashing
 
 The fresh post-path IP-only profile directly samples `SlugConfiguration::hash`

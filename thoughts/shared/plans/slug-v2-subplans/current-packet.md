@@ -28,6 +28,17 @@ Retirement was exact. The report used 129,137 bytes with its prefix.
 Eighty-seven focused tests, five native guards and the 7.93-second six-archive
 gate passed.
 
+The 920-compute CPU profile attributes 25.77% of cycles to liblzma and 11.62% to
+packed decoding. Fresh rooted comparisons account for 76.03% of decoder cycles.
+The exact literal/back-reference verifier trial on 3.74 GB used CPU 1.049 and
+instructions 1.293 of baseline. The trial was retired.
+Word-at-a-time Unix path comparison preserves standard order for admitted raw
+aliases. Matched Workspace unions used 0.414 CPU and 0.285 instructions of
+baseline. All 218 focused tests, five native guards and the 7.95-second
+six-archive gate passed. The original adopted `local_config_cc` at 935 computes
+with 55 roots and 151 records before the Source deadline. All 45 shared sampled
+compute rows agreed with the preceding run and retirement was exact.
+
 Prior accepted owner results include pidfd retirement (ABBA wall 0.836),
 sorted union insertion (CPU 0.772, instructions 0.837), and the
 [pinned single-threaded XZ revision][xz-design] with the
