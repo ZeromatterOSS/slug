@@ -61,6 +61,10 @@ fn output_roots_are_independent_of_owner_and_preserve_coordinates() {
         output: output.clone(),
     };
     assert_eq!(artifact.root(), AnalysisArtifactRoot::Derived(root.clone()));
+    assert_eq!(
+        artifact.short_path_parts().as_slice(),
+        ["../", "dep+/pkg/a"]
+    );
     assert_eq!(artifact.short_path(), "../dep+/pkg/a");
     let solib = ActionOutput::new(root.clone(), "_solib_k8/liba.so", ActionOutputKind::File);
     let artifact = AnalysisArtifact::Derived {
@@ -70,7 +74,14 @@ fn output_roots_are_independent_of_owner_and_preserve_coordinates() {
         },
         output: solib,
     };
-    assert_eq!(artifact.short_path(), "_solib_k8/liba.so");
+    assert_eq!(
+        artifact.short_path_parts().as_slice(),
+        ["_solib_k8/liba.so"]
+    );
+    assert!(matches!(
+        artifact.short_path(),
+        std::borrow::Cow::Borrowed("_solib_k8/liba.so")
+    ));
     let mut registry = ActionRegistry::new();
     let write = |output| {
         ActionSpec::new(

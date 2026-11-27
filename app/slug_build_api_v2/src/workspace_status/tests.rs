@@ -29,7 +29,11 @@ fn workspace_status_identity_metadata_and_projections_are_structural() {
     for value in [pair.stable(), pair.volatile()] {
         let artifact = AnalysisArtifact::WorkspaceStatus(value.clone());
         assert_eq!(artifact.path(), value.path());
-        assert_eq!(artifact.short_path(), value.short_path());
+        assert_eq!(artifact.short_path_parts().as_slice(), [value.short_path()]);
+        assert!(matches!(
+            artifact.short_path(),
+            std::borrow::Cow::Borrowed(path) if std::ptr::eq(path, value.short_path())
+        ));
         assert_eq!(artifact.dirname(), "bazel-out");
         assert_eq!(
             artifact.root(),

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::*;
 
 fn source(label: &str) -> AnalysisArtifact {
@@ -6,42 +8,61 @@ fn source(label: &str) -> AnalysisArtifact {
 
 #[test]
 fn source_execution_and_short_paths_preserve_repository_identity() {
-    for (label, exec, short, directory) in [
-        ("@@//:lib.rs", "lib.rs", "lib.rs", "."),
+    for (label, exec, short, parts, directory) in [
+        ("@@//:lib.rs", "lib.rs", "lib.rs", &["lib.rs"][..], "."),
         (
             "@@//pkg:src/lib.rs",
             "pkg/src/lib.rs",
             "pkg/src/lib.rs",
+            &["pkg", "/", "src/lib.rs"],
             "pkg/src",
         ),
         (
             "@@dep+//:lib.rs",
             "external/dep+/lib.rs",
             "../dep+/lib.rs",
+            &["../", "dep+", "/", "lib.rs"],
             "external/dep+",
         ),
         (
             "@@dep+//pkg:src/lib.rs",
             "external/dep+/pkg/src/lib.rs",
             "../dep+/pkg/src/lib.rs",
+            &["../", "dep+", "/", "pkg", "/", "src/lib.rs"],
             "external/dep+/pkg/src",
         ),
         (
             "@@other+//pkg:src/lib.rs",
             "external/other+/pkg/src/lib.rs",
             "../other+/pkg/src/lib.rs",
+            &["../", "other+", "/", "pkg", "/", "src/lib.rs"],
             "external/other+/pkg/src",
         ),
     ] {
         let artifact = source(label);
-        assert_eq!(artifact.path(), exec);
-        assert_eq!(artifact.short_path(), short);
+        let execution_path = artifact.path();
+        let short_path = artifact.short_path();
+        assert_eq!(execution_path, exec);
+        assert_eq!(short_path, short);
+        let short_parts = artifact.short_path_parts();
+        assert_eq!(short_parts.as_slice(), parts);
+        assert_eq!(matches!(execution_path, Cow::Borrowed(_)), parts.len() == 1);
+        match short_path {
+            Cow::Borrowed(path) => {
+                let [part] = short_parts.as_slice() else {
+                    panic!("expected one borrowed short path piece");
+                };
+                assert!(std::ptr::eq(path, *part));
+            }
+            Cow::Owned(_) => assert!(parts.len() > 1),
+        }
         assert_eq!(artifact.dirname(), directory);
         assert_eq!(artifact.path().rsplit('/').next(), Some("lib.rs"));
     }
     let generated = derived_artifact("pkg/out", ActionOutputKind::File);
     assert_eq!(generated.path(), root_support::exec_path("pkg/out"));
-    assert_eq!(generated.short_path(), "pkg/out");
+    assert_eq!(generated.short_path_parts().as_slice(), ["pkg/out"]);
+    assert!(matches!(generated.short_path(), Cow::Borrowed("pkg/out")));
     assert_ne!(source("@@dep+//:lib.rs"), source("@@other+//:lib.rs"));
 }
 

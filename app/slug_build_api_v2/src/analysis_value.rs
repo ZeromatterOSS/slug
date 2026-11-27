@@ -361,6 +361,46 @@ pub enum AnalysisArtifact {
     },
 }
 
+/// Borrowed pieces of an artifact path in display order, including separators.
+pub struct ArtifactPathParts<'a> {
+    parts: [&'a str; 6],
+    len: usize,
+}
+
+impl<'a> ArtifactPathParts<'a> {
+    fn new<const N: usize>(parts: [&'a str; N]) -> Self {
+        let mut storage = [""; 6];
+        storage[..N].copy_from_slice(&parts);
+        Self {
+            parts: storage,
+            len: N,
+        }
+    }
+
+    /// Pieces to copy into the destination in order.
+    pub fn as_slice(&self) -> &[&'a str] {
+        &self.parts[..self.len]
+    }
+
+    fn into_cow(self) -> Cow<'a, str> {
+        match self.as_slice() {
+            [path] => Cow::Borrowed(path),
+            parts => {
+                let len = parts
+                    .iter()
+                    .map(|part| part.len())
+                    .try_fold(0usize, usize::checked_add)
+                    .expect("artifact path length overflow");
+                let mut path = String::with_capacity(len);
+                for part in parts {
+                    path.push_str(part);
+                }
+                Cow::Owned(path)
+            }
+        }
+    }
+}
+
 impl AnalysisArtifact {
     pub fn root(&self) -> crate::AnalysisArtifactRoot {
         match self {
@@ -393,42 +433,52 @@ impl AnalysisArtifact {
     pub fn path(&self) -> Cow<'_, str> {
         match self {
             Self::WorkspaceStatus(status) => Cow::Borrowed(status.path()),
-            Self::Source(label) => Self::source_path(label, "external"),
+            Self::Source(label) => Self::source_path_parts(label, "external/").into_cow(),
             Self::Derived { output, .. } => Cow::Borrowed(output.path()),
         }
     }
 
     /// Runfiles path relative to the main repository, independent of root bytes.
     pub fn short_path(&self) -> Cow<'_, str> {
+        self.short_path_parts().into_cow()
+    }
+
+    /// Runfiles path pieces for consumers that can copy directly into their destination.
+    pub fn short_path_parts(&self) -> ArtifactPathParts<'_> {
         match self {
-            Self::WorkspaceStatus(status) => Cow::Borrowed(status.short_path()),
-            Self::Source(label) => Self::source_path(label, ".."),
+            Self::WorkspaceStatus(status) => ArtifactPathParts::new([status.short_path()]),
+            Self::Source(label) => Self::source_path_parts(label, "../"),
             Self::Derived { output, .. } => {
                 let relative = output.root_relative_path();
                 match relative.strip_prefix("external/") {
-                    Some(external) => Cow::Owned(format!("../{external}")),
-                    None => Cow::Borrowed(relative),
+                    Some(external) => ArtifactPathParts::new(["../", external]),
+                    None => ArtifactPathParts::new([relative]),
                 }
             }
         }
     }
 
-    fn source_path<'a>(label: &'a CanonicalLabel, external_prefix: &str) -> Cow<'a, str> {
+    fn source_path_parts<'a>(
+        label: &'a CanonicalLabel,
+        external_prefix: &'static str,
+    ) -> ArtifactPathParts<'a> {
         let package = label.package().package().as_str();
         let target = label.target().as_str();
-        let relative = if package.is_empty() {
-            Cow::Borrowed(target)
-        } else {
-            Cow::Owned(format!("{package}/{target}"))
-        };
         let repository = label.package().repo();
-        if repository.is_root() {
-            relative
-        } else {
-            Cow::Owned(format!(
-                "{external_prefix}/{}/{relative}",
-                repository.as_str()
-            ))
+        match (repository.is_root(), package.is_empty()) {
+            (true, true) => ArtifactPathParts::new([target]),
+            (true, false) => ArtifactPathParts::new([package, "/", target]),
+            (false, true) => {
+                ArtifactPathParts::new([external_prefix, repository.as_str(), "/", target])
+            }
+            (false, false) => ArtifactPathParts::new([
+                external_prefix,
+                repository.as_str(),
+                "/",
+                package,
+                "/",
+                target,
+            ]),
         }
     }
 }
