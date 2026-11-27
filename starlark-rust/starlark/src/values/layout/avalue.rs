@@ -78,6 +78,18 @@ pub(crate) trait AValue<'v>: Sized + 'v {
         ))
     }
 
+    /// Compute an admitted object size without overflowing the allocator layout.
+    fn checked_alloc_size_for_extra_len(extra_len: usize) -> Option<ValueAllocSize> {
+        let payload = mem::size_of::<Self::ExtraElem>().checked_mul(extra_len)?;
+        let bytes = AValueRepr::<Self>::offset_of_extra().checked_add(payload)?;
+        let max_aligned = (isize::MAX as usize & !(AValueHeader::ALIGN - 1))
+            .min(AlignedSize::MAX_SIZE.bytes() as usize);
+        if bytes > max_aligned {
+            return None;
+        }
+        Some(Self::alloc_size_for_extra_len(extra_len))
+    }
+
     /// The memory that should be charged to this value in a profile.
     ///
     /// Both the size of the value itself and anything it references.

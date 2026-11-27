@@ -22,10 +22,13 @@ use fxhash::FxHashSet;
 use fxhash::hash64;
 
 mod bounded_storage;
+mod bounded_traversal;
 pub use bounded_storage::DepsetStorageCharge;
 pub use bounded_storage::DepsetStorageEvent;
 pub use bounded_storage::DepsetStorageVisitError;
 pub use bounded_storage::DepsetStorageVisitSet;
+pub use bounded_traversal::DepsetTraversalError;
+pub use bounded_traversal::traverse_depset_bounded;
 
 pub const MAX_DEPTH: usize = 3500;
 

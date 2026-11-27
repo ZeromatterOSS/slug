@@ -17,8 +17,51 @@
 
 use std::fmt::Debug;
 
+use crate::eval::ExecutionLimit;
+use crate::typing::TyStarlarkValue;
 use crate::values::Heap;
+use crate::values::UnpackValue;
 use crate::values::Value;
+use crate::values::ValueError;
+use crate::values::ValueLike;
+use crate::values::dict::DictRef;
+use crate::values::int::inline_int::InlineInt;
+use crate::values::list::ListRef;
+use crate::values::range::Range;
+use crate::values::set::SetRef;
+use crate::values::tuple::TupleRef;
+
+impl<'v> Heap<'v> {
+    /// Admit iterator startup on types with fixed-work, nonallocating steps.
+    /// The caller must charge each step before advancing the iterator.
+    pub(crate) fn bounded_iterator(
+        self,
+        value: Value<'v>,
+        operation: &'static str,
+    ) -> crate::Result<StarlarkIterator<'v>> {
+        if let Some(budget) = self.execution_budget() {
+            budget.charge(1, 0)?;
+            if !TyStarlarkValue::is_iterable(&value.vtable().starlark_value) {
+                return ValueError::unsupported_type(value, "(iter)");
+            }
+            let admitted = ListRef::from_value(value).is_some()
+                || TupleRef::from_value(value).is_some()
+                || DictRef::from_value(value).is_some()
+                || SetRef::unpack_value_opt(value).is_some()
+                // A range step emits an i32. Admit it when that is stored inline.
+                || (!InlineInt::smaller_than_i32() && value.downcast_ref::<Range>().is_some());
+            if !admitted {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation,
+                        value_type: value.get_type(),
+                    })
+                    .into());
+            }
+        }
+        value.iterate(self)
+    }
+}
 
 /// Iterator of starlark values.
 #[derive(Debug)]

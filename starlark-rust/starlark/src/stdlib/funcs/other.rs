@@ -38,6 +38,8 @@ use crate::values::typing::never::StarlarkNever;
 use crate::values::typing::ty::AbstractType;
 use crate::values::value_of_unchecked::ValueOfUnchecked;
 
+mod sorted_budget;
+
 #[starlark_module]
 pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// fail: fail the execution
@@ -348,8 +350,14 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] key: Option<Value<'v>>,
         #[starlark(require = named, default = false)] reverse: bool,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<AllocList<impl IntoIterator<Item = Value<'v>> + use<'v>>> {
-        let it = x.get().iterate(eval.heap())?;
+    ) -> starlark::Result<ValueOfUnchecked<'v, Vec<Value<'v>>>> {
+        let heap = eval.heap();
+        if let Some(budget) = heap.execution_budget() {
+            return sorted_budget::sorted(x.get(), key, reverse, eval, budget)
+                .map(ValueOfUnchecked::new);
+        }
+
+        let it = x.get().iterate(heap)?;
         let mut it = match key {
             None => it.map(|x| (x, x)).collect(),
             Some(key) => {
@@ -380,7 +388,9 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
 
         compare_ok?;
 
-        Ok(AllocList(it.into_iter().map(|x| x.0)))
+        Ok(ValueOfUnchecked::new(
+            heap.alloc(AllocList(it.into_iter().map(|x| x.0))),
+        ))
     }
 
     /// [type](

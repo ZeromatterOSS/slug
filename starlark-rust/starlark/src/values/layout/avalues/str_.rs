@@ -33,7 +33,6 @@ use crate::values::StringValueLike as _;
 use crate::values::Tracer;
 use crate::values::Value;
 use crate::values::constant_string;
-use crate::values::layout::aligned_size::AlignedSize;
 use crate::values::layout::avalue::AValue;
 use crate::values::layout::avalue::AValueImpl;
 use crate::values::layout::heap::repr::AValueHeader;
@@ -152,13 +151,10 @@ impl<'v> Heap<'v> {
         if let Some(value) = constant_string(text) {
             return Ok(value.to_string_value());
         }
-        let max_aligned = (isize::MAX as usize & !(AValueHeader::ALIGN - 1))
-            .min(AlignedSize::MAX_SIZE.bytes() as usize);
-        if text.len() > max_aligned - AValueRepr::<StarlarkStrAValue>::offset_of_extra() {
-            return Err(budget.refuse(ExecutionLimit::AllocationBytes));
-        }
         let payload = StarlarkStr::payload_len_for_len(text.len());
-        let bytes = StarlarkStrAValue::alloc_size_for_extra_len(payload).bytes() as usize;
+        let bytes = StarlarkStrAValue::checked_alloc_size_for_extra_len(payload)
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?
+            .bytes() as usize;
         budget.charge(1 + ExecutionBudget::text_work(text.len()), bytes)?;
         Ok(self.alloc_str(text))
     }

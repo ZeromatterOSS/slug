@@ -164,14 +164,16 @@ Publish through the existing accepted terminal outside the DICE graph.
 Public admission requires a closed evaluator with no loader and finite source,
 heap, work and output admission. Use the shared interpreter's untyped module
 mode to defer operations on script values to runtime and preserve original
-bytecode after freeze. Bound parsing and value freeze separately. Runtime
-admission uses sticky request credits shared by evaluator heaps and terminal
-text. Bounded `str`, `repr`, `%`, and `.format` charge traversal, scratch
-growth, and the heap copy. Interpolation admits argument expansion and
-diagnostics before materializing them. Extend admission to other diagnostics
-and native collection growth before activation. Resource outcomes are
-Slug-native. Pinned Bazel's `StarlarkOutputFormatterCallback` and
-`configured_query_test.sh` own the setup and partial-output semantics.
+bytecode after freeze. The source parser admits bytes, grammar tokens, and
+integer digits before recursive grammar work. Value freeze still needs its
+own admission. Runtime admission shares sticky request credits across heaps
+and terminal text. String rendering, interpolation, stable sort, and ordered
+depset traversal precharge their scratch and result allocation. Depset
+provider leaves still require metered structural hash and equality. Bound
+native call packing, diagnostics, and the remaining collection operations
+before activation. Resource outcomes are Slug-native. Pinned Bazel's
+`StarlarkOutputFormatterCallback` and `configured_query_test.sh` own the setup
+and partial-output semantics.
 
 First prove setup failure, partial output, formatter edit and recovery on real
 custom providers through both command routes. Then run the unchanged Rust

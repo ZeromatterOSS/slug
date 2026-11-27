@@ -79,6 +79,7 @@ use crate::bzl_module::manifest_starlark_sources;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::starlark_label::StarlarkLabel;
 
+mod depset_budget;
 mod depset_freeze;
 mod feature_flag_info;
 mod output_group;
@@ -1344,6 +1345,13 @@ impl<'v> StarlarkDepset<'v> {
         }
     }
 
+    fn occurrence_from_value(value: Value<'v>) -> Option<&'v AnalysisDepsetOccurrence> {
+        match Self::from_value(value)? {
+            starlark::__macro_refs::Either::Left(value) => Some(&value.occurrence),
+            starlark::__macro_refs::Either::Right(value) => Some(&value.occurrence),
+        }
+    }
+
     pub fn parts_from_value(
         value: Value<'v>,
     ) -> Option<(
@@ -1542,8 +1550,8 @@ where
     }
 
     fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
-        Ok(StarlarkDepset::parts_from_value(other)
-            .is_some_and(|(_, _, occurrence, _, _, _)| self.occurrence == occurrence))
+        Ok(StarlarkDepset::occurrence_from_value(other)
+            .is_some_and(|occurrence| self.occurrence == *occurrence))
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
@@ -1578,7 +1586,12 @@ fn starlark_depset_methods(builder: &mut MethodsBuilder) {
         this: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        Ok(eval.heap().alloc(StarlarkDepset::flatten(this)?))
+        let heap = eval.heap();
+        if let Some(budget) = heap.execution_budget() {
+            let values = depset_budget::flatten(this, budget)?;
+            return Ok(heap.alloc_budgeted_list(values.into_iter())?);
+        }
+        Ok(heap.alloc(StarlarkDepset::flatten(this)?))
     }
 }
 

@@ -19,6 +19,7 @@ use std::convert::Infallible;
 use std::mem;
 
 use crate::collections::maybe_uninit_backport::maybe_uninit_write_slice;
+use crate::eval::ExecutionLimit;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
 use crate::values::FrozenHeap;
@@ -31,6 +32,7 @@ use crate::values::ValueTyped;
 use crate::values::layout::avalue::AValue;
 use crate::values::layout::avalue::AValueImpl;
 use crate::values::layout::avalue::heap_copy_impl;
+use crate::values::layout::avalues::array::checked_array_allocation;
 use crate::values::layout::heap::maybe_uninit_slice_util::maybe_uninit_write_from_exact_size_iter;
 use crate::values::layout::heap::repr::AValueHeader;
 use crate::values::layout::heap::repr::AValueRepr;
@@ -180,6 +182,28 @@ impl FrozenHeap {
 }
 
 impl<'v> Heap<'v> {
+    /// Admit list and backing-array objects before copying exact-size elements.
+    /// Iterating must already be admitted by the caller.
+    pub fn alloc_budgeted_list(
+        self,
+        elems: impl ExactSizeIterator<Item = Value<'v>>,
+    ) -> Result<Value<'v>, ExecutionLimit> {
+        let Some(budget) = self.execution_budget() else {
+            return Ok(self.alloc_list_iter(elems));
+        };
+        let count = elems.len();
+        let list_bytes = AValueList::alloc_size_for_extra_len(0).bytes() as usize;
+        let bytes = checked_array_allocation(count)
+            .and_then(|bytes| bytes.checked_add(list_bytes))
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        budget.charge(1 + count, bytes)?;
+        let array = self.alloc_array(count);
+        for value in elems {
+            array.push(value);
+        }
+        Ok(self.alloc_raw(list_avalue(array)).to_value())
+    }
+
     /// Allocate a list with the given elements.
     pub(crate) fn alloc_list(self, elems: &[Value<'v>]) -> Value<'v> {
         let array = self.alloc_array(elems.len());

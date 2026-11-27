@@ -17,7 +17,6 @@
 
 use std::borrow::Cow;
 use std::fmt;
-use std::mem;
 use std::num::ParseIntError;
 use std::str::FromStr;
 
@@ -192,20 +191,7 @@ fn collect_indexed_args<'v>(
         let Some(value) = iterator.next() else {
             return Ok(());
         };
-        let capacity = args.capacity();
-        if args.len() == capacity {
-            let next = capacity
-                .checked_mul(2)
-                .map(|capacity| capacity.max(1))
-                .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
-            let allocation = next
-                .checked_mul(mem::size_of::<Value>())
-                .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
-            budget.charge(capacity, allocation)?;
-            args.try_reserve_exact(next - args.len())
-                .map_err(|_| budget.refuse(ExecutionLimit::AllocationFailed))?;
-        }
-        args.push(value);
+        budget.push_vec(args, value)?;
     }
 }
 

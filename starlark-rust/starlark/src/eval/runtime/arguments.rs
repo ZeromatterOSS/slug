@@ -352,9 +352,16 @@ impl<'v, 'a> Arguments<'v, 'a> {
         &'b self,
         heap: Heap<'v>,
     ) -> crate::Result<impl Iterator<Item = Value<'v>> + 'b> {
+        self.positions_with(move |args| args.iterate(heap))
+    }
+
+    fn positions_with<'b>(
+        &'b self,
+        start: impl FnOnce(Value<'v>) -> crate::Result<StarlarkIterator<'v>>,
+    ) -> crate::Result<impl Iterator<Item = Value<'v>> + 'b> {
         let tail = match self.0.args {
             None => Either::Left(iter::empty()),
-            Some(args) => Either::Right(args.iterate(heap)?),
+            Some(args) => Either::Right(start(args)?),
         };
         Ok(self.0.pos.iter().copied().chain(tail))
     }

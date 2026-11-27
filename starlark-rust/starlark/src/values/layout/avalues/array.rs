@@ -56,6 +56,13 @@ fn any_array_avalue<T: Debug + 'static>(
 
 struct AValueArray;
 
+pub(super) fn checked_array_allocation(capacity: usize) -> Option<usize> {
+    if capacity == 0 {
+        return Some(0);
+    }
+    AValueArray::checked_alloc_size_for_extra_len(capacity).map(|size| size.bytes() as usize)
+}
+
 impl<'v> AValue<'v> for AValueArray {
     type StarlarkValue = Array<'v>;
 

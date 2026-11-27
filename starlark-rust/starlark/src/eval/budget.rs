@@ -99,6 +99,46 @@ impl ExecutionBudget {
         bytes.div_ceil(256)
     }
 
+    /// Admit a scratch vector's requested capacity and possible relocation.
+    /// The caller pays for work that fills the admitted storage.
+    pub fn reserve_vec<T>(
+        &self,
+        values: &mut Vec<T>,
+        required_len: usize,
+    ) -> Result<(), ExecutionLimit> {
+        let capacity = values.capacity();
+        if required_len <= capacity {
+            return self.check();
+        }
+        let next = capacity
+            .checked_mul(2)
+            .map(|next| next.max(required_len))
+            .ok_or_else(|| self.refuse(ExecutionLimit::AllocationBytes))?;
+        let element_bytes = std::mem::size_of::<T>();
+        let bytes = next
+            .checked_mul(element_bytes)
+            .ok_or_else(|| self.refuse(ExecutionLimit::AllocationBytes))?;
+        self.charge(
+            capacity.max(Self::text_work(capacity * element_bytes)),
+            bytes,
+        )?;
+        values
+            .try_reserve_exact(next - values.len())
+            .map_err(|_| self.refuse(ExecutionLimit::AllocationFailed))
+    }
+
+    /// Admit and append one element to a scratch vector.
+    pub fn push_vec<T>(&self, values: &mut Vec<T>, item: T) -> Result<(), ExecutionLimit> {
+        self.charge(1, 0)?;
+        let len = values
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| self.refuse(ExecutionLimit::AllocationBytes))?;
+        self.reserve_vec(values, len)?;
+        values.push(item);
+        Ok(())
+    }
+
     /// Return the configured text nesting limit.
     pub fn text_depth(&self) -> usize {
         self.text_depth

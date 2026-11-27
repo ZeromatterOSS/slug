@@ -3,21 +3,12 @@ use super::FunctionError;
 use crate::collections::symbol::symbol::Symbol;
 use crate::eval::ExecutionBudget;
 use crate::eval::ExecutionLimit;
-use crate::typing::TyStarlarkValue;
 use crate::values::BoundedText;
 use crate::values::Heap;
 use crate::values::StringValue;
 use crate::values::StringValueLike;
-use crate::values::UnpackValue;
 use crate::values::Value;
-use crate::values::ValueError;
-use crate::values::ValueLike;
 use crate::values::dict::DictRef;
-use crate::values::int::inline_int::InlineInt;
-use crate::values::list::ListRef;
-use crate::values::range::Range;
-use crate::values::set::SetRef;
-use crate::values::tuple::TupleRef;
 
 /// Borrowed, validated named arguments. Lookups pay for scanned keys instead of
 /// rebuilding an index or depending on the distribution of caller hashes.
@@ -79,26 +70,9 @@ impl<'v, 'a> Arguments<'v, 'a> {
         budget: &ExecutionBudget,
     ) -> crate::Result<impl Iterator<Item = Value<'v>> + 'b> {
         budget.charge(1, 0)?;
-        if let Some(value) = self.0.args {
-            if !TyStarlarkValue::is_iterable(&value.vtable().starlark_value) {
-                return ValueError::unsupported_type(value, "(iter)");
-            }
-            let admitted = ListRef::from_value(value).is_some()
-                || TupleRef::from_value(value).is_some()
-                || DictRef::from_value(value).is_some()
-                || SetRef::unpack_value_opt(value).is_some()
-                // A range step emits an i32. Admit it when that is stored inline.
-                || (!InlineInt::smaller_than_i32() && value.downcast_ref::<Range>().is_some());
-            if !admitted {
-                return Err(budget
-                    .refuse(ExecutionLimit::UnsupportedOperation {
-                        operation: "positional argument expansion",
-                        value_type: value.get_type(),
-                    })
-                    .into());
-            }
-        }
-        self.positions(heap)
+        self.positions_with(move |value| {
+            heap.bounded_iterator(value, "positional argument expansion")
+        })
     }
 
     pub(crate) fn bounded_format_names(
