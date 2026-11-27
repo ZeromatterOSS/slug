@@ -1565,12 +1565,13 @@ fn command_local_path_override(path: &Path) -> RootModuleOverride {
     })
 }
 
-fn project_host_effective_module_override(
-    files: &RootModuleFiles,
+pub(crate) fn project_host_effective_module_override(
+    module: &EvaluatedRootModule,
+    overrides: &RootModuleOverrides,
     policy: &RootModuleCommandPolicy,
     module_name: &CompactString,
 ) -> Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError> {
-    if let Some(root_name) = files.module.header.as_ref().map(|header| &header.name)
+    if let Some(root_name) = module.header.as_ref().map(|header| &header.name)
         && policy.command_module_override(root_name).is_some()
     {
         return Err(HostEffectiveModuleOverrideError::RootModuleOverride {
@@ -1584,7 +1585,7 @@ fn project_host_effective_module_override(
             override_: command_local_path_override(path),
         });
     }
-    Ok(match files.overrides.get(module_name.as_str()) {
+    Ok(match overrides.get(module_name.as_str()) {
         Some(override_) => HostEffectiveModuleOverride::Root {
             override_: override_.clone(),
         },
@@ -1693,7 +1694,12 @@ async fn drive_host_effective_module_override(
         }
     };
     effective_override_complete(
-        project_host_effective_module_override(&files, &policy, &key.module_name),
+        project_host_effective_module_override(
+            &files.module,
+            &files.overrides,
+            &policy,
+            &key.module_name,
+        ),
         observations,
     )
 }

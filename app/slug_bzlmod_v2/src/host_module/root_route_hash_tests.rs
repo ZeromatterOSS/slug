@@ -178,7 +178,12 @@ fn full_equality_and_bucket_lookup_ignore_forced_cached_collisions() {
             1 => fields.1 = ApparentRepoName::new("other").unwrap(),
             2 => fields.2 = "other".into(),
             3 => fields.3 = CanonicalRepoName::new("other+").unwrap(),
-            _ => fields.4 = RootRepositorySource::DirectLocal(local_spec("different")),
+            _ => {
+                fields.4 = RootRepositorySource::DirectLocal(DirectLocalRepositoryRoute {
+                    repo_spec: local_spec("different"),
+                    local_path_policy: HostRepositoryLocalPathPolicy::WorkspaceRelative,
+                })
+            }
         }
         let value =
             RootRepositoryRoute::from_fields(fields.0, fields.1, fields.2, fields.3, fields.4);
