@@ -205,12 +205,17 @@ class PacketValidateTest(unittest.TestCase):
         self.fixture("retained", daemon=True)
         slug = self.binary()
 
-        def run(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[object]:
+        def run(
+            argv: list[str], *, env: dict[str, str], **_kwargs: object
+        ) -> subprocess.CompletedProcess[object]:
             self.assertEqual(sys.executable, argv[0])
             self.assertIn("--slug-daemon-route=installed", argv)
             self.assertEqual(str(slug), argv[argv.index("--slug") + 1])
             root = Path(argv[argv.index("--run-root") + 1])
             self.assertEqual(0o700, root.stat().st_mode & 0o777)
+            scratch = Path(env["TMPDIR"])
+            self.assertEqual(root, scratch.parent)
+            self.assertEqual(0o700, scratch.stat().st_mode & 0o777)
             control = root / "ob" / argv[-1] / "slug" / ".slugd-installed"
             if argv[-1] == "retained":
                 control.mkdir(parents=True)
@@ -240,6 +245,7 @@ class PacketValidateTest(unittest.TestCase):
         self.fixture("retained", daemon=True)
         slug = self.binary()
         root = self.root / "run"
+        root.mkdir()
         base = root / "ob" / "retained" / "slug"
         markers = [
             base / ".slugd-installed" / "stage",

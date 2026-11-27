@@ -163,6 +163,11 @@ def _run_fixture(
     fixture: Fixture, slug: Path, run_root: Path, timeout: int, *, installed: bool
 ) -> int | None:
     try:
+        environment = None
+        if installed:
+            # Prepare scratch before the subprocess observes its workspace ancestors.
+            scratch = tempfile.mkdtemp(prefix="scratch.", dir=run_root)
+            environment = {**os.environ, "TMPDIR": scratch}
         return subprocess.run(
             [
                 sys.executable,
@@ -183,6 +188,7 @@ def _run_fixture(
                 fixture.name,
             ],
             cwd=REPO_ROOT,
+            env=environment,
             check=False,
         ).returncode
     except OSError:
