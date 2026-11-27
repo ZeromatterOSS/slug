@@ -22,6 +22,8 @@ use std::slice;
 use crate::cast;
 use crate::collections::maybe_uninit_backport::maybe_uninit_write_slice;
 use crate::collections::maybe_uninit_backport::maybe_uninit_write_slice_cloned;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
 use crate::values::FrozenHeap;
@@ -178,6 +180,21 @@ impl FrozenHeap {
 }
 
 impl<'v> Heap<'v> {
+    pub(crate) fn alloc_budgeted_array_copy(
+        self,
+        capacity: usize,
+        contents: &[Value<'v>],
+        budget: &ExecutionBudget,
+    ) -> Result<ValueTyped<'v, Array<'v>>, ExecutionLimit> {
+        debug_assert!(contents.len() <= capacity);
+        let bytes = checked_array_allocation(capacity)
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        budget.charge(1 + contents.len(), bytes)?;
+        let array = self.alloc_array(capacity);
+        array.extend_from_slice(contents);
+        Ok(array)
+    }
+
     pub(crate) fn alloc_array(self, cap: usize) -> ValueTyped<'v, Array<'v>> {
         if cap == 0 {
             return VALUE_EMPTY_ARRAY.unpack().to_value_typed();
@@ -186,5 +203,51 @@ impl<'v> Heap<'v> {
         let cap: u32 = cap.try_into().expect("capacity overflows u32::MAX");
 
         self.alloc_raw_extra(array_avalue(cap)).0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::environment::Module;
+    use crate::values::types::list::value::ListData;
+
+    #[test]
+    fn budgeted_list_growth_prepays_allocation_copy_and_append() {
+        let bytes = checked_array_allocation(8).unwrap();
+        // Four old elements, one array initialization, one append.
+        let work = 6;
+        for (work, bytes, expected) in [
+            (work - 1, bytes, Err(ExecutionLimit::Work)),
+            (work, bytes - 1, Err(ExecutionLimit::AllocationBytes)),
+            (work, bytes, Ok(())),
+        ] {
+            let budget = Arc::new(ExecutionBudget::new(work, bytes, 8));
+            let module = Module::new_with_execution_budget(budget.clone());
+            let heap = module.heap();
+            let contents = [1, 2, 3, 4].map(|i| heap.alloc(i));
+            let list = ListData::from_value_mut(heap.alloc_list(&contents)).unwrap();
+            let old = list.content.get();
+            let available = heap.available_bytes();
+            assert_eq!(list.push_budgeted(heap.alloc(5), heap, &budget), expected);
+            assert_eq!(budget.check(), expected);
+            if expected.is_ok() {
+                assert_eq!(list.content.get().as_ref().capacity(), 8);
+                assert_eq!(list.content()[4].unpack_i32(), Some(5));
+                assert_eq!(budget.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+            } else {
+                assert!(std::ptr::eq(list.content.get().as_ref(), old.as_ref()));
+                assert_eq!(list.len(), contents.len());
+                assert_eq!(heap.available_bytes(), available);
+            }
+            assert!(
+                list.content()[..4]
+                    .iter()
+                    .zip(contents)
+                    .all(|(actual, before)| actual.ptr_eq(before))
+            );
+        }
     }
 }

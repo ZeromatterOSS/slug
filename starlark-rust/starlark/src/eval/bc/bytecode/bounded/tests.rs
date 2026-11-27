@@ -27,6 +27,7 @@ use crate::values::dict::AllocDict;
 use crate::values::dict::DictMut;
 use crate::values::list::ListRef;
 use crate::values::list::value::ListData;
+use crate::values::tuple::TupleRef;
 
 #[derive(
     Debug,
@@ -132,6 +133,89 @@ fn bounded_bytecode_tracks_comprehension_after_return_stops_outer_loops() {
     assert_eq!(budget.check(), Ok(()));
     assert!(ListData::from_value_mut(first).is_ok());
     assert!(ListData::from_value_mut(second).is_ok());
+}
+
+#[test]
+fn strict_frozen_comprehension_preserves_order_and_slot_identity() {
+    let program = freeze("def run(xs): return ([x for x in xs], (xs,))");
+    let budget = Arc::new(ExecutionBudget::new(4096, 4096, 16).with_bounded_operations());
+    let caller = Module::new_with_execution_budget(budget.clone());
+    let heap = caller.heap();
+    let keys = ["first", "second", "snow雪", "fourth", "fifth"].map(|key| heap.alloc(key));
+    let input = heap.alloc(AllocDict(
+        keys.into_iter().map(|key| (key, Value::new_none())),
+    ));
+    let result = TupleRef::from_value(invoke(&program, &caller, &[input]).unwrap()).unwrap();
+    let collected = ListRef::from_value(result.content()[0]).unwrap();
+    assert_eq!(collected.len(), keys.len());
+    assert!(
+        collected
+            .iter()
+            .zip(keys)
+            .all(|(actual, key)| actual.ptr_eq(key))
+    );
+    let second = TupleRef::from_value(result.content()[1]).unwrap();
+    assert_eq!(second.len(), 1);
+    assert!(second.content()[0].ptr_eq(input));
+    assert_eq!(budget.check(), Ok(()));
+}
+
+#[test]
+fn strict_frozen_comprehension_refuses_first_growth_and_releases_iteration() {
+    let program = freeze("def run(xs): return [x for x in xs]");
+    let list_header = Heap::temp(|heap| {
+        heap.alloc_list(&[]);
+        let available = heap.available_bytes();
+        heap.alloc_list(&[]);
+        available - heap.available_bytes()
+    });
+    assert_ne!(list_header, 0);
+    // One active-loop slot and one empty result list. No array growth fits.
+    let bytes = std::mem::size_of::<BcSlotIn>() + list_header;
+    for nonempty in [false, true] {
+        let budget = Arc::new(ExecutionBudget::new(4096, bytes, 16).with_bounded_operations());
+        let caller = Module::new_with_execution_budget(budget.clone());
+        let body = [(17, 23)];
+        let input = caller
+            .heap()
+            .alloc(AllocDict(body.into_iter().take(usize::from(nonempty))));
+        let result = invoke(&program, &caller, &[input]);
+        if nonempty {
+            assert!(result.is_err());
+            assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
+        } else {
+            let result = result.unwrap();
+            assert_eq!(ListRef::from_value(result).unwrap().len(), 0);
+            assert_eq!(budget.check(), Ok(()));
+            assert_eq!(budget.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+        }
+        assert!(DictMut::from_value(input).is_ok());
+    }
+}
+
+#[test]
+fn strict_frozen_tuple_opcode_refuses_unadmitted_object_for_every_arity() {
+    for (expression, arity) in [("(x,)", 1), ("(x,x)", 2), ("(x,x,x,x,x,x,x,x,x,x)", 10)] {
+        let program = freeze(&format!("def run(x): return {expression}"));
+        let run = program.get("run").unwrap();
+        let bytecode = run
+            .value()
+            .downcast_ref::<FrozenDef>()
+            .unwrap()
+            .dump_debug();
+        assert!(bytecode.contains("TupleNPop"), "{bytecode}");
+        let ordinary = Module::new();
+        let arg = Value::new_none();
+        let result = invoke(&program, &ordinary, &[arg]).unwrap();
+        assert_eq!(TupleRef::from_value(result).unwrap().len(), arity);
+
+        let budget = Arc::new(ExecutionBudget::new(4096, 0, 16).with_bounded_operations());
+        let caller = Module::new_with_execution_budget(budget.clone());
+        let before = caller.heap().allocated_bytes();
+        assert!(invoke(&program, &caller, &[arg]).is_err());
+        assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
+        assert_eq!(caller.heap().allocated_bytes(), before);
+    }
 }
 
 #[test]

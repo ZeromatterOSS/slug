@@ -40,6 +40,8 @@ use crate::any::ProvidesStaticType;
 use crate::coerce::coerce;
 use crate::environment::Methods;
 use crate::environment::MethodsStatic;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::hint::likely;
 use crate::hint::unlikely;
 use crate::private::Private;
@@ -156,15 +158,22 @@ impl<'v> ListData<'v> {
         Ok(())
     }
 
-    #[cold]
-    #[inline(never)]
-    fn reserve_additional_slow(&self, additional: usize, heap: Heap<'v>) {
-        let new_cap = cmp::max(self.len() + additional, self.len() * 2);
+    fn checked_grown_capacity(&self, additional: usize) -> Option<usize> {
+        let len = self.len();
+        let new_cap = cmp::max(len.checked_add(additional)?, len.checked_mul(2)?);
         // Size of `Array` is 2 words and size of `List` is one word,
         // so allocating at least 4 words would not be too large waste.
         // Note `Vec` allocates 4 by default.
         // Also note `Array` removes extra capacity on GC.
-        let new_cap = cmp::max(new_cap, 4);
+        Some(cmp::max(new_cap, 4))
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn reserve_additional_slow(&self, additional: usize, heap: Heap<'v>) {
+        let new_cap = self
+            .checked_grown_capacity(additional)
+            .expect("list capacity overflow");
 
         let new_array = heap.alloc_array(new_cap);
         new_array.extend_from_slice(self.content());
@@ -226,6 +235,24 @@ impl<'v> ListData<'v> {
     pub(crate) fn push(&self, value: Value<'v>, heap: Heap<'v>) {
         self.reserve_additional(1, heap);
         self.content.get().push(value);
+    }
+
+    pub(crate) fn push_budgeted(
+        &self,
+        value: Value<'v>,
+        heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> Result<(), ExecutionLimit> {
+        budget.charge(1, 0)?;
+        if self.content.get().as_ref().remaining_capacity() == 0 {
+            let capacity = self
+                .checked_grown_capacity(1)
+                .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+            let array = heap.alloc_budgeted_array_copy(capacity, self.content(), budget)?;
+            self.content.set(array);
+        }
+        self.content.get().push(value);
+        Ok(())
     }
 
     pub(crate) fn clear(&self) {
