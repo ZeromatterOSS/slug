@@ -39,6 +39,8 @@ use crate::values::typing::never::StarlarkNever;
 use crate::values::typing::ty::AbstractType;
 use crate::values::value_of_unchecked::ValueOfUnchecked;
 
+#[cfg(test)]
+mod bounded_len_tests;
 mod sorted_budget;
 
 fn attribute_name<'v>(value: Value<'v>, heap: Heap<'v>) -> crate::Result<&'v str> {
@@ -321,8 +323,8 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// # "#, "not supported");
     /// ```
     #[starlark(speculative_exec_safe)]
-    fn len(#[starlark(require = pos)] a: Value) -> starlark::Result<i32> {
-        a.length()
+    fn len<'v>(#[starlark(require = pos)] a: Value<'v>, heap: Heap<'v>) -> starlark::Result<i32> {
+        a.length_on_heap(heap)
     }
 
     /// [reversed](

@@ -915,7 +915,7 @@ pub(crate) type InstrLen = InstrUnOp<InstrLenImpl>;
 impl InstrUnOpImpl for InstrLenImpl {
     #[inline(always)]
     fn eval<'v>(v: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
-        Ok(heap.alloc(v.length()?))
+        Ok(heap.alloc(v.length_on_heap(heap)?))
     }
 }
 

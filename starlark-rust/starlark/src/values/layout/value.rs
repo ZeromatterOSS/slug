@@ -47,6 +47,7 @@ use num_bigint::BigInt;
 use serde::Serialize;
 use serde::Serializer;
 use starlark_map::Equivalent;
+use starlark_syntax::fast_string;
 use starlark_syntax::value_error;
 
 use crate as starlark;
@@ -612,6 +613,37 @@ impl<'v> Value<'v> {
     /// `len(x)`.
     pub fn length(self) -> crate::Result<i32> {
         self.get_ref().length()
+    }
+
+    /// Evaluate Starlark `len(x)` with the active heap's admission policy.
+    #[inline]
+    pub(crate) fn length_on_heap(self, heap: Heap<'v>) -> crate::Result<i32> {
+        let Some(budget) = heap.bounded_operation_budget() else {
+            return self.length();
+        };
+        budget.charge(1, 0)?;
+        if let Some(list) = ListRef::from_value(self) {
+            return Ok(list.len() as i32);
+        }
+        if let Some(tuple) = TupleRef::from_value(self) {
+            return Ok(tuple.len() as i32);
+        }
+        if let Some(dict) = DictRef::from_value(self) {
+            return Ok(dict.len() as i32);
+        }
+        if let Some(range) = self.downcast_ref::<Range>() {
+            return range.length();
+        }
+        if let Some(text) = self.unpack_str() {
+            budget.charge_text_work(text.len())?;
+            return Ok(fast_string::len(text).0 as i32);
+        }
+        Err(budget
+            .refuse(ExecutionLimit::UnsupportedOperation {
+                operation: "len()",
+                value_type: self.get_type(),
+            })
+            .into())
     }
 
     /// `other in x`.
