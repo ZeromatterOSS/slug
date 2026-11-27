@@ -19,9 +19,9 @@ commits.
 4. Continue the manifest's packet. Read owner-plan context only for a reserved
    decision or unresolved contradiction, and Stage 9 only for retained
    representation or reuse work. Read evidence files only as the task needs.
-5. Inspect agents/Cargo/`slugd` only before overlapping work, retries, or
+5. Inspect agents/Cargo/`slugd` before overlapping work, retries, or
    daemon-sensitive validation. Run `python3 scripts/v2_plan_status.py` after
-   scheduling edits; the root reconciles any mismatch before delegation.
+   scheduling or routing-log edits.
 
 Read `thoughts/shared/plans/slug-v2-plan-authoring-guide.md` before creating or
 materially revising a packet. Read
@@ -34,24 +34,11 @@ packet touches one of its listed surfaces.
 
 ## Route
 
-Favor useful parallel work to shorten elapsed time. When independent tasks are
-available, prefer three subagents alongside the root, within the session's
-available slots. Use fewer for small or sequential tasks. The user favors faster
-project progress over modest token savings while weekly usage has headroom;
-do not leave a useful third worker idle solely to conserve tokens. This is a
-staffing preference, not a quota or an instruction to spend the remaining budget.
-Use the user's latest usage guidance when weighing token cost against elapsed
-time; do not treat an old usage percentage or reset date as current. As workers
-finish, reuse them for ready independent tasks while the root continues integration; do not
-wait for the whole group unless the next work depends on all their results.
-Examples include disjoint implementation, pinned-source research, focused
-validation on an already-built executable, and independent review. Keep each
-assignment concrete and bounded, give concurrent writers disjoint files/worktrees,
-and continue useful root work while they run. Reuse agents and accepted evidence;
-avoid duplicate investigations or delegation overhead for small sequential edits.
-The root still owns integration and may complete a cohesive packet directly.
-Use the user's selected model; there is no mandatory model or effort downgrade.
-Reduce concurrency if actual resource pressure or conflicts appear.
+Prefer three parallel workers for useful independent tasks when capacity and
+current user guidance allow. Use fewer for cohesive or sequential work and for
+actual resource pressure or conflicts. Give workers concrete assignments and
+writers disjoint files or worktrees. Reuse workers and accepted evidence while
+the root continues integration. Use the user's selected model.
 
 Obtain independent review for a new shared public boundary, semantic
 identity/ownership or DICE locking change, lifecycle risk, and milestone close.
@@ -180,13 +167,9 @@ command, exit status, selected/pass count, elapsed time, and failure output.
 Use fresh-root Bazel replays only for state/non-hermetic behavior. Format changed
 Rust and always run `git diff --check`.
 
-At acceptance or a genuine blocker, update the owner contract only for changed
-architecture/gates and update manifest/canonical status only for scheduling.
-Run the plan status checker. Commit accepted work with its compact evidence;
-do not publish a new status commit per audit or invocation correction.
-Routing logs record only reusable routing lessons or unusual delegation.
-
-Record packet elapsed time, compile/test/review time where available, replan
-reason, and observable gate advanced in the acceptance receipt or commit.
-Do not claim workflow speedups without measurements, or impose a separate
-metrics/reporting packet on routine work.
+At acceptance or a genuine blocker, update the owner contract for changed
+architecture/gates and the manifest/canonical plan for scheduling. Run the plan
+status checker. Commit accepted chunks with a compact receipt naming the gate,
+elapsed time, available compile/test/review time and any replan reason.
+Keep reusable routing lessons within the routing log cap. Use bounded run logs
+and retain only the evidence needed for the receipt.
