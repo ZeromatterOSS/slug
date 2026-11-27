@@ -625,6 +625,55 @@ fn terminal_capture_mode(value: Option<&std::ffi::OsStr>) -> Result<bool, &'stat
 fn reduced_profile_report() -> Value {
     json!({"enabled":false,"purpose":"typed_terminal_capture"})
 }
+
+fn rust_probe_projection(evaluation: &CqueryCommandEvaluation) -> Option<Value> {
+    let mut analyses = evaluation.analyses();
+    let analysis = analyses.next()?;
+    if analyses.next().is_some() {
+        return None;
+    }
+
+    let probe = CanonicalLabel::parse("@@//pkg:probe").unwrap();
+    let host = CanonicalLabel::parse("@@platforms//host:host").unwrap();
+    // A fourth selected action is sufficient to disprove the three-row oracle.
+    // Project static names only so the terminal report never carries action text.
+    let selected = analysis
+        .actions()
+        .iter()
+        .filter_map(|action| {
+            let mnemonic = match action.mnemonic() {
+                "Rustc" => "Rustc",
+                "SymlinkTree" => "SymlinkTree",
+                "RunfilesTree" => "RunfilesTree",
+                _ => return None,
+            };
+            Some((mnemonic, action))
+        })
+        .take(4)
+        .collect::<Vec<_>>();
+    let rustc = selected.iter().find(|(mnemonic, _)| *mnemonic == "Rustc");
+    let argv = rustc.and_then(|(_, action)| action.spawn_spec()?.render_argv().ok());
+    Some(json!({
+        "target": analysis.key().label().bazel_natural_cmp(&probe).is_eq(),
+        "actions": selected.iter().map(|(mnemonic, _)| mnemonic).collect::<Vec<_>>(),
+        "owners": selected.iter().all(|(_, action)| {
+            Some(action.context().owner()) == analysis.configured_target_key()
+        }),
+        "rustc_host_platform": rustc.and_then(|(_, action)| action.context().execution_platform())
+            .is_some_and(|platform| platform.label().bazel_natural_cmp(&host).is_eq()),
+        "rustc_edition_2024": argv.as_ref().is_some_and(|argv| argv.iter().any(|arg| arg == "--edition=2024")),
+        "rustc_process_wrapper": argv.as_ref().and_then(|argv| argv.first()).is_some_and(|arg| {
+            arg.ends_with("external/rules_rust+/util/process_wrapper/process_wrapper")
+        }),
+        "rustc_generated_tool": argv.as_ref().is_some_and(|argv| argv.iter().any(|arg| {
+            arg.ends_with(concat!(
+                "external/rules_rust++rust+rust_linux_x86_64__",
+                "x86_64-unknown-linux-gnu__nightly_tools/rust_toolchain/bin/rustc"
+            ))
+        })),
+    }))
+}
+
 #[derive(Clone)]
 struct ObservedCquery {
     inner: CqueryCommandRoot,
@@ -960,7 +1009,7 @@ fn native_original_rust_toolchain_cquery_frontier() {
                 json!({"status":"accepted_terminal_error","kind":terminal_error(error),"terminal_leaf":terminal_leaf(error),"reason":reason(error),"attempts":driven.attempts})
             }
             Ok(evaluation) => {
-                json!({"status":"accepted_success","analyses":evaluation.analyses().count(),"attempts":driven.attempts})
+                json!({"status":"accepted_success","analyses":evaluation.analyses().count(),"attempts":driven.attempts,"probe":rust_probe_projection(evaluation)})
             }
         },
     };
@@ -1011,6 +1060,20 @@ fn native_original_rust_toolchain_cquery_frontier() {
     assert!(encoded.len() + overhead <= TRACE_BYTES);
     println!("WP425_RUST_FRONTIER {encoded}");
     println!("WP425_RUST_CLEANUP {cleanup}");
+    if report["result"]["status"] == "accepted_success" {
+        assert_eq!(
+            report["result"]["probe"],
+            json!({
+                "target": true,
+                "actions": ["Rustc", "SymlinkTree", "RunfilesTree"],
+                "owners": true,
+                "rustc_host_platform": true,
+                "rustc_edition_2024": true,
+                "rustc_process_wrapper": true,
+                "rustc_generated_tool": true,
+            }),
+        );
+    }
 }
 
 #[test]

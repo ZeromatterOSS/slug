@@ -12,6 +12,16 @@ attempts, with 57 roots and 155 records. It adopted `rules_rust+`, materialized
 the stopped control. Native cleanup returned to 168 bytes, zero FDs and zero
 backing. The report used 134,190 bytes with its prefix.
 
+The original exercised live scoped HTTPS acquisition for five toolchain
+archives whose rules supplied no expected checksum. The [staged Bazel 9.2.0
+oracle][rust-oracle] completed all 11 commands. Registration and CrateInfo
+stdout matched. The direct edge set matched with one reorder, and three
+stderr rows differed.
+All four action shapes passed. Rustc's key changed with edition and restored,
+while both runfiles keys stayed stable. The inactive Slug edition-2024 result
+matched the target, ordered action names, owners, Rustc host platform and
+selected tool arguments. Its bounded projection adds no raw action text.
+
 Matched Source manifests reuse validated entry paths and modes and count closed
 state capacities directly. The 7,935-entry native fixture used 0.886 of control
 instructions and 0.952 of CPU, with identical inode and block facts. Bzlmod 94,
@@ -37,9 +47,10 @@ backing was again 6,301 MiB. Across the three earlier identical compute
 prefixes, Archive acquisition ranged from 3.061 to 3.795 seconds. Preserve
 the [bounded phase and typed scope cause][attribution] for exact attribution.
 
-Verify output against the pinned original and continue the public-command,
-action and activation gates. Keep native quotas, clocks, launcher/PID1,
-rooted reads, codec and history checks. Compare equal work for timing.
+Continue the full action comparison with the pinned edition mutation and
+restoration, then the public-command and activation gates. Keep native quotas,
+clocks, launcher/PID1, rooted reads, codec and history checks. Compare equal
+work for timing.
 Private message parsing, blind repeats, presumed API repair,
 diagnostic-only integration, caller pruning, Need cacheability, new route,
 syntax or global path caches, and concurrent Archive batching remain outside
@@ -128,8 +139,8 @@ final review precedes activation.
 
 The bounded six-archive gate and authored General glob cquery are accepted.
 The authentic inactive Rust driver gate has completed. Full Archive envelope,
-scoped HTTPS with omitted checksum, repeated Workspace publication, public
-Rust cquery, required action comparison, Rust REAPI,
+same-URL scoped HTTPS freshness with omitted checksum, repeated Workspace
+publication, public Rust cquery, required action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. Native credit,
 standalone timings and incomplete originals are each evidence for their own
@@ -175,6 +186,7 @@ Full chronology is pinned to Git commit
 [stage9]: 09-v1-extraction-ledger.md
 [dice]: ../../../../docs/developers/dice.md
 [readiness]: bootstrap-readiness.md
+[rust-oracle]: ../../../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/fixture.toml
 [glob]: wp1225-repository-glob-anchor-acceptance-2026-11-10.json
 [links]: wp1225-source-links-acceptance-2026-11-08.json
 [source-quota]: wp1225-source-quota-acceptance-2026-11-08.json

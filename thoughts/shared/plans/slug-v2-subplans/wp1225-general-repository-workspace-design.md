@@ -900,7 +900,9 @@ equivalent-command RSS remain unproved until their own evidence is complete.
 
 The inactive original completed with one configured result in 1,025 attempts.
 The terminal handler completed and native credits returned to baseline. The
-public command, action comparison, and matched latency/RSS gates remain open.
+pinned edition-2024 Bazel comparison verified the target, ordered actions,
+owners, Rustc host platform and selected tool arguments. Full action identity
+comparison, the public command and matched latency/RSS remain open.
 
 The [frontier receipt](wp1225-rust-frontier-acceptance-2026-11-08.json) establishes
 a genuine admission conflict:43 initial states plus85 completed records fill
