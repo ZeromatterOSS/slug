@@ -1,0 +1,4 @@
+filegroup(
+    name = "installed_qualification",
+    srcs = ["@proof//:out"],
+)

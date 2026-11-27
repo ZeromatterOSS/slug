@@ -6379,6 +6379,17 @@ fn evaluate_workspace_source(path: &Path, source: &str, is_module: bool) -> Eval
     }
 }
 
+fn repository_workspace_retention_limits() -> Result<
+    slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits,
+    slug_bzlmod_v2::RepositoryWorkspaceError,
+> {
+    slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits::new(
+        128,
+        16 * 1024 * 1024,
+        1024 * 1024 * 1024,
+    )
+}
+
 impl WorkspaceRuntime {
     pub fn new(
         workspace: impl Into<PathBuf>,
@@ -6391,10 +6402,53 @@ impl WorkspaceRuntime {
         )
     }
 
+    /// Construct a Native runtime for the protected Slug CLI installation.
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    pub fn new_with_installed_repository_launcher(
+        workspace: impl Into<PathBuf>,
+    ) -> anyhow::Result<Self> {
+        let installed = repository_workspace_driver::GeneralWorkspaceRuntime::installed()
+            .context("acquiring the installed repository launcher")?;
+        Self::initialize(
+            workspace,
+            super::ProcessHostOwner::native(),
+            source_service::WorkspaceSourceServices::Native,
+            Some(installed),
+        )
+    }
+
     fn new_with_source_services(
         workspace: impl Into<PathBuf>,
         process_host: Arc<super::ProcessHostOwner>,
         services: source_service::WorkspaceSourceServices,
+    ) -> anyhow::Result<Self> {
+        Self::initialize(
+            workspace,
+            process_host,
+            services,
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            None,
+        )
+    }
+
+    fn initialize(
+        workspace: impl Into<PathBuf>,
+        process_host: Arc<super::ProcessHostOwner>,
+        services: source_service::WorkspaceSourceServices,
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        general_workspaces: Option<repository_workspace_driver::GeneralWorkspaceRuntime>,
     ) -> anyhow::Result<Self> {
         let source_scope = match services {
             source_service::WorkspaceSourceServices::Native => None,
@@ -6476,7 +6530,7 @@ impl WorkspaceRuntime {
                 target_arch = "x86_64",
                 target_pointer_width = "64"
             ))]
-            general_workspaces: None,
+            general_workspaces,
             scratch_resources,
             workspace,
             process_host,
@@ -6641,12 +6695,7 @@ impl WorkspaceRuntime {
         let workspace_epoch = slug_bzlmod_v2::RepositoryWorkspaceEpoch::fresh(
             self.repository_materializer.workspace().clone(),
             workspace_lease,
-            slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits::new(
-                128,
-                16 * 1024 * 1024,
-                1024 * 1024 * 1024,
-            )
-            .map_err(|error| {
+            repository_workspace_retention_limits().map_err(|error| {
                 NativeDemandSessionError::Computation(anyhow::anyhow!(
                     "workspace policy: {error:?}"
                 ))

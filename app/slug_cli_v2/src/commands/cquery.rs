@@ -18,12 +18,17 @@ use slug_core_v2::runtime::ArchiveDistdirPolicy;
 use slug_core_v2::runtime::CqueryCommandError;
 use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::capture_cquery_starlark_file;
-use slug_core_v2::runtime::evaluate_workspace_cquery_command_with_repository_environment_and_distdirs;
 use slug_core_v2::runtime::format_cquery_starlark_file;
 use slug_core_v2::runtime::publish_cquery_starlark_file;
 use slug_server_v2::CqueryOutput;
 
+use super::RuntimeStartup;
+
 pub fn run(argv: Vec<String>) -> i32 {
+    run_with_startup(argv, RuntimeStartup::Generic)
+}
+
+pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i32 {
     let workspace = match std::env::current_dir() {
         Ok(workspace) => workspace,
         Err(error) => return emit_error(&error.to_string(), "one-shot"),
@@ -76,25 +81,30 @@ pub fn run(argv: Vec<String>) -> i32 {
             output,
             bzlmod,
             repository_environment,
+            startup,
         );
     }
     let archive_distdirs = match ArchiveDistdirPolicy::from_request(&workspace, &request.distdirs) {
         Ok(policy) => policy,
         Err(error) => return emit_error(&error, "one-shot"),
     };
-    let accepted = match evaluate_workspace_cquery_command_with_repository_environment_and_distdirs(
-        &workspace,
-        &request.expression,
-        request.include_implicit,
-        request.include_tool,
-        request.bzlmod_policy,
-        environment_policy,
-        request.lockfile_mode,
-        &request.registry_urls,
-        repository_environment,
-        request.configuration_overlay.clone(),
-        archive_distdirs,
-    ) {
+    let accepted = match startup
+        .new_runtime(&workspace)
+        .map_err(CqueryCommandError::infrastructure)
+        .and_then(|runtime| {
+            runtime.cquery_command_with_repository_environment_and_distdirs(
+                &request.expression,
+                request.include_implicit,
+                request.include_tool,
+                request.bzlmod_policy,
+                environment_policy,
+                request.lockfile_mode,
+                &request.registry_urls,
+                repository_environment,
+                request.configuration_overlay.clone(),
+                archive_distdirs,
+            )
+        }) {
         Ok(accepted) => accepted,
         Err(error) => {
             if let Some(stderr) = error.missing_stderr() {
@@ -155,14 +165,15 @@ fn run_daemon(
     output: CqueryOutput,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
+    startup: RuntimeStartup,
 ) -> i32 {
     let output_base = std::path::Path::new(output_base);
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return emit_error(&error.to_string(), "daemon");
     }
-    let socket = slug_server_v2::socket_path(output_base);
+    let socket = startup.daemon_socket(output_base);
     if std::os::unix::net::UnixStream::connect(&socket).is_err()
-        && let Err(error) = super::build::start_daemon(output_base)
+        && let Err(error) = super::build::start_daemon(output_base, startup)
     {
         return emit_error(&error.to_string(), "daemon");
     }

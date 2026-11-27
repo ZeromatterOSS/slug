@@ -226,6 +226,50 @@ mod tests {
         std::fs::set_permissions(&old, std::fs::Permissions::from_mode(0o755)).unwrap();
         assert!(pin.checked_fd().is_err());
     }
+
+    #[test]
+    fn installed_images_require_their_own_bank_and_refund_when_the_last_owner_drops() {
+        unsafe extern "C" fn unused_closefrom(
+            _actions: *mut libc::posix_spawn_file_actions_t,
+            _first_fd: i32,
+        ) -> i32 {
+            libc::ENOSYS
+        }
+
+        let temporary = tempfile::tempdir().unwrap();
+        let path = temporary.path().join("image");
+        std::fs::write(&path, b"\x7fELF").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let pin = || {
+            let directory = File::open(temporary.path()).unwrap();
+            pin_from_directory(directory, Path::new("image"), false).unwrap()
+        };
+        let make_bank = || {
+            let limits = RepositoryRootResourceLimits::new(1024 * 1024, 16, 1024 * 1024).unwrap();
+            RepositoryRootResources::new(limits).unwrap()
+        };
+        let resources = make_bank();
+        let before = resources.snapshot();
+        let credit = resources
+            .reserve(arc_bytes::<Images>().unwrap() + PATH_BYTES, 2, 0)
+            .unwrap();
+        let owner = InstalledProcessPlatform(Arc::new(Images {
+            bwrap: pin(),
+            helper: pin(),
+            helper_path: path,
+            closefrom: unused_closefrom,
+            resources: resources.clone(),
+            _credit: credit,
+        }));
+        assert!(owner.verify_resources(&resources).is_ok());
+        assert!(owner.verify_resources(&make_bank()).is_err());
+        let retained = owner.clone();
+        drop(owner);
+        assert_eq!(resources.snapshot().native_fds, before.native_fds + 2);
+        drop(retained);
+        assert_eq!(resources.snapshot().native_fds, before.native_fds);
+        assert_eq!(resources.snapshot().retained_bytes, before.retained_bytes);
+    }
 }
 
 fn open_at(base: libc::c_int, name: &CStr, flags: libc::c_int) -> io::Result<File> {

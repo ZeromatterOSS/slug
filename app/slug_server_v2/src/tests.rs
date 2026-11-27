@@ -272,7 +272,7 @@ fn daemon_new_retains_only_its_runtime_and_test_process_host_arcs() {
     let workspace = scratch("process-host-owner");
     let daemon = Daemon::new(&workspace).unwrap();
     assert_eq!(
-        std::sync::Arc::strong_count(&daemon.process_host_for_test),
+        std::sync::Arc::strong_count(daemon.process_host_for_test.as_ref().unwrap()),
         2
     );
 }

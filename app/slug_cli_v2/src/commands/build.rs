@@ -12,15 +12,18 @@ use slug_commands_v2::CommandParseError;
 use slug_commands_v2::build::BuildRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::WorkspaceRuntime;
-use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
 use slug_reapi_v2::ActionChainReapiTransport;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
+use super::RuntimeStartup;
+
 pub fn run(argv: Vec<String>) -> i32 {
+    run_with_startup(argv, RuntimeStartup::Generic)
+}
+
+pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i32 {
     let workspace = match std::env::current_dir() {
         Ok(workspace) => workspace,
         Err(error) => {
@@ -104,26 +107,25 @@ pub fn run(argv: Vec<String>) -> i32 {
             bzlmod,
             repository_environment,
             &remote,
+            startup,
         );
     }
 
     if let Some(transport) = transport {
-        let accepted = WorkspaceRuntime::new(&workspace, ProcessHostOwner::native())
-            .map_err(|error| error.to_string())
-            .and_then(|runtime| {
-                runtime
-                    .execute_and_publish_requested_actions_with_repository_environment(
-                        &request.targets,
-                        request.bzlmod_policy,
-                        environment_policy,
-                        request.lockfile_mode,
-                        &request.registry_urls,
-                        repository_environment,
-                        request.configuration_overlay,
-                        &transport,
-                    )
-                    .map_err(|error| error.to_string())
-            });
+        let accepted = startup.new_runtime(&workspace).and_then(|runtime| {
+            runtime
+                .execute_and_publish_requested_actions_with_repository_environment(
+                    &request.targets,
+                    request.bzlmod_policy,
+                    environment_policy,
+                    request.lockfile_mode,
+                    &request.registry_urls,
+                    repository_environment,
+                    request.configuration_overlay,
+                    &transport,
+                )
+                .map_err(|error| error.to_string())
+        });
         let accepted = match accepted {
             Ok(accepted) => accepted,
             Err(error) => {
@@ -160,21 +162,24 @@ pub fn run(argv: Vec<String>) -> i32 {
         return emit_output(code, stdout, stderr);
     }
 
-    let accepted = match evaluate_workspace_build_command_with_repository_environment(
-        &workspace,
-        &request.targets,
-        request.bzlmod_policy.clone(),
-        environment_policy,
-        request.lockfile_mode.clone(),
-        &request.registry_urls,
-        repository_environment,
-        request.configuration_overlay.clone(),
-    ) {
+    let accepted = match startup.new_runtime(&workspace).and_then(|runtime| {
+        runtime
+            .build_command_with_repository_environment(
+                &request.targets,
+                request.bzlmod_policy.clone(),
+                environment_policy,
+                request.lockfile_mode.clone(),
+                &request.registry_urls,
+                repository_environment,
+                request.configuration_overlay.clone(),
+            )
+            .map_err(|error| error.to_string())
+    }) {
         Ok(accepted) => accepted,
         Err(error) => {
             eprint!(
                 "{}",
-                build_error_json("build_runtime_error", &error.to_string(), "one-shot")
+                build_error_json("build_runtime_error", &error, "one-shot")
             );
             return 2;
         }
@@ -326,14 +331,15 @@ fn run_daemon_build(
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
     remote: &RemoteConfig,
+    startup: RuntimeStartup,
 ) -> i32 {
     let output_base_path = std::path::Path::new(output_base);
     let _ = std::fs::create_dir_all(output_base_path);
-    let socket = slug_server_v2::socket_path(output_base_path);
+    let socket = startup.daemon_socket(output_base_path);
 
     // Try to connect; if the daemon isn't running, start it.
     if std::os::unix::net::UnixStream::connect(&socket).is_err() {
-        if let Err(error) = start_daemon(output_base_path) {
+        if let Err(error) = start_daemon(output_base_path, startup) {
             eprintln!(
                 "{{\"error\":\"daemon_start_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\"}}",
                 json_escape(&error.to_string())
@@ -387,12 +393,16 @@ pub(super) fn capture_bzlmod_allow_yanked_versions() -> Result<Option<String>, C
 
 /// Start the daemon as a background process. The current binary re-execs
 /// itself with `--serve` to enter server mode.
-pub(super) fn start_daemon(output_base: &std::path::Path) -> anyhow::Result<()> {
-    let socket = slug_server_v2::socket_path(output_base);
-    let pid_file = slug_server_v2::pid_path(output_base);
+pub(super) fn start_daemon(
+    output_base: &std::path::Path,
+    startup: RuntimeStartup,
+) -> anyhow::Result<()> {
+    let socket = startup.daemon_socket(output_base);
+    let pid_file = startup.daemon_pid(output_base);
     let workspace = std::env::current_dir()
         .map_err(|e| anyhow::anyhow!("getting current dir for daemon: {e}"))?;
-    let exe = std::env::current_exe()
+    let exe = startup
+        .daemon_executable()
         .map_err(|e| anyhow::anyhow!("getting current exe for daemon: {e}"))?;
     let mut child = std::process::Command::new(&exe)
         .arg("--serve")
@@ -494,7 +504,7 @@ mod daemon_readiness_tests {
         std::fs::write(&socket, b"existing socket path").unwrap();
 
         // The libtest image exits on the daemon arguments before binding.
-        let result = start_daemon(&output_base);
+        let result = start_daemon(&output_base, RuntimeStartup::Generic);
         let socket_bytes = std::fs::read(&socket);
         std::fs::remove_dir_all(output_base).unwrap();
         let error = result.unwrap_err();

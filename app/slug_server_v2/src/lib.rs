@@ -52,7 +52,7 @@ pub struct Daemon {
     #[cfg(test)]
     forwarded_archive_distdirs: Vec<ArchiveDistdirPolicy>,
     #[cfg(test)]
-    process_host_for_test: std::sync::Arc<ProcessHostOwner>,
+    process_host_for_test: Option<std::sync::Arc<ProcessHostOwner>>,
 }
 
 impl Daemon {
@@ -63,11 +63,21 @@ impl Daemon {
         let process_host = ProcessHostOwner::native();
         let runtime =
             WorkspaceRuntime::new(workspace.as_ref().to_path_buf(), process_host.clone())?;
-        let workspace = runtime.workspace().to_path_buf();
-        Ok(Self {
-            workspace,
+        Ok(Self::from_runtime(
+            runtime,
             #[cfg(test)]
-            process_host_for_test: process_host,
+            Some(process_host),
+        ))
+    }
+
+    fn from_runtime(
+        runtime: WorkspaceRuntime,
+        #[cfg(test)] process_host_for_test: Option<std::sync::Arc<ProcessHostOwner>>,
+    ) -> Self {
+        Self {
+            workspace: runtime.workspace().to_path_buf(),
+            #[cfg(test)]
+            process_host_for_test,
             runtime,
             observations: FilesystemObservationAdapter::default(),
             #[cfg(test)]
@@ -76,7 +86,7 @@ impl Daemon {
             forwarded_repository_environments: Vec::new(),
             #[cfg(test)]
             forwarded_archive_distdirs: Vec::new(),
-        })
+        }
     }
     pub fn workspace(&self) -> &Path {
         &self.workspace
@@ -1020,6 +1030,7 @@ pub use server::send_query_request;
 pub use server::send_run_request;
 pub use server::send_shutdown;
 pub use server::serve;
+pub use server::serve_with_runtime;
 pub use server::socket_path;
 
 #[cfg(test)]

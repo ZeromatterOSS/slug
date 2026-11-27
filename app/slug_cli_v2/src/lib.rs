@@ -17,8 +17,17 @@ compile_error!("native-probe-observer is available only to the slug_cli_v2 libra
 mod payload_demand_probe;
 
 pub fn main() -> i32 {
+    run(|| commands::RuntimeStartup::Generic)
+}
+
+#[doc(hidden)]
+pub fn installed_main() -> i32 {
+    run(commands::RuntimeStartup::for_installed_binary)
+}
+
+fn run(startup: impl FnOnce() -> commands::RuntimeStartup) -> i32 {
     if let Some(status) = slug_core_v2::runtime::repository_process_helper_main() {
         return status;
     }
-    commands::dispatch(std::env::args())
+    commands::dispatch_with_startup(std::env::args(), startup())
 }

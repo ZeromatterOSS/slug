@@ -631,6 +631,19 @@ pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyh
     serve_daemon(socket_path.as_ref(), daemon)
 }
 
+#[doc(hidden)]
+pub fn serve_with_runtime(
+    socket_path: impl AsRef<Path>,
+    runtime: slug_core_v2::runtime::WorkspaceRuntime,
+) -> anyhow::Result<()> {
+    let daemon = Daemon::from_runtime(
+        runtime,
+        #[cfg(test)]
+        None,
+    );
+    serve_daemon(socket_path.as_ref(), daemon)
+}
+
 fn serve_daemon(socket_path: &Path, mut daemon: Daemon) -> anyhow::Result<()> {
     let _ = std::fs::remove_file(socket_path);
     let listener = UnixListener::bind(socket_path)

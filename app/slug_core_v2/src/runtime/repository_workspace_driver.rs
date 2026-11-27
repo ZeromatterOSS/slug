@@ -35,38 +35,17 @@ impl WorkspaceRuntime {
         slug_bzlmod_v2::RepositoryWorkspaceExecutionPolicy::Disabled
     }
 
-    /// Trusted internal configuration. Public/default activation remains disabled.
+    /// Alternate native images are confined to controlled test runtimes.
     #[cfg(all(
+        any(test, feature = "repository-workspace-test-support"),
         target_os = "linux",
         target_arch = "x86_64",
         target_pointer_width = "64"
     ))]
-    pub(in crate::runtime) fn configure_general_repository_workspaces(
-        &mut self,
-        launcher: InstalledProcessPlatform,
-        limits: slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits,
-    ) -> Result<(), NativeDemandSessionError> {
-        if self.source_scope.is_some() {
-            return Err(refusal(
-                "installed launcher requires an ordinary Native runtime",
-            ));
-        }
-        self.bind_general_repository_workspaces(
-            launcher.resources().clone(),
-            limits,
-            RepositoryWorkspaceLauncher::Installed(launcher),
-        )
-    }
-    #[cfg(all(
-        target_os = "linux",
-        target_arch = "x86_64",
-        target_pointer_width = "64"
-    ))]
-    fn bind_general_repository_workspaces(
+    pub(in crate::runtime) fn enable_general_repository_workspaces_for_test(
         &mut self,
         resources: Arc<super::super::repository_physical_root::RepositoryRootResources>,
         limits: slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits,
-        launcher: RepositoryWorkspaceLauncher,
     ) -> Result<(), NativeDemandSessionError> {
         self.check_source_scope()?;
         if self.general_workspaces.is_some()
@@ -84,30 +63,12 @@ impl WorkspaceRuntime {
         self.general_workspaces = Some(GeneralWorkspaceRuntime {
             resources,
             limits,
-            launcher,
+            launcher: RepositoryWorkspaceLauncher::TestFixture,
             #[cfg(test)]
             probe: None,
         });
         Ok(())
     }
-    #[cfg(all(
-        any(test, feature = "repository-workspace-test-support"),
-        target_os = "linux",
-        target_arch = "x86_64",
-        target_pointer_width = "64"
-    ))]
-    pub(in crate::runtime) fn enable_general_repository_workspaces_for_test(
-        &mut self,
-        resources: Arc<super::super::repository_physical_root::RepositoryRootResources>,
-        limits: slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits,
-    ) -> Result<(), NativeDemandSessionError> {
-        self.bind_general_repository_workspaces(
-            resources,
-            limits,
-            RepositoryWorkspaceLauncher::TestFixture,
-        )
-    }
-
     pub(super) fn new_command_source_scope(
         &self,
     ) -> Result<(Option<Arc<source_service::SourceServiceScope>>, bool), NativeDemandSessionError>
@@ -410,6 +371,7 @@ mod native {
     use super::*;
     use crate::runtime::repository_io::reservations::ReservedRepositoryWorkspace;
     use crate::runtime::repository_physical_root::PhysicalRootError;
+    use crate::runtime::repository_physical_root::RepositoryRootResourceLimits;
     use crate::runtime::repository_physical_root::RepositoryRootResources;
     use crate::runtime::repository_physical_root::RepositoryWorkspaceCommand;
     use crate::runtime::repository_physical_root::ResourceCredit;
@@ -420,6 +382,25 @@ mod native {
         pub(super) launcher: RepositoryWorkspaceLauncher,
         #[cfg(test)]
         pub(super) probe: Option<GeneralWorkspaceProbe>,
+    }
+    impl GeneralWorkspaceRuntime {
+        pub(in crate::runtime::dice) fn installed() -> anyhow::Result<Self> {
+            let resources =
+                RepositoryRootResourceLimits::new(512 * 1024 * 1024, 512, 8 * 1024 * 1024 * 1024)
+                    .and_then(RepositoryRootResources::new)
+                    .map_err(physical)?;
+            let limits = repository_workspace_retention_limits()
+                .map_err(|error| anyhow::anyhow!("workspace policy: {error:?}"))?;
+            let launcher =
+                InstalledProcessPlatform::acquire(resources.clone()).map_err(physical)?;
+            Ok(Self {
+                resources,
+                limits,
+                launcher: RepositoryWorkspaceLauncher::Installed(launcher),
+                #[cfg(test)]
+                probe: None,
+            })
+        }
     }
     #[cfg(test)]
     pub(super) struct GeneralWorkspaceProbe {
