@@ -2,7 +2,7 @@
   "version": 1,
   "fixture": "rules-rust-073-toolchain-owner",
   "classification": "Source-only staged inputs; unchanged original sources and fixture workspace. Archive candidates do not force demand or establish runtime admission.",
-  "aggregate_cache_bytes": 239012719,
+  "aggregate_cache_bytes": 239155517,
   "aggregate_workspace_bytes": 1729,
   "provenance": {
     "MODULE.bazel": "109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c",
@@ -122,6 +122,22 @@
       "size": 204,
       "kind": "registry",
       "provenance": "MODULE.bazel.lock registryFileHashes"
+    },
+    {
+      "destination": "mirror/github.com/bazelbuild/apple_support/releases/download/1.24.2/apple_support.1.24.2.tar.gz",
+      "source_url": "https://github.com/bazelbuild/apple_support/releases/download/1.24.2/apple_support.1.24.2.tar.gz",
+      "sha256": "8625cc7b7b2952e38101e17b4a9e7c043b3a79f55d26e4772819891998725e16",
+      "size": 106895,
+      "kind": "archive",
+      "provenance": "https://bcr.bazel.build/modules/apple_support/1.24.2/source.json integrity"
+    },
+    {
+      "destination": "mirror/github.com/bazelbuild/rules_license/releases/download/1.0.0/rules_license-1.0.0.tar.gz",
+      "source_url": "https://github.com/bazelbuild/rules_license/releases/download/1.0.0/rules_license-1.0.0.tar.gz",
+      "sha256": "26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38",
+      "size": 35903,
+      "kind": "archive",
+      "provenance": "https://bcr.bazel.build/modules/rules_license/1.0.0/source.json integrity"
     },
     {
       "destination": "mirror/github.com/bazelbuild/rules_rust/releases/download/0.73.0/rules_rust-0.73.0.tar.gz",
