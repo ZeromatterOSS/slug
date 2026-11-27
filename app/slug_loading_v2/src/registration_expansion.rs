@@ -503,8 +503,7 @@ struct ExpansionScratch {
     workspace: NormalizedAbsolutePath,
     family: ModuleRegistrationFamily,
     mode: ObservationMode,
-    labels: Vec<CanonicalLabel>,
-    seen: SmallSet<CanonicalLabel>,
+    labels: SmallSet<CanonicalLabel>,
     ambiguities: Vec<ModuleRegistrationAmbiguity>,
     routes: SmallMap<CanonicalRepoName, HostCanonicalRepositorySourceInput>,
     packages: SmallMap<PackageIdentifier, PackageCarrier>,
@@ -530,8 +529,7 @@ impl ExpansionScratch {
             workspace,
             family,
             mode,
-            labels: Vec::new(),
-            seen: SmallSet::new(),
+            labels: SmallSet::new(),
             ambiguities: Vec::new(),
             routes: SmallMap::new(),
             packages: SmallMap::new(),
@@ -564,14 +562,10 @@ impl ExpansionScratch {
     fn apply(&mut self, label: CanonicalLabel, sign: RegistrationSign) {
         match sign {
             RegistrationSign::Positive => {
-                if self.seen.insert(label.clone()) {
-                    self.labels.push(label);
-                }
+                self.labels.insert(label);
             }
             RegistrationSign::Negative => {
-                if self.seen.shift_remove(&label) {
-                    self.labels.retain(|candidate| candidate != &label);
-                }
+                self.labels.shift_remove(&label);
             }
         }
     }
@@ -579,7 +573,7 @@ impl ExpansionScratch {
     fn finish(self, error: Option<ModuleRegistrationExpansionError>) -> DriverOutcome {
         let labels = match error {
             Some(error) => Err(Arc::new(error)),
-            None => Ok(self.labels.into()),
+            None => Ok(self.labels.into_iter().collect()),
         };
         SourcePreparationOutcome::Complete(Ok((
             Arc::new(ModuleRegistrationExpansion {
@@ -1028,7 +1022,7 @@ async fn expand_wildcard(
     scratch: &mut ExpansionScratch,
     package: PackageIdentifier,
     conflict: Option<CanonicalLabel>,
-    raw: &CompactString,
+    raw: &str,
     wildcard: TargetPatternWildcard,
     row: u32,
     sign: RegistrationSign,
@@ -1045,7 +1039,7 @@ async fn expand_wildcard(
             scratch.ambiguities.push(ModuleRegistrationAmbiguity {
                 family: scratch.family,
                 row,
-                raw_pattern: raw.clone(),
+                raw_pattern: CompactString::new(raw),
                 wildcard: CompactString::new(wildcard.as_str()),
                 conflict_target: conflict,
             });
@@ -1069,7 +1063,7 @@ async fn expand_pattern(
     ctx: &mut DiceComputations<'_>,
     scratch: &mut ExpansionScratch,
     pattern: CanonicalTargetPattern,
-    raw: &CompactString,
+    raw: &str,
     row: u32,
     sign: RegistrationSign,
 ) -> Step<()> {
@@ -1142,7 +1136,6 @@ async fn expand_contextual_row<'a>(
     row: u32,
     sign: RegistrationSign,
 ) -> Step<()> {
-    let raw = CompactString::new(display_text);
     let pattern = CanonicalTargetPattern::parse(parse_text, current_repo, mapping_target).map_err(
         |error| {
             scratch.error(
@@ -1151,7 +1144,7 @@ async fn expand_contextual_row<'a>(
             )
         },
     )?;
-    expand_pattern(ctx, scratch, pattern, &raw, row, sign).await
+    expand_pattern(ctx, scratch, pattern, display_text, row, sign).await
 }
 
 async fn expand_module_rows<'a>(

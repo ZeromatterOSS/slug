@@ -6,71 +6,40 @@ Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS. General production remains Disabled
 
 ## Current result and next step
 
-The [pinned single-threaded XZ revision][xz-design] passed current Core and
-default-CLI builds, 35 ordinary checks, 20 protected native cases and the
-six-original-archive/File/Read/seal/last-reader gate. Independent final review
-accepted the bounded component. The [receipt][xz-receipt] distinguishes native
-ownership and exact byte/SHA proof, standalone ABBA, and actual generated catalog
-reconciliation with a fresh no-repin check.
+The original reached 991 computes, 56 roots and 152 records. It adopted
+`local_config_xcode` and serviced more path batches before SourceWorkDeadline.
+The candidate registration revision adopted Xcode at 958 computes with the
+same roots and records. It reached 62,826 validated toolchain rows through the
+candidate path, which now merges only the execution-platform labels while
+keeping all four reads and their precedence. Both runs retired to 168 bytes,
+zero FDs and zero backing. The earlier refusal at compute 859 remains
+unattributed. Full Rust and completed-command latency/RSS remain open.
 
-The `release-symbols` baseline reached 931 computes, 55 roots and 149 accepted
-records, with `local_config_cc` Execute 31 pending. A second baseline recorded
-0.483 seconds of terminal polls after stream EOF. Waiting on the owned launcher
-pidfd reduced that total to 0.183 milliseconds across 56 roots and 25 Executes.
-Exact same-root ABBA wall was 0.836 of baseline with equal measured CPU.
-The optimized Core/CLI builds took 38.42/19.72 seconds. Thirty focused tests,
-five native guards and the 7.84-second six-archive gate passed. That original
-accepted the `local_config_cc` BUILD template and adopted `local_config_xcode`
-at compute 958. The next graph attempt hit SourceWorkDeadline. A terminal-only
-run serviced three more path batches after adoption.
+Of 645 observed module-toolchain Need returns, 630 rebuilt a completed prefix,
+totaling 20,656 rows. Loading keeps one ordered label set per attempt and
+captures spelling only for actual ambiguities. The matched accumulator
+comparison processed 8,837,500 rows and emitted 2,187,500 labels in both
+variants, with CPU and wall at 0.580 of baseline. Existing DICE children own
+completed route, package and subtree reuse. Keep parent ordering, first
+conflict, Need validity, events and exact observation custody.
+The ordered-set run stopped at 954 computes, 55 roots and 151 records.
+All 60 shared sampled compute rows and peak credit matched the preceding run.
+Retirement was exact. The report used 129,137 bytes with its prefix.
+Eighty-seven focused tests, five native guards and the 7.93-second six-archive
+gate passed.
 
-Observation unions now use unique insertion after sorted merge resolves
-duplicates. Matched CPU and instructions were 0.772 and 0.837 of baseline.
-All 135 Workspace, 48 Loading, 28 Core and five native guards passed, along
-with the 7.83-second six-archive gate. The profiled original advanced to 991
-computes, 56 roots and 152 records. The deadline followed more post-adoption
-path progress. Cleanup returned to 168 retained bytes, zero FDs and zero
-backing. The trace used 126,905 of 524,288 bytes.
-The earlier unclassified refusal at attempt 859 remains unattributed. Full Rust
-and completed-command latency/RSS remain open.
+Prior accepted owner results include pidfd retirement (ABBA wall 0.836),
+sorted union insertion (CPU 0.772, instructions 0.837), and the
+[pinned single-threaded XZ revision][xz-design] with the
+[six-archive and offline-repin receipt][xz-receipt]. The [archive
+frontier][frontier] attributed 4.09 of 4.23 rooted extraction seconds to
+liblzma. Bzlmod dev/test `-O3` passed CPU/wall at 0.936/0.935 (`f33c1690a`).
+XZ and LZ4 `-O3` and the stored observation-map hash fell short of their gates.
+The previous detailed checkpoint is in `ff79543a2`.
 
-Candidate preparation keeps the four registration reads and their precedence,
-then merges only execution-platform labels. Loading shares single-input label
-slices. The original reached 62,826 validated toolchain input rows on this path
-before Xcode adoption at 958 computes, 56 roots and 152 records. The Source work
-deadline followed adoption. Retirement was exact and the report used 129,467
-bytes including its prefix. Eighty-seven focused tests, five native guards and
-the 7.92-second six-archive gate passed. Compare equal work before attributing
-elapsed changes across different stopped prefixes.
-
-Packed capture forwards full aligned RootIo blocks to the existing encoder and
-assembles fragments under the same scratch admission. Matched runs of the
-relocatable six-archive gate preserved bytes, peak credit and last-reader
-retirement with effectively flat elapsed time and instructions. The [authentic
-Rust frontier][frontier] attributed 4.09 of 4.23 rooted extraction seconds to
-liblzma. Six snapshots took 3.57 seconds, including 2.06 in builder append,
-1.27 in prior-body comparison and 0.17 in record completion and replacement.
-The XZ and LZ4 package `-O3` trials fell short of the six-archive CPU gate.
-The Bzlmod package `-O3` Cargo dev/test profile passed matched warm ABBA.
-Mean CPU fell 6.4% and wall time fell 6.5% with identical per-archive decoded
-bytes, logical body bytes, peak native credit and exact last-reader retirement.
-The default builds, native checks and checksum-only offline Bazel repin are
-recorded in `f33c1690a`. Filesystem capture and acquisition attribution are
-recorded in `fdf3685a4`.
-All six source-checked XZ streams have one Block. The LZ4 overlap loop
-accounted for 1.75% of sampled cycles in the six-archive gate. Reached rooted
-comparisons in the sampled original had no unaligned callbacks. That original
-stopped during Archive 5 at 831 computes, 55 roots and 114 records, then
-retired exactly. Of 645 observed module-toolchain Need returns, 630 discarded
-a completed prefix, totaling 20,656 rows. A focused DICE fixture repeats the
-same completed row across Need retries with stable child and fact owners.
-Choose a complete registration reuse boundary that preserves parent ordering,
-first conflict, Need validity, selected events and exact observation custody.
-The stored observation-map hash trial passed 205 tests. Matched CPU and
-instructions were 0.959 and 0.989 of baseline, short of the 0.95 gate. The trial
-was retired. Drive the next genuine materialization and configured Rust frontier
-while preserving the independent launcher and PID1 completion proofs.
-Keep rooted comparisons, codec roundtrips and history checks.
+Drive the next actual configured Rust frontier with the existing deadline.
+Compare equal work before attributing runtime differences across stopped
+prefixes. Keep launcher/PID1, rooted comparison, codec and history checks.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,

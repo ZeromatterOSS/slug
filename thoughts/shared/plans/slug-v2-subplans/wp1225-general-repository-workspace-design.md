@@ -1860,6 +1860,10 @@ Instrumentation remains coupled to the subsequently selected semantic proof.
 The observed Loading module-toolchain driver folds a fixed delta for each
 returned Need, tracking whether and how many complete rows preceded the first
 gap. Later speculative successes do not extend that contiguous prefix.
+Loading builds each attempt in one insertion-ordered label set. Duplicate
+insertion keeps its first position. Signed removal preserves survivor order,
+and reinsertion appends. Conflict diagnostics copy the original spelling on
+emission. Complete child reuse retains its existing DICE owners.
 
 A separate 48-byte feature-only package BUILD-child collector counts entries
 and the actual returned whole singleton-Lstat, singleton-FileBytes or other

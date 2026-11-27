@@ -744,21 +744,34 @@ fn command_key_identity_includes_configuration_and_family() {
 #[tokio::test]
 async fn command_rows_apply_signed_order_and_family_specific_reversal() {
     let module = "module(name = 'bazel_tools')\n";
-    let build = concat!(
+    let mut build = concat!(
         "filegroup(name = 'impl')\n",
         "toolchain_type(name = 'type')\n",
         "toolchain(name = 'ta', toolchain_type = ':type', toolchain = ':impl')\n",
         "toolchain(name = 'tb', toolchain_type = ':type', toolchain = ':impl')\n",
         "platform(name = 'pa')\n",
         "platform(name = 'pb')\n",
-    );
+        "platform(name = 'all')\n",
+    )
+    .to_owned();
+    let mut expected_platforms = Vec::new();
+    for index in 0..40 {
+        let name = format!("p{index:02}");
+        build.push_str(&format!("platform(name = '{name}')\n"));
+        expected_platforms.push(format!("@@//pkg:{name}"));
+    }
+    expected_platforms.extend([
+        "@@//pkg:pa".into(),
+        "@@//pkg:pb".into(),
+        "@@//pkg:all".into(),
+    ]);
     let configuration = command_configuration([
         CommandConfigurationOccurrence::extra_toolchains("//pkg:ta,//pkg:tb"),
         CommandConfigurationOccurrence::extra_execution_platforms(
-            "//pkg:pa,//pkg:pb,-//pkg:pa,//pkg:pa",
+            "//pkg:*,-//pkg:all,//pkg:all,//pkg:pa",
         ),
     ]);
-    let mut tx = transaction(module, EpochBuilder::root_package(module, build, 50)).await;
+    let mut tx = transaction(module, EpochBuilder::root_package(module, &build, 50)).await;
     let toolchains = tx
         .compute(&CommandRegistrationExpansionKey::toolchains(
             workspace(),
@@ -780,7 +793,15 @@ async fn command_rows_apply_signed_order_and_family_specific_reversal() {
         panic!("command execution-platform expansion returned Need")
     };
     assert_eq!(labels(&toolchains), ["@@//pkg:tb", "@@//pkg:ta"]);
-    assert_eq!(labels(&platforms), ["@@//pkg:pb", "@@//pkg:pa"]);
+    assert_eq!(labels(&platforms), expected_platforms);
+    assert_eq!(
+        platforms
+            .ambiguities()
+            .iter()
+            .map(|ambiguity| (ambiguity.row(), ambiguity.raw_pattern()))
+            .collect::<Vec<_>>(),
+        [(1, "-//pkg:all"), (2, "//pkg:all")],
+    );
 }
 
 #[tokio::test]
