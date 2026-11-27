@@ -171,7 +171,7 @@ fn source_bootstrap_admits_exact_backing_budget_and_refuses_one_more_byte_before
     assert_eq!(live(), (baseline, 0, 0));
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Fault {
     None,
     WrongNonce,
@@ -454,7 +454,7 @@ impl Fixture {
         ));
         (output, verified, fd, identity)
     }
-    fn cleanup(self) {
+    fn cleanup(self, fault: Fault) {
         let Self {
             builder,
             state,
@@ -473,7 +473,15 @@ impl Fixture {
         drop(state_credit);
         let observer = command.retirement_observer();
         drop(command);
-        assert!(observer.wait_until(Instant::now() + Duration::from_secs(1)));
+        assert!(
+            observer.wait_until(Instant::now() + Duration::from_secs(1)),
+            "{fault:?}: native worker must retire after cleanup"
+        );
+        assert_eq!(
+            resources.snapshot().backing_bytes,
+            0,
+            "{fault:?}: worker retirement must release all backing"
+        );
         drop(observer);
         drop(ticket);
         actor.discard(token).unwrap();
@@ -486,7 +494,8 @@ impl Fixture {
                 resources.snapshot().backing_bytes,
                 resources.snapshot().retained_bytes
             ),
-            (0, 0, baseline)
+            (0, 0, baseline),
+            "{fault:?}: all native credits must return to baseline"
         );
     }
 }
@@ -497,19 +506,15 @@ fn native_small_source_contraction_keeps_original_identity_old_debit_until_reap_
     let workspace = tempfile::tempdir().unwrap();
     std::fs::write(workspace.path().join("payload"), b"source bytes").unwrap();
     let mut fixture = Fixture::new(workspace.path());
-    let (output, verified, fd, identity) =
-        fixture.finalize(FrozenArchiveQuota::CompactArchive, Fault::None);
+    let expected = FrozenArchiveQuota::SMALL;
+    let (output, verified, fd, identity) = fixture.finalize(expected, Fault::None);
     let output = output.unwrap();
     assert!(verified.load(Ordering::Acquire));
     let root = output.receipt.root();
     assert_eq!(root.file.as_raw_fd(), fd);
     assert_eq!(root.identity, identity);
-    assert_eq!(
-        root.frozen_archive_quota(),
-        Some(FrozenArchiveQuota::CompactArchive)
-    );
-    assert_frozen_source(root, FrozenArchiveQuota::CompactArchive);
-    assert_eq!(fixture.resources.snapshot().backing_bytes, PROCESS_BYTES);
+    assert_frozen_source(root, expected);
+    assert_eq!(fixture.resources.snapshot().backing_bytes, expected.bytes());
     assert!(!root.anchor().root().as_path().exists());
     let mut reader = root
         .open_member("payload", &fixture.scope, &|| true)
@@ -544,7 +549,7 @@ fn native_small_source_contraction_keeps_original_identity_old_debit_until_reap_
     drop(fixture_scope);
     drop(fixture_resources);
     drop(runtime);
-    assert_eq!(resources.snapshot().backing_bytes, PROCESS_BYTES);
+    assert_eq!(resources.snapshot().backing_bytes, expected.bytes());
     let mut body = Vec::new();
     reader.read_to_end(&mut body).unwrap();
     assert_eq!(body, b"source bytes");
@@ -573,25 +578,27 @@ fn native_source_contraction_refusals_reap_without_publishing_or_refunding_live_
         let workspace = tempfile::tempdir().unwrap();
         std::fs::write(workspace.path().join("payload"), b"source bytes").unwrap();
         let mut fixture = Fixture::new(workspace.path());
-        let (output, verified, _, _) = fixture.finalize(FrozenArchiveQuota::CompactArchive, fault);
+        let (output, verified, _, _) = fixture.finalize(FrozenArchiveQuota::SMALL, fault);
         assert!(
             output.is_err(),
-            "no sealed Source/view may escape a refused attempt"
+            "{fault:?}: no sealed Source/view may escape a refused attempt"
         );
         if matches!(
             fault,
             Fault::RefuseAfterSuccessor | Fault::CancelAfterSuccessor | Fault::DriftBeforeSeal
         ) {
-            assert!(verified.load(Ordering::Acquire));
+            assert!(
+                verified.load(Ordering::Acquire),
+                "{fault:?}: successor verification must precede the fault"
+            );
         }
-        assert_eq!(fixture.resources.snapshot().backing_bytes, 0);
-        fixture.cleanup();
+        fixture.cleanup(fault);
     }
 }
 
 #[test]
-#[ignore = "actual CLI Source physical inode fallback inside unchanged logical Source limits"]
-fn native_source_contraction_keeps_full_quota_when_actual_charged_inodes_cross_compact_allowance() {
+#[ignore = "actual CLI Source contraction with a separate wide inode quota"]
+fn native_source_contraction_uses_wide_inodes_when_actual_charges_exceed_small_allowance() {
     let workspace = tempfile::tempdir().unwrap();
     // Long names increase real tmpfs metadata charges without increasing logical
     // entries beyond8192 or path bytes beyond1MiB. No one-name/one-unit assumption.
@@ -616,22 +623,19 @@ fn native_source_contraction_keeps_full_quota_when_actual_charged_inodes_cross_c
     );
     let before = facts(fixture.builder.as_ref().unwrap().file.as_raw_fd());
     assert!(
-        before.used_inodes > 8192,
-        "actual charges must cross compact allowance: {before:?}"
+        before.used_inodes > FrozenArchiveQuota::SMALL.quota().1,
+        "actual charges must exceed the small inode allowance: {before:?}"
     );
+    let expected = FrozenArchiveQuota::SMALL_WIDE_INODES;
     assert!(
-        before.allocated <= PROCESS_BYTES,
-        "isolate inode fallback: {before:?}"
+        before.allocated <= expected.bytes(),
+        "actual allocation must fit the smallest byte class: {before:?}"
     );
-    let (output, verified, _, _) = fixture.finalize(FrozenArchiveQuota::FullArchive, Fault::None);
+    let (output, verified, _, _) = fixture.finalize(expected, Fault::None);
     let output = output.unwrap();
     assert!(verified.load(Ordering::Acquire));
-    assert_eq!(
-        output.receipt.root().frozen_archive_quota(),
-        Some(FrozenArchiveQuota::FullArchive)
-    );
-    assert_frozen_source(output.receipt.root(), FrozenArchiveQuota::FullArchive);
-    assert_eq!(fixture.resources.snapshot().backing_bytes, ARCHIVE_BYTES);
+    assert_frozen_source(output.receipt.root(), expected);
+    assert_eq!(fixture.resources.snapshot().backing_bytes, expected.bytes());
     eprintln!(
         "source logical entries={} observed inode units={} allocated={}",
         output.receipt.state().entries().len(),
@@ -639,7 +643,7 @@ fn native_source_contraction_keeps_full_quota_when_actual_charged_inodes_cross_c
         before.allocated
     );
     drop(output);
-    fixture.cleanup();
+    fixture.cleanup(Fault::None);
 }
 
 #[test]
@@ -665,16 +669,14 @@ fn native_compact_source_views_remain_readonly_across_two_executes_and_data_outl
         false,
     )
     .unwrap();
-    assert_eq!(
-        source.frozen_archive_quota(),
-        Some(FrozenArchiveQuota::CompactArchive)
-    );
+    let expected = FrozenArchiveQuota::SMALL;
+    assert_eq!(source.frozen_archive_quota(), Some(expected));
     assert_eq!(
         (
             facts(source.file.as_raw_fd()).bytes,
             facts(source.file.as_raw_fd()).inodes
         ),
-        (PROCESS_BYTES, 8192)
+        expected.quota()
     );
     let (mut command, executor) =
         source_links::general(&actor, token, command, &resources, &scope, &runtime);
@@ -686,7 +688,7 @@ fn native_compact_source_views_remain_readonly_across_two_executes_and_data_outl
     let code = r#"import errno,os,pathlib,sys
 p=pathlib.Path(sys.argv[1])
 v=os.statvfs(p)
-assert v.f_blocks*v.f_frsize==67108864 and v.f_files==8192
+assert v.f_blocks*v.f_frsize==16777216 and v.f_files==8192
 assert (p/'payload').read_bytes()==b'small source'
 for name in ['payload','new']:
  try: os.open(p/name,os.O_WRONLY|os.O_CREAT,0o644)
@@ -771,7 +773,7 @@ print(n)
     actor.discard(token).unwrap();
     drop(actor);
     drop(source);
-    assert_eq!(resources.snapshot().backing_bytes, PROCESS_BYTES);
+    assert_eq!(resources.snapshot().backing_bytes, expected.bytes());
     let mut bytes = Vec::new();
     reader.read_to_end(&mut bytes).unwrap();
     assert_eq!(bytes, b"small source");
@@ -845,5 +847,5 @@ fn native_source_contraction_cannot_borrow_another_reservations_claim() {
     drop(ticket);
     other.discard(other_token).unwrap();
     drop(other);
-    fixture.cleanup();
+    fixture.cleanup(Fault::None);
 }

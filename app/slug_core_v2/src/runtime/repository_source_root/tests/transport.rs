@@ -79,7 +79,8 @@ fn native_captured_source_transport_rejects_foreign_epochs_metadata_and_scopes_a
         false,
     )
     .unwrap();
-    assert_eq!(a.frozen_archive_quota(), Some(crate::runtime::repository_physical_root::mount_lease::readonly_quota::FrozenArchiveQuota::CompactArchive));
+    let expected = FrozenArchiveQuota::SMALL;
+    assert_eq!(a.frozen_archive_quota(), Some(expected));
     let a_lease = actor.workspace_lease(a_token).unwrap();
     let a_epoch = RepositorySourceSnapshotEpoch::fresh(normalized.clone(), a_lease)
         .unwrap()
@@ -258,7 +259,7 @@ fn native_captured_source_transport_rejects_foreign_epochs_metadata_and_scopes_a
         )
         .is_err()
     );
-    assert_eq!(b.frozen_archive_quota(), Some(crate::runtime::repository_physical_root::mount_lease::readonly_quota::FrozenArchiveQuota::CompactArchive));
+    assert_eq!(b.frozen_archive_quota(), Some(expected));
     let digest_b = match b.state().entry("payload").unwrap().node() {
         Node::File(digest) => *digest,
         _ => panic!("captured regular payload"),
@@ -288,7 +289,7 @@ fn native_captured_source_transport_rejects_foreign_epochs_metadata_and_scopes_a
     drop(b);
     drop(actor);
     assert!(!a_display.as_path().exists());
-    assert_eq!(resources.snapshot().backing_bytes, 2 * PROCESS_BYTES);
+    assert_eq!(resources.snapshot().backing_bytes, 2 * expected.bytes());
     drop(lease_a);
     drop(selected_a);
     drop(selected_b);

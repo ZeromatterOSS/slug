@@ -124,6 +124,7 @@ pub(super) struct Totals {
     backing_refusals: u64,
     last_backing_refusal: Option<[u64; 3]>,
     backing_inventory: Option<BackingInventory>,
+    closed_archive_quotas: [Option<[u64; 4]>; 10],
 }
 
 impl Totals {
@@ -134,6 +135,27 @@ impl Totals {
 
     pub(super) fn record_backing_inventory(&mut self, inventory: BackingInventory) {
         self.backing_inventory = Some(inventory);
+    }
+
+    pub(super) fn record_closed_archive_quota(
+        &mut self,
+        (bytes, inodes): (u64, u64),
+        source: bool,
+    ) {
+        let Some(row) = self
+            .closed_archive_quotas
+            .iter_mut()
+            .find(|row| row.is_none_or(|[limit, units, ..]| (limit, units) == (bytes, inodes)))
+        else {
+            self.invalid = true;
+            return;
+        };
+        let count = &mut row.get_or_insert([bytes, inodes, 0, 0])[2 + usize::from(source)];
+        if let Some(next) = count.checked_add(1) {
+            *count = next;
+        } else {
+            self.invalid = true;
+        }
     }
 
     fn record(&mut self, stage: Stage, completed: bool, wall_ns: Option<u64>) {
@@ -173,6 +195,10 @@ impl Totals {
                 json!({"live_bytes": live, "requested_bytes": requested, "limit_bytes": limit})
             }),
             "last_source_bootstrap_backing_inventory": self.backing_inventory.as_ref().map(BackingInventory::report),
+            "closed_archive_quotas": {
+                "columns": ["bytes", "inode_limit", "general", "source"],
+                "rows": self.closed_archive_quotas,
+            },
             "dispatch_completion_includes_replay": true,
             "archive_substages_are_nested_and_exclude_replay": true,
             "archive_acquire_and_verify_are_nested_in_verified_capture": true,
@@ -408,11 +434,12 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
             }); 4],
             complete: false,
         }),
+        closed_archive_quotas: [Some([u64::MAX; 4]); 10],
     }
     .report();
     assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);
 }
 
 // The original probe subtracts this from its fixed event partition. Reserve
-// room for the backing refusal and its live inventory at maximum width.
-pub(crate) const REPORT_BYTES: usize = 5 * 1024 + 512;
+// room for the backing diagnostics and closed quota rows at maximum width.
+pub(crate) const REPORT_BYTES: usize = 6 * 1024 + 512;

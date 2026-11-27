@@ -396,6 +396,14 @@ impl Observer {
     }
 
     #[cfg(test)]
+    pub(crate) fn record_closed_archive_quota(&self, quota: (u64, u64), source: bool) {
+        self.workspace_progress
+            .lock()
+            .expect("workspace progress sampler poisoned")
+            .record_closed_archive_quota(quota, source);
+    }
+
+    #[cfg(test)]
     pub(crate) fn record_activity_for_test(
         &self,
         kind: usize,

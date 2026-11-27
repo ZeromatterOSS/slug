@@ -744,10 +744,10 @@ That accepted General-only component preserved Source quotas; the Source
 contract below extends physical finalization separately. Process finalization
 is unchanged.
 The eligibility decision uses actual quiescent tmpfs allocated block bytes and
-used inode units: if they fit64MiB and8192 inodes, the trusted owner may lower
-the SAME superblock to that sealed quota class; otherwise it keeps the full2GiB
-Archive class. Apply by actual owner/lifecycle facts, never caller or repository
-names. No performance or completed-command memory claim follows.
+used inode units. Select the smallest fitting byte quota from 16, 64, 256, 1,024
+and 2,048 MiB, independently of the 8,192 or 262,144 inode ceiling. The helper
+remounts the same superblock if either quota changes. Apply by physical owner
+and lifecycle facts. This is a Slug-native resource policy.
 
 The private native frozen-quota class is distinct from semantic mutable mode.
 Before contraction, authenticate the consuming full finalization request,
@@ -782,7 +782,7 @@ proof and debit commit, a later view-control allocation or validation failure
 disposes the actual compacted owner under its new matching debit. Neither path
 publishes a partial owner. Cancellation and deadlines retain their
 original clocks. Verify actual quota/identity contraction and shared debit,
-non-Execute Archive history preservation, large/over-inode fallback, forged or
+non-Execute Archive history preservation, exact/+one byte and inode boundaries, forged or
 foreign facts/owners/scopes, failure/cancel/last-drop behavior and an actual
 read-only child. Reuse the existing Process transition and finalized-view
 fixtures. The final original `cc_autoconf` and linked-artifact gates must then
@@ -804,11 +804,9 @@ Slug-native physical-resource operation supporting the same general repository
 capability and eventual authentic Rust cquery. Derived Source Path APIs do not
 resolve this ledger; no caller identity may choose the quota class.
 
-Every Source still bootstraps and copies under the full2GiB/262144 capacity.
-Consuming Source finalization, with no payload writer remaining, may use the
-existing same-superblock compaction leaf: actual allocated block bytes<=64MiB
-and charged inode units<=8192 select the smaller read-only Archive class;
-otherwise retain the full class. Source's existing256MiB logical manifest envelope,
+Every Source still bootstraps and copies under the full 2 GiB/262,144 capacity.
+Consuming Source finalization reuses the General same-superblock byte and inode
+classes. Source's existing 256 MiB logical manifest envelope,
 64MiB/file and all path/entry bounds, complete manifest, semantic Eq/content identity,
 source observations and original clocks stay unchanged. Never fabricate a
 General reservation/history or an Execute result. Default General remains
@@ -1241,7 +1239,7 @@ and preservation of existing mapped counters. The existing ignored original
 frontier supplies bounded attribution under unchanged inputs/caps/clocks; a
 stopped probe remains no public-command or memory-ratio proof.
 
-The native workspace observer shares the same ceiling. Its 5 KiB plus 512
+The native workspace observer shares the same ceiling. Its 6 KiB plus 512
 bytes come from the event allowance. Keep fixed synchronous wall intervals for
 Archive acquisition, closed-FD verification, rooted extraction, and snapshot completion.
 Start filesystem operation and snapshot spans after exact replay. Separate
@@ -1255,6 +1253,8 @@ On Source bootstrap resource refusal, measure held capture credits and classify
 live command slots by mutable or sealed ownership. Sample at most four full
 sealed Archive FDs after releasing bank and backing locks. Mark the inventory
 incomplete on unassigned debit, missing owners or failed physical attestation.
+Keep fixed counts by exact byte and inode pair at successful finalization for
+General and Source separately. A closure count precedes repository adoption.
 Off-boundary actual comparison callbacks share those outcome buckets.
 The runner measures polls after all three streams close, separately for
 bootstrap and Execute.

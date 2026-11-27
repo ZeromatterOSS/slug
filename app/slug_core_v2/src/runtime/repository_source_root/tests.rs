@@ -438,6 +438,7 @@ fn initialize_requested(
 #[ignore = "actual compiled CLI digest-only SourceRoot lifetime and >64MiB capability; finite native supervisor required"]
 fn native_source_roots_keep_large_digest_only_data_and_original_scope_after_controller_retirement()
 {
+    let expected_quota = FrozenArchiveQuota::MEDIUM;
     let workspace = tempfile::tempdir().unwrap();
     write_large(&workspace.path().join("a"), 0x31);
     write_large(&workspace.path().join("b"), 0xa7);
@@ -459,10 +460,7 @@ fn native_source_roots_keep_large_digest_only_data_and_original_scope_after_cont
         false,
     )
     .unwrap();
-    readonly_quota::assert_frozen_source(
-        &a,
-        crate::runtime::repository_physical_root::mount_lease::readonly_quota::FrozenArchiveQuota::FullArchive,
-    );
+    readonly_quota::assert_frozen_source(&a, expected_quota);
     assert!(a.state().file_bytes() > 64 * 1024 * 1024);
     assert!(a.state().tree_storage_bytes().unwrap() < 1024 * 1024);
     assert!(
@@ -522,10 +520,7 @@ fn native_source_roots_keep_large_digest_only_data_and_original_scope_after_cont
         false,
     )
     .unwrap();
-    readonly_quota::assert_frozen_source(
-        &b,
-        crate::runtime::repository_physical_root::mount_lease::readonly_quota::FrozenArchiveQuota::FullArchive,
-    );
+    readonly_quota::assert_frozen_source(&b, expected_quota);
     assert_eq!(a_display, *b.reservation().display_root());
     assert_ne!(a_root.reservation().instance(), b.reservation().instance());
     assert!(a_root.open_member("a", &b_scope, &|| true).is_err());
@@ -576,7 +571,8 @@ fn native_source_roots_keep_large_digest_only_data_and_original_scope_after_cont
     .unwrap();
     let code = r#"import errno,os,pathlib,sys
 p=pathlib.Path(sys.argv[1])
-assert os.statvfs(p).f_blocks*os.statvfs(p).f_frsize==2147483648
+v=os.statvfs(p)
+assert v.f_blocks*v.f_frsize==268435456 and v.f_files==8192
 assert os.statvfs('.').f_blocks*os.statvfs('.').f_frsize==67108864
 assert (p/'a').stat().st_size+(p/'b').stat().st_size>67108864
 for name in ['a','b']:
@@ -646,10 +642,13 @@ print('source-ok')
     drop(b);
     drop(actor);
     assert!(!a_display.as_path().exists());
-    assert_eq!(resources.snapshot().backing_bytes, 2 * ARCHIVE_BYTES);
+    assert_eq!(
+        resources.snapshot().backing_bytes,
+        2 * expected_quota.bytes()
+    );
     drop(reader);
     drop(a_root);
-    assert_eq!(resources.snapshot().backing_bytes, ARCHIVE_BYTES);
+    assert_eq!(resources.snapshot().backing_bytes, expected_quota.bytes());
     drop(b_root);
     drop(a_scope);
     drop(b_scope);

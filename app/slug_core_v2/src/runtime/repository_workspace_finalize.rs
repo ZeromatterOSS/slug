@@ -123,7 +123,16 @@ impl RepositoryWorkspaceCommand {
     > {
         let admission = self.admit_view_finalization(request, scope, active)?;
         let launch = FinalizeLaunch::new(admission, active)?;
-        process_owner::run(launch, super::super::super::initialize::platform()?, active).await
+        let finalized =
+            process_owner::run(launch, super::super::super::initialize::platform()?, active)
+                .await?;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(class) = finalized.1.root().frozen_archive_quota()
+            && let Some(probe) = crate::runtime::probe_observer::capture()
+        {
+            probe.record_closed_archive_quota(class.quota(), false);
+        }
+        Ok(finalized)
     }
 }
 impl NativeViewFinalization {

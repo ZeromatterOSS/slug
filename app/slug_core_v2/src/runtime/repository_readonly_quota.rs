@@ -8,29 +8,74 @@ use super::readonly::ReadOnlyMountClone;
 use super::readonly::check_readonly;
 use super::*;
 
+const SMALL_BYTES: u64 = 16 * 1024 * 1024;
+const MEDIUM_BYTES: u64 = 256 * 1024 * 1024;
+const LARGE_BYTES: u64 = 1024 * 1024 * 1024;
+const COMPACT_INODES: u64 = 8192;
+const FULL_INODES: u64 = 262_144;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::runtime::repository_physical_root) enum FrozenArchiveQuota {
-    FullArchive,
-    CompactArchive,
+enum FrozenArchiveSize {
+    Small,
+    Standard,
+    Medium,
+    Large,
+    Full,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::runtime::repository_physical_root) struct FrozenArchiveQuota {
+    size: FrozenArchiveSize,
+    wide_inodes: bool,
+}
+
 impl FrozenArchiveQuota {
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) const SMALL: Self = Self {
+        size: FrozenArchiveSize::Small,
+        wide_inodes: false,
+    };
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) const SMALL_WIDE_INODES: Self = Self {
+        size: FrozenArchiveSize::Small,
+        wide_inodes: true,
+    };
+    #[cfg(test)]
+    pub(in crate::runtime::repository_physical_root) const MEDIUM: Self = Self {
+        size: FrozenArchiveSize::Medium,
+        wide_inodes: false,
+    };
+
     pub(in crate::runtime::repository_physical_root) fn bytes(self) -> u64 {
-        self.quota().0
-    }
-    pub(in crate::runtime::repository_physical_root) fn inodes(self) -> u64 {
-        self.quota().1
-    }
-    pub(in crate::runtime::repository_physical_root) fn quota(self) -> (u64, u64) {
-        match self {
-            Self::FullArchive => (ARCHIVE_BYTES, 262_144),
-            Self::CompactArchive => (PROCESS_BYTES, 8192),
+        match self.size {
+            FrozenArchiveSize::Small => SMALL_BYTES,
+            FrozenArchiveSize::Standard => PROCESS_BYTES,
+            FrozenArchiveSize::Medium => MEDIUM_BYTES,
+            FrozenArchiveSize::Large => LARGE_BYTES,
+            FrozenArchiveSize::Full => ARCHIVE_BYTES,
         }
     }
-    pub(in crate::runtime::repository_physical_root) fn select(facts: QuotaFacts) -> Self {
-        if facts.allocated <= PROCESS_BYTES && facts.used_inodes <= 8192 {
-            Self::CompactArchive
+    pub(in crate::runtime::repository_physical_root) fn inodes(self) -> u64 {
+        if self.wide_inodes {
+            FULL_INODES
         } else {
-            Self::FullArchive
+            COMPACT_INODES
+        }
+    }
+    pub(in crate::runtime::repository_physical_root) fn quota(self) -> (u64, u64) {
+        (self.bytes(), self.inodes())
+    }
+    pub(in crate::runtime::repository_physical_root) fn select(facts: QuotaFacts) -> Self {
+        let size = match facts.allocated {
+            0..=SMALL_BYTES => FrozenArchiveSize::Small,
+            ..=PROCESS_BYTES => FrozenArchiveSize::Standard,
+            ..=MEDIUM_BYTES => FrozenArchiveSize::Medium,
+            ..=LARGE_BYTES => FrozenArchiveSize::Large,
+            _ => FrozenArchiveSize::Full,
+        };
+        Self {
+            size,
+            wide_inodes: facts.used_inodes > COMPACT_INODES,
         }
     }
 }
@@ -51,8 +96,11 @@ pub(super) fn compact_attached(
     let _owner = current_owner(resources)?;
     let before = facts_for_quota(&root.file, quota(RepositoryWorkspaceMode::Archive))?;
     let class = FrozenArchiveQuota::select(before);
-    if class == FrozenArchiveQuota::CompactArchive {
+    let (bytes, inodes) = class.quota();
+    if (bytes, inodes) != (before.bytes, before.inodes) {
         let path = std::ffi::CString::new(display.as_os_str().as_bytes())
+            .map_err(|_| MountLeaseError::AttachedRoot)?;
+        let options = std::ffi::CString::new(format!("size={bytes},nr_inodes={inodes}"))
             .map_err(|_| MountLeaseError::AttachedRoot)?;
         if unsafe {
             libc::mount(
@@ -60,7 +108,7 @@ pub(super) fn compact_attached(
                 path.as_ptr(),
                 c"tmpfs".as_ptr(),
                 libc::MS_REMOUNT | libc::MS_NOSUID | libc::MS_NODEV,
-                c"size=67108864,nr_inodes=8192".as_ptr().cast(),
+                options.as_ptr().cast(),
             )
         } != 0
         {
@@ -268,25 +316,25 @@ mod tests {
             allocated,
             used_inodes,
         };
-        for (allocated, used) in [(0, 1), (PROCESS_BYTES, 8192)] {
-            assert_eq!(
-                FrozenArchiveQuota::select(facts(allocated, used)),
-                FrozenArchiveQuota::CompactArchive
-            );
+        for (allocated_mib, overshoot, capacity_mib) in [
+            (0, 0, 16),
+            (16, 0, 16),
+            (16, 4096, 64),
+            (64, 0, 64),
+            (64, 4096, 256),
+            (256, 0, 256),
+            (256, 4096, 1024),
+            (1024, 0, 1024),
+            (1024, 4096, 2048),
+            (2048, 0, 2048),
+        ] {
+            let allocated = allocated_mib * 1024 * 1024 + overshoot;
+            for (used, inodes) in [(1, 8192), (8192, 8192), (8193, 262_144), (262_144, 262_144)] {
+                assert_eq!(
+                    FrozenArchiveQuota::select(facts(allocated, used)).quota(),
+                    (capacity_mib * 1024 * 1024, inodes),
+                );
+            }
         }
-        for (allocated, used) in [(PROCESS_BYTES + 4096, 1), (0, 8193)] {
-            assert_eq!(
-                FrozenArchiveQuota::select(facts(allocated, used)),
-                FrozenArchiveQuota::FullArchive
-            );
-        }
-        assert_eq!(
-            FrozenArchiveQuota::CompactArchive.quota(),
-            (64 * 1024 * 1024, 8192)
-        );
-        assert_eq!(
-            FrozenArchiveQuota::FullArchive.quota(),
-            (2 * 1024 * 1024 * 1024, 262_144)
-        );
     }
 }

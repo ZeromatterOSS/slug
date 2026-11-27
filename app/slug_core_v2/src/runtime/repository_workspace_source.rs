@@ -104,6 +104,12 @@ impl RepositoryWorkspaceCommand {
             });
             self.source_dependencies = dependencies;
             self.mount_domain = Some(domain);
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if let Some(class) = finalized.receipt.root().frozen_archive_quota()
+                && let Some(probe) = crate::runtime::probe_observer::capture()
+            {
+                probe.record_closed_archive_quota(class.quota(), true);
+            }
             Ok((self, finalized.receipt))
         }
     }

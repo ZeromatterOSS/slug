@@ -1,5 +1,5 @@
 //! Bounded inspection of the exclusive command at Source bootstrap refusal.
-use super::super::super::mount_lease::quota::full_archive_usage_for_probe;
+use super::super::super::mount_lease::quota::archive_usage_for_probe;
 use super::super::super::source::SourceRootInput;
 use super::*;
 use crate::runtime::probe_observer::workspace_progress::BackingInventory;
@@ -16,27 +16,42 @@ enum SlotClass {
 }
 
 impl SlotClass {
-    fn record(self, inventory: &mut BackingInventory) {
+    fn record(self, inventory: &mut BackingInventory, debit_bytes: u64) {
         inventory.root_counts[self as usize] += 1;
-        inventory.root_debit_bytes += match self {
-            Self::MutableArchive
-            | Self::SealedFullGeneralArchive
-            | Self::SealedFullSourceArchive => ARCHIVE_BYTES,
-            Self::MutableProcess | Self::SealedProcess | Self::SealedCompactArchive => {
-                PROCESS_BYTES
-            }
-        };
+        inventory.root_debit_bytes += debit_bytes;
     }
 }
 
-fn sample_sealed_full(inventory: &mut BackingInventory, family: u64, slot: usize, file: &File) {
+#[derive(Clone, Copy)]
+enum ArchiveFamily {
+    General,
+    Source,
+}
+
+fn record_sealed_archive(
+    inventory: &mut BackingInventory,
+    family: ArchiveFamily,
+    slot: usize,
+    file: &File,
+    class: FrozenArchiveQuota,
+) {
+    let bytes = class.bytes();
+    if bytes < ARCHIVE_BYTES {
+        SlotClass::SealedCompactArchive.record(inventory, bytes);
+        return;
+    }
+    match family {
+        ArchiveFamily::General => SlotClass::SealedFullGeneralArchive,
+        ArchiveFamily::Source => SlotClass::SealedFullSourceArchive,
+    }
+    .record(inventory, bytes);
     let Some(row) = inventory.sealed_full.iter_mut().find(|row| row.is_none()) else {
         inventory.complete = false;
         return;
     };
-    let usage = full_archive_usage_for_probe(file).ok();
+    let usage = archive_usage_for_probe(file, class.quota()).ok();
     *row = Some(SealedArchiveBacking {
-        family,
+        family: family as u64,
         slot: slot as u64,
         allocated_bytes: usage.map(|(allocated, _)| allocated),
         used_inodes: usage.map(|(_, used_inodes)| used_inodes),
@@ -74,7 +89,7 @@ impl RepositoryWorkspaceCommand {
                         RepositoryWorkspaceMode::Archive => SlotClass::MutableArchive,
                         RepositoryWorkspaceMode::Process => SlotClass::MutableProcess,
                     }
-                    .record(&mut inventory);
+                    .record(&mut inventory, quota(builder.mode).0);
                 }
                 (None, Some(view)) => {
                     let Some(root) = view.data.root() else {
@@ -92,20 +107,16 @@ impl RepositoryWorkspaceCommand {
                     }
                     match (root.mode, frozen) {
                         (RepositoryWorkspaceMode::Process, None) => {
-                            SlotClass::SealedProcess.record(&mut inventory);
+                            SlotClass::SealedProcess.record(&mut inventory, PROCESS_BYTES);
                         }
-                        (
-                            RepositoryWorkspaceMode::Archive,
-                            Some(FrozenArchiveQuota::CompactArchive),
-                        ) => {
-                            SlotClass::SealedCompactArchive.record(&mut inventory);
-                        }
-                        (
-                            RepositoryWorkspaceMode::Archive,
-                            Some(FrozenArchiveQuota::FullArchive),
-                        ) => {
-                            SlotClass::SealedFullGeneralArchive.record(&mut inventory);
-                            sample_sealed_full(&mut inventory, 0, index, &root.file);
+                        (RepositoryWorkspaceMode::Archive, Some(class)) => {
+                            record_sealed_archive(
+                                &mut inventory,
+                                ArchiveFamily::General,
+                                index,
+                                &root.file,
+                                class,
+                            );
                         }
                         _ => inventory.complete = false,
                     }
@@ -132,12 +143,14 @@ impl RepositoryWorkspaceCommand {
                 continue;
             }
             match frozen {
-                Some(FrozenArchiveQuota::CompactArchive) => {
-                    SlotClass::SealedCompactArchive.record(&mut inventory);
-                }
-                Some(FrozenArchiveQuota::FullArchive) => {
-                    SlotClass::SealedFullSourceArchive.record(&mut inventory);
-                    sample_sealed_full(&mut inventory, 1, index, &root.file);
+                Some(class) => {
+                    record_sealed_archive(
+                        &mut inventory,
+                        ArchiveFamily::Source,
+                        index,
+                        &root.file,
+                        class,
+                    );
                 }
                 None => inventory.complete = false,
             }

@@ -7,13 +7,17 @@ Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS. General production remains Disabled
 ## Current result and next step
 
 The original reached 999 computes, 57 roots and 153 records, with the pinned
-`tinyjson` Archive in the epoch. All 62 shared compute samples agreed with the
-998-compute control. The next need was the immutable `rules_rust+` source.
-It transferred 67,201,371 bytes, then refused the 2,048 MiB Source bootstrap
-with 7,937 MiB live under the 8,192 MiB backing cap. No decoding began and
-scope had no first error. The exact/+1 constructor test passed. Cleanup returned
-to 168 bytes, zero FDs and zero backing. The report used 128,936 bytes with
-its prefix. Full Rust and completed-command latency/RSS remain open.
+`tinyjson` Archive in the epoch. All 63 shared compute samples matched the
+backing-refused control. It admitted immutable `rules_rust+` and decoded all
+224,337,920 bytes of the pinned archive. The Source work deadline expired before
+adoption. Cleanup returned to 168 bytes, zero FDs and zero backing. The report
+used 128,679 bytes with its prefix. Full Rust and completed-command latency/RSS
+remain open.
+
+Measured read-only Archive finalization closed 56 roots at 16 MiB, one at
+64 MiB and one at 1,024 MiB. Peak native backing was 6,301 MiB versus 8,066 MiB
+in the control. The earlier 2,048 MiB bootstrap refusal had 7,937 MiB live,
+fully reconciled by the backing inventory. The bank and mutable quotas stay fixed.
 
 The [Archive writer receipt][archive-writes] preserves rooted reads through EOF
 while removing 380 prior-body comparisons over 2,362,966,940 bytes in the
@@ -51,14 +55,10 @@ liblzma. Bzlmod dev/test `-O3` passed CPU/wall at 0.936/0.935 (`f33c1690a`).
 XZ and LZ4 `-O3` and the stored observation-map hash fell short of their gates.
 The previous detailed checkpoint is in `ff79543a2`.
 
-The live inventory accounts for all 7,937 MiB. One mutable Archive and one
-sealed General Archive hold 2 GiB each. The sealed full root uses 820,174,848
-bytes and 189 inode units. There are also 57 compact Archives, one sealed
-Process and 129 MiB in captures. The full sealed root alone cannot supply
-the required 1,793 MiB plus launcher allowance. Evaluate measured size classes
-across all sealed Archives. Keep the existing bank, mutable quotas, deadline,
-launcher/PID1, rooted comparison, codec and history checks. The earlier refusal
-at compute 859 remains unattributed.
+Attribute the work after immutable Archive decoding and prove closed `rules_rust+`
+Source adoption under the existing deadline. Keep the bank, mutable quotas,
+launcher/PID1, rooted comparison, codec and history checks. Compare equal work
+for timing. The earlier refusal at compute 859 remains unattributed.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,
