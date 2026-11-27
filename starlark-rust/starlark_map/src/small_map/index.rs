@@ -10,10 +10,7 @@ use hashbrown::HashTable;
 use hashbrown::TryReserveError;
 
 use super::BoundedMapError;
-
-// Pinned hashbrown 0.14.5 raw generic/SSE2/NEON group implementations.
-const MIN_GROUP_WIDTH: usize = 4;
-const MAX_GROUP_WIDTH: usize = 16;
+use crate::hashbrown_table;
 
 #[derive(Clone, Allocative)]
 pub(super) struct Index {
@@ -43,25 +40,8 @@ impl Index {
 
     /// Work to initialize a fresh table and requested bytes for it and its box.
     pub(super) fn fresh_allocation(capacity: usize) -> Option<(usize, usize)> {
-        // Match hashbrown 0.14.5 RawTableInner::capacity_to_buckets for a
-        // requested capacity. The retained-storage certificate below starts
-        // from a different fact, the effective capacity observed after allocation.
-        let buckets = match capacity {
-            0 => return Some((0, mem::size_of::<Self>())),
-            1..=3 => 4,
-            4..=7 => 8,
-            n => (n.checked_mul(8)? / 7).checked_next_power_of_two()?,
-        };
-        let control_len = buckets.checked_add(MAX_GROUP_WIDTH)?;
-        let controls = Layout::from_size_align(control_len, MAX_GROUP_WIDTH).ok()?;
-        let (layout, _) = Layout::array::<usize>(buckets)
-            .ok()?
-            .extend(controls)
-            .ok()?;
-        Some((
-            control_len,
-            layout.size().checked_add(mem::size_of::<Self>())?,
-        ))
+        let (work, bytes) = hashbrown_table::fresh_allocation::<usize>(capacity)?;
+        Some((work, bytes.checked_add(mem::size_of::<Self>())?))
     }
 
     /// Allocate a fresh table after the caller pays its layout.
@@ -112,11 +92,8 @@ impl Index {
         &self,
         charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
     ) -> Result<(), BoundedMapError<E>> {
-        // Pinned hashbrown 0.14.5's triangular probe visits disjoint control
-        // groups until a match or vacancy. Every prior group is full in this
-        // fresh table. Include the terminal group and the possible extra
-        // small-table fixup load on insertion.
-        charge(self.table.len() / MIN_GROUP_WIDTH + 2, 0).map_err(BoundedMapError::Operation)
+        charge(hashbrown_table::fresh_insert_work(self.table.len()), 0)
+            .map_err(BoundedMapError::Operation)
     }
 
     pub(super) fn len(&self) -> usize {

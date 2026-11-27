@@ -343,6 +343,43 @@ impl<V> ParametersSpecBuilder<V> {
 }
 
 impl<V> ParametersSpec<V> {
+    /// Build the compiled, nonvariadic portion of a runtime signature with
+    /// admitted copies of the names and fully reserved parameter storage.
+    pub(crate) fn try_new_bounded<'a>(
+        function_name: &str,
+        parameters: impl ExactSizeIterator<Item = (&'a str, ParameterKind<V>)>,
+        indices: DefParamIndices,
+        budget: &ExecutionBudget,
+    ) -> Result<Self, ExecutionLimit> {
+        let count = parameters.len();
+        let positional_only = indices.num_positional_only as usize;
+        assert!(positional_only <= indices.num_positional as usize);
+        assert!(indices.num_positional as usize <= count);
+        assert!(indices.args.is_none() && indices.kwargs.is_none());
+
+        budget.charge(count, 0)?;
+        let function_name = try_copy_signature_name(function_name, budget)?;
+        let mut param_names = Vec::new();
+        let mut param_kinds = Vec::new();
+        budget.reserve_vec(&mut param_names, count)?;
+        budget.reserve_vec(&mut param_kinds, count)?;
+        let mut names = SymbolMap::try_with_capacity_bounded(count - positional_only, budget)?;
+        for (index, (name, kind)) in parameters.enumerate() {
+            if index >= positional_only {
+                names.insert_distinct_bounded(name, index as u32, budget)?;
+            }
+            param_names.push(try_copy_signature_name(name, budget)?);
+            param_kinds.push(kind);
+        }
+        Ok(Self {
+            function_name,
+            param_kinds: finish_signature_vec(param_kinds, budget)?,
+            param_names: finish_signature_vec(param_names, budget)?,
+            names,
+            indices,
+        })
+    }
+
     /// Create a new [`ParametersSpec`] with the given function name and an advance capacity hint.
     pub(crate) fn with_capacity(
         function_name: String,
@@ -555,6 +592,26 @@ impl<V> ParametersSpec<V> {
             kwargs: self.indices.kwargs.map(|a| a as usize).map(&mut dp),
         }
     }
+}
+
+fn try_copy_signature_name(name: &str, budget: &ExecutionBudget) -> Result<String, ExecutionLimit> {
+    budget.charge(ExecutionBudget::text_work(name.len()), name.len())?;
+    let mut copy = String::new();
+    copy.try_reserve_exact(name.len())
+        .map_err(|_| budget.refuse(ExecutionLimit::AllocationFailed))?;
+    copy.push_str(name);
+    Ok(copy)
+}
+
+fn finish_signature_vec<T>(
+    values: Vec<T>,
+    budget: &ExecutionBudget,
+) -> Result<Box<[T]>, ExecutionLimit> {
+    if std::mem::size_of::<T>() != 0 && values.capacity() != values.len() {
+        let bytes = std::mem::size_of_val(values.as_slice());
+        budget.charge(values.len().max(ExecutionBudget::text_work(bytes)), bytes)?;
+    }
+    Ok(values.into_boxed_slice())
 }
 
 impl<'v, V: ValueLike<'v>> ParametersSpec<V> {

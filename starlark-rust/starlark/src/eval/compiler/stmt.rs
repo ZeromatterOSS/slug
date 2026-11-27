@@ -550,6 +550,11 @@ impl Compiler<'_, '_, '_, '_> {
 // We also require that `extra_v` is None, since otherwise the user might have
 // additional values stashed somewhere.
 pub(crate) fn possible_gc(eval: &mut Evaluator) -> crate::Result<()> {
+    if let Some(budget) = eval.heap().bounded_operation_budget() {
+        // Strict bytecode keeps its admitted heap until retirement. Moving it
+        // here would call native tracing hooks on the module's live values.
+        return budget.check().map_err(Into::into);
+    }
     if !eval.disable_gc && eval.heap().allocated_bytes() >= eval.next_gc_level {
         // When we are at a module scope (as checked above) the eval contains
         // references to all values, so walking covers everything and the unsafe

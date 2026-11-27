@@ -1472,6 +1472,19 @@ impl InstrNoFlowImpl for InstrDefImpl {
         (pops, def_data, target): &(BcSlotInRange, InstrDefData, BcSlotOut),
     ) -> crate::Result<()> {
         let pop = frame.get_bc_slot_range(*pops);
+        if let Some(budget) = eval.heap().bounded_operation_budget() {
+            let def = Def::new_bounded(
+                &def_data.function_name,
+                &def_data.params,
+                pop,
+                def_data.return_type,
+                def_data.info,
+                eval,
+                budget,
+            )?;
+            frame.set_bc_slot(*target, def);
+            return Ok(());
+        }
 
         let mut parameters = ParametersSpec::with_capacity(
             def_data.function_name.clone(),

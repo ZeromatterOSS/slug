@@ -19,6 +19,9 @@
 
 pub(crate) mod inspection;
 
+#[cfg(test)]
+mod bounded_creation_tests;
+
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -55,6 +58,8 @@ use crate::docs::DocStringKind;
 use crate::environment::FrozenModuleData;
 use crate::environment::Globals;
 use crate::eval::Arguments;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::bc::bytecode::Bc;
 use crate::eval::bc::frame::alloca_frame;
 use crate::eval::compiler::Compiler;
@@ -79,6 +84,7 @@ use crate::eval::runtime::arguments::ResolvedArgName;
 use crate::eval::runtime::evaluator::Evaluator;
 use crate::eval::runtime::frame_span::FrameSpan;
 use crate::eval::runtime::frozen_file_span::FrozenFileSpan;
+use crate::eval::runtime::params::spec::ParameterKind;
 use crate::eval::runtime::params::spec::ParametersSpec;
 use crate::eval::runtime::profile::instant::ProfilerInstant;
 use crate::eval::runtime::slots::LocalSlotId;
@@ -608,6 +614,81 @@ impl<'v> Def<'v> {
             .parent
             .as_ref()
             .map(|copy| eval.clone_slot_capture(copy, &stmt));
+        Self::new_with_captures(
+            parameters,
+            parameter_types,
+            return_type,
+            stmt,
+            captured,
+            eval,
+        )
+    }
+
+    pub(crate) fn new_bounded(
+        function_name: &str,
+        parameters: &ParametersCompiled<u32>,
+        defaults: &[Value<'v>],
+        return_type: Option<TypeCompiled<FrozenValue>>,
+        stmt: FrozenRef<'static, DefInfo>,
+        eval: &mut Evaluator<'v, '_, '_>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Value<'v>> {
+        let unsupported = || {
+            budget.refuse(ExecutionLimit::UnsupportedOperation {
+                operation: "function definition",
+                value_type: FUNCTION_TYPE,
+            })
+        };
+        budget.charge(1, 0)?;
+        if !stmt.stmt_compile_context.defer_script_operations
+            || !stmt.parent.is_empty()
+            || !stmt.parameter_captures.is_empty()
+            || return_type.is_some()
+            || parameters.indices.args.is_some()
+            || parameters.indices.kwargs.is_some()
+        {
+            return Err(unsupported().into());
+        }
+        budget.charge(parameters.params.len(), 0)?;
+        if parameters
+            .params
+            .iter()
+            .any(|param| !matches!(&param.node, ParameterCompiled::Normal(_, None, _)))
+        {
+            return Err(unsupported().into());
+        }
+
+        budget.charge(1, Heap::complex_allocation_bytes::<Self>())?;
+        let rows = parameters.params.iter().map(|param| match &param.node {
+            ParameterCompiled::Normal(name, None, default) => {
+                let kind = match default {
+                    Some(index) => ParameterKind::Defaulted(defaults[*index as usize]),
+                    None => ParameterKind::Required,
+                };
+                (name.name.as_str(), kind)
+            }
+            _ => unreachable!("function parameters were already admitted"),
+        });
+        let parameters =
+            ParametersSpec::try_new_bounded(function_name, rows, parameters.indices, budget)?;
+        Ok(Self::new_with_captures(
+            parameters,
+            Vec::new(),
+            None,
+            stmt,
+            Vec::new(),
+            eval,
+        )?)
+    }
+
+    fn new_with_captures(
+        parameters: ParametersSpec<Value<'v>>,
+        parameter_types: Vec<(LocalSlotId, String, TypeCompiled<FrozenValue>)>,
+        return_type: Option<TypeCompiled<FrozenValue>>,
+        stmt: FrozenRef<'static, DefInfo>,
+        captured: Vec<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
         Ok(eval.heap().alloc(Self {
             symbol: eval
                 .function_symbols

@@ -38,11 +38,15 @@ use std::mem;
 
 use allocative::Allocative;
 use hashbrown::HashTable;
+use hashbrown::TryReserveError;
 use starlark_derive::Trace;
 use starlark_map::Hashed;
+use starlark_map::hashbrown_table;
 
 use crate as starlark;
 use crate::collections::symbol::symbol::Symbol;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::values::StringValue;
 
 // We use a RawTable (the thing that underlies HashMap) so we can look up efficiently
@@ -65,6 +69,41 @@ impl<T> SymbolMap<T> {
 
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         SymbolMap(HashTable::with_capacity(capacity))
+    }
+
+    pub(crate) fn try_with_capacity_bounded(
+        capacity: usize,
+        budget: &ExecutionBudget,
+    ) -> Result<Self, ExecutionLimit> {
+        let (work, bytes) = hashbrown_table::fresh_allocation::<(Symbol, T)>(capacity)
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        budget.charge(work, bytes)?;
+        let mut map = Self::new();
+        map.0
+            .try_reserve(capacity, |_| unreachable!("fresh symbol table is empty"))
+            .map_err(|error| {
+                budget.refuse(match error {
+                    TryReserveError::CapacityOverflow => ExecutionLimit::AllocationBytes,
+                    TryReserveError::AllocError { .. } => ExecutionLimit::AllocationFailed,
+                })
+            })?;
+        Ok(map)
+    }
+
+    /// Add a distinct compiled name to a fully reserved table without deletions.
+    pub(crate) fn insert_distinct_bounded(
+        &mut self,
+        key: &str,
+        value: T,
+        budget: &ExecutionBudget,
+    ) -> Result<(), ExecutionLimit> {
+        assert!(self.0.len() < self.0.capacity());
+        budget.charge(hashbrown_table::fresh_insert_work(self.0.len()), 0)?;
+        let symbol = Symbol::try_new_bounded(key, budget)?;
+        self.0.insert_unique(symbol.hash(), (symbol, value), |_| {
+            unreachable!("fresh symbol table must not grow")
+        });
+        Ok(())
     }
 
     pub(crate) fn insert(&mut self, key: &str, value: T) -> Option<T> {

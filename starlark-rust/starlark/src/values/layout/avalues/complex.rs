@@ -146,6 +146,14 @@ where
 }
 
 impl<'v> Heap<'v> {
+    pub(crate) fn complex_allocation_bytes<T>() -> usize
+    where
+        T: ComplexValue<'v>,
+        T::Frozen: StarlarkValue<'static>,
+    {
+        AValueComplex::<T>::alloc_size_for_extra_len(0).bytes() as usize
+    }
+
     pub(crate) fn alloc_budgeted_bound_method(
         self,
         method: BoundMethodGen<Value<'v>>,

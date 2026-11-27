@@ -30,6 +30,8 @@ use starlark_map::StarlarkHashValue;
 use crate as starlark;
 use crate::coerce::Coerce;
 use crate::collections::aligned_padded_str::AlignedPaddedStr;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 
 /// A pre-hashed string used for efficient dictionary lookup.
 #[derive(Clone, Trace, Allocative)]
@@ -75,16 +77,44 @@ impl Symbol {
     }
 
     pub(crate) fn new_hashed(x: Hashed<&str>) -> Self {
-        let small_hash = x.hash();
-        let hash = small_hash.promote();
-        let len = x.key().len();
+        let len_words = x.key().len().div_ceil(mem::size_of::<usize>());
+        Self::with_payload(x, vec![0; len_words])
+    }
+
+    pub(crate) fn try_new_bounded(
+        key: &str,
+        budget: &ExecutionBudget,
+    ) -> Result<Self, ExecutionLimit> {
+        let len = key.len();
         let len_words = len.div_ceil(mem::size_of::<usize>());
-        let mut payload = vec![0; len_words]; // 0 pad it at the end
+        let bytes = len_words
+            .checked_mul(mem::size_of::<usize>())
+            .filter(|_| u32::try_from(len).is_ok())
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        // Hash, zero-initialize the padded words, then copy the key.
+        budget.charge(
+            2 * ExecutionBudget::text_work(len) + ExecutionBudget::text_work(bytes),
+            bytes,
+        )?;
+        let mut payload = Vec::new();
+        payload
+            .try_reserve_exact(len_words)
+            .map_err(|_| budget.refuse(ExecutionLimit::AllocationFailed))?;
+        payload.resize(len_words, 0);
+        if payload.capacity() != len_words {
+            budget.charge(ExecutionBudget::text_work(bytes), bytes)?;
+        }
+        Ok(Self::with_payload(Hashed::new(key), payload))
+    }
+
+    fn with_payload(x: Hashed<&str>, mut payload: Vec<usize>) -> Self {
+        let small_hash = x.hash();
+        let len = x.key().len();
         unsafe {
             copy_nonoverlapping(x.key().as_ptr(), payload.as_mut_ptr() as *mut u8, len);
         }
         Self {
-            hash,
+            hash: small_hash.promote(),
             len: len.try_into().unwrap(),
             payload: payload.into_boxed_slice(),
             small_hash,

@@ -1067,6 +1067,19 @@ impl<'v> Value<'v> {
         variable_name: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> crate::Result<()> {
+        if let Some(budget) = eval.heap().bounded_operation_budget() {
+            budget.check()?;
+            if self.vtable().starlark_value.HAS_export_as {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "module export",
+                        value_type: self.get_type(),
+                    })
+                    .into());
+            }
+            // The default export hook is a no-op.
+            return Ok(());
+        }
         self.get_ref().export_as(variable_name, eval)
     }
 

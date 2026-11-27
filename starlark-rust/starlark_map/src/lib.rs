@@ -27,6 +27,8 @@
 #![cfg_attr(rust_nightly, allow(internal_features))]
 
 mod hash_value;
+#[doc(hidden)]
+pub mod hashbrown_table;
 mod hashed;
 mod hasher;
 mod iter;
