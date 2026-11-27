@@ -297,7 +297,7 @@ impl GlobalsBuilder {
         self.set(
             name,
             NativeFunction {
-                function: NativeFunc(f, sig),
+                function: NativeFunc(f, sig, components.bounded_function),
                 name: name.to_owned(),
                 speculative_exec_safe: components.speculative_exec_safe,
                 as_type: as_type.as_ref().map(|x| x.0.dupe()),

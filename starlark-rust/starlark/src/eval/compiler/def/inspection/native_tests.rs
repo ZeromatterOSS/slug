@@ -46,7 +46,7 @@ fn parameters(function_name: &str, default: FrozenValue) -> ParametersSpec<Froze
 
 fn wrapper(implementation: NativeFuncFn, default: FrozenValue) -> NativeFunction {
     NativeFunction {
-        function: NativeFunc(implementation, parameters("canonical", default)),
+        function: NativeFunc(implementation, parameters("canonical", default), false),
         name: "canonical".to_owned(),
         as_type: None,
         ty: Ty::any(),
@@ -85,7 +85,7 @@ fn canonical_native_matcher_rejects_same_name_spoof_and_every_changed_metadata_f
             .unpack_bool(),
         Some(false)
     );
-    for change in 0..7 {
+    for change in 0..8 {
         let mut changed = wrapper(first, default);
         match change {
             0 => changed.name = "different name".to_owned(),
@@ -103,6 +103,7 @@ fn canonical_native_matcher_rejects_same_name_spoof_and_every_changed_metadata_f
                 }))
             }
             6 => changed.function.1 = parameters("different diagnostic name", default),
+            7 => changed.function.2 = true,
             _ => unreachable!(),
         }
         let changed = inspect_native_function(heap.alloc(changed).to_value()).unwrap();

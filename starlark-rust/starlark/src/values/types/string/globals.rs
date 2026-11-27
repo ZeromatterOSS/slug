@@ -151,7 +151,7 @@ pub(crate) fn register_str(globals: &mut GlobalsBuilder) {
     /// str([1, "x"])                   == "[1, \"x\"]"
     /// # "#);
     /// ```
-    #[starlark(as_type = StarlarkStr, speculative_exec_safe)]
+    #[starlark(as_type = StarlarkStr, speculative_exec_safe, bounded_function)]
     fn str<'v>(
         #[starlark(require = pos)] a: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,

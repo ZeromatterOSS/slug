@@ -59,6 +59,7 @@ struct FnAttrs {
     starlark_ty_custom_function: Option<Expr>,
     special_builtin_function: Option<Expr>,
     speculative_exec_safe: bool,
+    bounded_function: bool,
     bounded_method: bool,
     docstring: Option<String>,
     /// Rest attributes
@@ -201,6 +202,9 @@ fn parse_starlark_fn_attr(tokens: &Attribute, attrs: &mut FnAttrs) -> syn::Resul
             } else if ident == "speculative_exec_safe" {
                 attrs.speculative_exec_safe = true;
                 continue;
+            } else if ident == "bounded_function" {
+                attrs.bounded_function = true;
+                continue;
             } else if ident == "bounded_method" {
                 attrs.bounded_method = true;
                 continue;
@@ -219,6 +223,7 @@ fn parse_starlark_fn_attr(tokens: &Attribute, attrs: &mut FnAttrs) -> syn::Resul
                     `#[starlark(as_type = ImplStarlarkValue)]`, \
                     `#[starlark(ty_custom_function = MyTy)]`, \
                     `#[starlark(attribute)]`, \
+                    `#[starlark(bounded_function)]`, \
                     `#[starlark(bounded_method)]`, \
                     `#[starlark(speculative_exec_safe)]` attribute",
             ));
@@ -301,6 +306,7 @@ pub(crate) fn parse_fun(func: ItemFn, module_kind: ModuleKind) -> syn::Result<St
         is_attribute,
         as_type,
         speculative_exec_safe,
+        bounded_function,
         bounded_method,
         docstring,
         starlark_ty_custom_function,
@@ -308,6 +314,12 @@ pub(crate) fn parse_fun(func: ItemFn, module_kind: ModuleKind) -> syn::Result<St
         attrs,
     } = parse_fn_attrs(func.span(), func.attrs)?;
 
+    if bounded_function && (module_kind != ModuleKind::Globals || is_attribute) {
+        return Err(syn::Error::new(
+            sig_span,
+            "`#[starlark(bounded_function)]` is only valid on native global functions",
+        ));
+    }
     if bounded_method && (module_kind != ModuleKind::Methods || is_attribute) {
         return Err(syn::Error::new(
             sig_span,
@@ -464,6 +476,7 @@ pub(crate) fn parse_fun(func: ItemFn, module_kind: ModuleKind) -> syn::Result<St
             starlark_ty_custom_function,
             special_builtin_function,
             speculative_exec_safe,
+            bounded_function,
             bounded_method,
             body: *func.block,
             source,
@@ -798,6 +811,30 @@ fn parse_arg(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bounded_function_marker_is_independent_and_global_only() {
+        let function = syn::parse_quote! {
+            #[starlark(bounded_function)]
+            fn project() -> anyhow::Result<i32> { Ok(1) }
+        };
+        let StarStmt::Fun(function) = parse_fun(function, ModuleKind::Globals).unwrap() else {
+            panic!("expected a native global function");
+        };
+        assert!(function.bounded_function);
+        assert!(!function.bounded_method);
+        assert!(!function.speculative_exec_safe);
+
+        let invalid = syn::parse_quote! {
+            #[starlark(bounded_function)]
+            fn project(this: Value) -> anyhow::Result<i32> { Ok(1) }
+        };
+        let error = parse_fun(invalid, ModuleKind::Methods).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "`#[starlark(bounded_function)]` is only valid on native global functions"
+        );
+    }
 
     #[test]
     fn bounded_method_marker_is_independent_and_method_only() {

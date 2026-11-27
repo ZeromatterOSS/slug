@@ -56,6 +56,7 @@ impl<'v> NativeFunctionInspection<'v> {
             && actual.name == canonical.name
             && actual.function.1.inspection_function_name()
                 == canonical.function.1.inspection_function_name()
+            && actual.function.is_bounded() == canonical.function.is_bounded()
             && actual.as_type == canonical.as_type
             && actual.ty == canonical.ty
             && actual

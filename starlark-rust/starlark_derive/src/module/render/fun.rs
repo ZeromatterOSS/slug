@@ -627,11 +627,13 @@ fn render_native_callable_components(
     let turbofish = generics.turbofish();
 
     let speculative_exec_safe = x.speculative_exec_safe;
+    let bounded_function = x.bounded_function;
     Ok(quote!(
         {
             let param_spec = #param_spec;
             starlark::__derive_refs::components::NativeCallableComponents {
                 speculative_exec_safe: #speculative_exec_safe,
+                bounded_function: #bounded_function,
                 rust_docstring: #docs,
                 param_spec,
                 return_type: __starlark_return_type_starlark_type_repr #turbofish(),

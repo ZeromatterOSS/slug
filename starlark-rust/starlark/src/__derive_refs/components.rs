@@ -33,6 +33,8 @@ use crate::typing::Ty;
 /// A wrapper for the parameters to `GlobalsBuilder::set_function` and `MethodBuilder::set_method`
 pub struct NativeCallableComponents {
     pub speculative_exec_safe: bool,
+    /// The native global's generated argument unpack and implementation are budgeted.
+    pub bounded_function: bool,
     pub rust_docstring: Option<&'static str>,
     pub param_spec: NativeCallableParamSpec,
     pub return_type: Ty,

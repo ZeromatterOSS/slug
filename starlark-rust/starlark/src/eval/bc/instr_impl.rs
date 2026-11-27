@@ -81,6 +81,7 @@ use crate::values::StringValue;
 use crate::values::StringValueLike;
 use crate::values::Value;
 use crate::values::dict::Dict;
+use crate::values::function::NativeFunc;
 use crate::values::int::pointer_i32::PointerI32;
 use crate::values::layout::value_not_special::FrozenValueNotSpecial;
 use crate::values::string::dot_format::format_one;
@@ -867,12 +868,15 @@ impl InstrCompareImpl for InstrGreaterOrEqualImpl {
     }
 }
 
+// Ordinary frozen functions can enter a bounded evaluator with these
+// specialized global calls already emitted, bypassing NativeFunc::invoke.
 pub(crate) struct InstrTypeImpl;
 pub(crate) type InstrType = InstrUnOp<InstrTypeImpl>;
 
 impl InstrUnOpImpl for InstrTypeImpl {
     #[inline(always)]
-    fn eval<'v>(v: Value<'v>, _heap: Heap<'v>) -> crate::Result<Value<'v>> {
+    fn eval<'v>(v: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        NativeFunc::check_admission(heap, false)?;
         Ok(v.get_type_value().to_frozen_value().to_value())
     }
 }
@@ -885,11 +889,12 @@ impl InstrNoFlowImpl for InstrTypeIsImpl {
 
     #[inline(always)]
     fn run_with_args<'v>(
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
         frame: BcFramePtr<'v>,
         _: BcPtrAddr,
         (arg, t, target): &(BcSlotIn, FrozenStringValue, BcSlotOut),
     ) -> crate::Result<()> {
+        NativeFunc::check_admission(eval.heap(), false)?;
         let arg = frame.get_bc_slot(*arg);
         let r = arg.get_type_value() == *t;
         frame.set_bc_slot(*target, Value::new_bool(r));
@@ -905,11 +910,12 @@ impl InstrNoFlowImpl for InstrIsInstanceImpl {
 
     #[inline(always)]
     fn run_with_args<'v>(
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
         frame: BcFramePtr<'v>,
         _: BcPtrAddr,
         (arg, t, target): &(BcSlotIn, TypeCompiled<FrozenValue>, BcSlotOut),
     ) -> crate::Result<()> {
+        NativeFunc::check_admission(eval.heap(), false)?;
         let arg = frame.get_bc_slot(*arg);
         let r = t.matches(arg);
         frame.set_bc_slot(*target, Value::new_bool(r));

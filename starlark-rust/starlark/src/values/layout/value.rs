@@ -67,6 +67,7 @@ use crate::eval::ExecutionLimit;
 use crate::eval::ParametersSpec;
 use crate::eval::compiler::def::Def;
 use crate::eval::compiler::def::FrozenDef;
+use crate::eval::is_starlark_def;
 use crate::eval::runtime::arguments::ArgumentsFull;
 use crate::eval::runtime::frame_span::FrameSpan;
 use crate::sealed::Sealed;
@@ -96,6 +97,7 @@ use crate::values::dict::FrozenDictRef;
 use crate::values::dict::value::VALUE_EMPTY_FROZEN_DICT;
 use crate::values::enumeration::EnumType;
 use crate::values::enumeration::FrozenEnumValue;
+use crate::values::function::BoundMethod;
 use crate::values::function::FUNCTION_TYPE;
 use crate::values::function::FrozenBoundMethod;
 use crate::values::function::NativeFunction;
@@ -730,6 +732,21 @@ impl<'v> Value<'v> {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> crate::Result<Value<'v>> {
+        if let Some(budget) = eval.heap().bounded_operation_budget() {
+            budget.check()?;
+            // Native wrappers still enforce their own descriptor admission.
+            if !is_starlark_def(self)
+                && self.downcast_ref::<NativeFunction>().is_none()
+                && BoundMethod::from_value(self).is_none()
+            {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "callable invocation",
+                        value_type: self.get_type(),
+                    })
+                    .into());
+            }
+        }
         eval.with_call_stack(self, location, |eval| {
             self.get_ref_full().invoke(args, eval)
         })
@@ -1674,6 +1691,10 @@ where
     FrozenValue: Send + Sync,
 {
 }
+
+#[cfg(test)]
+#[path = "callable_admission_tests.rs"]
+mod callable_admission_tests;
 
 #[cfg(test)]
 mod tests {

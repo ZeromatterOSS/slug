@@ -35,12 +35,28 @@ fn bounded_user_provider_lookup_preserves_live_field_identity_and_absence() {
     let module = Module::new_with_execution_budget(budget.clone());
     let heap = module.heap();
     let payload = heap.alloc("a retained field payload");
-    for schema in [Some(&["none", "present", "unset"][..]), None] {
-        let provider = user_provider(
-            &module,
-            schema,
-            &[("present", payload), ("none", Value::new_none())],
-        );
+    let id = ProviderId::new("@@//:independent.bzl", "Probe").unwrap();
+    // Supply retained providers as a trusted host would. Their Starlark
+    // constructor is outside the strict evaluator's callable set.
+    for fields in [
+        LoadingProviderFieldsGen::Schemaful {
+            schema: Arc::from([
+                CompactString::new("none"),
+                CompactString::new("present"),
+                CompactString::new("unset"),
+            ]),
+            values: SmallMap::from_iter([(1, payload), (0, Value::new_none())]),
+        },
+        LoadingProviderFieldsGen::Schemaless(SchemalessLoadingFieldsGen {
+            names: Arc::from([CompactString::new("present"), CompactString::new("none")]),
+            values: vec![payload, Value::new_none()],
+            has_schema: false,
+        }),
+    ] {
+        let provider = heap.alloc_complex(LoadingStarlarkUserProviderGen {
+            id: id.dupe(),
+            fields,
+        });
         assert!(
             provider
                 .get_attr("present", heap)
@@ -70,11 +86,13 @@ fn bounded_provider_inequality_with_none_preserves_live_and_frozen_values() {
     let module = Module::new_with_execution_budget(budget.clone());
     module.set(
         "live_provider",
-        user_provider(
-            &module,
-            Some(&["value"]),
-            &[("value", Value::new_bool(true))],
-        ),
+        module.heap().alloc_complex(LoadingStarlarkUserProviderGen {
+            id: ProviderId::new("@@//:independent.bzl", "Probe").unwrap(),
+            fields: LoadingProviderFieldsGen::Schemaful {
+                schema: Arc::from([CompactString::new("value")]),
+                values: SmallMap::from_iter([(0, Value::new_bool(true))]),
+            },
+        }),
     );
     module.set(
         "frozen_provider",

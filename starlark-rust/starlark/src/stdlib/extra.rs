@@ -199,6 +199,7 @@ impl PrintHandler for StderrPrintHandler {
 #[starlark_module]
 pub fn print(builder: &mut GlobalsBuilder) {
     /// Print some values to the output.
+    #[starlark(bounded_function)]
     fn print<'v>(
         #[starlark(args)] args: &'v TupleRef<'v>,
         eval: &mut Evaluator<'v, '_, '_>,

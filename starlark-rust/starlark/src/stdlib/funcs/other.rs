@@ -73,6 +73,7 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// fail("oops", 1, False)  # fail: oops 1 False
     /// # "#, "oops 1 False");
     /// ```
+    #[starlark(bounded_function)]
     fn fail<'v>(
         #[starlark(args)] args: &'v TupleRef<'v>,
         #[starlark(require = named, default = ValueOfUnchecked::new(FrozenStringValue::default().to_frozen_value().to_value()))]
@@ -188,7 +189,7 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// "capitalize" in dir("abc")
     /// # "#);
     /// ```
-    #[starlark(speculative_exec_safe)]
+    #[starlark(speculative_exec_safe, bounded_function)]
     fn dir<'v>(
         #[starlark(require = pos)] x: Value<'v>,
         heap: Heap<'v>,
@@ -252,7 +253,7 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// getattr("banana", "split")("a") == ["b", "n", "n", ""] # equivalent to "banana".split("a")
     /// # "#);
     /// ```
-    #[starlark(speculative_exec_safe)]
+    #[starlark(speculative_exec_safe, bounded_function)]
     fn getattr<'v>(
         #[starlark(require = pos)] a: Value<'v>,
         #[starlark(require = pos)] attr: ValueOfUnchecked<'v, &'v str>,
@@ -276,7 +277,7 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     ///
     /// `hasattr(x, name)` reports whether x has an attribute (field or method)
     /// named `name`.
-    #[starlark(speculative_exec_safe)]
+    #[starlark(speculative_exec_safe, bounded_function)]
     fn hasattr<'v>(
         #[starlark(require = pos)] a: Value<'v>,
         #[starlark(require = pos)] attr: ValueOfUnchecked<'v, &'v str>,
@@ -349,6 +350,7 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// # "#, "not supported");
     /// ```
     #[starlark(speculative_exec_safe)]
+    #[starlark(bounded_function)]
     fn len<'v>(#[starlark(require = pos)] a: Value<'v>, heap: Heap<'v>) -> starlark::Result<i32> {
         a.length_on_heap(heap)
     }
@@ -402,18 +404,32 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// ```
     // This function is not spec-safe, because it may call `key` function
     // which might be not spec-safe.
+    #[starlark(bounded_function)]
     fn sorted<'v>(
         #[starlark(require = pos)] x: ValueOfUnchecked<'v, StarlarkIter<Value<'v>>>,
         #[starlark(require = named)] key: Option<Value<'v>>,
-        #[starlark(require = named, default = false)] reverse: bool,
+        #[starlark(require = named, default = ValueOfUnchecked::new(Value::new_bool(false)))]
+        reverse: ValueOfUnchecked<'v, bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<ValueOfUnchecked<'v, Vec<Value<'v>>>> {
         let heap = eval.heap();
         if let Some(budget) = heap.execution_budget() {
+            budget.charge(1, 0)?;
+            let reverse = reverse.get();
+            let reverse = reverse.unpack_bool().ok_or_else(|| {
+                let typ = reverse.get_type();
+                ValueError::bounded_message(
+                    budget,
+                    format_args!(
+                        "Type of parameter `reverse` doesn't match, expected `bool`, actual `{typ}`"
+                    ),
+                )
+            })?;
             return sorted_budget::sorted(x.get(), key, reverse, eval, budget)
                 .map(ValueOfUnchecked::new);
         }
 
+        let reverse = bool::unpack_named_param(reverse.get(), "reverse")?;
         let it = x.get().iterate(heap)?;
         let mut it = match key {
             None => it.map(|x| (x, x)).collect(),

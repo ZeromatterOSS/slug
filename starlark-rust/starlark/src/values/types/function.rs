@@ -41,6 +41,10 @@ use crate::starlark_complex_value;
 use crate::starlark_simple_value;
 use crate::typing::Ty;
 use crate::typing::TyBasic;
+
+#[cfg(test)]
+#[path = "bounded_native_functions_tests.rs"]
+mod bounded_native_functions_tests;
 use crate::typing::arc_ty::ArcTy;
 use crate::typing::tuple::TyTuple;
 use crate::values::AllocFrozenValue;
@@ -103,15 +107,38 @@ pub(crate) struct NativeFunc(
     #[allocative(skip)] // Not general enough
     pub(crate)  NativeFuncFn,
     pub(crate) ParametersSpec<FrozenValue>,
+    pub(crate) bool,
 );
 
 impl NativeFunc {
+    #[inline]
+    pub(crate) fn is_bounded(&self) -> bool {
+        self.2
+    }
+
+    #[inline]
+    pub(crate) fn check_admission(heap: Heap<'_>, bounded: bool) -> crate::Result<()> {
+        if let Some(budget) = heap.bounded_operation_budget() {
+            if !bounded {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "function invocation",
+                        value_type: FUNCTION_TYPE,
+                    })
+                    .into());
+            }
+            budget.check()?;
+        }
+        Ok(())
+    }
+
     #[inline]
     pub(crate) fn invoke<'v>(
         &self,
         eval: &mut Evaluator<'v, '_, '_>,
         args: &Arguments<'v, '_>,
     ) -> crate::Result<Value<'v>> {
+        Self::check_admission(eval.heap(), self.is_bounded())?;
         (self.0)(eval, &self.1, args)
     }
 }

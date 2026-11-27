@@ -116,6 +116,7 @@ pub(crate) struct StarFun {
     pub starlark_ty_custom_function: Option<Expr>,
     pub special_builtin_function: Option<Expr>,
     pub speculative_exec_safe: bool,
+    pub bounded_function: bool,
     pub bounded_method: bool,
     pub body: Block,
     pub source: StarFunSource,
