@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import threading
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -19,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from tools.v2_oracle_lib import nativelink
 from tools.v2_oracle_lib.compare import compare_result, write_failure_artifacts
 from tools.v2_oracle_lib.evidence import validate_evidence
 from tools.v2_oracle_lib.fixture import (
@@ -1971,6 +1974,64 @@ def test_cli_validate_evidence_outputs_status() -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert '"status": "ok"' in completed.stdout
+
+
+@pytest.fixture
+def nativelink_stub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[[str], Path]:
+    ports = iter((12000, 12001))
+    monkeypatch.setattr(nativelink, "READY_TIMEOUT_SECONDS", 2)
+    monkeypatch.setattr(nativelink, "_free_port", lambda: next(ports))
+    monkeypatch.setattr(nativelink, "_port_ready", lambda _port: True)
+
+    def write_stub(code: str) -> Path:
+        binary = tmp_path / "nativelink-stub"
+        binary.write_text(f"#!{sys.executable}\n{code}", encoding="utf-8")
+        binary.chmod(0o700)
+        return binary
+
+    return write_stub
+
+
+def test_nativelink_worker_marker_survives_split_reads_and_tail_eviction() -> None:
+    prefix = b"x" * (nativelink.LOG_READ_BYTES - 8)
+    suffix = b"y" * nativelink.LOG_TAIL_BYTES + b"\xff-last"
+    stream = io.BytesIO(prefix + nativelink.READY_SIGNAL + suffix)
+    log = nativelink._NativeLinkLog()
+
+    log.collect(stream)
+
+    assert log.worker_ready.is_set()
+    assert log.tail() == suffix[-nativelink.LOG_TAIL_BYTES:]
+    assert stream.closed
+
+
+def test_nativelink_worker_ready_does_not_wait_for_a_newline_or_full_read(
+    tmp_path: Path, nativelink_stub: Callable[[str], Path]
+) -> None:
+    code = f"import os, time\nos.write(2, {nativelink.READY_SIGNAL!r})\ntime.sleep(60)\n"
+    service = nativelink.start_nativelink(nativelink_stub(code), tmp_path / "service")
+    try:
+        assert service.log_tail() == nativelink.READY_SIGNAL
+    finally:
+        nativelink.stop_nativelink(service)
+    assert service.process.poll() is not None
+    assert service.process.stdout is not None and service.process.stdout.closed
+
+
+def test_nativelink_startup_error_reports_newest_bounded_bytes(
+    tmp_path: Path, nativelink_stub: Callable[[str], Path]
+) -> None:
+    code = (
+        "import os\n"
+        f"os.write(1, b'outdated\\n' + b'x' * {2 * nativelink.LOG_TAIL_BYTES})\n"
+        "os.write(2, b'\\xff-last-warning')\n"
+    )
+    with pytest.raises(RuntimeError, match="NativeLink exited before becoming ready") as failure:
+        nativelink.start_nativelink(nativelink_stub(code), tmp_path / "service")
+    _, tail = str(failure.value).split("\n", 1)
+    assert len(tail) == nativelink.LOG_TAIL_BYTES
+    assert tail.endswith("\ufffd-last-warning")
+    assert "outdated" not in tail
 
 
 def test_fixture_parser_reads_reapi_section() -> None:

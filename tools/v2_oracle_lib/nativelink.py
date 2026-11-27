@@ -16,19 +16,55 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import BinaryIO
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 READY_TIMEOUT_SECONDS = 20
-READY_SIGNAL = "Worker registered with scheduler"
+READY_SIGNAL = b"Worker registered with scheduler"
+LOG_TAIL_BYTES = 16 * 1024
+LOG_READ_BYTES = 4 * 1024
+LOG_DRAIN_TIMEOUT_SECONDS = 1
+
+
+class _NativeLinkLog:
+    def __init__(self) -> None:
+        self.worker_ready = threading.Event()
+        self._lock = threading.Lock()
+        self._tail = bytearray()
+
+    def collect(self, stream: BinaryIO) -> None:
+        overlap = b""
+        with stream:
+            while chunk := stream.read(LOG_READ_BYTES):
+                with self._lock:
+                    excess = len(self._tail) + len(chunk) - LOG_TAIL_BYTES
+                    if excess > 0:
+                        del self._tail[:excess]
+                    self._tail.extend(chunk)
+                if not self.worker_ready.is_set():
+                    window = overlap + chunk
+                    if READY_SIGNAL in window:
+                        self.worker_ready.set()
+                    else:
+                        overlap = window[-(len(READY_SIGNAL) - 1):]
+
+    def tail(self) -> bytes:
+        with self._lock:
+            return bytes(self._tail)
 
 
 @dataclass(frozen=True)
 class NativeLinkService:
     endpoint: str
-    process: subprocess.Popen[str]
+    process: subprocess.Popen[bytes]
     config_path: Path
     root: Path
-    log_lines: list[str]
+    _log: _NativeLinkLog
+    _collector: threading.Thread
+
+    def log_tail(self) -> bytes:
+        """Snapshot the last LOG_TAIL_BYTES of merged process output."""
+        return self._log.tail()
 
 
 def _is_executable(path: Path) -> bool:
@@ -201,52 +237,50 @@ def start_nativelink(
     process = subprocess.Popen(
         [str(binary), str(config_path)],
         cwd=config_path.parent,
-        text=True,
+        bufsize=0,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    log_lines: list[str] = []
-
-    def collect_output() -> None:
-        assert process.stdout is not None
-        for line in process.stdout:
-            log_lines.append(line)
-
-    thread = threading.Thread(target=collect_output, daemon=True)
-    thread.start()
+    assert process.stdout is not None
+    log = _NativeLinkLog()
+    collector = threading.Thread(target=log.collect, args=(process.stdout,), daemon=True)
+    service = NativeLinkService(
+        endpoint=f"grpc://127.0.0.1:{frontend_port}",
+        process=process,
+        config_path=config_path,
+        root=root,
+        _log=log,
+        _collector=collector,
+    )
+    collector.start()
 
     deadline = time.monotonic() + READY_TIMEOUT_SECONDS
-    while time.monotonic() < deadline:
-        if process.poll() is not None:
-            raise RuntimeError(
-                "NativeLink exited before becoming ready:\n" + "".join(log_lines)
-            )
-        worker_ready = any(READY_SIGNAL in line for line in log_lines)
-        if _port_ready(frontend_port) and worker_ready:
-            return NativeLinkService(
-                endpoint=f"grpc://127.0.0.1:{frontend_port}",
-                process=process,
-                config_path=config_path,
-                root=root,
-                log_lines=log_lines,
-            )
-        time.sleep(0.05)
-
-    process.terminate()
+    failure = "NativeLink did not become ready"
     try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=5)
-    raise RuntimeError("NativeLink did not become ready:\n" + "".join(log_lines))
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                failure = "NativeLink exited before becoming ready"
+                break
+            if _port_ready(frontend_port) and log.worker_ready.is_set():
+                return service
+            time.sleep(0.05)
+    except BaseException:
+        stop_nativelink(service)
+        raise
+
+    stop_nativelink(service)
+    raise RuntimeError(f"{failure}:\n" + service.log_tail().decode("utf-8", errors="replace"))
 
 
 def stop_nativelink(service: NativeLinkService) -> None:
     process = service.process
-    if process.poll() is None:
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=5)
+    try:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+    finally:
+        service._collector.join(LOG_DRAIN_TIMEOUT_SECONDS)
