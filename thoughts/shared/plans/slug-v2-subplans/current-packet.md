@@ -16,7 +16,9 @@ The protected launcher candidate passed confinement on unprivileged Linux.
 The [Stage 8 public cquery formatter][stage8] matched all four pinned CrateInfo
 cases on each route, with empty stderr and one daemon generation.
 
-Finish the installed integration sweep and final review before activation.
+Finish the installed sweep and review before activation. The retained Build
+fixture passed cold and warm REAPI cases. The full fixture still fails event
+publication, failure exits and source restoration.
 Public action comparison and Rust REAPI follow. Keep atomic
 publication, existing readers, native quotas, clocks, launcher/PID1, rooted
 reads, codec and history checks. Compare equal work for timing.
