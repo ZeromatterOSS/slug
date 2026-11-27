@@ -6,13 +6,22 @@ Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS. General production remains Disabled
 
 ## Current result and next step
 
-The original adopted immutable `rules_rust+` after all 224,337,920 archive
-bytes, then completed File and Delete and materialized `tinyjson`. It reached
-1,020 computes, 57 roots and 155 records before the Source work deadline in
-later path work. All 43 shared compute samples matched the typed-deadline
-control. Cleanup returned to 168 bytes, zero FDs and zero backing. The report
-used 129,759 bytes with its prefix. Full Rust and completed-command latency/RSS
-remain open.
+The inactive original Rust cquery completed one configured result in 1,025
+attempts, with 57 roots and 155 records. It adopted `rules_rust+`, materialized
+`tinyjson` and passed terminal completion. All 59 shared compute samples matched
+the stopped control. Native cleanup returned to 168 bytes, zero FDs and zero
+backing. The report used 134,190 bytes with its prefix.
+
+Matched Source manifests reuse validated entry paths and modes and count closed
+state capacities directly. The 7,935-entry native fixture used 0.886 of control
+instructions and 0.952 of CPU, with identical inode and block facts. Bzlmod 94,
+Core 41 and three native invariants passed. Seventeen extra legacy image tests
+failed identically in the preserved control. The fresh default CLI built.
+
+The preceding original served its last General directory listing at compute
+1,020 before the next compute hit the work deadline. Total path service was
+156 ms versus 10.7 seconds in graph computation. Typed singleton rows preserve
+operation, selected owner and freshness inside the existing report cap.
 
 The [writer receipt][archive-writes] now covers trusted Archive-mode filesystem
 operations. Completed filesystem snapshots went from 520 prior comparisons
@@ -28,10 +37,10 @@ backing was again 6,301 MiB. Across the three earlier identical compute
 prefixes, Archive acquisition ranged from 3.061 to 3.795 seconds. Preserve
 the [bounded phase and typed scope cause][attribution] for exact attribution.
 
-Follow the later path frontier using its actual operation class and owner.
-Keep native quotas, clocks, launcher/PID1, rooted reads, codec and history
-checks. Compare equal work for timing. The earlier compute-859 refusal remains
-unattributed. Private message parsing, blind repeats, presumed API repair,
+Verify output against the pinned original and continue the public-command,
+action and activation gates. Keep native quotas, clocks, launcher/PID1,
+rooted reads, codec and history checks. Compare equal work for timing.
+Private message parsing, blind repeats, presumed API repair,
 diagnostic-only integration, caller pruning, Need cacheability, new route,
 syntax or global path caches, and concurrent Archive batching remain outside
 scope.
@@ -118,8 +127,9 @@ and justified public Rust cquery at a fresh unused destination. Independent
 final review precedes activation.
 
 The bounded six-archive gate and authored General glob cquery are accepted.
-Full Archive envelope, scoped HTTPS with omitted checksum, repeated Workspace
-publication, authentic Rust cquery, required action comparison, Rust REAPI,
+The authentic inactive Rust driver gate has completed. Full Archive envelope,
+scoped HTTPS with omitted checksum, repeated Workspace publication, public
+Rust cquery, required action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. Native credit,
 standalone timings and incomplete originals are each evidence for their own

@@ -257,6 +257,7 @@ struct PendingProgress {
     scope_id: Option<usize>,
     before: ChargeTotals,
     family: usize,
+    singleton_path: Option<(&'static str, &'static str, bool)>,
     indices: [usize; CONTENT_IDENTITIES],
     count: usize,
 }
@@ -271,7 +272,7 @@ fn family_name(family: usize) -> &'static str {
         "non_path_or_refused",
     ][family]
 }
-fn content_family(command: &NativeDemandCommand<'_>, demand: &PathObservationDemand) -> usize {
+fn path_family(command: &NativeDemandCommand<'_>, demand: &PathObservationDemand) -> usize {
     let PathObservationNamespace::Materialization(id) = demand.namespace() else {
         return 3;
     };
@@ -294,6 +295,18 @@ fn content_family(command: &NativeDemandCommand<'_>, demand: &PathObservationDem
         return 2;
     }
     4
+}
+fn path_operation_name(operation: PathObservationOperation) -> &'static str {
+    match operation {
+        PathObservationOperation::InputImage(_) => "input_image",
+        PathObservationOperation::Lstat => "lstat",
+        PathObservationOperation::ReadLink => "read_link",
+        PathObservationOperation::FileBytes => "file_bytes",
+        PathObservationOperation::FileDigest => "file_digest",
+        PathObservationOperation::DirectoryEntries => "directory_entries",
+        PathObservationOperation::WindowsLongPath => "windows_long_path",
+        PathObservationOperation::WindowsOptionPathLongName => "windows_option_long_name",
+    }
 }
 fn progress_kind(result: &Result<NativeDemandProgress, NativeDemandSessionError>) -> usize {
     match result {
@@ -653,7 +666,10 @@ impl NativeCommandRoot for ObservedCquery {
                         .census
                         .completed_paths(&pending.indices[..pending.count]);
                 }
-                trace.record(json!({"event":"progress_observed","attempt":attempt,"kind":progress_name(kind),"family":family_name(family),"before":pending.before.value(),"after":after.value(),"delta":delta.value()}));
+                let singleton_path = pending.singleton_path.map(|(operation, selected_owner, was_new)| {
+                    json!({"operation":operation,"selected_owner":selected_owner,"was_new":was_new})
+                });
+                trace.record(json!({"event":"progress_observed","attempt":attempt,"kind":progress_name(kind),"family":family_name(family),"singleton_path":singleton_path,"before":pending.before.value(),"after":after.value(),"delta":delta.value()}));
             } else {
                 trace.invalid_counter_delta = true;
             }
@@ -665,6 +681,16 @@ impl NativeCommandRoot for ObservedCquery {
                 scope_id,
                 before,
                 family: 0,
+                singleton_path: needs.only_path_observations().and_then(|paths| {
+                    let [demand] = paths.demands() else {
+                        return None;
+                    };
+                    Some((
+                        path_operation_name(demand.operation()),
+                        family_name(path_family(command, demand)),
+                        command.path_observations.get(demand).is_none(),
+                    ))
+                }),
                 indices: [0; CONTENT_IDENTITIES],
                 count: 0,
             };
@@ -681,7 +707,7 @@ impl NativeCommandRoot for ObservedCquery {
                         continue;
                     }
                     let new = command.path_observations.get(demand).is_none();
-                    let family = content_family(command, demand);
+                    let family = path_family(command, demand);
                     if new {
                         pending.family = if pending.family == 0 || pending.family == family {
                             family

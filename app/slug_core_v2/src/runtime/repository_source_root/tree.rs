@@ -74,10 +74,11 @@ pub(super) fn capture(
     let mut index = 0;
     while index < entries.len() {
         check(scope, active)?;
-        let path = entries[index].path().to_owned();
         let framed = stats[index];
         match entries[index].node() {
             Node::Directory => {
+                // Reading this directory appends to the same entry vector.
+                let path = entries[index].path().to_owned();
                 if let Some(target) = destination {
                     target.ensure_directory(Path::new(&path), 0o755)?;
                 }
@@ -131,15 +132,17 @@ pub(super) fn capture(
                 })?;
             }
             Node::File(_) => {
+                let entry = &mut entries[index];
+                let path = Path::new(entry.path());
                 let mut output = destination
                     .map(|d| {
                         d.open_write_regular(
-                            Path::new(&path),
+                            path,
                             super::super::super::repository_root_io::WriteMode::CreateNew,
                         )
                     })
                     .transpose()?;
-                let captured = source.read_file(Path::new(&path), &running, |bytes| {
+                let captured = source.read_file(path, &running, |bytes| {
                     if let Some(file) = &mut output {
                         crate::runtime::repository_io::source_service::write_counted(
                             file,
@@ -156,19 +159,16 @@ pub(super) fn capture(
                 if let (Some(target), Some(file)) = (destination, output.as_ref()) {
                     target.chmod_regular(file, (framed.st_mode & 0o7777) as u32)?;
                 }
-                entries[index] = Entry::new(
-                    CompactString::new(path),
-                    (framed.st_mode & 0o7777) as u16,
-                    Node::File(
-                        FileContentDigest::new(captured.digest, framed.st_size as u64)
-                            .ok_or(PhysicalRootError::Snapshot)?,
-                    ),
-                )
-                .map_err(PhysicalRootError::Protocol)?;
+                entry.replace_node(Node::File(
+                    FileContentDigest::new(captured.digest, framed.st_size as u64)
+                        .ok_or(PhysicalRootError::Snapshot)?,
+                ));
             }
             Node::Link(_) => {
+                let entry = &mut entries[index];
+                let path = Path::new(entry.path());
                 let mut buffer = [0u8; 257];
-                let target = source.read_link(Path::new(&path), &mut buffer)?;
+                let target = source.read_link(path, &mut buffer)?;
                 let target =
                     std::str::from_utf8(target).map_err(|_| PhysicalRootError::Snapshot)?;
                 names = add(names, target.len())?;
@@ -176,17 +176,12 @@ pub(super) fn capture(
                     return Err(PhysicalRootError::Resource);
                 }
                 if let Some(destination) = destination {
-                    destination.symlink_relative(Path::new(&path), Path::new(target))?;
+                    destination.symlink_relative(path, Path::new(target))?;
                 }
-                if !super::super::seal::unchanged(&framed, &source.lstat(Path::new(&path))?) {
+                if !super::super::seal::unchanged(&framed, &source.lstat(path)?) {
                     return Err(PhysicalRootError::Snapshot);
                 }
-                entries[index] = Entry::new(
-                    CompactString::new(path),
-                    (framed.st_mode & 0o7777) as u16,
-                    Node::Link(CompactString::new(target)),
-                )
-                .map_err(PhysicalRootError::Protocol)?;
+                entry.replace_node(Node::Link(CompactString::new(target)));
             }
         }
         index += 1;

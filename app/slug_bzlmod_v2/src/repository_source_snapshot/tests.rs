@@ -78,12 +78,12 @@ fn digest_state_enforces_exact_file_and_total_limits_without_body_retention() {
     assert_eq!(state.file_bytes(), REPOSITORY_SOURCE_SNAPSHOT_TOTAL_BYTES);
     assert_eq!(forecast, state.retained_storage_bytes().unwrap());
     assert!(forecast < 64 * 1024);
+    let mut excess_file = file("a", 1);
+    excess_file.replace_node(RepositorySourceSnapshotNode::File(
+        FileContentDigest::new([1; 32], REPOSITORY_SOURCE_SNAPSHOT_FILE_BYTES + 1).unwrap(),
+    ));
     assert_eq!(
-        RepositorySourceSnapshotState::new(
-            r.clone(),
-            vec![root(), file("a", REPOSITORY_SOURCE_SNAPSHOT_FILE_BYTES + 1)]
-        )
-        .unwrap_err(),
+        RepositorySourceSnapshotState::new(r.clone(), vec![root(), excess_file]).unwrap_err(),
         RepositoryWorkspaceError::StateLimit
     );
     let mut excess = state.entries().to_vec();
@@ -91,6 +91,68 @@ fn digest_state_enforces_exact_file_and_total_limits_without_body_retention() {
     assert_eq!(
         RepositorySourceSnapshotState::new(r, excess).unwrap_err(),
         RepositoryWorkspaceError::StateLimit
+    );
+}
+
+#[test]
+fn closed_state_sizing_counts_path_and_replaced_link_capacity() {
+    let r = reservation(7, 1);
+    let capture = |capacity| {
+        let mut path = CompactString::with_capacity(capacity);
+        path.push_str("link");
+        let mut target = CompactString::with_capacity(capacity);
+        target.push_str("data");
+        let string_capacity = path.capacity() + target.capacity();
+        let mut link = RepositorySourceSnapshotEntry::new(
+            path,
+            0o777,
+            RepositorySourceSnapshotNode::Directory,
+        )
+        .unwrap();
+        link.replace_node(RepositorySourceSnapshotNode::Link(target));
+        assert_eq!((link.path(), link.mode()), ("link", 0o777));
+        let entries = vec![root(), file("data", 1), link];
+        let forecast =
+            RepositorySourceSnapshotState::retained_storage_bytes_for(&r, &entries).unwrap();
+        let state = RepositorySourceSnapshotState::new(r.clone(), entries).unwrap();
+        let tree = state.tree_storage_bytes().unwrap();
+        assert_eq!(state.retained_storage_bytes().unwrap(), forecast);
+        assert_eq!(tree + r.retained_storage_bytes().unwrap(), forecast);
+        (state, tree, string_capacity)
+    };
+    let (inline, inline_bytes, inline_capacity) = capture(0);
+    let (heap, heap_bytes, heap_capacity) = capture(512);
+    assert_eq!(inline, heap);
+    assert!(heap_capacity > inline_capacity);
+    assert_eq!(heap_bytes - inline_bytes, heap_capacity - inline_capacity);
+}
+
+#[test]
+fn state_checks_joined_path_limit_for_a_valid_entry() {
+    let leaf = file("a", 1);
+    let leaf_len = leaf.path().len();
+    let component = format!("/{}", "d".repeat(255));
+    let prefix = format!("/__slug_repositories__{}", component.repeat(15));
+    let reservation_at = |joined_len: usize| {
+        let suffix = "d".repeat(joined_len - prefix.len() - leaf_len - 2);
+        let display = format!("{prefix}/{suffix}");
+        assert_eq!(display.len() + 1 + leaf_len, joined_len);
+        Arc::new(
+            RepositorySourceSnapshotReservation::new(
+                request(7),
+                NormalizedAbsolutePath::new(display).unwrap(),
+                PathObservationInstanceId::new(1),
+            )
+            .unwrap(),
+        )
+    };
+    assert!(
+        RepositorySourceSnapshotState::new(reservation_at(4096), vec![root(), leaf.clone()])
+            .is_ok()
+    );
+    assert_eq!(
+        RepositorySourceSnapshotState::new(reservation_at(4097), vec![root(), leaf]).unwrap_err(),
+        RepositoryWorkspaceError::InvalidPath
     );
 }
 
@@ -106,12 +168,13 @@ fn complete_tree_rejects_missing_parents_aliases_and_escaping_literal_links() {
         assert!(RepositorySourceSnapshotState::new(r.clone(), entries).is_err());
     }
     for link in ["/absolute", "../outside", "a/../../outside"] {
-        let e = RepositorySourceSnapshotEntry::new(
+        let mut e = RepositorySourceSnapshotEntry::new(
             "link".into(),
             0o777,
-            RepositorySourceSnapshotNode::Link(link.into()),
+            RepositorySourceSnapshotNode::Directory,
         )
         .unwrap();
+        e.replace_node(RepositorySourceSnapshotNode::Link(link.into()));
         assert_eq!(
             RepositorySourceSnapshotState::new(r.clone(), vec![root(), e]).unwrap_err(),
             RepositoryWorkspaceError::InvalidPath

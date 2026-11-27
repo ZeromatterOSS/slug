@@ -38,10 +38,11 @@ Packet: WP-7-425-m7a-general-repository-process
 
 The [active contract](./slug-v2-subplans/current-packet.md) has General
 repository execution Disabled in production. Both GCC and Homebrew profiles
-have retired. The next step is to attribute work reached by authentic Rust
-cquery under the existing finite observation contract.
+have retired. The authentic Rust cquery completed through the inactive Native
+driver. Compare its result with the pinned oracle and continue the admission,
+action and public-command gates.
 
-Authentic Rust analysis, required action comparison, Rust REAPI execution,
+Public Rust cquery, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.
 
 ### Bootstrap command queue

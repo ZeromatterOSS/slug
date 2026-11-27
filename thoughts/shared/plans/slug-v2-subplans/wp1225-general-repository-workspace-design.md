@@ -617,6 +617,10 @@ Implementation splits pure protocol/provenance in Bzlmod, SourceRoot/sealing and
 rooted archive/Local kernels in Core private leaves, and route/Need/replay plus
 catalog projection in existing source owners. Reuse Arc/Allocative, compact
 strings/maps and RootIo hashing, with no global cache/interner or donor import.
+Each Source entry owns its checked relative path and mode. A framed file or
+link capture fills its node while preserving those fields. Tree admission
+checks the display path and all structural, node and quota bounds. Closed
+immutable states recount allocation capacities for each owner.
 Proof must cover actual original arbitrary argv using all source families,
 fresh A/B ownership, Local mutation/link refusals, complete-set rejection,
 cleanup/credits and a greater-than64 MiB source beside the64 MiB writable root.
@@ -891,8 +895,12 @@ retirement/refund evidence. A finite supervised run chooses the next generic
 API/archive implementation from its actual outcome, not inferred cap arithmetic.
 General's exact-body state/history must not be replaced with digest-only Source
 state to make extraction fit. Fixture preparation, input corrections and that
-API work stay in this capability. Full Archive, authentic Rust completion and
+API work stay in this capability. Full Archive, public Rust completion and
 equivalent-command RSS remain unproved until their own evidence is complete.
+
+The inactive original completed with one configured result in 1,025 attempts.
+The terminal handler completed and native credits returned to baseline. The
+public command, action comparison, and matched latency/RSS gates remain open.
 
 The [frontier receipt](wp1225-rust-frontier-acceptance-2026-11-08.json) establishes
 a genuine admission conflict:43 initial states plus85 completed records fill

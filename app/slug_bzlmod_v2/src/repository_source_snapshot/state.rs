@@ -12,10 +12,9 @@ pub struct RepositorySourceSnapshotEntry {
     mode: u16,
     node: RepositorySourceSnapshotNode,
 }
-fn relative(path: &str, root: bool) -> bool {
-    (root && path.is_empty())
-        || (!path.is_empty()
-            && path.len() <= REPOSITORY_SOURCE_SNAPSHOT_PATH
+fn relative(path: &str) -> bool {
+    path.is_empty()
+        || (path.len() <= REPOSITORY_SOURCE_SNAPSHOT_PATH
             && !path.contains(['\0', '\\'])
             && path
                 .split('/')
@@ -28,7 +27,7 @@ impl RepositorySourceSnapshotEntry {
         mode: u16,
         node: RepositorySourceSnapshotNode,
     ) -> Result<Self, RepositoryWorkspaceError> {
-        if !relative(&path, true) || mode & !0o7777 != 0 {
+        if !relative(&path) || mode & !0o7777 != 0 {
             return Err(RepositoryWorkspaceError::InvalidPath);
         }
         Ok(Self { path, mode, node })
@@ -41,6 +40,21 @@ impl RepositorySourceSnapshotEntry {
     }
     pub fn node(&self) -> &RepositorySourceSnapshotNode {
         &self.node
+    }
+
+    /// Replace the discovered node with the captured contents while keeping the
+    /// validated path and mode. State construction still validates tree rules.
+    #[doc(hidden)]
+    pub fn replace_node(&mut self, node: RepositorySourceSnapshotNode) {
+        self.node = node;
+    }
+
+    fn metadata_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
+        let link = match &self.node {
+            RepositorySourceSnapshotNode::Link(target) => target.capacity(),
+            _ => 0,
+        };
+        add(self.path.capacity(), link)
     }
 }
 
@@ -93,12 +107,28 @@ impl RepositorySourceSnapshotState {
         add(tree, reservation.retained_storage_bytes()?)
     }
     pub fn retained_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
-        Self::retained_storage_bytes_for(&self.reservation, &self.entries)
+        add(
+            self.tree_storage_bytes()?,
+            self.reservation.retained_storage_bytes()?,
+        )
     }
     /// The entire tree allocation, excluding its independently covered source
     /// request/reservation. No file payload allocation exists in this state.
     pub fn tree_storage_bytes(&self) -> Result<usize, RepositoryWorkspaceError> {
-        Self::validate_entries(&self.reservation, &self.entries)
+        // Once published, entries are immutable and have passed full tree
+        // admission. Recount their actual allocation capacities for each owner.
+        self.entries
+            .iter()
+            .try_fold(Self::metadata_base(self.entries.len())?, |bytes, entry| {
+                add(bytes, entry.metadata_bytes()?)
+            })
+    }
+
+    fn metadata_base(entries: usize) -> Result<usize, RepositoryWorkspaceError> {
+        add(
+            array::<Self>(1)?,
+            array::<RepositorySourceSnapshotEntry>(entries)?,
+        )
     }
     fn validate_entries(
         reservation: &RepositorySourceSnapshotReservation,
@@ -110,20 +140,16 @@ impl RepositorySourceSnapshotState {
         if entries[0].path() != "" || entries[0].node != RepositorySourceSnapshotNode::Directory {
             return Err(RepositoryWorkspaceError::MissingRoot);
         }
-        let mut metadata = add(
-            array::<Self>(1)?,
-            array::<RepositorySourceSnapshotEntry>(entries.len())?,
-        )?;
+        let mut metadata = Self::metadata_base(entries.len())?;
         let mut names = 0usize;
         let mut file_bytes = 0u64;
         let display_len = reservation.display_root().as_path().as_os_str().len();
         for (i, e) in entries.iter().enumerate() {
-            if !relative(e.path(), true)
-                || e.mode & !0o7777 != 0
-                || add(
-                    add(display_len, usize::from(!e.path.is_empty()))?,
-                    e.path.len(),
-                )? > 4096
+            // Entry construction owns the intrinsic path and mode checks.
+            if add(
+                add(display_len, usize::from(!e.path.is_empty()))?,
+                e.path.len(),
+            )? > 4096
             {
                 return Err(RepositoryWorkspaceError::InvalidPath);
             }
@@ -141,7 +167,6 @@ impl RepositorySourceSnapshotState {
                 }
             }
             names = add(names, e.path.len())?;
-            metadata = add(metadata, e.path.capacity())?;
             match &e.node {
                 RepositorySourceSnapshotNode::Directory => {}
                 RepositorySourceSnapshotNode::File(d) => {
@@ -180,9 +205,9 @@ impl RepositorySourceSnapshotState {
                         }
                     }
                     names = add(names, target.len())?;
-                    metadata = add(metadata, target.capacity())?;
                 }
             }
+            metadata = add(metadata, e.metadata_bytes()?)?;
             if names > REPOSITORY_SOURCE_SNAPSHOT_NAMES
                 || metadata > REPOSITORY_SOURCE_SNAPSHOT_METADATA
             {
