@@ -12,9 +12,11 @@ attempts, with 57 roots and 155 records. It adopted `rules_rust+`, materialized
 the stopped control. Native cleanup returned to 168 bytes, zero FDs and zero
 backing. The report used 134,190 bytes with its prefix.
 
-The original exercised live scoped HTTPS acquisition for five toolchain
-archives whose rules supplied no expected checksum. The [staged Bazel 9.2.0
-oracle][rust-oracle] completed all 11 commands. Registration and CrateInfo
+The original fetched five HTTPS toolchain archives with omitted checksums.
+A controlled native A/warm-A/B/restored-A test at one HTTPS URL verified one
+GET per command through Starlark replay, exact SHA/SRI and bytes, and full bank
+refund. Both file and native digest-replay controls passed. The [staged Bazel
+9.2.0 oracle][rust-oracle] completed all 11 commands. Registration and CrateInfo
 stdout matched. The direct edge set matched with one reorder, and three
 stderr rows differed.
 All four action shapes passed. Rustc's key changed with edition and restored,
@@ -149,9 +151,9 @@ and justified public Rust cquery at a fresh unused destination. Independent
 final review precedes activation.
 
 The bounded six-archive gate and authored General glob cquery are accepted.
-The authentic inactive Rust driver gate has completed. Full Archive envelope,
-same-URL scoped HTTPS freshness with omitted checksum, repeated Workspace
-publication, public Rust cquery, required public action comparison, Rust REAPI,
+The authentic inactive Rust driver and scoped HTTPS freshness gates have
+completed. Full Archive envelope, repeated Workspace publication, public Rust
+cquery, required public action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. Native credit,
 standalone timings and incomplete originals are each evidence for their own

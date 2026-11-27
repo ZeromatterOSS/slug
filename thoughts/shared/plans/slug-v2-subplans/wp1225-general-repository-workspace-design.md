@@ -1610,12 +1610,13 @@ B/A semantic checks. Keep causal tests unchanged for GREEN; test multi-chunk/
 empty/correct/wrong `Some` behavior and reuse mismatch/mirror/frame/EOF/cancel
 controls. A private `cfg(test)` TLS Copy witness retains no input or Scope.
 
-There is no existing successful local scoped-TLS fixture. Shared helper proof,
-actual file/closed capture, real Hyper-duplex and legacy scripted transport
-guards compose the arithmetic boundary; do not call scripted plain transport
-successful General HTTPS-None proof. No global trust override, TLS permission
-bypass or new CA seam is selected. Independent review accepts that composed arithmetic evidence scope; successful
-General HTTPS-None end-to-end proof remains separate.
+The [loopback TLS fixture](../../../../scripts/v2_optional_archive_https.py)
+runs the exact native Core test with a compiled `SLUG_V2_BIN` under a finite
+process-tree supervisor. A temporary CA is trusted only in the test process
+environment through the ordinary verifier. One URL served A/warm-A/B/restored-A
+to actual `download_and_extract`, with exactly one GET per command through
+Starlark replay. Actual SHA/SRI and bytes matched, leases stayed distinct and
+the bank returned to baseline. File freshness and native digest replay passed.
 
 A temporary fixed Core observer must show positive actual-original `None`
 payload, zero acquisition hashing for it, and positive mandatory captured-FD

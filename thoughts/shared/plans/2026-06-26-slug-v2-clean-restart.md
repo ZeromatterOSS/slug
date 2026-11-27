@@ -40,8 +40,8 @@ The [active contract](./slug-v2-subplans/current-packet.md) has General
 repository execution Disabled in production. Both GCC and Homebrew profiles
 have retired. The inactive Native Rust cquery matched the pinned CrateInfo and
 action projection across cold, warm, edition change and restoration on one
-runtime within the fixed bank. Continue the public-command and activation
-gates.
+runtime within the fixed bank. Same-URL HTTPS freshness with an omitted
+checksum passed. Continue the public-command and activation gates.
 
 Public Rust cquery, required action comparison, Rust REAPI execution,
 complete Slug closure, Stage 10 and whole-goal memory fit remain open.

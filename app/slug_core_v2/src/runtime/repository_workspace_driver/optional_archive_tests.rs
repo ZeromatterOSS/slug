@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use base64::Engine as _;
 use sha2::Digest as _;
 use slug_bzlmod_v2::RepositoryWorkspaceNode;
@@ -26,13 +28,41 @@ fn archive(payload: &[u8]) -> Vec<u8> {
 #[test]
 #[ignore = "actual compiled CLI + original optional-checksum archive A/B/A; finite native supervisor required"]
 fn native_original_optional_archive_is_fresh_across_a_b_a() {
+    let input = tempfile::tempdir().unwrap();
+    let input_path = input.path().join("source.tar.gz");
+    let url = url::Url::from_file_path(&input_path).unwrap();
+    assert_optional_archive_freshness(&url, &input_path, |_| {});
+}
+
+#[test]
+#[ignore = "actual compiled CLI and verified loopback TLS; run via scripts/v2_optional_archive_https.py"]
+fn native_original_optional_https_archive_is_fresh_across_a_b_a() {
+    let input = std::path::PathBuf::from(
+        std::env::var_os("SLUG_TEST_ARCHIVE_HTTPS_DIR").expect("start the loopback TLS fixture"),
+    );
+    let url = url::Url::parse(&std::fs::read_to_string(input.join("url")).unwrap()).unwrap();
+    assert_eq!(url.scheme(), "https");
+    assert_eq!(url.host_str(), Some("127.0.0.1"));
+    let count_path = input.join("requests");
+    assert_eq!(std::fs::read_to_string(&count_path).unwrap(), "0");
+    assert_optional_archive_freshness(&url, &input.join("source.tar.gz"), |completed| {
+        assert_eq!(
+            std::fs::read_to_string(&count_path).unwrap(),
+            completed.to_string(),
+            "each command acquires once even when Starlark replays the archive record"
+        );
+    });
+}
+
+fn assert_optional_archive_freshness(
+    url: &url::Url,
+    input_path: &Path,
+    assert_completed: impl Fn(usize),
+) {
     // Authored original Starlark uses the normal public repository API. The
     // archive/result/state below are produced by that invocation, not injected.
     // Bazel 9.2 download_and_extract returns the actual sha256 and integrity
     // when both expected checksums are omitted (upstream 8220c6198837).
-    let input = tempfile::tempdir().unwrap();
-    let input_path = input.path().join("source.tar.gz");
-    let url = url::Url::from_file_path(&input_path).unwrap();
     let source = format!(
         r#"
 def _repository(ctx):
@@ -74,7 +104,7 @@ ext = module_extension(implementation=_extension)
     .enumerate()
     {
         // Same URL, same authored source and module, no distdir/cache input.
-        std::fs::write(&input_path, compressed).unwrap();
+        std::fs::write(input_path, compressed).unwrap();
         let digest: [u8; 32] = sha2::Sha256::digest(compressed).into();
         let sri = format!(
             "sha256-{}",
@@ -109,6 +139,7 @@ ext = module_extension(implementation=_extension)
             "{:#?}",
             accepted.terminal_for_test()
         );
+        assert_completed(ordinal + 1);
         let state = runtime.native_demand_sessions.state.lock().unwrap();
         assert!(matches!(state.phase, NativeDemandLeasePhase::Idle));
         let requests = state.accepted.selected.repository_requests();
