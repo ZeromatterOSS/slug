@@ -10,6 +10,10 @@ use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderOccurrence;
 
 use super::*;
+use crate::runtime::TerminalOutput;
+use crate::runtime::capture_cquery_starlark_file;
+use crate::runtime::format_cquery_starlark_file;
+use crate::runtime::publish_cquery_starlark_file;
 
 const PROVIDERS: &str = "@@rules_rust+//rust/private:providers.bzl";
 
@@ -101,9 +105,52 @@ fn check_action_outputs([rustc, symlink_tree, runfiles_tree]: [&ConfiguredAction
     }
 }
 
+fn check_formatter(
+    accepted: crate::runtime::AcceptedCommand<CqueryCommandTerminal>,
+    (name, source): &(String, String),
+    case: &str,
+    edition: &str,
+) {
+    // The pinned Bazel crate_info rows captured in expected/oracle.json.
+    let expected = format!(
+        "label=@@//pkg:probe owner=@@//pkg:probe name=probe type=bin edition={edition} \
+         root=pkg/main.rs output=pkg/probe deps=[\"@@//pkg:support\"] data=[\"pkg/data.txt\"]\n"
+    );
+    let mut formatter_exact = false;
+    let projected = accepted.project(|terminal| {
+        let evaluation = terminal.result.as_ref().as_ref().ok().unwrap();
+        let output = format_cquery_starlark_file(evaluation, name, source);
+        formatter_exact = output == TerminalOutput::new(0, expected.clone(), String::new());
+        output
+    });
+    let (_terminal, exit_code, stdout, stderr) =
+        publish_cquery_starlark_file(projected).into_parts();
+    let exact = formatter_exact && exit_code == 0 && stdout == expected;
+    let matched_digest = exact.then(|| hex::encode(sha2::Sha256::digest(stdout.as_bytes())));
+    println!(
+        "WP425_RUST_FORMATTER {case} {edition} exact={exact} exit={exit_code} stdout_bytes={} published_stderr_bytes={} matched_stdout_sha256={matched_digest:?}",
+        stdout.len(),
+        stderr.len(),
+    );
+    assert!(
+        exact,
+        "{case} formatter differs from the pinned Bazel CrateInfo row"
+    );
+}
+
 #[test]
 #[ignore = "four actual sequential Rust cqueries, each under native policy; staged sources and finite supervisor required"]
 fn native_original_rust_toolchain_action_edition_comparison() {
+    rust_edition_comparison(false);
+}
+
+#[test]
+#[ignore = "four actual sequential Rust cqueries with metered formatting; staged sources and finite supervisor required"]
+fn native_original_rust_toolchain_formatter_edition_comparison() {
+    rust_edition_comparison(true);
+}
+
+fn rust_edition_comparison(with_formatter: bool) {
     let config_path = std::env::var_os("SLUG_NATIVE_RUST_INPUTS").expect("staged Rust inputs");
     let config = read_config(Path::new(&config_path)).unwrap();
     let staged = Path::new(config["workspace"].as_str().unwrap());
@@ -118,6 +165,10 @@ fn native_original_rust_toolchain_action_edition_comparison() {
         fs::copy(staged.join(relative), destination).unwrap();
     }
     verify_inputs(&config, workspace);
+    let formatter = with_formatter.then(|| {
+        capture_cquery_starlark_file(&workspace.join(FORMATTER_FILE))
+            .expect("capture the verified original Rust formatter")
+    });
     let module = workspace.join("MODULE.bazel");
     let edition_a = fs::read_to_string(&module).unwrap();
     let token = "edition = \"2024\"";
@@ -268,7 +319,11 @@ fn native_original_rust_toolchain_action_edition_comparison() {
             initial = Some(actions.map(Clone::clone));
         }
         let attempts = driven.attempts;
-        drop(driven);
+        if let Some(formatter) = &formatter {
+            check_formatter(driven.accepted, formatter, case, edition);
+        } else {
+            drop(driven);
+        }
         let expected_module = if edition == "2021" {
             &edition_b
         } else {

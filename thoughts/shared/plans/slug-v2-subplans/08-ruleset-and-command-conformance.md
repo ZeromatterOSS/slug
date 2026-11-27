@@ -176,16 +176,17 @@ checkpoints, and refuses native export hooks. Closed bytecode rejects
 unmodeled instructions and skips eager error frames. Bounded freeze preserves
 deferred definitions and captures. `print` and `fail` use bounded text and
 admitted locations. Native file and symlink depsets use iterative projection.
-Frozen allocations and owner attachment have admission primitives. Wire the
-shared materialization budget and verify terminal diagnostics before activation.
-Resource outcomes are Slug-native.
+Frozen allocation and owner attachment share the formatter request budget.
+Setup resource refusals use Slug's request-error exit.
 Bazel 9.2's `StarlarkOutputFormatterCallback` and `configured_query_test.sh`
 define setup and partial-output semantics.
 
-First prove setup failure, partial output, formatter edit and recovery on real
-custom providers through both command routes. Then run the unchanged Rust
-fixture on the reviewed activation candidate and compare with pinned Bazel.
-Public action comparison and Rust REAPI follow this cquery gate.
+The isolated command routes passed setup failure, partial output, formatter
+edit and recovery on real providers. The inactive General driver matched
+pinned Rust formatter stdout for initial, warm, changed and restored editions.
+Public Rust still needs the protected production launcher and a successful
+comparison through both routes. Public action comparison and Rust REAPI
+follow this cquery gate.
 
 Initial modules:
 

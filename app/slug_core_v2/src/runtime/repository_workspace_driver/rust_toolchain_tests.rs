@@ -45,13 +45,14 @@ const EVENT_BYTES: usize = EVENT_TRACE_BYTES / (PREFIX_EVENTS + 1);
 const CONFIG_BYTES: usize = 128 * 1024;
 const REASON_BYTES: usize = 16 * 1024;
 const ROW_LIMIT: usize = 8;
+const FORMATTER_FILE: &str = "cquery_format.bzl";
 const OWNER_FILES: [&str; 6] = [
     "MODULE.bazel",
     "pkg/BUILD.bazel",
     "pkg/main.rs",
     "pkg/lib.rs",
     "pkg/data.txt",
-    "cquery_format.bzl",
+    FORMATTER_FILE,
 ];
 
 #[derive(Default)]

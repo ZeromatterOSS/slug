@@ -4143,6 +4143,12 @@ impl CqueryCommandEvaluation {
     pub fn analyses(&self) -> impl Iterator<Item = &ConfiguredNodeResult> {
         self.targets.iter().map(|target| target.analysis.as_ref())
     }
+
+    pub(super) fn formatter_rows(&self) -> impl Iterator<Item = (&ConfiguredNodeResult, &str)> {
+        self.targets
+            .iter()
+            .map(|target| (target.analysis.as_ref(), target.display_label.as_ref()))
+    }
 }
 
 fn cquery_target_kind(
