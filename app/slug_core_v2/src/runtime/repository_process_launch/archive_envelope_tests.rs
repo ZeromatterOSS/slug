@@ -11,6 +11,26 @@ use crate::runtime::repository_io::ArchiveFailureStage;
 
 const MIB: u64 = 1024 * 1024;
 
+#[path = "archive_tree_history_tests.rs"]
+mod tree_history;
+
+fn verified_archive(file: &tempfile::NamedTempFile) -> (RepositoryWorkspaceOperation, [u8; 32]) {
+    let digest = sha2::Sha256::digest(std::fs::read(file.path()).unwrap()).into();
+    let archive = GeneratedRepositoryArchiveEffect::new(
+        Arc::from([url::Url::from_file_path(file.path())
+            .unwrap()
+            .to_string()
+            .into()]),
+        Some(digest),
+        "".into(),
+        GeneratedRepositoryArchiveFormat::TarGz,
+        "".into(),
+        "".into(),
+    )
+    .unwrap();
+    (RepositoryWorkspaceOperation::Archive(archive), digest)
+}
+
 struct ArchiveInput {
     _file: tempfile::NamedTempFile,
     operation: RepositoryWorkspaceOperation,
@@ -43,22 +63,10 @@ impl ArchiveInput {
             padding,
         );
         gzip.finish().unwrap();
-        let digest = sha2::Sha256::digest(std::fs::read(file.path()).unwrap()).into();
-        let archive = GeneratedRepositoryArchiveEffect::new(
-            Arc::from([url::Url::from_file_path(file.path())
-                .unwrap()
-                .to_string()
-                .into()]),
-            Some(digest),
-            "".into(),
-            GeneratedRepositoryArchiveFormat::TarGz,
-            "".into(),
-            "".into(),
-        )
-        .unwrap();
+        let (operation, digest) = verified_archive(&file);
         Self {
             _file: file,
-            operation: RepositoryWorkspaceOperation::Archive(archive),
+            operation,
             digest,
             decoded,
             name,

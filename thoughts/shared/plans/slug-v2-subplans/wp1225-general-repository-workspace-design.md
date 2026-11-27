@@ -314,7 +314,13 @@ original FD measured 1/1/2 pages for 4095/4096/4097-byte files and increased ino
 use for an admitted literal link. Four trusted File operations also sealed
 exactly 4 MiB of complete paths over 2,305 entries. A matched leaf spelling
 with one extra byte refused during capture. Both lanes retired to baseline.
-Maximum entry/body and physical quota evidence remains open.
+Three verified directory archives sealed 81,921 entries with 89,761 charged
+inodes and 15,166,862 bytes of history. Reordering those same archives reached
+the history refusal after full decoding, then returned the bank to baseline.
+At most 32,768 entries can be added per Archive record. A 131,072-entry command
+would retain at least 327,680 entry occurrences across four states, exceeding
+16 MiB in entry and path storage alone.
+The standalone entry sampler, body and physical quota evidence remain open.
 
 Process snapshot bounds: **8192 entries INCLUDING root**, depth<=64 below root,
 each logical absolute demand/path<=4096 bytes (including display prefix), and

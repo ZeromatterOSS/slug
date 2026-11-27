@@ -32,8 +32,9 @@ matched the pinned comparison. Peak backing was 7,747,932,160 bytes, retained
 
 The native Archive launcher verified 512 MiB/call and 1 GiB cumulative decode
 at exact and +1, physical page rounding and link inode charging. Complete-tree
-paths sealed at 4 MiB and refused +1 with full retirement. Seven Archive tests
-passed. The remaining maximum-tree envelope is open.
+paths sealed at 4 MiB and refused +1 with full retirement. A matched archive
+reorder sealed 81,921 entries in one order and hit the 16 MiB history limit in
+the other. Eight native Archive checks passed. Maximum-tree evidence is open.
 
 Repeated Workspace publication passed cold, warm, changed and restored inputs
 with contained runfiles and alias links. The readonly child verified prior
