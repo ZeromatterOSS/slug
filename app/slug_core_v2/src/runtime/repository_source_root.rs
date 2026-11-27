@@ -265,9 +265,24 @@ impl SourceRootBuilder {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<tree::CapturedTree, PhysicalRootError> {
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let probe = crate::runtime::probe_observer::capture();
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let capture_span = probe
+            .as_ref()
+            .filter(|_| self.frozen_archive_quota.is_none())
+            .and_then(|probe| {
+                use crate::runtime::probe_observer::workspace_progress::Stage;
+                probe.workspace_progress_span(Stage::SourceInitialManifest)
+            });
         self.check(scope, active)?;
         let io = RootIo::new(&self.file, limits(&self.reservation)?)?;
-        tree::capture(&io, &self.reservation, None, &self.resources, scope, active)
+        let captured = tree::capture(&io, &self.reservation, None, &self.resources, scope, active)?;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(span) = capture_span {
+            span.finish();
+        }
+        Ok(captured)
     }
     pub(super) fn seal(
         self,

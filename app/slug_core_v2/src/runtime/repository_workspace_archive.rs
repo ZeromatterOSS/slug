@@ -380,7 +380,7 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
             Some(scope),
             record_open,
         )
-        .map_err(PhysicalRootError::Mutation)?;
+        .map_err(|error| PhysicalRootError::Mutation(error).with_source_cause(scope))?;
         self.check_scope(scope, active)?;
         if !unchanged(before, &file.metadata()?) {
             return Err(PhysicalRootError::Snapshot);

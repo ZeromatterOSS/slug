@@ -753,7 +753,23 @@ fn drive<L: ProcessLaunch>(
                 root,
                 proof,
             );
-            return owner.finish_reaped(capture);
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let post_reap_span = probe.and_then(|probe| {
+                use crate::runtime::probe_observer::workspace_progress::Stage;
+                if owner.mode() == RunMode::FinalizeSourceArchive {
+                    probe.workspace_progress_span(Stage::SourcePostReap)
+                } else {
+                    None
+                }
+            });
+            let finished = owner.finish_reaped(capture);
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if finished.is_ok()
+                && let Some(span) = post_reap_span
+            {
+                span.finish();
+            }
+            return finished;
         }
         let child = driver.child.as_ref().unwrap();
         let captures = driver.captures.as_ref().unwrap();

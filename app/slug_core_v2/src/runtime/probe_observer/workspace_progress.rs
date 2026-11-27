@@ -26,6 +26,14 @@ pub(crate) enum Stage {
     FilesystemSnapshot,
     BootstrapClosedStreamPoll,
     ExecuteClosedStreamPoll,
+    SourceInputCapture,
+    SourceBootstrap,
+    SourceArchivePopulate,
+    SourceInitialManifest,
+    SourceState,
+    SourceFinalize,
+    SourcePostReap,
+    SourceAdoption,
 }
 
 #[derive(Clone, Copy)]
@@ -57,7 +65,7 @@ impl Stage {
     }
 }
 
-const LABELS: [&str; 15] = [
+const LABELS: [&str; 23] = [
     "preflight",
     "reserve_and_initialize",
     "source_snapshot",
@@ -73,6 +81,14 @@ const LABELS: [&str; 15] = [
     "filesystem_snapshot_and_record",
     "bootstrap_closed_stream_poll",
     "execute_closed_stream_poll",
+    "source_input_capture",
+    "source_bootstrap",
+    "source_archive_populate",
+    "source_initial_manifest",
+    "source_state",
+    "source_finalize",
+    "source_post_reap",
+    "source_adoption",
 ];
 
 #[derive(Clone, Copy)]
@@ -203,6 +219,7 @@ impl Totals {
             "archive_substages_are_nested_and_exclude_replay": true,
             "archive_acquire_and_verify_are_nested_in_verified_capture": true,
             "filesystem_substages_are_nested_and_exclude_replay": true,
+            "source_substages_overlap_snapshot_and_post_reap_overlaps_finalize": true,
             "overlaps_outer_progress_wall": true,
             "archive_stages_use_probe_thread": true,
             "xz_calls_within_rooted_extract": {
@@ -270,6 +287,43 @@ impl Drop for Span<'_> {
         if let Some((kind, work)) = snapshot_work {
             totals.snapshots[kind as usize][usize::from(!self.completed)].merge(work);
         }
+    }
+}
+
+/// Elapsed wall time for a Source stage that can suspend. It carries no
+/// thread-local work collector, so it can live across the worker await.
+#[must_use]
+pub(crate) struct Interval<'a> {
+    totals: &'a Mutex<Totals>,
+    stage: Stage,
+    start: Instant,
+    completed: bool,
+}
+
+impl<'a> Interval<'a> {
+    pub(super) fn start(totals: &'a Mutex<Totals>, stage: Stage) -> Self {
+        Self {
+            totals,
+            stage,
+            start: Instant::now(),
+            completed: false,
+        }
+    }
+
+    pub(crate) fn finish(mut self) {
+        self.completed = true;
+    }
+}
+
+impl Drop for Interval<'_> {
+    fn drop(&mut self) {
+        let wall_ns = Instant::now()
+            .checked_duration_since(self.start)
+            .and_then(|duration| u64::try_from(duration.as_nanos()).ok());
+        self.totals
+            .lock()
+            .expect("workspace progress sampler poisoned")
+            .record(self.stage, self.completed, wall_ns);
     }
 }
 
@@ -441,5 +495,5 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
 }
 
 // The original probe subtracts this from its fixed event partition. Reserve
-// room for the backing diagnostics and closed quota rows at maximum width.
-pub(crate) const REPORT_BYTES: usize = 6 * 1024 + 512;
+// room for the fixed source stages and backing diagnostics at maximum width.
+pub(crate) const REPORT_BYTES: usize = 7 * 1024 + 512;

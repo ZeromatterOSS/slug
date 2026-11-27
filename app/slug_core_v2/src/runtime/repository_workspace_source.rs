@@ -6,6 +6,8 @@ use super::super::super::process_owner;
 use super::super::super::source::SealedSourceSnapshot;
 use super::super::super::source::SourceRootInput;
 use super::*;
+#[cfg(all(test, feature = "native-probe-observer"))]
+use crate::runtime::probe_observer::workspace_progress::Stage;
 impl RepositoryWorkspaceCommand {
     pub(in crate::runtime) fn initialize_source_snapshot<'a>(
         mut self,
@@ -63,6 +65,18 @@ impl RepositoryWorkspaceCommand {
                 }
             }
             let observer = self.retirement_observer();
+            // The authentic driver's block_on polls this future on the probe
+            // thread. The spans include the caller's wait for the owned worker.
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let probe = crate::runtime::probe_observer::capture();
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let span = |stage| {
+                probe
+                    .as_ref()
+                    .and_then(|probe| probe.workspace_progress_interval(stage))
+            };
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let mut bootstrap = span(Stage::SourceBootstrap);
             let launch = SourceBootstrap::new(
                 reservation.clone(),
                 claim,
@@ -76,20 +90,37 @@ impl RepositoryWorkspaceCommand {
             if matches!(&launch, Err(PhysicalRootError::Resource))
                 && let Some(probe) = crate::runtime::probe_observer::capture()
             {
+                drop(bootstrap.take());
                 probe.record_backing_inventory(self.backing_inventory_for_probe(&input));
             }
             let launch = launch?;
             let builder =
                 process_owner::run(launch, super::super::super::initialize::platform()?, active)
                     .await?;
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if let Some(bootstrap) = bootstrap {
+                bootstrap.finish();
+            }
             let domain = builder.domain.clone();
             let captured = input.populate(&builder, scope, active)?;
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let state_span = span(Stage::SourceState);
             let (state, state_credit) =
                 captured.into_state(reservation.clone(), &self.resources)?;
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if let Some(state_span) = state_span {
+                state_span.finish();
+            }
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let finalize = span(Stage::SourceFinalize);
             let launch = SourceFinalize::new(builder, state, state_credit, observer)?;
             let finalized =
                 process_owner::run(launch, super::super::super::initialize::platform()?, active)
                     .await?;
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if let Some(finalize) = finalize {
+                finalize.finish();
+            }
             self.check_scope(scope, active)?;
             let data = NativeReadViewData::from_source(&finalized.receipt)?;
             let dependencies = self

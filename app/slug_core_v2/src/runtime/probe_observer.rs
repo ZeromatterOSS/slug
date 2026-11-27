@@ -372,6 +372,15 @@ impl Observer {
     }
 
     #[cfg(test)]
+    pub(crate) fn workspace_progress_interval(
+        &self,
+        stage: workspace_progress::Stage,
+    ) -> Option<workspace_progress::Interval<'_>> {
+        (self.words()[DISABLED].load(Ordering::Acquire) == 0)
+            .then(|| workspace_progress::Interval::start(&self.workspace_progress, stage))
+    }
+
+    #[cfg(test)]
     pub(crate) fn workspace_progress_report(&self) -> serde_json::Value {
         self.workspace_progress
             .lock()

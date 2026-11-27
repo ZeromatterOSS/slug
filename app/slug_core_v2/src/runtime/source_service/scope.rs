@@ -524,6 +524,10 @@ impl SourceServiceScope {
     pub(in crate::runtime) fn check(&self) -> Result<(), SourceServiceError> {
         self.check_locked(&mut self.state(), false)
     }
+    /// Read the recorded failure without checking the clock or changing scope state.
+    pub(in crate::runtime) fn first_error(&self) -> Option<SourceServiceError> {
+        self.state().first
+    }
     pub(super) fn check_network(&self) -> Result<(), SourceServiceError> {
         self.check()?;
         if self.limits.allow_network {
@@ -643,7 +647,7 @@ impl SourceServiceScope {
     }
     #[cfg(test)]
     pub(in crate::runtime::dice) fn first_error_for_test(&self) -> Option<SourceServiceError> {
-        self.state().first
+        self.first_error()
     }
     pub(in crate::runtime) fn charge(
         &self,

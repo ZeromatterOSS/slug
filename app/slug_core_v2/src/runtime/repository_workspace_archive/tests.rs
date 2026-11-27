@@ -438,11 +438,24 @@ fn archive_capture_cancellation_at_acquisition_verification_and_decode_retires_o
         io_limits(RepositoryWorkspaceMode::Archive, request.reservation()),
     )
     .unwrap();
-    scope.cancel();
-    assert!(
-        capture
-            .extract_at(&root, &mut 0, &scope, &|| true, None)
-            .is_err()
+    assert_eq!(scope.snapshot().decoded_bytes, 0);
+    let cancel_during_decode = || {
+        if scope.snapshot().decoded_bytes > 0 {
+            scope.cancel();
+        }
+        true
+    };
+    assert!(matches!(
+        capture.extract_at(&root, &mut 0, &scope, &cancel_during_decode, None),
+        Err(PhysicalRootError::SourceService(
+            SourceServiceError::Cancelled
+        ))
+    ));
+    let counters = scope.snapshot();
+    assert!(counters.decoded_bytes > 0);
+    assert_eq!(
+        (counters.live_buffer_bytes, counters.live_decoder_bytes),
+        (0, 0)
     );
     drop(capture);
     closed(capture_fd);

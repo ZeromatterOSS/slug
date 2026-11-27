@@ -14,6 +14,12 @@ adoption. Cleanup returned to 168 bytes, zero FDs and zero backing. The report
 used 128,679 bytes with its prefix. Full Rust and completed-command latency/RSS
 remain open.
 
+Two timed runs matched all 63 shared compute samples. The seven earlier
+Archive acquisitions varied from 3.061 to 3.795 seconds while extraction stayed
+at 4.167–4.183 seconds. The slower runs reached the same Source and stopped
+during population before its first manifest. The latest retained the typed
+`WorkDeadline` after 174,620,672 decoded bytes. Its report used 129,056 bytes.
+
 Measured read-only Archive finalization closed 56 roots at 16 MiB, one at
 64 MiB and one at 1,024 MiB. Peak native backing was 6,301 MiB versus 8,066 MiB
 in the control. The earlier 2,048 MiB bootstrap refusal had 7,937 MiB live,
@@ -55,8 +61,9 @@ liblzma. Bzlmod dev/test `-O3` passed CPU/wall at 0.936/0.935 (`f33c1690a`).
 XZ and LZ4 `-O3` and the stored observation-map hash fell short of their gates.
 The previous detailed checkpoint is in `ff79543a2`.
 
-Attribute the work after immutable Archive decoding and prove closed `rules_rust+`
-Source adoption under the existing deadline. Keep the bank, mutable quotas,
+Measure and remove redundant prior packed-body comparisons in trusted
+Archive-mode filesystem snapshots. This reduces work before the immutable
+`rules_rust+` Source adoption gate. Keep the bank, mutable quotas, deadline,
 launcher/PID1, rooted comparison, codec and history checks. Compare equal work
 for timing. The earlier refusal at compute 859 remains unattributed.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the

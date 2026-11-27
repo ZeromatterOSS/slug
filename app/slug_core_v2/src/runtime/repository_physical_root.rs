@@ -117,6 +117,16 @@ pub(in crate::runtime) enum PhysicalRootError {
     Observation(RootedObservationError),
 }
 impl PhysicalRootError {
+    /// Recover an already recorded cause from the operation's checked scope.
+    pub(in crate::runtime) fn with_source_cause(self, scope: &SourceServiceScope) -> Self {
+        match self {
+            error @ (Self::Mutation(_) | Self::Io(_)) => {
+                scope.first_error().map_or(error, Self::SourceService)
+            }
+            error => error,
+        }
+    }
+
     pub(super) fn mount(error: mount_lease::MountLeaseError) -> Self {
         match error {
             mount_lease::MountLeaseError::Root(error) => error,

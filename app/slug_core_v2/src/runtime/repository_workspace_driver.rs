@@ -807,6 +807,8 @@ mod native {
                     .repository_materializer
                     .reserve_source_snapshot(token, request.clone(), &self.scope)
                     .map_err(NativeDemandSessionError::Repository)?;
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                let capture = span(Stage::SourceInputCapture);
                 let input =
                     crate::runtime::repository_physical_root::source::SourceRootInput::capture(
                         request.clone(),
@@ -816,7 +818,11 @@ mod native {
                         &self.scope,
                         &active,
                     )
-                    .map_err(physical)?;
+                    .map_err(|error| physical(error.with_source_cause(&self.scope)))?;
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                if let Some(capture) = capture {
+                    capture.finish();
+                }
                 let command = self
                     .command
                     .take()
@@ -830,8 +836,10 @@ mod native {
                         &self.scope,
                         &active,
                     ))
-                    .map_err(physical)?;
+                    .map_err(|error| physical(error.with_source_cause(&self.scope)))?;
                 self.command = Some(command);
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                let adoption = span(Stage::SourceAdoption);
                 let state = runtime
                     .repository_materializer
                     .adopt_source_snapshot(token, &ticket, sealed, &self.scope)
@@ -841,6 +849,10 @@ mod native {
                     .with_snapshot(state)
                     .map_err(|_| refusal("source snapshot epoch publication refused"))?;
                 self.source_epoch = Arc::new(epoch);
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                if let Some(adoption) = adoption {
+                    adoption.finish();
+                }
                 advanced = true;
                 #[cfg(all(test, feature = "native-probe-observer"))]
                 if let Some(snapshot) = snapshot {

@@ -548,6 +548,13 @@ impl SourceRootInput {
                 builder.capture(scope, active)
             }
             Input::Archive(archive) => {
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                let probe = crate::runtime::probe_observer::capture();
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                let populate_span = probe.as_ref().and_then(|probe| {
+                    use crate::runtime::probe_observer::workspace_progress::Stage;
+                    probe.workspace_progress_span(Stage::SourceArchivePopulate)
+                });
                 archive.archive.verify(128 * 1024 * 1024, scope, active)?;
                 crate::runtime::repository_archive_realize::extract_selected_bcr_at(
                     archive.archive.file(),
@@ -581,6 +588,10 @@ impl SourceRootInput {
                     .map_err(PhysicalRootError::Mutation)?;
                 }
                 place_capture(&archive.module, &io, "MODULE.bazel", 0o644, scope, active)?;
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                if let Some(span) = populate_span {
+                    span.finish();
+                }
                 builder.capture(scope, active)
             }
         }?;
