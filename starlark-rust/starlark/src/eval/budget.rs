@@ -24,6 +24,14 @@ pub enum ExecutionLimit {
     /// No admitted renderer exists for this value type.
     #[error("bounded Starlark text is unsupported for type {0}")]
     UnsupportedText(&'static str),
+    /// No bounded implementation is admitted for this operation and value.
+    #[error("bounded Starlark {operation} is unsupported for type {value_type}")]
+    UnsupportedOperation {
+        /// The attempted operation.
+        operation: &'static str,
+        /// The runtime type that needs an admitted implementation.
+        value_type: &'static str,
+    },
     /// An admitted writer failed without a more specific refusal.
     #[error("bounded Starlark text formatting failed")]
     TextFormatting,

@@ -19,24 +19,32 @@
 //! Based on <https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting>
 
 use std::borrow::Cow;
+use std::fmt;
 use std::fmt::Write;
 
 use dupe::Dupe;
 use num_traits::Signed;
 use thiserror::Error;
 
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
+use crate::values::BoundedText;
 use crate::values::Heap;
 use crate::values::StringValue;
 use crate::values::UnpackValue;
 use crate::values::Value;
 use crate::values::ValueError;
 use crate::values::ValueLike;
+use crate::values::ValueTextMode;
 use crate::values::float::StarlarkFloat;
 use crate::values::float::float;
 use crate::values::string::dot_format::format_one;
+use crate::values::string::dot_format::format_one_bounded;
+use crate::values::type_repr::StarlarkTypeRepr;
 use crate::values::types::int::int_or_big::StarlarkIntRef;
 use crate::values::types::num::value::NumRef;
 use crate::values::types::tuple::value::Tuple;
+use crate::values::unpack::incorrect_parameter_type;
 
 // `i32::abs(i32::MIN)` panics as `i32::MIN` has no corresponding
 // positive value that fits inside `i32`. For this edge case,
@@ -197,8 +205,41 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
     //   * after single %s made intrinsic, this code is not that hot now
 
     // random guess as a baseline capacity
-    let mut res: String = String::with_capacity(format.len() + 20);
+    let mut res = String::with_capacity(format.len() + 20);
+    write_percent(format, value, &mut res, None, |res, value, mode| {
+        match mode {
+            ValueTextMode::Str => value.collect_str(res),
+            ValueTextMode::Repr => value.collect_repr(res),
+            ValueTextMode::Display => unreachable!(),
+        }
+        Ok(())
+    })?;
+    Ok(res)
+}
 
+pub(crate) fn percent_bounded<'v>(
+    format: &str,
+    value: Value<'v>,
+    heap: Heap<'v>,
+) -> crate::Result<StringValue<'v>> {
+    let Some(budget) = heap.execution_budget() else {
+        return Ok(heap.alloc_str(&percent(format, value)?));
+    };
+    budget.charge(1 + ExecutionBudget::text_work(format.len()), 0)?;
+    let mut res = BoundedText::new(budget, usize::MAX);
+    write_percent(format, value, &mut res, Some(budget), |res, value, mode| {
+        Ok(res.write_value(value, mode)?)
+    })?;
+    Ok(heap.alloc_budgeted_str(res.as_str())?)
+}
+
+fn write_percent<'v, W: Write>(
+    format: &str,
+    value: Value<'v>,
+    res: &mut W,
+    budget: Option<&ExecutionBudget>,
+    mut write_value: impl FnMut(&mut W, Value<'v>, ValueTextMode) -> crate::Result<()>,
+) -> crate::Result<()> {
     let tuple = Tuple::from_value(value);
     let one = &[value];
     let values = match &tuple {
@@ -206,39 +247,46 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
         None => one,
     };
     let mut values = values.iter().copied();
-    let mut next_value = || -> anyhow::Result<Value> {
+    let mut next_value = || -> crate::Result<Value> {
+        if let Some(budget) = budget {
+            budget.charge(1, 0)?;
+        }
         values
             .next()
-            .ok_or_else(|| StringInterpolationError::NotEnoughParameters.into())
+            .ok_or_else(|| crate::Error::new_other(StringInterpolationError::NotEnoughParameters))
     };
 
     // because of the way format is defined, we can deal with it as bytes
     for item in (PercentFormatParser { rem: format }) {
         let item = item?;
-        res.push_str(item.literal);
-        match item.format {
-            None => {}
+        check_format(res.write_str(item.literal), budget)?;
+        let formatted = match item.format {
+            None => continue,
             Some(PercentSFormat::Str) => {
-                let arg = next_value()?;
-                arg.collect_str(&mut res);
+                write_value(res, next_value()?, ValueTextMode::Str)?;
+                continue;
             }
-            Some(PercentSFormat::Repr) => next_value()?.collect_repr(&mut res),
+            Some(PercentSFormat::Repr) => {
+                write_value(res, next_value()?, ValueTextMode::Repr)?;
+                continue;
+            }
             Some(PercentSFormat::Dec) => {
                 let value = next_value()?;
                 match value.unpack_num() {
                     Some(NumRef::Int(StarlarkIntRef::Small(v))) => {
-                        write!(res, "{}", v.to_i32()).unwrap()
+                        write!(res, "{}", v.to_i32())
                     }
                     Some(NumRef::Int(StarlarkIntRef::Big(v))) => {
-                        write!(res, "{}", v.get()).unwrap()
+                        check_big_int(budget)?;
+                        write!(res, "{}", v.get())
                     }
                     Some(NumRef::Float(v)) => {
                         match NumRef::Float(StarlarkFloat(v.0.trunc())).as_int() {
-                            Some(v) => write!(res, "{v}").unwrap(),
-                            None => ValueError::unsupported_type(value, "format(%d)")?,
+                            Some(v) => write!(res, "{v}"),
+                            None => return ValueError::unsupported_type(value, "format(%d)"),
                         }
                     }
-                    None => ValueError::unsupported_type(value, "format(%d)")?,
+                    None => return ValueError::unsupported_type(value, "format(%d)"),
                 }
             }
             Some(PercentSFormat::Oct) => {
@@ -248,12 +296,13 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
                         let v = v.to_i32();
                         match v.checked_abs() {
                             Some(vp) => {
-                                write!(res, "{}{:o}", if v < 0 { "-" } else { "" }, vp).unwrap()
+                                write!(res, "{}{:o}", if v < 0 { "-" } else { "" }, vp)
                             }
-                            None => write!(res, "{I32_MIN_OCTAL}").unwrap(),
+                            None => write!(res, "{I32_MIN_OCTAL}"),
                         }
                     }
                     Some(NumRef::Int(StarlarkIntRef::Big(v))) => {
+                        check_big_int(budget)?;
                         let v = v.get();
                         write!(
                             res,
@@ -261,10 +310,9 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
                             if v.is_negative() { "-" } else { "" },
                             v.abs()
                         )
-                        .unwrap()
                     }
                     Some(NumRef::Float(_)) | None => {
-                        ValueError::unsupported_type(value, "format(%o)")?
+                        return ValueError::unsupported_type(value, "format(%o)");
                     }
                 }
             }
@@ -275,12 +323,13 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
                         let v = v.to_i32();
                         match v.checked_abs() {
                             Some(vp) => {
-                                write!(res, "{}{:x}", if v < 0 { "-" } else { "" }, vp).unwrap()
+                                write!(res, "{}{:x}", if v < 0 { "-" } else { "" }, vp)
                             }
-                            None => write!(res, "{I32_MIN_HEX}").unwrap(),
+                            None => write!(res, "{I32_MIN_HEX}"),
                         }
                     }
                     Some(NumRef::Int(StarlarkIntRef::Big(v))) => {
+                        check_big_int(budget)?;
                         let v = v.get();
                         write!(
                             res,
@@ -288,10 +337,9 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
                             if v.is_negative() { "-" } else { "" },
                             v.abs()
                         )
-                        .unwrap()
                     }
                     Some(NumRef::Float(_)) | None => {
-                        ValueError::unsupported_type(value, "format(%x)")?
+                        return ValueError::unsupported_type(value, "format(%x)");
                     }
                 }
             }
@@ -302,12 +350,13 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
                         let v = v.to_i32();
                         match v.checked_abs() {
                             Some(vp) => {
-                                write!(res, "{}{:X}", if v < 0 { "-" } else { "" }, vp).unwrap()
+                                write!(res, "{}{:X}", if v < 0 { "-" } else { "" }, vp)
                             }
-                            None => write!(res, "{I32_MIN_HEX}").unwrap(),
+                            None => write!(res, "{I32_MIN_HEX}"),
                         }
                     }
                     Some(NumRef::Int(StarlarkIntRef::Big(v))) => {
+                        check_big_int(budget)?;
                         let v = v.get();
                         write!(
                             res,
@@ -315,41 +364,67 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
                             if v.is_negative() { "-" } else { "" },
                             v.abs()
                         )
-                        .unwrap()
                     }
                     Some(NumRef::Float(_)) | None => {
-                        ValueError::unsupported_type(value, "format(%X)")?
+                        return ValueError::unsupported_type(value, "format(%X)");
                     }
                 }
             }
-            Some(PercentSFormat::Exp) => {
-                let v = NumRef::unpack_param(next_value()?)?.as_float();
-                float::write_scientific(&mut res, v, 'e', false).unwrap()
+            Some(conversion) => {
+                let v = float_arg(next_value()?, budget)?;
+                match conversion {
+                    PercentSFormat::Exp => float::write_scientific(res, v, 'e', false),
+                    PercentSFormat::ExpUpper => float::write_scientific(res, v, 'E', false),
+                    PercentSFormat::Float => float::write_decimal(res, v),
+                    PercentSFormat::FloatCompact => float::write_compact(res, v, 'e'),
+                    PercentSFormat::FloatCompactUpper => float::write_compact(res, v, 'E'),
+                    _ => unreachable!(),
+                }
             }
-            Some(PercentSFormat::ExpUpper) => {
-                let v = NumRef::unpack_param(next_value()?)?.as_float();
-                float::write_scientific(&mut res, v, 'E', false).unwrap()
-            }
-            Some(PercentSFormat::Float) => {
-                let v = NumRef::unpack_param(next_value()?)?.as_float();
-                float::write_decimal(&mut res, v).unwrap()
-            }
-            Some(PercentSFormat::FloatCompact) => {
-                let v = NumRef::unpack_param(next_value()?)?.as_float();
-                float::write_compact(&mut res, v, 'e').unwrap()
-            }
-            Some(PercentSFormat::FloatCompactUpper) => {
-                let v = NumRef::unpack_param(next_value()?)?.as_float();
-                float::write_compact(&mut res, v, 'E').unwrap()
-            }
-        }
+        };
+        check_format(formatted, budget)?;
     }
     if values.next().is_some() {
         Err(crate::Error::new_other(
             StringInterpolationError::TooManyParameters,
         ))
     } else {
-        Ok(res)
+        Ok(())
+    }
+}
+
+fn check_format(result: fmt::Result, budget: Option<&ExecutionBudget>) -> crate::Result<()> {
+    match budget {
+        Some(budget) => result.map_err(|_| budget.refuse(ExecutionLimit::TextFormatting).into()),
+        None => {
+            result.unwrap();
+            Ok(())
+        }
+    }
+}
+
+fn check_big_int(budget: Option<&ExecutionBudget>) -> crate::Result<()> {
+    if let Some(budget) = budget {
+        // The dependency converts big integers using host radix scratch.
+        return Err(budget.refuse(ExecutionLimit::UnsupportedText("int")).into());
+    }
+    Ok(())
+}
+
+fn float_arg(value: Value, budget: Option<&ExecutionBudget>) -> crate::Result<f64> {
+    let Some(budget) = budget else {
+        return Ok(NumRef::unpack_param(value)?.as_float());
+    };
+    match value.unpack_num() {
+        Some(NumRef::Int(StarlarkIntRef::Big(_))) => {
+            // Bound the operand before calling the dependency's conversion.
+            Err(budget.refuse(ExecutionLimit::UnsupportedText("int")).into())
+        }
+        Some(number) => Ok(number.as_float()),
+        None => Err(incorrect_parameter_type(
+            NumRef::starlark_type_repr(),
+            value.bounded_type_description(budget)?,
+        )),
     }
 }
 
@@ -417,30 +492,35 @@ pub(crate) fn percent_s_one<'v>(
     after: &str,
     heap: Heap<'v>,
 ) -> crate::Result<StringValue<'v>> {
+    if let Some(budget) = heap.execution_budget() {
+        budget.charge(1, 0)?;
+        return format_one_bounded(before, percent_s_arg(arg)?, after, heap);
+    }
     Ok(match StringValue::new(arg) {
         Some(arg) if before.is_empty() && after.is_empty() => arg,
         Some(arg) => heap.alloc_str_concat3(before, &arg, after),
-        None => {
-            let one = match Tuple::from_value(arg) {
-                Some(tuple) => match tuple.content() {
-                    [] => {
-                        return Err(crate::Error::new_other(
-                            StringInterpolationError::NotEnoughParameters,
-                        ));
-                    }
-                    [value] => *value,
-                    [_, _, ..] => {
-                        return Err(crate::Error::new_other(
-                            StringInterpolationError::TooManyParameters,
-                        ));
-                    }
-                },
-                None => arg,
-            };
-            format_one(before, one, after, heap)
-        }
+        None => format_one(before, percent_s_arg(arg)?, after, heap),
     })
 }
+
+fn percent_s_arg(arg: Value<'_>) -> crate::Result<Value<'_>> {
+    match Tuple::from_value(arg) {
+        Some(tuple) => match tuple.content() {
+            [] => Err(crate::Error::new_other(
+                StringInterpolationError::NotEnoughParameters,
+            )),
+            [value] => Ok(*value),
+            [_, _, ..] => Err(crate::Error::new_other(
+                StringInterpolationError::TooManyParameters,
+            )),
+        },
+        None => Ok(arg),
+    }
+}
+
+#[cfg(test)]
+#[path = "percent_budget_tests.rs"]
+mod percent_budget_tests;
 
 #[cfg(test)]
 #[path = "percent_s_memory_tests.rs"]

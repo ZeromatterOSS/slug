@@ -25,6 +25,23 @@ pub struct FormatParser<'a> {
     view: StringView<'a>,
 }
 
+/// A malformed format string. The diagnostic borrows the original text.
+#[derive(Debug, thiserror::Error)]
+pub enum FormatParseError<'a> {
+    /// A closing brace followed `!` without a conversion character.
+    #[error("Missing conversion character in format string `{0}`")]
+    MissingConversion(&'a str),
+    /// The conversion character was unsupported.
+    #[error("Invalid conversion in format string `{0}`")]
+    InvalidConversion(&'a str),
+    /// An opening brace had no matching close.
+    #[error("Unmatched '{{' in format string `{0}`")]
+    UnmatchedOpen(&'a str),
+    /// A closing brace was neither escaped nor paired.
+    #[error("Standalone '}}' in format string `{0}`")]
+    StandaloneClose(&'a str),
+}
+
 /// Output the capture as `str` or `repr`.
 #[derive(Debug, PartialEq, Copy, Clone, Dupe)]
 pub enum FormatConv {
@@ -83,6 +100,12 @@ impl<'a> FormatParser<'a> {
 
     /// Parse the next token from the format string.
     pub fn next(&mut self) -> anyhow::Result<Option<FormatToken<'a>>> {
+        self.next_borrowed()
+            .map_err(|error| anyhow::anyhow!("{error}"))
+    }
+
+    /// Parse the next token without allocating a diagnostic on failure.
+    pub fn next_borrowed(&mut self) -> Result<Option<FormatToken<'a>>, FormatParseError<'a>> {
         let mut i = 0;
 
         while i < self.view.len() {
@@ -113,14 +136,12 @@ impl<'a> FormatParser<'a> {
                                 } else if self.view.rem().starts_with('s') {
                                     FormatConv::Str
                                 } else if self.view.rem().starts_with('}') {
-                                    return Err(anyhow::anyhow!(
-                                        "Missing conversion character in format string `{}`",
-                                        self.view.original()
+                                    return Err(FormatParseError::MissingConversion(
+                                        self.view.original(),
                                     ));
                                 } else {
-                                    return Err(anyhow::anyhow!(
-                                        "Invalid conversion in format string `{}`",
-                                        self.view.original()
+                                    return Err(FormatParseError::InvalidConversion(
+                                        self.view.original(),
                                     ));
                                 };
                                 self.view.eat(1); // `r` or `s` after the exclamation mark.
@@ -140,10 +161,7 @@ impl<'a> FormatParser<'a> {
                             _ => i += 1,
                         }
                     }
-                    return Err(anyhow::anyhow!(
-                        "Unmatched '{{' in format string `{}`",
-                        self.view.original()
-                    ));
+                    return Err(FormatParseError::UnmatchedOpen(self.view.original()));
                 }
                 b'}' => {
                     assert!(i == 0);
@@ -151,10 +169,7 @@ impl<'a> FormatParser<'a> {
                         self.view.eat(2);
                         return Ok(Some(FormatToken::Escape(EscapeCurlyBrace::Close)));
                     }
-                    return Err(anyhow::anyhow!(
-                        "Standalone '}}' in format string `{}`",
-                        self.view.original()
-                    ));
+                    return Err(FormatParseError::StandaloneClose(self.view.original()));
                 }
                 _ => i += 1,
             }

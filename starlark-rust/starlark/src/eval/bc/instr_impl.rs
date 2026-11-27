@@ -83,6 +83,7 @@ use crate::values::dict::Dict;
 use crate::values::int::pointer_i32::PointerI32;
 use crate::values::layout::value_not_special::FrozenValueNotSpecial;
 use crate::values::string::dot_format::format_one;
+use crate::values::string::dot_format::format_one_bounded;
 use crate::values::string::interpolation::percent_s_one;
 use crate::values::types::known_methods::KnownMethod;
 use crate::values::types::list::value::ListData;
@@ -787,7 +788,12 @@ impl InstrNoFlowImpl for InstrFormatOneImpl {
         (before, arg, after, target): &(FrozenStringValue, BcSlotIn, FrozenStringValue, BcSlotOut),
     ) -> crate::Result<()> {
         let arg = frame.get_bc_slot(*arg);
-        let r = format_one(before.as_str(), arg, after.as_str(), eval.heap());
+        let heap = eval.heap();
+        let r = if heap.execution_budget().is_some() {
+            format_one_bounded(before.as_str(), arg, after.as_str(), heap)?
+        } else {
+            format_one(before.as_str(), arg, after.as_str(), heap)
+        };
         frame.set_bc_slot(*target, r.to_value());
         Ok(())
     }

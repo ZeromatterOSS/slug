@@ -597,7 +597,12 @@ where
     }
 
     unsafe fn iter_next(&self, index: usize, _heap: Heap<'v>) -> Option<Value<'v>> {
-        unsafe { self.0.content_unchecked().keys().nth(index).copied() }
+        unsafe {
+            self.0
+                .content_unchecked()
+                .get_index(index)
+                .map(|(key, _)| *key)
+        }
     }
 
     unsafe fn iter_stop(&self) {

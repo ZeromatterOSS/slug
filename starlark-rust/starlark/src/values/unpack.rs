@@ -28,6 +28,15 @@ use crate::typing::Ty;
 use crate::values::Value;
 use crate::values::type_repr::StarlarkTypeRepr;
 
+#[cold]
+pub(crate) fn incorrect_parameter_type(expected: Ty, actual: String) -> crate::Error {
+    #[derive(thiserror::Error, Debug)]
+    #[error("Type of parameters mismatch, expected `{0}`, actual `{1}`")]
+    struct IncorrectParameterTypeWithExpected(Ty, String);
+
+    crate::Error::new_value(IncorrectParameterTypeWithExpected(expected, actual))
+}
+
 /// Error that can be returned by [`UnpackValue`].
 pub trait UnpackValueError: Debug + Send + Sync + 'static {
     /// Convert into a crate error.
@@ -205,19 +214,9 @@ pub trait UnpackValue<'v>: Sized + StarlarkTypeRepr {
     /// Unpack value, but instead of `None` return error about incorrect argument type.
     #[inline]
     fn unpack_param(value: Value<'v>) -> crate::Result<Self> {
-        #[cold]
-        fn error<'v>(value: Value<'v>, ty: fn() -> Ty) -> crate::Error {
-            #[derive(thiserror::Error, Debug)]
-            #[error("Type of parameters mismatch, expected `{0}`, actual `{1}`")]
-            struct IncorrectParameterTypeWithExpected(Ty, String);
-
-            crate::Error::new_value(IncorrectParameterTypeWithExpected(
-                ty(),
-                value.to_string_for_type_error(),
-            ))
-        }
-
-        Self::unpack_value(value)?.ok_or_else(|| error(value, Self::starlark_type_repr))
+        Self::unpack_value(value)?.ok_or_else(|| {
+            incorrect_parameter_type(Self::starlark_type_repr(), value.to_string_for_type_error())
+        })
     }
 
     /// Unpack value, but instead of `None` return error about incorrect named argument type.

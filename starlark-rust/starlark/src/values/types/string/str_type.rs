@@ -439,7 +439,11 @@ impl<'v> StarlarkValue<'v> for StarlarkStr {
     }
 
     fn percent(&self, other: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
-        Ok(heap.alloc(interpolation::percent(self, other)?))
+        if heap.execution_budget().is_some() {
+            interpolation::percent_bounded(self, other, heap).map(|text| text.to_value())
+        } else {
+            Ok(heap.alloc(interpolation::percent(self, other)?))
+        }
     }
 
     fn typechecker_ty(&self) -> Option<Ty> {

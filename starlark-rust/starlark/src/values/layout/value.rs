@@ -61,6 +61,8 @@ use crate::collections::StarlarkHasher;
 use crate::docs::DocItem;
 use crate::eval::Arguments;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::ParametersSpec;
 use crate::eval::compiler::def::Def;
 use crate::eval::compiler::def::FrozenDef;
@@ -72,6 +74,7 @@ use crate::typing::ParamSpec;
 use crate::typing::Ty;
 use crate::typing::TyCallable;
 use crate::util::ArcStr;
+use crate::values::BoundedText;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
 use crate::values::FrozenRef;
@@ -84,6 +87,7 @@ use crate::values::Trace;
 use crate::values::UnpackValue;
 use crate::values::ValueError;
 use crate::values::ValueIdentity;
+use crate::values::ValueTextMode;
 use crate::values::bool::value::VALUE_FALSE_TRUE;
 use crate::values::demand::request_value_impl;
 use crate::values::dict::FrozenDictRef;
@@ -1019,44 +1023,19 @@ impl<'v> Value<'v> {
 
     #[cold]
     fn display_for_type_error(self) -> impl Display + 'v {
-        fn split_at_safe(s: &str, index: usize) -> (&str, &str) {
-            for index in index..s.len() {
-                if s.is_char_boundary(index) {
-                    return s.split_at(index);
-                }
-            }
-            (s, "")
-        }
+        struct DisplayWithType<'v>(Value<'v>);
 
-        struct DisplayWithTypeImpl<'v>(Value<'v>);
-
-        impl<'v> Display for DisplayWithTypeImpl<'v> {
+        impl Display for DisplayWithType<'_> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                let mut repr = self.0.to_repr();
-
-                let max_len = 60usize;
-
-                if repr.len() > max_len && repr.chars().count() > max_len {
-                    let truncated = "<<...>>";
-
-                    // 1/3 from back, 2/3 from front, because front is usually more interesting.
-                    let take_from_back = max_len.saturating_sub(truncated.len()) / 3;
-                    let take_from_front = take_from_back * 2;
-
-                    // Resulting repr is approximately `max_len` long.
-                    repr = format!(
-                        "{}{}{}",
-                        split_at_safe(&repr, take_from_front).0,
-                        truncated,
-                        split_at_safe(&repr, repr.len().saturating_sub(take_from_back)).1
-                    );
+                TypeErrorRepr {
+                    value_type: self.0.get_type(),
+                    repr: &self.0.to_repr(),
                 }
-
-                write!(f, "{} (repr: {})", self.0.get_type(), repr)
+                .fmt(f)
             }
         }
 
-        DisplayWithTypeImpl(self)
+        DisplayWithType(self)
     }
 
     /// Return a string usable for error messages.
@@ -1065,6 +1044,62 @@ impl<'v> Value<'v> {
     #[cold]
     pub fn to_string_for_type_error(self) -> String {
         self.display_for_type_error().to_string()
+    }
+
+    /// Produce the ordinary type description using admitted representation work.
+    pub(crate) fn bounded_type_description(
+        self,
+        budget: &ExecutionBudget,
+    ) -> Result<String, ExecutionLimit> {
+        let mut repr = BoundedText::new(budget, usize::MAX);
+        repr.write_value(self, ValueTextMode::Repr)?;
+        let description = TypeErrorRepr {
+            value_type: self.get_type(),
+            repr: repr.as_str(),
+        };
+        // The preview examines at most 61 UTF-8 scalars and two boundaries.
+        budget.charge_text_work(description.repr.len().min(4 * (TypeErrorRepr::PREVIEW + 3)))?;
+        let mut text = BoundedText::new(budget, usize::MAX);
+        fmt::write(&mut text, format_args!("{description}"))
+            .map_err(|_| budget.refuse(ExecutionLimit::TextFormatting))?;
+        text.finish()
+    }
+}
+
+struct TypeErrorRepr<'a> {
+    value_type: &'static str,
+    repr: &'a str,
+}
+
+impl TypeErrorRepr<'_> {
+    const PREVIEW: usize = 60;
+
+    fn ceil_boundary(text: &str, mut index: usize) -> usize {
+        while !text.is_char_boundary(index) {
+            index += 1;
+        }
+        index
+    }
+}
+
+impl Display for TypeErrorRepr<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} (repr: ", self.value_type)?;
+        if self.repr.len() > Self::PREVIEW && self.repr.chars().nth(Self::PREVIEW).is_some() {
+            const TRUNCATED: &str = "<<...>>";
+            let back = (Self::PREVIEW - TRUNCATED.len()) / 3;
+            let front_end = Self::ceil_boundary(self.repr, 2 * back);
+            let back_start = Self::ceil_boundary(self.repr, self.repr.len() - back);
+            write!(
+                f,
+                "{}{TRUNCATED}{}",
+                &self.repr[..front_end],
+                &self.repr[back_start..]
+            )?;
+        } else {
+            f.write_str(self.repr)?;
+        }
+        f.write_str(")")
     }
 }
 

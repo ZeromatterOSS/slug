@@ -17,6 +17,9 @@
 
 //! Methods for the `string` type.
 
+#[cfg(test)]
+mod bounded_format_tests;
+
 use std::cmp;
 
 use starlark_derive::starlark_module;
@@ -329,15 +332,17 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StringValue<'v>> {
-        let iter = args.positions(eval.heap())?;
-        dot_format::format(
-            this,
-            iter,
-            args.names()?,
-            &mut eval.string_pool,
-            eval.module_env.heap(),
-        )
-        .map_err(Into::into)
+        let heap = eval.heap();
+        if let Some(budget) = heap.execution_budget() {
+            let iter = args.bounded_positions(heap, budget)?;
+            let names = args.bounded_format_names(budget)?;
+            return dot_format::format_bounded(this, iter, |name| names.get(name, budget), heap)
+                .map_err(Into::into);
+        }
+
+        let iter = args.positions(heap)?;
+        dot_format::format(this, iter, args.names()?, &mut eval.string_pool, heap)
+            .map_err(Into::into)
     }
 
     /// [string.index](
