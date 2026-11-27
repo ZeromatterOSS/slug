@@ -1,5 +1,5 @@
 //! Left-biased union of already validated immutable observation epochs.
-use starlark_map::ordered_map::OrderedMap;
+use starlark_map::small_map::SmallMap;
 
 use super::*;
 
@@ -16,9 +16,11 @@ impl PathObservationEpoch {
                 if let Some(map) = Arc::get_mut(&mut self.observations) {
                     // Allocate before taking any LEFT owner. Returned errors
                     // have already been ruled out by the complete plan pass.
-                    let mut merged = OrderedMap::with_capacity(capacity);
+                    let mut merged = SmallMap::with_capacity(capacity);
                     let mut left = std::mem::take(map).into_iter().peekable();
                     let mut right = other.observations.iter().peekable();
+                    // Both epochs are sorted and unique. The merge emits one
+                    // row per key, keeping the exact left row on equality.
                     while let (Some((left_demand, _)), Some((right_demand, _))) =
                         (left.peek(), right.peek())
                     {
@@ -34,17 +36,17 @@ impl PathObservationEpoch {
                                     .expect("equal demand retains the complete left row")
                             }
                         };
-                        merged.insert(row.0, row.1);
+                        merged.insert_unique_unchecked(row.0, row.1);
                         #[cfg(test)]
                         assignment_inserted_for_test();
                     }
                     for (demand, result) in left {
-                        merged.insert(demand, result);
+                        merged.insert_unique_unchecked(demand, result);
                         #[cfg(test)]
                         assignment_inserted_for_test();
                     }
                     for (demand, result) in right {
-                        merged.insert(demand.dupe(), result.dupe());
+                        merged.insert_unique_unchecked(demand.dupe(), result.dupe());
                         #[cfg(test)]
                         assignment_inserted_for_test();
                     }
@@ -129,7 +131,7 @@ impl PathObservationEpoch {
     }
 
     fn union_growth(&self, other: &Self, capacity: usize) -> Self {
-        let mut merged = OrderedMap::with_capacity(capacity);
+        let mut merged = SmallMap::with_capacity(capacity);
         let mut left = self.observations.iter().peekable();
         let mut right = other.observations.iter().peekable();
         while let (Some((left_demand, _)), Some((right_demand, _))) = (left.peek(), right.peek()) {
@@ -142,10 +144,10 @@ impl PathObservationEpoch {
                         .expect("equal demand retains the complete left row")
                 }
             };
-            merged.insert(row.0.dupe(), row.1.dupe());
+            merged.insert_unique_unchecked(row.0.dupe(), row.1.dupe());
         }
         for (demand, result) in left.chain(right) {
-            merged.insert(demand.dupe(), result.dupe());
+            merged.insert_unique_unchecked(demand.dupe(), result.dupe());
         }
         debug_assert_eq!(merged.len(), capacity);
         // SortedMap's existing sorted-key guard avoids sorting/reindexing this

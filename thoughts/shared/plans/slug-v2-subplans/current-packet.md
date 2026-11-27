@@ -19,10 +19,18 @@ records, with `local_config_cc` Execute 31 pending. A second baseline recorded
 pidfd reduced that total to 0.183 milliseconds across 56 roots and 25 Executes.
 Exact same-root ABBA wall was 0.836 of baseline with equal measured CPU.
 The optimized Core/CLI builds took 38.42/19.72 seconds. Thirty focused tests,
-five native guards and the 7.84-second six-archive gate passed. The authentic
-run accepted the `local_config_cc` BUILD template, reached 958 computes and
-152 accepted records, then hit SourceWorkDeadline at `local_config_xcode`
-materialization. Cleanup returned to 168 retained bytes, zero FDs and zero backing.
+five native guards and the 7.84-second six-archive gate passed. That original
+accepted the `local_config_cc` BUILD template and adopted `local_config_xcode`
+at compute 958. The next graph attempt hit SourceWorkDeadline. A terminal-only
+run serviced three more path batches after adoption.
+
+Observation unions now use unique insertion after sorted merge resolves
+duplicates. Matched CPU and instructions were 0.772 and 0.837 of baseline.
+All 135 Workspace, 48 Loading, 28 Core and five native guards passed, along
+with the 7.83-second six-archive gate. The profiled original advanced to 991
+computes, 56 roots and 152 records. The deadline followed more post-adoption
+path progress. Cleanup returned to 168 retained bytes, zero FDs and zero
+backing. The trace used 126,905 of 524,288 bytes.
 The earlier unclassified refusal at attempt 859 remains unattributed. Full Rust
 and completed-command latency/RSS remain open.
 
@@ -37,18 +45,9 @@ The XZ and LZ4 package `-O3` trials fell short of the six-archive CPU gate.
 The Bzlmod package `-O3` Cargo dev/test profile passed matched warm ABBA.
 Mean CPU fell 6.4% and wall time fell 6.5% with identical per-archive decoded
 bytes, logical body bytes, peak native credit and exact last-reader retirement.
-The pinned default build passed 129 focused tests, five native guards and the
-six-archive gate in 9.38 seconds. Core/Bzlmod test and CLI builds took 37.51
-and 95.06 seconds. The 5.07-second offline Bazel repin changed only the catalog
-checksum across 503 identical records. The fresh no-repin check took 1.00 second.
-The new profile reached 834 computes, 55 roots and 117 records, including
-File 7. Follow-up attribution stopped at the same frontier during File 8's
-snapshot. Six archive acquisitions took 3.28 seconds and closed-file
-verification took 0.079 seconds. Completed filesystem captures spent 0.755
-of 0.770 seconds comparing prior bodies after 0.004 seconds in operations.
-The follow-up Core build took 69.51 seconds. All 28 focused tests and five native
-guards passed, and the 27.12-second original retired to 168 retained bytes,
-zero FDs and zero backing. The report used 130,095 of 524,288 bytes.
+The default builds, native checks and checksum-only offline Bazel repin are
+recorded in `f33c1690a`. Filesystem capture and acquisition attribution are
+recorded in `fdf3685a4`.
 All six source-checked XZ streams have one Block. The LZ4 overlap loop
 accounted for 1.75% of sampled cycles in the six-archive gate. Reached rooted
 comparisons in the sampled original had no unaligned callbacks. That original

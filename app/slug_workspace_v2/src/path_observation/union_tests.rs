@@ -679,6 +679,45 @@ fn union_assign_unique_growth_preserves_facts_then_reuses_left_controller() {
 }
 
 #[test]
+fn union_growth_preserves_colliding_demands_and_left_owners() {
+    let key = |number: usize| {
+        let mut demand = demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::Lstat,
+            &format!("/union/colliding/{number:02}"),
+        );
+        demand.cached_hash = 0;
+        demand
+    };
+    // Both input maps and the output exceed the small-map index threshold.
+    // Ten equal facts have independent owners, and every distinct key collides.
+    let mut left = PathObservationEpoch::from_shared((0..50).map(|n| (key(n), missing()))).unwrap();
+    let right = PathObservationEpoch::from_shared((40..90).map(|n| (key(n), missing()))).unwrap();
+    let rows = assignment_rows(&left);
+    let controller = left.observations() as *const _;
+    let expected = reference(&left, &right).unwrap();
+    let copied = left.try_union(&right).unwrap();
+    assignment_facts(&copied, &expected, &rows);
+    assert!(!std::ptr::eq(copied.observations(), controller));
+
+    left.try_union_assign(&right).unwrap();
+    assignment_facts(&left, &expected, &rows);
+    assert!(std::ptr::eq(left.observations(), controller));
+    assert_eq!(left.observations().len(), 90);
+    for n in 50..90 {
+        let key = key(n);
+        assert!(Arc::ptr_eq(
+            left.get(&key).unwrap(),
+            right.get(&key).unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            copied.get(&key).unwrap(),
+            right.get(&key).unwrap()
+        ));
+    }
+}
+
+#[test]
 fn union_assign_shared_and_weak_maps_keep_borrowed_growth_fallback() {
     for weak_only in [false, true] {
         let mut left = PathObservationEpoch::from_shared([(

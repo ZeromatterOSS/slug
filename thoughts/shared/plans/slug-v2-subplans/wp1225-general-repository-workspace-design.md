@@ -1613,6 +1613,11 @@ complete left duplicate custody and existing conversion guards, then install
 the complete map into the same unique controller. Shared/Weak maps use the old
 clone-growth fallback without duplicate validation or a discarded allocation.
 
+Both growth loops use the existing SmallMap unique insertion. Private epoch
+construction supplies sorted, unique inputs. The merge emits one entry per
+key and keeps the complete left entry on equality. The destination uses the
+existing sorted-map guard and exact capacity after full conflict validation.
+
 Returned errors must leave all original facts, owners and map identity unchanged.
 The new assigning API proposes basic unwind safety after rows move, not strong
 panic rollback: storage remains valid, and unwinding discards private Scratch;
