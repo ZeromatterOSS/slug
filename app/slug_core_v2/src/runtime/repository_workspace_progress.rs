@@ -177,6 +177,21 @@ impl RepositoryWorkspaceProgress {
         {
             return Ok(self);
         }
+        // The test installs its observer on the synchronous dispatch thread.
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        use crate::runtime::probe_observer::capture;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        use crate::runtime::probe_observer::workspace_progress::Stage;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let observer = capture();
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let span = |stage| {
+            observer
+                .as_ref()
+                .and_then(|observer| observer.workspace_progress_span(stage))
+        };
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let capture_span = span(Stage::ArchiveCapture);
         let capture = archive::VerifiedWorkspaceArchiveCapture::capture(
             &incoming.request,
             &self.builder.resources,
@@ -185,8 +200,25 @@ impl RepositoryWorkspaceProgress {
             scope,
             active,
         )?;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(span) = capture_span {
+            span.finish();
+        }
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let extract_span = span(Stage::ArchiveExtract);
         let result = capture.extract(&self.builder, &mut self.decoded, scope, active)?;
-        self.complete_snapshot(incoming, result, scope, active)
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(span) = extract_span {
+            span.finish();
+        }
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let snapshot_span = span(Stage::ArchiveSnapshot);
+        let progress = self.complete_snapshot(incoming, result, scope, active)?;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(span) = snapshot_span {
+            span.finish();
+        }
+        Ok(progress)
     }
 
     fn complete_snapshot(

@@ -20,6 +20,8 @@ use super::*;
 #[cfg(feature = "native-probe-observer")]
 #[path = "rust_toolchain_tests/phase_profile.rs"]
 mod phase_profile;
+#[cfg(feature = "native-probe-observer")]
+use crate::runtime::probe_observer::workspace_progress;
 
 const EVENT_LIMIT: usize = 128;
 const TRACE_BYTES: usize = 512 * 1024;
@@ -29,7 +31,11 @@ const CENSUS_BYTES: usize = 64 * 1024;
 const PHASE_BYTES: usize = phase_profile::REPORT_BYTES;
 #[cfg(not(feature = "native-probe-observer"))]
 const PHASE_BYTES: usize = 0;
-const EVENT_TRACE_BYTES: usize = TRACE_BYTES - CENSUS_BYTES - 4096 - PHASE_BYTES;
+#[cfg(feature = "native-probe-observer")]
+const WORKSPACE_BYTES: usize = workspace_progress::REPORT_BYTES;
+#[cfg(not(feature = "native-probe-observer"))]
+const WORKSPACE_BYTES: usize = 0;
+const EVENT_TRACE_BYTES: usize = TRACE_BYTES - CENSUS_BYTES - 4096 - PHASE_BYTES - WORKSPACE_BYTES;
 const CONTENT_IDENTITIES: usize = 65;
 const CONTENT_PATH_BYTES: usize = CONTENT_IDENTITIES * 4096;
 const EVENT_BYTES: usize = EVENT_TRACE_BYTES / (PREFIX_EVENTS + 1);
@@ -950,7 +956,12 @@ fn native_original_rust_toolchain_cquery_frontier() {
             slug_loading_v2::file_bytes_lookahead_extended(),
         );
         if let Some(phase_profile) = phase_profile {
-            report["phase_profile"] = phase_profile.finish();
+            let (phase, workspace) = phase_profile.finish();
+            assert!(
+                workspace.to_string().len() + "\"workspace_progress\":".len() < WORKSPACE_BYTES
+            );
+            report["phase_profile"] = phase;
+            report["workspace_progress"] = workspace;
             report["progress_wall"] = trace.lock().unwrap().progress_wall.summary();
         } else {
             report["phase_profile"] = reduced_profile_report();

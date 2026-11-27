@@ -73,7 +73,7 @@ impl InstalledProfile {
     }
     /// Called only after the outcome and runtime have dropped and native owners
     /// have refunded. Disable first, then sample the still-owned atomic mapping.
-    pub(super) fn finish(self) -> Value {
+    pub(super) fn finish(self) -> (Value, Value) {
         let observer = self.guard.observer();
         drop(self.guard);
         let words = std::array::from_fn(|i| observer.words_for_test()[i].load(Ordering::Acquire));
@@ -81,7 +81,6 @@ impl InstalledProfile {
         let mut profile = decode(&words);
         profile["scalar_counter_scope"] = scalar_counter_scope();
         profile["dice_family_counts"] = family_counts(counts);
-        profile["workspace_progress"] = observer.workspace_progress_report();
         profile["observation_union_helpers"] =
             union_counts(self.union_before, observation_union_probe::snapshot());
         profile["metadata_path_lookahead"] = lookahead_counts(
@@ -96,7 +95,7 @@ impl InstalledProfile {
             self.package_children_before,
             slug_loading_v2::repository_package_child_probe_snapshot(),
         );
-        profile
+        (profile, observer.workspace_progress_report())
     }
 }
 

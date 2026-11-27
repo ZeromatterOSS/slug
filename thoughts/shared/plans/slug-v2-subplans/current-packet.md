@@ -19,13 +19,14 @@ Cleanup returned to exactly 168 retained bytes, zero FDs and zero backing.
 The earlier unclassified refusal at attempt 859 still has no attributed cause
 or demonstrated removal. Full Rust and completed-command latency/RSS remain open.
 
-The bounded dispatch observer recorded six Archives taking 11.13 of 13.69 seconds
-of workspace progress. The 833-compute prefix reached 55 roots and 116 records,
-then refused File 7 at SourceWorkDeadline with exact cleanup. No Execute ran in
-this capture. Next attribute Archive wall time at verified capture, rooted
-decode/extraction and full snapshot/record boundaries on the [authentic Rust
-frontier][frontier]. The [attribution contract][attribution] caps the report at
-512 KiB. Require causal evidence before removing work. Keep the
+The [authentic Rust frontier][frontier] recorded 11.72 of 13.80 workspace seconds
+inside six Archive dispatches: 4.03 verified capture, 4.31 rooted extraction,
+and 3.35 snapshot/record. At 831 computes, 55 roots and 114 records, the sixth
+Archive passed extraction and refused during snapshot/record at
+SourceWorkDeadline. Cleanup was exact. Next test a causal hypothesis within
+the reached extraction or snapshot owners while preserving full rooted reads,
+decoded bytes, checks and history. The [attribution contract][attribution]
+keeps the complete report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,
 diagnostic-only integration, caller pruning, Need cacheability, new route,

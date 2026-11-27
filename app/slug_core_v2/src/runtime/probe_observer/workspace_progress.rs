@@ -14,6 +14,9 @@ pub(crate) enum Stage {
     Archive,
     Execute,
     Filesystem,
+    ArchiveCapture,
+    ArchiveExtract,
+    ArchiveSnapshot,
 }
 
 impl Stage {
@@ -31,13 +34,16 @@ impl Stage {
     }
 }
 
-const LABELS: [&str; 6] = [
+const LABELS: [&str; 9] = [
     "preflight",
     "reserve_and_initialize",
     "source_snapshot",
     "archive",
     "execute",
     "filesystem",
+    "archive_verified_capture",
+    "archive_rooted_extract",
+    "archive_snapshot_and_record",
 ];
 
 #[derive(Default)]
@@ -67,8 +73,10 @@ impl Totals {
             "columns": ["completed", "completed_wall_ns", "aborted", "aborted_wall_ns"],
             "rows": self.rows,
             "invalid_clock_or_overflow": self.invalid,
-            "completed_includes_replay": true,
+            "dispatch_completion_includes_replay": true,
+            "archive_substages_are_nested_and_exclude_replay": true,
             "overlaps_outer_progress_wall": true,
+            "archive_stages_use_probe_thread": true,
         })
     }
 }
@@ -135,14 +143,12 @@ fn workspace_progress_spans_distinguish_completion_early_drop_and_invalid_totals
 
 #[test]
 fn workspace_progress_report_is_bounded_at_maximum_counts() {
-    let totals = Totals {
+    let report = Totals {
         rows: [[u64::MAX; 4]; LABELS.len()],
-        invalid: true,
-    };
-    assert!(
-        json!({"workspace_progress": totals.report()})
-            .to_string()
-            .len()
-            < 1024
-    );
+        invalid: false,
+    }
+    .report();
+    assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);
 }
+
+pub(crate) const REPORT_BYTES: usize = 2 * 1024;
