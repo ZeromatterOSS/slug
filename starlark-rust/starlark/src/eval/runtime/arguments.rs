@@ -33,6 +33,8 @@ use crate::collections::Hashed;
 use crate::collections::SmallMap;
 use crate::collections::StarlarkHashValue;
 use crate::collections::symbol::symbol::Symbol;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::ParametersSpec;
 use crate::hint::unlikely;
 use crate::values::Heap;
@@ -44,6 +46,8 @@ use crate::values::dict::DictRef;
 use crate::values::iter::StarlarkIterator;
 
 mod bounded;
+
+pub(crate) use self::bounded::bounded_name_matches;
 
 #[derive(Debug, Clone, Error)]
 pub(crate) enum FunctionError {
@@ -80,6 +84,15 @@ pub(crate) trait ArgSymbol: Debug + Coerce<Self> + 'static {
         ps: &ParametersSpec<V>,
     ) -> Option<usize>;
 
+    fn bounded_index_from_param_spec(
+        &self,
+        ps: &ParametersSpec<Value<'_>>,
+        name: &str,
+        budget: &ExecutionBudget,
+    ) -> Result<Option<usize>, ExecutionLimit> {
+        ps.bounded_named_index(name, budget)
+    }
+
     fn small_hash(&self) -> StarlarkHashValue;
 }
 
@@ -111,6 +124,15 @@ impl ArgSymbol for ResolvedArgName {
         _ps: &ParametersSpec<V>,
     ) -> Option<usize> {
         self.param_index.map(|i| i as usize)
+    }
+
+    fn bounded_index_from_param_spec(
+        &self,
+        _ps: &ParametersSpec<Value<'_>>,
+        _name: &str,
+        _budget: &ExecutionBudget,
+    ) -> Result<Option<usize>, ExecutionLimit> {
+        Ok(self.param_index.map(|i| i as usize))
     }
 
     fn small_hash(&self) -> StarlarkHashValue {

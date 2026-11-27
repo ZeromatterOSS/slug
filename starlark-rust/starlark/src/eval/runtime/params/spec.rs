@@ -25,13 +25,12 @@ use starlark_derive::Coerce;
 use starlark_derive::Freeze;
 use starlark_derive::Trace;
 use starlark_map::Hashed;
-use starlark_map::small_map::SmallMap;
 use starlark_syntax::function_error;
 use starlark_syntax::other_error;
 use starlark_syntax::syntax::def::DefParamIndices;
 
+use self::keywords::CapturedKeywords;
 use crate as starlark;
-use crate::__macro_refs::coerce;
 use crate::cast::transmute;
 use crate::collections::symbol::map::SymbolMap;
 use crate::docs::DocParam;
@@ -39,11 +38,14 @@ use crate::docs::DocParams;
 use crate::docs::DocString;
 use crate::eval::Arguments;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::ParametersParser;
 use crate::eval::runtime::arguments::ArgSymbol;
 use crate::eval::runtime::arguments::ArgumentsImpl;
 use crate::eval::runtime::arguments::FunctionError;
 use crate::eval::runtime::arguments::ResolvedArgName;
+use crate::eval::runtime::arguments::bounded_name_matches;
 use crate::eval::runtime::params::display::PARAM_FMT_OPTIONAL;
 use crate::eval::runtime::params::display::ParamFmt;
 use crate::eval::runtime::params::display::fmt_param_spec;
@@ -54,9 +56,12 @@ use crate::values::Heap;
 use crate::values::StringValue;
 use crate::values::Value;
 use crate::values::ValueLike;
-use crate::values::dict::Dict;
 use crate::values::dict::DictRef;
 
+mod keywords;
+
+#[cfg(test)]
+mod keyword_budget_tests;
 #[cfg(test)]
 mod star_budget_tests;
 
@@ -285,7 +290,7 @@ impl<V> ParametersSpecBuilder<V> {
         self.current_style = CurrentParameterStyle::NamedOnly;
     }
 
-    /// Add a `**kwargs` parameter which will be a dictionary, recorded into a [`SmallMap`].
+    /// Add a `**kwargs` parameter which will be a dictionary.
     /// A function can only have one `kwargs` parameter.
     /// parameter. After this call, any subsequent
     /// [`required`](ParametersSpecBuilder::required),
@@ -565,6 +570,23 @@ impl<'v, V: ValueLike<'v>> ParametersSpec<V> {
 }
 
 impl<'v> ParametersSpec<Value<'v>> {
+    pub(crate) fn bounded_named_index(
+        &self,
+        name: &str,
+        budget: &ExecutionBudget,
+    ) -> Result<Option<usize>, ExecutionLimit> {
+        for index in self
+            .indices
+            .pos_or_named()
+            .chain(self.indices.named_only(self.param_names.len()))
+        {
+            if bounded_name_matches(&self.param_names[index], name, budget)? {
+                return Ok(Some(index));
+            }
+        }
+        Ok(None)
+    }
+
     /// Move parameters from [`Arguments`] to a list of [`Value`],
     /// using the supplied [`ParametersSpec`].
     #[inline]
@@ -634,50 +656,6 @@ impl<'v> ParametersSpec<Value<'v>> {
     where
         'v: 'a,
     {
-        /// Lazily initialized `kwargs` object.
-        #[derive(Default)]
-        struct LazyKwargs<'v> {
-            kwargs: Option<SmallMap<StringValue<'v>, Value<'v>>>,
-        }
-
-        impl<'v> LazyKwargs<'v> {
-            // Return true if the value is a duplicate
-            #[inline(always)]
-            fn insert(&mut self, key: Hashed<StringValue<'v>>, val: Value<'v>) -> bool {
-                match &mut self.kwargs {
-                    None => {
-                        let mut mp = SmallMap::with_capacity(12);
-                        mp.insert_hashed_unique_unchecked(key, val);
-                        self.kwargs = Some(mp);
-                        false
-                    }
-                    Some(mp) => mp.insert_hashed(key, val).is_some(),
-                }
-            }
-
-            #[inline(always)]
-            fn insert_unique_unchecked(&mut self, key: Hashed<StringValue<'v>>, val: Value<'v>) {
-                match &mut self.kwargs {
-                    None => {
-                        let mut mp = SmallMap::with_capacity(12);
-                        mp.insert_hashed_unique_unchecked(key, val);
-                        self.kwargs = Some(mp);
-                    }
-                    Some(mp) => {
-                        mp.insert_hashed_unique_unchecked(key, val);
-                    }
-                }
-            }
-
-            fn alloc(self, heap: Heap<'v>) -> Value<'v> {
-                let kwargs = match self.kwargs {
-                    Some(kwargs) => Dict::new(coerce(kwargs)),
-                    None => Dict::default(),
-                };
-                heap.alloc(kwargs)
-            }
-        }
-
         let len = self.param_kinds.len();
         // We might do unchecked stuff later on, so make sure we have as many slots as we expect
         assert!(slots.len() >= len);
@@ -700,7 +678,7 @@ impl<'v> ParametersSpec<Value<'v>> {
             }
             Ok(())
         };
-        let mut kwargs = LazyKwargs::default();
+        let mut kwargs = CapturedKeywords::new(budget);
         let mut next_position = 0;
 
         // First deal with positional parameters
@@ -730,12 +708,18 @@ impl<'v> ParametersSpec<Value<'v>> {
         if !args.names().names().is_empty() {
             for ((name, name_value), v) in args.names().names().iter().zip(args.named()) {
                 // Safe to use new_unchecked because hash for the Value and str are the same
-                match name.get_index_from_param_spec(self) {
+                let index = if let Some(budget) = budget {
+                    budget.charge(1, 0)?;
+                    name.bounded_index_from_param_spec(self, name_value.as_str(), budget)?
+                } else {
+                    name.get_index_from_param_spec(self)
+                };
+                match index {
                     None => {
-                        kwargs.insert_unique_unchecked(
+                        kwargs.push_explicit(
                             Hashed::new_unchecked(name.small_hash(), *name_value),
                             *v,
-                        );
+                        )?;
                     }
                     Some(i) => {
                         slots[i] = Some(*v);
@@ -779,35 +763,53 @@ impl<'v> ParametersSpec<Value<'v>> {
 
         // Check if the named arguments clashed with the positional arguments
         if unlikely(next_position > lowest_name) {
-            return Err(FunctionError::RepeatedArg {
-                name: self.param_names[lowest_name].clone(),
+            let name = &self.param_names[lowest_name];
+            if let Some(budget) = budget {
+                return Err(FunctionError::bounded_message(
+                    budget,
+                    format_args!("Argument `{name}` occurs more than once"),
+                ));
             }
-            .into());
+            return Err(FunctionError::RepeatedArg { name: name.clone() }.into());
         }
 
         // Now insert the kwargs, if there are any
         if let Some(param_kwargs) = args.kwargs() {
+            let explicit_len = kwargs.len();
             match DictRef::from_value(param_kwargs) {
                 Some(y) => {
                     for (k, v) in y.iter_hashed() {
+                        if let Some(budget) = budget {
+                            budget.charge(1, 0)?;
+                        }
                         match StringValue::new(*k.key()) {
                             None => return Err(FunctionError::ArgsValueIsNotString.into()),
                             Some(s) => {
-                                let repeat = match self
-                                    .names
-                                    .get_hashed_string_value(Hashed::new_unchecked(k.hash(), s))
-                                {
-                                    None => kwargs.insert(Hashed::new_unchecked(k.hash(), s), v),
+                                let key = Hashed::new_unchecked(k.hash(), s);
+                                let index = if let Some(budget) = budget {
+                                    self.bounded_named_index(s.as_str(), budget)?
+                                } else {
+                                    self.names.get_hashed_string_value(key).map(|i| *i as usize)
+                                };
+                                let repeat = match index {
+                                    None => kwargs.push_unpacked(key, v, explicit_len)?,
                                     Some(i) => {
-                                        let this_slot = &mut slots[*i as usize];
+                                        let this_slot = &mut slots[i];
                                         let repeat = this_slot.is_some();
                                         *this_slot = Some(v);
                                         repeat
                                     }
                                 };
                                 if unlikely(repeat) {
+                                    let name = s.as_str();
+                                    if let Some(budget) = budget {
+                                        return Err(FunctionError::bounded_message(
+                                            budget,
+                                            format_args!("Argument `{name}` occurs more than once"),
+                                        ));
+                                    }
                                     return Err(FunctionError::RepeatedArg {
-                                        name: s.as_str().to_owned(),
+                                        name: name.to_owned(),
                                     }
                                     .into());
                                 }
@@ -837,19 +839,24 @@ impl<'v> ParametersSpec<Value<'v>> {
                 ParameterKind::Required => {
                     let function_name = &self.function_name;
                     let param_name = &self.param_names[index];
-                    if index < self.indices.num_positional_only as usize {
-                        return Err(function_error!(
-                            "Missing positional-only parameter `{param_name}` for call to `{function_name}`",
-                        ));
+                    let description = if index < self.indices.num_positional_only as usize {
+                        "positional-only parameter"
                     } else if index >= self.indices.num_positional as usize {
-                        return Err(function_error!(
-                            "Missing named-only parameter `{param_name}` for call to `{function_name}`",
-                        ));
+                        "named-only parameter"
                     } else {
-                        return Err(function_error!(
-                            "Missing parameter `{param_name}` for call to `{function_name}`"
+                        "parameter"
+                    };
+                    if let Some(budget) = budget {
+                        return Err(FunctionError::bounded_message(
+                            budget,
+                            format_args!(
+                                "Missing {description} `{param_name}` for call to `{function_name}`"
+                            ),
                         ));
                     }
+                    return Err(function_error!(
+                        "Missing {description} `{param_name}` for call to `{function_name}`"
+                    ));
                 }
                 ParameterKind::Defaulted(x) => {
                     *slot = Some(x.to_value());
@@ -864,6 +871,15 @@ impl<'v> ParametersSpec<Value<'v>> {
         if let Some(args_pos) = self.indices.args {
             slots[args_pos as usize] = Some(heap.alloc_budgeted_tuple(&star_args)?);
         } else if unlikely(extra_pos != 0) {
+            if let Some(budget) = budget {
+                let function = &self.function_name;
+                return Err(FunctionError::bounded_message(
+                    budget,
+                    format_args!(
+                        "Found {extra_pos} extra positional argument(s) for call to {function}"
+                    ),
+                ));
+            }
             return Err(FunctionError::ExtraPositionalArg {
                 count: extra_pos,
                 function: self.signature(),
@@ -872,13 +888,9 @@ impl<'v> ParametersSpec<Value<'v>> {
         }
 
         if let Some(kwargs_pos) = self.indices.kwargs {
-            slots[kwargs_pos as usize] = Some(kwargs.alloc(heap));
-        } else if let Some(kwargs) = kwargs.kwargs {
-            return Err(FunctionError::ExtraNamedArg {
-                names: kwargs.keys().map(|x| x.as_str().to_owned()).collect(),
-                function: self.signature(),
-            }
-            .into());
+            slots[kwargs_pos as usize] = Some(kwargs.alloc(heap)?);
+        } else {
+            kwargs.check_empty(&self.function_name)?;
         }
         Ok(())
     }

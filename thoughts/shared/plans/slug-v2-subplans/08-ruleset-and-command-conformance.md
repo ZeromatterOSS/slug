@@ -166,9 +166,9 @@ heap, work and output admission. Untyped modules defer script operations to
 runtime and preserve original bytecode after freeze. The parser bounds bytes,
 grammar tokens, and integer digits. Shared sticky runtime credits cover text,
 interpolation, stable sort, ordered depsets with structural provider identity,
-positional expansion, generated keyword capture, and bytecode dispatch with
-loop cleanup. Bound freeze, call frames, generic keyword binding, projections,
-diagnostics, and remaining native and collection operations before activation.
+argument binding, and bytecode dispatch with loop cleanup. Bound freeze, call
+frames, projections, diagnostics, and remaining native and collection
+operations before activation.
 Resource outcomes are Slug-native.
 Bazel 9.2's `StarlarkOutputFormatterCallback` and `configured_query_test.sh`
 define setup and partial-output semantics.

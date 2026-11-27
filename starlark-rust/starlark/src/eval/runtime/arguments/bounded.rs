@@ -1,9 +1,9 @@
-use starlark_map::small_map::BoundedMapError;
+use std::fmt;
+use std::fmt::Write;
 
 use super::Arguments;
 use super::FunctionError;
 use crate::collections::Hashed;
-use crate::collections::SmallMap;
 use crate::collections::symbol::symbol::Symbol;
 use crate::eval::ExecutionBudget;
 use crate::eval::ExecutionLimit;
@@ -13,7 +13,6 @@ use crate::values::StringValue;
 use crate::values::StringValueLike;
 use crate::values::Value;
 use crate::values::ValueLike;
-use crate::values::dict::Dict;
 use crate::values::dict::DictRef;
 
 /// Borrowed, validated named arguments. Lookups pay for scanned keys instead of
@@ -68,26 +67,7 @@ impl<'v> BoundedFormatNames<'v, '_> {
                 )
             });
         let kwargs = self.kwargs.iter().flat_map(|kwargs| kwargs.iter_hashed());
-        let rows =
-            SmallMap::try_from_unique_hashed_rows(count, explicit.chain(kwargs), |work, bytes| {
-                budget.charge(work, bytes)
-            });
-        let rows = match rows {
-            Ok(rows) => rows,
-            Err(BoundedMapError::Operation(limit)) => return Err(limit.into()),
-            Err(BoundedMapError::SizeOverflow) => {
-                return Err(budget.refuse(ExecutionLimit::AllocationBytes).into());
-            }
-            Err(BoundedMapError::AllocationFailed) => {
-                return Err(budget.refuse(ExecutionLimit::AllocationFailed).into());
-            }
-            Err(BoundedMapError::RowCountMismatch) => {
-                return Err(crate::Error::new_kind(crate::ErrorKind::Internal(
-                    anyhow::anyhow!("validated kwargs row count changed",),
-                )));
-            }
-        };
-        Ok(heap.alloc_budgeted_dict(Dict::new(rows))?)
+        heap.alloc_budgeted_dict_from_unique_rows(count, explicit.chain(kwargs), budget)
     }
 }
 
@@ -97,18 +77,70 @@ fn find_name<'v>(
     budget: &ExecutionBudget,
 ) -> Result<Option<Value<'v>>, ExecutionLimit> {
     for (key, value) in entries {
-        // Length-mismatched strings do not compare bytes.
-        let compared = if key.len() == name.len() {
-            ExecutionBudget::text_work(name.len())
-        } else {
-            0
-        };
-        budget.charge(1 + compared, 0)?;
-        if key == name {
+        if bounded_name_matches(key, name, budget)? {
             return Ok(Some(value));
         }
     }
     Ok(None)
+}
+
+pub(crate) fn bounded_name_matches(
+    left: &str,
+    right: &str,
+    budget: &ExecutionBudget,
+) -> Result<bool, ExecutionLimit> {
+    let compared = if left.len() == right.len() {
+        ExecutionBudget::text_work(left.len())
+    } else {
+        0
+    };
+    budget.charge(1 + compared, 0)?;
+    Ok(left == right)
+}
+
+impl FunctionError {
+    fn render_bounded(
+        budget: &ExecutionBudget,
+        render: impl FnOnce(&mut BoundedText<'_>) -> Result<(), ExecutionLimit>,
+    ) -> crate::Error {
+        let mut message = BoundedText::new(budget, usize::MAX);
+        match render(&mut message).and_then(|()| message.finish()) {
+            Ok(message) => {
+                crate::Error::new_kind(crate::ErrorKind::Function(anyhow::Error::msg(message)))
+            }
+            Err(limit) => limit.into(),
+        }
+    }
+
+    pub(crate) fn bounded_message(
+        budget: &ExecutionBudget,
+        message: fmt::Arguments<'_>,
+    ) -> crate::Error {
+        Self::render_bounded(budget, |output| {
+            output
+                .write_fmt(message)
+                .map_err(|_| budget.refuse(ExecutionLimit::TextFormatting))
+        })
+    }
+
+    pub(crate) fn bounded_extra_named<'a>(
+        budget: &ExecutionBudget,
+        function: &str,
+        names: impl Iterator<Item = &'a str>,
+    ) -> crate::Error {
+        Self::render_bounded(budget, |message| {
+            message.push_str("Found `")?;
+            for (index, name) in names.enumerate() {
+                budget.charge(1, 0)?;
+                if index != 0 {
+                    message.push_str("` `")?;
+                }
+                message.push_str(name)?;
+            }
+            message.push_str("` extra named parameter(s) for call to ")?;
+            message.push_str(function)
+        })
+    }
 }
 
 impl<'v, 'a> Arguments<'v, 'a> {
@@ -179,20 +211,7 @@ impl<'v, 'a> Arguments<'v, 'a> {
                 .flat_map(|kwargs| kwargs.keys().map(|key| key.unpack_str().unwrap())),
         );
 
-        // Write the diagnostic once so displaying it never joins owned key copies.
-        let mut message = BoundedText::new(budget, usize::MAX);
-        message.push_str("Found `")?;
-        for (index, name) in keys.enumerate() {
-            budget.charge(1, 0)?;
-            if index != 0 {
-                message.push_str("` `")?;
-            }
-            message.push_str(name)?;
-        }
-        message.push_str("` extra named parameter(s) for call to function")?;
-        Err(crate::Error::new_kind(crate::ErrorKind::Function(
-            anyhow::Error::msg(message.finish()?),
-        )))
+        Err(FunctionError::bounded_extra_named(budget, "function", keys))
     }
 
     pub(crate) fn bounded_format_names(
@@ -210,12 +229,10 @@ impl<'v, 'a> Arguments<'v, 'a> {
                 budget.charge(1, 0)?;
                 let key = Self::unpack_kwargs_key(key)?;
                 if find_name(names.explicit(), key, budget)?.is_some() {
-                    let mut name = BoundedText::new(budget, usize::MAX);
-                    name.push_str(key)?;
-                    return Err(FunctionError::RepeatedArg {
-                        name: name.finish()?,
-                    }
-                    .into());
+                    return Err(FunctionError::bounded_message(
+                        budget,
+                        format_args!("Argument `{key}` occurs more than once"),
+                    ));
                 }
             }
         }

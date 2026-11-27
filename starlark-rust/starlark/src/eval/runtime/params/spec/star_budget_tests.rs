@@ -56,13 +56,14 @@ fn bounded_signature_keeps_star_capture_order_and_reserves_storage() {
 #[test]
 fn bounded_signature_counts_excess_star_arguments_without_scratch() {
     let source = "def one(arg):\n    return arg\none(*spread)";
-    let budget = Arc::new(ExecutionBudget::new(100, 0, 16));
+    // The diagnostic fits, while a vector of all 128 supplied values would not.
+    let budget = Arc::new(ExecutionBudget::new(512, 256, 16));
     let module = Module::new_with_execution_budget(budget.clone());
-    let error = run(&module, source, spread(&module, 4)).unwrap_err();
+    let error = run(&module, source, spread(&module, 128)).unwrap_err();
     assert!(
         error
             .to_string()
-            .contains("Found 3 extra positional argument(s)")
+            .contains("Found 127 extra positional argument(s)")
     );
     assert_eq!(budget.check(), Ok(()));
 
@@ -70,6 +71,6 @@ fn bounded_signature_counts_excess_star_arguments_without_scratch() {
     assert!(error.to_string().contains("*args is not iterable"));
     assert_eq!(budget.check(), Ok(()));
 
-    assert!(run(&module, source, spread(&module, 256)).is_err());
+    assert!(run(&module, source, spread(&module, 1024)).is_err());
     assert_eq!(budget.check(), Err(ExecutionLimit::Work));
 }

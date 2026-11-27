@@ -20,7 +20,12 @@ use std::any::type_name;
 use std::marker::PhantomData;
 use std::mem;
 
+use starlark_map::Hashed;
+use starlark_map::small_map::BoundedMapError;
+use starlark_map::small_map::SmallMap;
+
 use super::simple::AValueSimple;
+use crate::eval::ExecutionBudget;
 use crate::eval::ExecutionLimit;
 use crate::eval::compiler::def::FrozenDef;
 use crate::private::Private;
@@ -138,14 +143,34 @@ where
 }
 
 impl<'v> Heap<'v> {
-    /// Admit the exact mutable dictionary arena object before moving its backing map.
-    /// The caller accounts for the row and index allocations.
-    pub(crate) fn alloc_budgeted_dict(self, dict: Dict<'v>) -> Result<Value<'v>, ExecutionLimit> {
-        if let Some(budget) = self.execution_budget() {
-            let bytes = AValueComplex::<MutableDict<'v>>::alloc_size_for_extra_len(0).bytes();
-            budget.charge(1, bytes as usize)?;
-        }
-        Ok(self.alloc(dict))
+    /// Admit the map and mutable dictionary from admitted unique, prehashed rows.
+    pub(crate) fn alloc_budgeted_dict_from_unique_rows(
+        self,
+        count: usize,
+        rows: impl IntoIterator<Item = (Hashed<Value<'v>>, Value<'v>)>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Value<'v>> {
+        let rows = SmallMap::try_from_unique_hashed_rows(count, rows, |work, bytes| {
+            budget.charge(work, bytes)
+        });
+        let rows = match rows {
+            Ok(rows) => rows,
+            Err(BoundedMapError::Operation(limit)) => return Err(limit.into()),
+            Err(BoundedMapError::SizeOverflow) => {
+                return Err(budget.refuse(ExecutionLimit::AllocationBytes).into());
+            }
+            Err(BoundedMapError::AllocationFailed) => {
+                return Err(budget.refuse(ExecutionLimit::AllocationFailed).into());
+            }
+            Err(BoundedMapError::RowCountMismatch) => {
+                return Err(crate::Error::new_kind(crate::ErrorKind::Internal(
+                    anyhow::anyhow!("validated dictionary row count changed"),
+                )));
+            }
+        };
+        let bytes = AValueComplex::<MutableDict<'v>>::alloc_size_for_extra_len(0).bytes();
+        budget.charge(1, bytes as usize)?;
+        Ok(self.alloc(Dict::new(rows)))
     }
 
     /// Allocate a [`ComplexValue`] on the [`Heap`].
