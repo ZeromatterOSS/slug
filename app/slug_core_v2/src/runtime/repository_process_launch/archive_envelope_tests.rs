@@ -67,7 +67,19 @@ impl ArchiveInput {
     }
 }
 
-fn run_case(id: u64, inputs: &[&ArchiveInput], overflow: Option<&str>) {
+fn command_scope(
+    id: u64,
+) -> (
+    tempfile::TempDir,
+    Arc<RepositoryWorkspaceReservation>,
+    Arc<RepositoryRootResources>,
+    usize,
+    Arc<SourceServiceScope>,
+    tokio::runtime::Runtime,
+    RepositoryWorkspaceCommand,
+    i32,
+    RootIdentity,
+) {
     let temporary = tempfile::tempdir().unwrap();
     let selected = reservation(
         &Path::new(wire::RESERVED_PREFIX).join(temporary.path().file_name().unwrap()),
@@ -85,7 +97,15 @@ fn run_case(id: u64, inputs: &[&ArchiveInput], overflow: Option<&str>) {
         bank.clone(),
     )
     .unwrap();
-    let (mut command, fd, identity) = launch_archive(&selected, &bank, &scope, &runtime);
+    let (command, fd, identity) = launch_archive(&selected, &bank, &scope, &runtime);
+    (
+        temporary, selected, bank, baseline, scope, runtime, command, fd, identity,
+    )
+}
+
+fn run_case(id: u64, inputs: &[&ArchiveInput], overflow: Option<&str>) {
+    let (_temporary, selected, bank, baseline, scope, runtime, mut command, fd, identity) =
+        command_scope(id);
     let mut prior = facts(fd);
     assert_eq!((prior.bytes, prior.inodes), (ARCHIVE_BYTES, 262144));
     let mut decoded = 0;
@@ -201,4 +221,102 @@ fn native_archive_decoded_limits_use_actual_verified_streams() {
         &[&first, &second, &plus_total],
         Some("generated archives exceed aggregate decoded limit"),
     );
+}
+
+#[test]
+#[ignore = "actual compiled CLI and two native Archive path-byte boundary cases; finite supervisor required"]
+fn native_archive_complete_tree_paths_accept_exact_limit_and_refuse_one_more() {
+    'cases: for overflow in [false, true] {
+        let (_temporary, selected, bank, baseline, scope, runtime, mut command, fd, identity) =
+            command_scope(2413 + u64::from(overflow));
+        let empty = facts(fd);
+        let mut paths = Vec::new();
+        for (index, branch) in ['a', 'b', 'c', 'd'].into_iter().enumerate() {
+            // A 95-byte first component plus 575 5-byte components gives
+            // 1,048,320 bytes over all 576 prefixes. One extra byte at
+            // component 321 contributes 256 more bytes per branch.
+            let mut path = format!("{branch}{}", "p".repeat(94));
+            for depth in 2..=576 {
+                path.push_str(if depth == 321 { "/member" } else { "/entry" });
+            }
+            let plus_one = overflow && index == 3;
+            if plus_one {
+                path.push('x');
+            }
+            let prefixes = path
+                .match_indices('/')
+                .map(|(index, _)| index)
+                .sum::<usize>();
+            assert_eq!(prefixes + path.len(), MIB as usize + usize::from(plus_one));
+            assert!(selected.display_root().as_path().as_os_str().len() + 1 + path.len() <= 4096);
+            let request = command
+                .request(
+                    &selected,
+                    RepositoryWorkspaceOperation::File {
+                        path: path.as_str().into(),
+                        body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(
+                            &b"payload"[..],
+                        )),
+                        mode: 0o644,
+                    },
+                    &scope,
+                    &|| true,
+                )
+                .unwrap();
+            let result = command.apply(request, &runtime, &Default::default(), &scope, &|| true);
+            if plus_one {
+                assert!(
+                    matches!(&result, Err(PhysicalRootError::Snapshot)),
+                    "{:?}",
+                    result.err()
+                );
+                assert!(scope.first_error().is_none());
+                assert_eq!(unsafe { libc::fcntl(fd, libc::F_GETFD) }, -1);
+                // The consumed root cannot proceed to finalization.
+                drop(scope);
+                release(&bank, baseline);
+                eprintln!("native Archive path quota refused 4194305 bytes");
+                continue 'cases;
+            }
+            command = result.unwrap();
+            let transcript = &command.epoch().transcripts().unwrap()[0];
+            assert_eq!(transcript.records().len(), index + 1);
+            let entries = transcript.current().entries();
+            assert_eq!(entries.len(), (index + 1) * 576 + 1);
+            assert_eq!(
+                entries
+                    .iter()
+                    .map(|entry| entry.path().len())
+                    .sum::<usize>(),
+                (index + 1) * MIB as usize,
+            );
+            assert_eq!(
+                facts(fd).allocated - empty.allocated,
+                (index + 1) as u64 * 4096
+            );
+            paths.push(path);
+        }
+        let before = facts(fd);
+        assert!(before.used_inodes > empty.used_inodes);
+        let request = final_request(&command, &selected);
+        let (command, sealed, view) = runtime
+            .block_on(command.finalize_read_view(request, &scope, &|| true))
+            .unwrap();
+        assert_eq!(sealed.root().identity, identity);
+        assert_eq!(sealed.root().file.as_raw_fd(), fd);
+        let after = facts(fd);
+        assert_eq!(
+            (after.allocated, after.used_inodes),
+            (before.allocated, before.used_inodes)
+        );
+        for path in paths {
+            let mut reader = sealed.root().open_member(&path, &scope, &|| true).unwrap();
+            let mut bytes = Vec::new();
+            reader.read_to_end(&mut bytes).unwrap();
+            assert_eq!(bytes, b"payload");
+        }
+        drop((command, sealed, view, scope));
+        release(&bank, baseline);
+        eprintln!("native Archive path quota accepted 4194304 bytes");
+    }
 }

@@ -311,8 +311,10 @@ used the fixed bank and 27+3 clock. Verified gzip streams reached exactly
 512 MiB/call and 1 GiB cumulative. One extra byte in either case gave the
 corresponding materialization refusal and released the unpublished root. The
 original FD measured 1/1/2 pages for 4095/4096/4097-byte files and increased inode
-use for an admitted literal link. Exact success sealed on the same root with
-verified members and returned the bank to baseline. Maximum-tree evidence is open.
+use for an admitted literal link. Four trusted File operations also sealed
+exactly 4 MiB of complete paths over 2,305 entries. A matched leaf spelling
+with one extra byte refused during capture. Both lanes retired to baseline.
+Maximum entry/body and physical quota evidence remains open.
 
 Process snapshot bounds: **8192 entries INCLUDING root**, depth<=64 below root,
 each logical absolute demand/path<=4096 bytes (including display prefix), and

@@ -31,8 +31,9 @@ matched the pinned comparison. Peak backing was 7,747,932,160 bytes, retained
 406,051,206 bytes and FDs 499. Runtime teardown refunded all credits.
 
 The native Archive launcher verified 512 MiB/call and 1 GiB cumulative decode
-at exact and +1, physical page rounding and link inode charging. Six Archive
-tests passed. Maximum complete-tree envelope remains open.
+at exact and +1, physical page rounding and link inode charging. Complete-tree
+paths sealed at 4 MiB and refused +1 with full retirement. Seven Archive tests
+passed. The remaining maximum-tree envelope is open.
 
 Repeated Workspace publication passed cold, warm, changed and restored inputs
 with contained runfiles and alias links. The readonly child verified prior
