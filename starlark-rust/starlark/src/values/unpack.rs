@@ -17,6 +17,7 @@
 
 //! Parameter conversion utilities for `starlark_module` macros.
 
+use std::borrow::Cow;
 use std::convert::Infallible;
 use std::fmt::Debug;
 
@@ -29,12 +30,15 @@ use crate::values::Value;
 use crate::values::type_repr::StarlarkTypeRepr;
 
 #[cold]
-pub(crate) fn incorrect_parameter_type(expected: Ty, actual: String) -> crate::Error {
+pub(crate) fn incorrect_parameter_type(
+    expected: Ty,
+    actual: impl Into<Cow<'static, str>>,
+) -> crate::Error {
     #[derive(thiserror::Error, Debug)]
     #[error("Type of parameters mismatch, expected `{0}`, actual `{1}`")]
-    struct IncorrectParameterTypeWithExpected(Ty, String);
+    struct IncorrectParameterTypeWithExpected(Ty, Cow<'static, str>);
 
-    crate::Error::new_value(IncorrectParameterTypeWithExpected(expected, actual))
+    crate::Error::new_value(IncorrectParameterTypeWithExpected(expected, actual.into()))
 }
 
 /// Error that can be returned by [`UnpackValue`].

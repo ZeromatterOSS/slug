@@ -30,6 +30,7 @@
 // somewhere. The solution is to have a separate value storage vs vtable.
 
 use std::any;
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Debug;
@@ -1245,11 +1246,15 @@ impl<'v> Value<'v> {
         self.display_for_type_error().to_string()
     }
 
-    /// Produce the ordinary type description using admitted representation work.
+    /// Describe an invalid operand without rendering it in the closed profile.
     pub(crate) fn bounded_type_description(
         self,
         budget: &ExecutionBudget,
-    ) -> Result<String, ExecutionLimit> {
+    ) -> Result<Cow<'static, str>, ExecutionLimit> {
+        if budget.bounds_formatter_bytecode() {
+            budget.charge(1, 0)?;
+            return Ok(Cow::Borrowed(self.get_type()));
+        }
         let mut repr = BoundedText::new(budget, usize::MAX);
         repr.write_value(self, ValueTextMode::Repr)?;
         let description = TypeErrorRepr {
@@ -1261,7 +1266,7 @@ impl<'v> Value<'v> {
         let mut text = BoundedText::new(budget, usize::MAX);
         fmt::write(&mut text, format_args!("{description}"))
             .map_err(|_| budget.refuse(ExecutionLimit::TextFormatting))?;
-        text.finish()
+        text.finish().map(Cow::Owned)
     }
 }
 

@@ -159,6 +159,25 @@ impl<'v> StarlarkValue<'v> for IndexTrap {
 }
 
 #[test]
+fn closed_sequence_index_errors_do_not_render_invalid_values() {
+    let budget = Arc::new(ExecutionBudget::new(100, 512, 16).with_closed_formatter_bytecode());
+    let module = Module::new_with_execution_budget(budget.clone());
+    let heap = module.heap();
+    let items = heap.alloc(AllocList([1]));
+    for (index, message) in [
+        (heap.alloc(IndexTrap), "got `index_trap`"),
+        (heap.alloc("雪".repeat(4096)), "got `string`"),
+        (heap.alloc(4_294_967_296i64), "Integer overflow"),
+    ] {
+        let error = items.at(index, heap).unwrap_err();
+        let diagnostic = error.without_diagnostic().to_string();
+        assert!(diagnostic.contains(message), "{diagnostic}");
+        assert_eq!(budget.check(), Ok(()));
+    }
+    assert_eq!(items.at(heap.alloc(0), heap).unwrap().unpack_i32(), Some(1));
+}
+
+#[test]
 fn strict_indexing_refuses_native_hooks_and_bigint_formatting() {
     let unsupported = ExecutionLimit::UnsupportedOperation {
         operation: "indexing",

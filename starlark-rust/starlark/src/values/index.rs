@@ -84,6 +84,9 @@ pub(crate) fn read_sequence_index_bounded<'v>(
     budget.charge(1, 0)?;
     let Some(index) = index.unpack_i32() else {
         if StarlarkIntRef::unpack(index).is_some() {
+            if budget.bounds_formatter_bytecode() {
+                return Err(ValueError::IntegerOverflow.into());
+            }
             // The ordinary out-of-i32 diagnostic performs unrestricted BigInt formatting.
             return Err(budget.refuse(ExecutionLimit::UnsupportedText("int")).into());
         }

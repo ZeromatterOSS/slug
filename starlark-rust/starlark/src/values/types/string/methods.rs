@@ -22,6 +22,7 @@ mod bounded_endswith_tests;
 #[cfg(test)]
 mod bounded_format_tests;
 
+use std::borrow::Cow;
 use std::cmp;
 
 use starlark_derive::starlark_module;
@@ -149,7 +150,7 @@ fn invalid_endswith_suffix(suffix: Value<'_>, budget: &ExecutionBudget) -> crate
     #[error("Type of parameter `suffix` doesn't match, expected `{expected}`, actual `{actual}`")]
     struct SuffixTypeError {
         expected: Ty,
-        actual: String,
+        actual: Cow<'static, str>,
     }
 
     let actual = suffix.bounded_type_description(budget)?;
