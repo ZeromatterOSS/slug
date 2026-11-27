@@ -33,7 +33,7 @@ use crate::eval::bc::opcode::BcOpcode;
 use crate::eval::bc::opcode::BcOpcodeHandler;
 use crate::eval::bc::slow_arg::BcInstrEndArg;
 use crate::eval::bc::slow_arg::BcInstrSlowArg;
-use crate::eval::compiler::add_span_to_expr_error;
+use crate::eval::compiler::add_lazy_span_to_expr_error;
 use crate::eval::runtime::evaluator::EvaluationCallbacks;
 use crate::values::Value;
 
@@ -86,8 +86,7 @@ impl Bc {
         e: crate::Error,
         eval: &Evaluator,
     ) -> EvalException {
-        let span = Self::slow_arg_at_ptr(ptr).span;
-        add_span_to_expr_error(e, span, eval)
+        add_lazy_span_to_expr_error(e, || Self::slow_arg_at_ptr(ptr).span, eval)
     }
 
     /// Run the bytecode in the current frame allocated in the evaluator.

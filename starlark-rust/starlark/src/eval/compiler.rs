@@ -51,6 +51,19 @@ pub(crate) fn add_span_to_expr_error(
     span: FrameSpan,
     eval: &Evaluator,
 ) -> EvalException {
+    add_lazy_span_to_expr_error(e, || span, eval)
+}
+
+#[cold]
+pub(crate) fn add_lazy_span_to_expr_error(
+    e: crate::Error,
+    span: impl FnOnce() -> FrameSpan,
+    eval: &Evaluator,
+) -> EvalException {
+    if let Some(limit) = eval.execution_refusal(&e) {
+        return EvalException::new_unknown_span(limit.into());
+    }
+    let span = span();
     EvalException::new_with_callstack(e, span.span.span(), &span.span.file(), || {
         eval.call_stack.to_diagnostic_frames(span.inlined_frames)
     })

@@ -721,6 +721,9 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
         #[cold]
         #[inline(never)]
         fn add_diagnostics(mut e: crate::Error, me: &Evaluator) -> crate::Error {
+            if let Some(limit) = me.execution_refusal(&e) {
+                return limit.into();
+            }
             // Make sure we capture the call_stack before popping things off it
             e.set_call_stack(|| me.call_stack.to_diagnostic_frames(InlinedFrames::default()));
             e
@@ -734,6 +737,24 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
         let res = within(self).map_err(|e| add_diagnostics(e, self));
         self.call_stack.pop();
         res
+    }
+
+    /// A refusal can cross an evaluation boundary after its module was restored.
+    /// Check the active ledger first, then recognize a refusal carried by the error.
+    pub(crate) fn execution_refusal(&self, error: &crate::Error) -> Option<ExecutionLimit> {
+        if let Some(limit) = self
+            .heap()
+            .execution_budget()
+            .and_then(|budget| budget.check().err())
+        {
+            return Some(limit);
+        }
+        match error.kind() {
+            crate::ErrorKind::Other(cause)
+            | crate::ErrorKind::Native(cause)
+            | crate::ErrorKind::Internal(cause) => cause.downcast_ref().copied(),
+            _ => None,
+        }
     }
 
     /// The active heap where [`Value`]s are allocated.
@@ -1298,6 +1319,9 @@ pub(crate) fn before_stmt(
     );
     result
 }
+
+#[cfg(test)]
+mod refusal_tests;
 
 #[cfg(test)]
 mod tests {
