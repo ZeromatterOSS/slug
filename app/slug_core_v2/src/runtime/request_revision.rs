@@ -27,6 +27,8 @@ use dice::Key;
 use dice::UserComputationData;
 use dupe::Dupe;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathLstat;
+use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationEpochKey;
@@ -34,6 +36,7 @@ use slug_workspace_v2::PathObservationKey;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
+use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::path_observation_shards;
 
@@ -256,7 +259,131 @@ pub(super) enum RequestRevisionError {
     Computation(String),
     RevisionExhausted,
     RetryNonProgress,
-    StaleBeforeExecution,
+    StaleBeforeExecution(StalePrecheckCause),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum StalePrecheckCause {
+    RevisionChanged,
+    ObservationChanged {
+        role: &'static str,
+        operation: &'static str,
+        lstat: Option<PrecheckLstatChange>,
+    },
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum PrecheckLstatState {
+    Present(PathNodeKind),
+    Missing,
+    Error,
+}
+
+const LSTAT_FIELDS: [&str; 6] = ["kind", "size", "mtime", "ctime", "inode", "permissions"];
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct PrecheckLstatChange {
+    before: PrecheckLstatState,
+    after: PrecheckLstatState,
+    changed: [bool; LSTAT_FIELDS.len()],
+}
+
+impl PrecheckLstatChange {
+    fn new(
+        before: &PathOperationResult<PathLstat>,
+        after: &PathOperationResult<PathLstat>,
+    ) -> Self {
+        let state = |result: &PathOperationResult<PathLstat>| match result {
+            PathOperationResult::Present(facts) => PrecheckLstatState::Present(facts.kind()),
+            PathOperationResult::Missing => PrecheckLstatState::Missing,
+            PathOperationResult::Error(_) => PrecheckLstatState::Error,
+        };
+        let changed = match (before, after) {
+            (PathOperationResult::Present(before), PathOperationResult::Present(after)) => [
+                before.kind() != after.kind(),
+                before.size() != after.size(),
+                before.mtime_millis() != after.mtime_millis(),
+                before.ctime_millis() != after.ctime_millis(),
+                before.node_id() != after.node_id(),
+                before.permissions() != after.permissions(),
+            ],
+            _ => [false; LSTAT_FIELDS.len()],
+        };
+        Self {
+            before: state(before),
+            after: state(after),
+            changed,
+        }
+    }
+}
+
+impl StalePrecheckCause {
+    fn observation(
+        workspace: &Path,
+        demand: &PathObservationDemand,
+        before: &PathObservationResult,
+        after: &PathObservationResult,
+    ) -> Self {
+        let path = demand.path().as_path();
+        let role = match demand.namespace() {
+            PathObservationNamespace::Materialization(_) => "selected_repository",
+            PathObservationNamespace::Host if path == workspace => "workspace_root",
+            PathObservationNamespace::Host if workspace.starts_with(path) => "workspace_ancestor",
+            PathObservationNamespace::Host if path.starts_with(workspace) => "workspace_input",
+            PathObservationNamespace::Host => "host_outside_workspace",
+        };
+        // The validated epoch associates each observation kind with the demand.
+        // Project only static labels, including for payload-bearing operations.
+        let operation = match before {
+            PathObservationResult::InputImage(_) => "input_image",
+            PathObservationResult::Lstat(_) => "lstat",
+            PathObservationResult::ReadLink(_) => "read_link",
+            PathObservationResult::FileBytes(_) => "file_bytes",
+            PathObservationResult::FileDigest(_) => "file_digest",
+            PathObservationResult::DirectoryEntries(_) => "directory_entries",
+            PathObservationResult::WindowsLongPath(_) => "windows_long_path",
+            PathObservationResult::WindowsOptionPathLongName(_) => "windows_option_path_long_name",
+        };
+        let lstat = match (before, after) {
+            (PathObservationResult::Lstat(before), PathObservationResult::Lstat(after)) => {
+                Some(PrecheckLstatChange::new(before, after))
+            }
+            _ => None,
+        };
+        Self::ObservationChanged {
+            role,
+            operation,
+            lstat,
+        }
+    }
+}
+
+impl fmt::Display for StalePrecheckCause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RevisionChanged => f.write_str("revision_changed"),
+            Self::ObservationChanged {
+                role,
+                operation,
+                lstat,
+            } => {
+                write!(f, "observation_changed role={role} operation={operation}")?;
+                if let Some(change) = lstat {
+                    write!(f, " before={:?} after={:?}", change.before, change.after)?;
+                    for (index, (field, _)) in LSTAT_FIELDS
+                        .into_iter()
+                        .zip(change.changed)
+                        .filter(|(_, changed)| *changed)
+                        .enumerate()
+                    {
+                        f.write_str(if index == 0 { " changed=" } else { "," })?;
+                        f.write_str(field)?;
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl fmt::Display for RequestRevisionError {
@@ -273,8 +400,8 @@ impl fmt::Display for RequestRevisionError {
             ),
             Self::Injection(error) => write!(f, "injecting path epoch: {error}"),
             Self::Computation(error) => write!(f, "computing request root: {error}"),
-            Self::StaleBeforeExecution => {
-                f.write_str("source or revision changed before execution")
+            Self::StaleBeforeExecution(cause) => {
+                write!(f, "source or revision changed before execution ({cause})")
             }
             Self::RevisionExhausted => f.write_str("request revision allocator exhausted"),
             Self::RetryNonProgress => f.write_str("request revision made no bounded progress"),
@@ -452,7 +579,9 @@ impl RequestRevisionRuntime {
         let _owner = self.owner.lock().await;
         let current = self.dice.updater().existing_state().await;
         if !current.equivalent(terminal) {
-            return Err(RequestRevisionError::StaleBeforeExecution);
+            return Err(RequestRevisionError::StaleBeforeExecution(
+                StalePrecheckCause::RevisionChanged,
+            ));
         }
         drop(current);
         validate_certificate_association(full_epoch, certificate)?;
@@ -465,13 +594,22 @@ impl RequestRevisionRuntime {
                 .collect(),
         )?;
         validate_reobserved_certificate(certificate, &observed)?;
-        if !certificate
+        for ((demand, before), after) in certificate
             .observations()
             .observations()
             .iter()
-            .all(|(demand, result)| observed.get(demand).is_some_and(|new| new == result))
+            .zip(observed.observations().values())
         {
-            return Err(RequestRevisionError::StaleBeforeExecution);
+            if before != after {
+                return Err(RequestRevisionError::StaleBeforeExecution(
+                    StalePrecheckCause::observation(
+                        self.workspace.as_path(),
+                        demand,
+                        before,
+                        after,
+                    ),
+                ));
+            }
         }
         Ok(())
     }
@@ -2080,14 +2218,131 @@ mod tests {
             .unwrap();
         drop(runtime.commit(advance).await);
         let commits = audit(&runtime).commits;
+        let error = runtime
+            .precheck_native(&terminal, first.certificate(), &epoch, |_| {
+                panic!("advanced revision must reject before observing")
+            })
+            .await
+            .unwrap_err();
         assert!(matches!(
-            runtime
-                .precheck_native(&terminal, first.certificate(), &epoch, |_| {
-                    panic!("advanced revision must reject before observing")
-                })
-                .await,
-            Err(RequestRevisionError::StaleBeforeExecution)
+            error,
+            RequestRevisionError::StaleBeforeExecution(StalePrecheckCause::RevisionChanged)
         ));
+        assert_eq!(
+            error.to_string(),
+            "source or revision changed before execution (revision_changed)"
+        );
         assert_eq!(audit(&runtime).commits, commits);
+    }
+
+    #[tokio::test]
+    async fn native_precheck_projects_only_the_first_changed_observation() {
+        let directory = tempfile::tempdir().unwrap();
+        let runtime = runtime(&directory);
+        let terminal = runtime.updater().existing_state().await;
+        let workspace = runtime.workspace.as_path();
+        let ancestor = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(workspace.parent().unwrap()).unwrap(),
+            PathObservationOperation::Lstat,
+        );
+        let input = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(workspace.join("private-input")).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let lstat = |mtime, ctime| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::Directory,
+                123456,
+                mtime,
+                ctime,
+                987654,
+                0o755,
+            )))
+        };
+        let bytes = |value: &'static [u8]| {
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(value)))
+        };
+        let before = PathObservationEpoch::new([
+            (input.dupe(), bytes(b"private-original")),
+            (ancestor.dupe(), lstat(123456789, 234567890)),
+        ])
+        .unwrap();
+        let after = PathObservationEpoch::new([
+            (input.dupe(), bytes(b"private-replacement")),
+            (ancestor.dupe(), lstat(345678901, 456789012)),
+        ])
+        .unwrap();
+        let certificate = SourceCertificate::from_epoch(before.dupe()).unwrap();
+        let commits = audit(&runtime).commits;
+        let error = runtime
+            .precheck_native(&terminal, &certificate, &before, |demands| {
+                assert_eq!(demands, [ancestor, input]);
+                Ok(after)
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            &error,
+            RequestRevisionError::StaleBeforeExecution(StalePrecheckCause::ObservationChanged {
+                role: "workspace_ancestor",
+                operation: "lstat",
+                lstat: Some(PrecheckLstatChange {
+                    before: PrecheckLstatState::Present(PathNodeKind::Directory),
+                    after: PrecheckLstatState::Present(PathNodeKind::Directory),
+                    changed: [false, false, true, true, false, false],
+                }),
+            })
+        ));
+        assert_eq!(
+            error.to_string(),
+            "source or revision changed before execution (observation_changed role=workspace_ancestor \
+             operation=lstat before=Present(Directory) after=Present(Directory) changed=mtime,ctime)"
+        );
+        assert_eq!(audit(&runtime).commits, commits);
+    }
+
+    #[test]
+    fn stale_precheck_observation_roles_never_render_paths_or_instances() {
+        let directory = tempfile::tempdir().unwrap();
+        let workspace = directory.path().join("private-workspace");
+        let descendant = workspace.join("private-input");
+        let sibling = directory.path().join("private-workspace-extra");
+        let materialization = PathObservationNamespace::Materialization(
+            slug_workspace_v2::PathObservationInstanceId::new(123456789),
+        );
+        for (path, namespace, role) in [
+            (&workspace, PathObservationNamespace::Host, "workspace_root"),
+            (
+                &descendant,
+                PathObservationNamespace::Host,
+                "workspace_input",
+            ),
+            (
+                &sibling,
+                PathObservationNamespace::Host,
+                "host_outside_workspace",
+            ),
+            (&descendant, materialization, "selected_repository"),
+        ] {
+            let demand = PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                PathObservationOperation::ReadLink,
+            );
+            let before = PathObservationResult::ReadLink(PathOperationResult::Missing);
+            let after = PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(
+                PathBuf::from("private-link-target"),
+            )));
+            let cause = StalePrecheckCause::observation(&workspace, &demand, &before, &after);
+            assert_eq!(
+                cause.to_string(),
+                format!("observation_changed role={role} operation=read_link")
+            );
+            let debug = format!("{cause:?}");
+            assert!(!debug.contains("private"));
+            assert!(!debug.contains("123456789"));
+        }
     }
 }
