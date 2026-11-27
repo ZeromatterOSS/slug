@@ -34,15 +34,20 @@ use crate::values::ComplexValue;
 use crate::values::FreezeError;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
+use crate::values::FrozenHeap;
+use crate::values::FrozenStringValue;
 use crate::values::FrozenValue;
 use crate::values::Heap;
 use crate::values::HeapSendable;
 use crate::values::StarlarkValue;
 use crate::values::StringValue;
+use crate::values::StringValueLike;
 use crate::values::Trace;
 use crate::values::Tracer;
 use crate::values::Value;
 use crate::values::dict::Dict;
+use crate::values::dict::value::DictGen;
+use crate::values::dict::value::FrozenDictData;
 use crate::values::dict::value::MutableDict;
 use crate::values::function::BoundMethodGen;
 use crate::values::layout::avalue::AValue;
@@ -52,6 +57,9 @@ use crate::values::layout::avalue::try_freeze_directly;
 use crate::values::layout::heap::repr::AValueHeader;
 use crate::values::layout::heap::repr::AValueRepr;
 use crate::values::layout::heap::repr::ForwardPtr;
+use crate::values::structs::StructuralIdentity;
+use crate::values::structs::StructuralIdentityNative;
+use crate::values::structs::value::FrozenStruct;
 
 #[derive(Debug, thiserror::Error)]
 enum AValueError {
@@ -145,6 +153,118 @@ where
     }
 }
 
+impl FrozenHeap {
+    /// Build a native frozen dictionary from admitted rows. Equal keys keep
+    /// the original key and position and receive the last value. The caller
+    /// pays for producing each row and attaches any foreign frozen owners.
+    pub fn alloc_budgeted_dict_from_rows<'v>(
+        &'v self,
+        budget: &ExecutionBudget,
+        count: usize,
+        rows: impl IntoIterator<Item = crate::Result<(FrozenValue, FrozenValue)>>,
+        native: &impl StructuralIdentityNative<'v>,
+    ) -> crate::Result<FrozenValue> {
+        budget.check()?;
+        let mut hash = StructuralIdentity::new(budget, native);
+        let mut equals = StructuralIdentity::new(budget, native);
+        let rows = rows.into_iter().map(|row| -> crate::Result<_> {
+            let (key, value) = row?;
+            Ok((
+                Hashed::new_unchecked(hash.small_hash(key.to_value())?, key),
+                value,
+            ))
+        });
+        let rows = SmallMap::try_from_hashed_rows(
+            count,
+            rows,
+            |existing, incoming| {
+                // Ordinary SmallMap insertion compares the incoming key first.
+                // FrozenValue::eq treats an ordinary comparison error as false.
+                let equal = equals.equals(incoming.to_value(), existing.to_value());
+                budget.check()?;
+                Ok(equal.unwrap_or(false))
+            },
+            |work, bytes| Ok(budget.charge(work, bytes)?),
+        );
+        let content = bounded_map_result(rows, budget)?;
+        if content.is_empty() {
+            return Ok(FrozenValue::new_empty_dict());
+        }
+        Ok(self.alloc_budgeted_simple(budget, || DictGen(FrozenDictData { content }))?)
+    }
+
+    /// Build a native frozen struct in source field order. The caller pays
+    /// for producing each row and attaches any foreign frozen owners.
+    pub fn alloc_budgeted_struct_from_rows(
+        &self,
+        budget: &ExecutionBudget,
+        count: usize,
+        rows: impl IntoIterator<Item = crate::Result<(FrozenStringValue, FrozenValue)>>,
+    ) -> crate::Result<FrozenValue> {
+        let fields = bounded_string_map(count, rows, budget, || {
+            Err(crate::Error::new_other(anyhow::anyhow!(
+                "duplicate struct field"
+            )))
+        })?;
+        Ok(self.alloc_budgeted_simple(budget, || FrozenStruct::new(fields))?)
+    }
+}
+
+fn bounded_string_map<'v, K: StringValueLike<'v>, V>(
+    count: usize,
+    rows: impl IntoIterator<Item = crate::Result<(K, V)>>,
+    budget: &ExecutionBudget,
+    mut equal_key: impl FnMut() -> crate::Result<bool>,
+) -> crate::Result<SmallMap<K, V>> {
+    let rows = rows.into_iter().map(|row| -> crate::Result<_> {
+        let (key, value) = row?;
+        budget.charge(1 + ExecutionBudget::text_work(key.as_str().len()), 0)?;
+        let hash = key.to_string_value().get_hashed().hash();
+        Ok((Hashed::new_unchecked(hash, key), value))
+    });
+    let rows = SmallMap::try_from_hashed_rows(
+        count,
+        rows,
+        |left, right| {
+            let left = left.as_str();
+            let right = right.as_str();
+            if left.len() != right.len() {
+                return Ok(false);
+            }
+            budget.charge_text_work(left.len())?;
+            if left == right {
+                equal_key()
+            } else {
+                Ok(false)
+            }
+        },
+        |work, bytes| Ok(budget.charge(work, bytes)?),
+    );
+    bounded_map_result(rows, budget)
+}
+
+fn bounded_map_result<K, V>(
+    rows: Result<SmallMap<K, V>, BoundedMapError<impl Into<crate::Error>>>,
+    budget: &ExecutionBudget,
+) -> crate::Result<SmallMap<K, V>> {
+    budget.check()?;
+    match rows {
+        Ok(rows) => Ok(rows),
+        Err(BoundedMapError::Operation(error)) => Err(error.into()),
+        Err(BoundedMapError::SizeOverflow) => {
+            Err(budget.refuse(ExecutionLimit::AllocationBytes).into())
+        }
+        Err(BoundedMapError::AllocationFailed) => {
+            Err(budget.refuse(ExecutionLimit::AllocationFailed).into())
+        }
+        Err(BoundedMapError::RowCountMismatch) => {
+            Err(crate::Error::new_kind(crate::ErrorKind::Internal(
+                anyhow::anyhow!("validated dictionary or struct row count changed"),
+            )))
+        }
+    }
+}
+
 impl<'v> Heap<'v> {
     pub(crate) fn complex_allocation_bytes<T>() -> usize
     where
@@ -174,7 +294,7 @@ impl<'v> Heap<'v> {
         let rows = SmallMap::try_from_unique_hashed_rows(count, rows, |work, bytes| {
             budget.charge(work, bytes)
         });
-        self.alloc_budgeted_dict_from_map(rows, budget)
+        self.alloc_budgeted_dict_from_map(bounded_map_result(rows, budget)?, budget)
     }
 
     /// Admit a mutable Starlark dictionary from exactly `count` trusted rows.
@@ -187,46 +307,15 @@ impl<'v> Heap<'v> {
         rows: impl IntoIterator<Item = crate::Result<(StringValue<'v>, Value<'v>)>>,
         budget: &ExecutionBudget,
     ) -> crate::Result<Value<'v>> {
-        let rows = rows.into_iter().map(|row| -> crate::Result<_> {
-            let (key, value) = row?;
-            budget.charge(1 + ExecutionBudget::text_work(key.len()), 0)?;
-            Ok((key.get_hashed(), value))
-        });
-        let rows = SmallMap::try_from_hashed_rows(
-            count,
-            rows,
-            |left, right| {
-                if left.len() != right.len() {
-                    return Ok(false);
-                }
-                budget.charge_text_work(left.len())?;
-                Ok(left.as_str() == right.as_str())
-            },
-            |work, bytes| Ok(budget.charge(work, bytes)?),
-        );
-        self.alloc_budgeted_dict_from_map(rows.map(coerce), budget)
+        let rows = bounded_string_map(count, rows, budget, || Ok(true))?;
+        self.alloc_budgeted_dict_from_map(coerce(rows), budget)
     }
 
     fn alloc_budgeted_dict_from_map(
         self,
-        rows: Result<SmallMap<Value<'v>, Value<'v>>, BoundedMapError<impl Into<crate::Error>>>,
+        rows: SmallMap<Value<'v>, Value<'v>>,
         budget: &ExecutionBudget,
     ) -> crate::Result<Value<'v>> {
-        let rows = match rows {
-            Ok(rows) => rows,
-            Err(BoundedMapError::Operation(error)) => return Err(error.into()),
-            Err(BoundedMapError::SizeOverflow) => {
-                return Err(budget.refuse(ExecutionLimit::AllocationBytes).into());
-            }
-            Err(BoundedMapError::AllocationFailed) => {
-                return Err(budget.refuse(ExecutionLimit::AllocationFailed).into());
-            }
-            Err(BoundedMapError::RowCountMismatch) => {
-                return Err(crate::Error::new_kind(crate::ErrorKind::Internal(
-                    anyhow::anyhow!("validated dictionary row count changed"),
-                )));
-            }
-        };
         let bytes = AValueComplex::<MutableDict<'v>>::alloc_size_for_extra_len(0).bytes();
         budget.charge(1, bytes as usize)?;
         Ok(self.alloc(Dict::new(rows)))
@@ -261,3 +350,7 @@ impl<'v> Heap<'v> {
 #[cfg(test)]
 #[path = "budgeted_str_dict_tests.rs"]
 mod budgeted_str_dict_tests;
+
+#[cfg(test)]
+#[path = "budgeted_frozen_containers_tests.rs"]
+mod budgeted_frozen_containers_tests;

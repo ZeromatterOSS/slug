@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use starlark_map::StarlarkHashValue;
 use starlark_map::StarlarkHasher;
 
 use crate::eval::ExecutionBudget;
@@ -164,17 +165,21 @@ impl<'a, 'v, N: StructuralIdentityNative<'v>> StructuralIdentity<'a, 'v, N> {
 
     /// Return the same small hash used by ordinary Starlark value lookup.
     pub fn leaf_hash(&mut self, value: Value<'v>) -> crate::Result<u64> {
+        self.small_hash(value).map(|hash| u64::from(hash.get()))
+    }
+
+    pub(crate) fn small_hash(&mut self, value: Value<'v>) -> crate::Result<StarlarkHashValue> {
         self.visit(
             StructuralIdentityOp::Hash,
             value,
             Value::new_none(),
             |ctx| {
                 if ctx.admit_atomic(value, StructuralIdentityOp::Hash)? {
-                    return Ok(u64::from(value.get_hashed()?.hash().get()));
+                    return Ok(value.get_hashed()?.hash());
                 }
                 let mut hasher = StarlarkHasher::new();
                 ctx.composite_hash(value, &mut hasher, false)?;
-                Ok(u64::from(hasher.finish_small().get()))
+                Ok(hasher.finish_small())
             },
         )
     }
