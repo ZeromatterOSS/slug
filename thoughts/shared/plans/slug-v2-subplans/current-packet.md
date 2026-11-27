@@ -13,13 +13,18 @@ accepted the bounded component. The [receipt][xz-receipt] distinguishes native
 ownership and exact byte/SHA proof, standalone ABBA, and actual generated catalog
 reconciliation with a fresh no-repin check.
 
-The existing `release-symbols` profile reached 931 computes, 55 roots and
-149 accepted records. It completed 25 Executes, through local_config_cc index
-30, with index 31 pending at SourceWorkDeadline. Five native guards and the
-six-archive gate passed. The six-archive gate took 7.81 seconds. The original
-took 27.10 seconds and retired to 168 retained bytes, zero FDs and zero backing.
-The earlier unclassified refusal at attempt 859 remains unattributed. Full
-Rust and completed-command latency/RSS remain open.
+The `release-symbols` baseline reached 931 computes, 55 roots and 149 accepted
+records, with `local_config_cc` Execute 31 pending. A second baseline recorded
+0.483 seconds of terminal polls after stream EOF. Waiting on the owned launcher
+pidfd reduced that total to 0.183 milliseconds across 56 roots and 25 Executes.
+Exact same-root ABBA wall was 0.836 of baseline with equal measured CPU.
+The optimized Core/CLI builds took 38.42/19.72 seconds. Thirty focused tests,
+five native guards and the 7.84-second six-archive gate passed. The authentic
+run accepted the `local_config_cc` BUILD template, reached 958 computes and
+152 accepted records, then hit SourceWorkDeadline at `local_config_xcode`
+materialization. Cleanup returned to 168 retained bytes, zero FDs and zero backing.
+The earlier unclassified refusal at attempt 859 remains unattributed. Full Rust
+and completed-command latency/RSS remain open.
 
 Packed capture forwards full aligned RootIo blocks to the existing encoder and
 assembles fragments under the same scratch admission. Matched runs of the
@@ -54,8 +59,9 @@ same completed row across Need retries with stable child and fact owners.
 Choose a complete registration reuse boundary that preserves parent ordering,
 first conflict, Need validity, selected events and exact observation custody.
 The stored observation-map hash trial passed 205 tests. Matched CPU and
-instructions were 0.959 and 0.989 of baseline, short of the 0.95 gate. Retire
-the trial. Inspect the runner's terminal poll at the new Execute frontier.
+instructions were 0.959 and 0.989 of baseline, short of the 0.95 gate. The trial
+was retired. Drive the next genuine materialization and configured Rust frontier
+while preserving the independent launcher and PID1 completion proofs.
 Keep rooted comparisons, codec roundtrips and history checks.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that

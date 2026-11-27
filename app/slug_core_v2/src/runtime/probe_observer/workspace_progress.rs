@@ -24,6 +24,8 @@ pub(crate) enum Stage {
     ArchiveVerifyCapture,
     FilesystemOperation,
     FilesystemSnapshot,
+    BootstrapClosedStreamPoll,
+    ExecuteClosedStreamPoll,
 }
 
 #[derive(Clone, Copy)]
@@ -55,7 +57,7 @@ impl Stage {
     }
 }
 
-const LABELS: [&str; 13] = [
+const LABELS: [&str; 15] = [
     "preflight",
     "reserve_and_initialize",
     "source_snapshot",
@@ -69,6 +71,8 @@ const LABELS: [&str; 13] = [
     "archive_verify_closed_capture",
     "filesystem_operation",
     "filesystem_snapshot_and_record",
+    "bootstrap_closed_stream_poll",
+    "execute_closed_stream_poll",
 ];
 
 #[derive(Default)]
@@ -337,4 +341,4 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
     assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);
 }
 
-pub(crate) const REPORT_BYTES: usize = 4 * 1024;
+pub(crate) const REPORT_BYTES: usize = 4 * 1024 + 256;

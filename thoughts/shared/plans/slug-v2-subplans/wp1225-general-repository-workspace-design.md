@@ -1241,14 +1241,16 @@ and preservation of existing mapped counters. The existing ignored original
 frontier supplies bounded attribution under unchanged inputs/caps/clocks; a
 stopped probe remains no public-command or memory-ratio proof.
 
-The native workspace observer shares the same ceiling. Its 4 KiB slice comes
-from the event allowance. Keep fixed synchronous wall intervals for Archive
-acquisition, closed-FD verification, rooted extraction, and snapshot completion.
+The native workspace observer shares the same ceiling. Its 4 KiB plus 256
+bytes come from the event allowance. Keep fixed synchronous wall intervals for
+Archive acquisition, closed-FD verification, rooted extraction, and snapshot completion.
 Start filesystem operation and snapshot spans after exact replay. Separate
 completed and aborted snapshots for both owners, with prior comparison and
 builder append nested in capture and record completion measured separately.
 Requested bytes describe the work presented to each owner, including refusals.
 Off-boundary actual comparison callbacks share those outcome buckets.
+The runner measures polls after all three streams close, separately for
+bootstrap and Execute.
 
 The [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json)
 joins attribution, the selected causal regression and the semantic cutoff below.
@@ -3404,12 +3406,16 @@ caller cannot drop native authority. Thread creation failure precedes launch.
 The helper is actual PID1 (`bwrap --as-pid-1`), checks single-thread entry, and
 sends its own pidfd over an anonymous Unix seqpacket channel. Parent stores that
 exact kernel handle and ACKs HELLO before any root creation/transfer is allowed.
-No numeric PID reopening is used. Before this ACK, no selected repository root
-authority may reach the helper;
-trusted Host/image/plan/control/status descriptors and setup-userns authority may
-already be inherited. Their credits survive until exact helper death or trusted
-terminal monitor status plus owned monitor reap. Monitor termination alone never
-proves namespace death.
+The PID1 witness always originates inside the helper. Selected repository root
+authority waits for this ACK. Trusted Host/image/plan/control/status descriptors
+and setup-userns authority may already be inherited. Their credits survive until
+exact helper death or trusted terminal monitor status plus owned monitor reap.
+Monitor termination alone never proves namespace death.
+
+After authenticated Done and all three EOFs, a pending proof may open one
+pidfd for the runner's still-unreaped launcher within the existing FD credit.
+The descriptor wakes the unchanged proof loop and retires on readiness or
+before cleanup. Preserve the 10 ms poll cadence when the FD is unavailable.
 
 New general roots occupy component-bounded descendants of the declared virtual
 `/__slug_repositories__` prefix, reserved before Starlark sees path text. The

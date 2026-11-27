@@ -31,6 +31,10 @@ use wire::RunPlan;
 
 use super::super::repository_process_wire as wire;
 use super::*;
+#[cfg(all(test, feature = "native-probe-observer"))]
+use crate::runtime::probe_observer::Observer;
+#[cfg(all(test, feature = "native-probe-observer"))]
+use crate::runtime::probe_observer::workspace_progress::Stage;
 #[path = "repository_process_owner/capture.rs"]
 mod capture;
 #[path = "repository_process_owner/lifecycle.rs"]
@@ -109,6 +113,8 @@ const CONTROL_BYTES: usize = THREAD_STACK + wire::PLAN_RETAINED_BYTES + 512 * 10
 // Covers the monitor's additional mirror/image FD copies before its
 // close_extra_fds runs, held until actual monitor reap. Not a kernel-wide FD
 // or RSS claim; caller still supplies the finite native resource bank.
+// At terminal EOF the four host endpoints and two pidfds fit in the fixed
+// allowance after the spawn and received-rights temporaries have retired.
 const CONTROL_FDS: usize = 48 + wire::MAX_MIRRORS + 2;
 // Virtual allowances for plan/newroot/scaffold/tmp, minimal dev mount and
 // the bounded2048-entry Host-proc masking inventory. Not a kernel-RAM claim.
@@ -402,11 +408,20 @@ pub(super) async fn run<L: ProcessLaunch>(
     let worker_retirement = launch
         .retirement_observer()
         .map(|observer| observer.worker_guard());
+    #[cfg(all(test, feature = "native-probe-observer"))]
+    let probe = crate::runtime::probe_observer::capture();
     std::thread::Builder::new()
         .name("slug-repository-owner".into())
         .stack_size(THREAD_STACK)
         .spawn(move || {
-            let result = drive(launch, platform, stop, credit);
+            let result = drive(
+                launch,
+                platform,
+                stop,
+                credit,
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                probe.as_deref(),
+            );
             let _ = send.send(result);
             // A refused receiver drops the complete output before this guard.
             drop(worker_retirement);
@@ -496,7 +511,14 @@ fn drive<L: ProcessLaunch>(
     platform: ProcessPlatform,
     stop: Arc<AtomicBool>,
     credit: resources::ResourceCredit,
+    #[cfg(all(test, feature = "native-probe-observer"))] probe: Option<&Observer>,
 ) -> Result<L::Output, PhysicalRootError> {
+    #[cfg(all(test, feature = "native-probe-observer"))]
+    let closed_stream_stage = match launch.mode() {
+        RunMode::InitializeArchive => Some(Stage::BootstrapClosedStreamPoll),
+        mode if mode.has_payload() => Some(Stage::ExecuteClosedStreamPoll),
+        _ => None,
+    };
     let mut driver = Driver {
         launch: Some(launch),
         child: None,
@@ -551,6 +573,10 @@ fn drive<L: ProcessLaunch>(
     let mut quota = None;
     let mut code = None;
     let mut control_closed = false;
+    // A readiness FD only wakes the same proof loop. Retire it before the
+    // driver releases its control credit, including cancellation and errors.
+    let mut monitor_wait = None;
+    let mut monitor_wait_attempted = false;
     loop {
         if stop.load(Ordering::Acquire) {
             return Err(PhysicalRootError::Inactive);
@@ -707,6 +733,7 @@ fn drive<L: ProcessLaunch>(
             .unwrap()
             .proof(captures.out_eof && captures.err_eof && control_closed)?
         {
+            drop(monitor_wait);
             if phase != Phase::Done {
                 return Err(failure("unbound native completion"));
             }
@@ -730,6 +757,7 @@ fn drive<L: ProcessLaunch>(
         }
         let child = driver.child.as_ref().unwrap();
         let captures = driver.captures.as_ref().unwrap();
+        let streams_closed = control_closed && captures.out_eof && captures.err_eof;
         let mut polls = [
             libc::pollfd {
                 fd: if control_closed {
@@ -759,11 +787,40 @@ fn drive<L: ProcessLaunch>(
                 revents: 0,
             },
         ];
-        if unsafe { libc::poll(polls.as_mut_ptr(), polls.len() as libc::nfds_t, 10) } < 0 {
+        if streams_closed {
+            if !monitor_wait_attempted {
+                monitor_wait_attempted = true;
+                monitor_wait = driver.life.as_ref().unwrap().open_monitor_readiness();
+            }
+            if let Some(wait) = &monitor_wait {
+                polls[0].fd = wait.as_raw_fd();
+            }
+        }
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let closed_stream_wait = if streams_closed {
+            probe
+                .zip(closed_stream_stage)
+                .and_then(|(probe, stage)| probe.workspace_progress_span(stage))
+        } else {
+            None
+        };
+        let polled = unsafe { libc::poll(polls.as_mut_ptr(), polls.len() as libc::nfds_t, 10) };
+        if polled < 0 {
             let e = io::Error::last_os_error();
             if e.kind() != io::ErrorKind::Interrupted {
                 return Err(e.into());
             }
+        }
+        if streams_closed && polls[0].revents != 0 {
+            // Readiness is level-triggered. Recheck proof instead of polling
+            // the same already-ready FD again if another witness is pending.
+            monitor_wait = None;
+        }
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(wait) = closed_stream_wait
+            && polled >= 0
+        {
+            wait.finish();
         }
     }
 }

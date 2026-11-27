@@ -93,6 +93,19 @@ impl Lifecycle {
             return Err(error);
         }
     }
+    pub(super) fn open_monitor_readiness(&self) -> Option<OwnedFd> {
+        if !self.owned {
+            return None;
+        }
+        // Only this lifecycle can reap the child. Its PID still identifies
+        // the same monitor if it exits between waitpid and pidfd_open.
+        let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, self.pid, 0) };
+        if fd < 0 {
+            return None;
+        }
+        Some(unsafe { OwnedFd::from_raw_fd(fd as libc::c_int) })
+    }
+
     pub(super) fn namespace_dead(&self) -> io::Result<bool> {
         let Some(init) = &self.init else {
             return Ok(false);
