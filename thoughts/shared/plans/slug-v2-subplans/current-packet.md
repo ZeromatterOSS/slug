@@ -30,6 +30,10 @@ CrateInfo, typed rows, stable support payloads and Rustc change/restoration
 matched the pinned comparison. Peak backing was 7,747,932,160 bytes, retained
 406,051,206 bytes and FDs 499. Runtime teardown refunded all credits.
 
+The native Archive launcher verified 512 MiB/call and 1 GiB cumulative decode
+at exact and +1, physical page rounding and link inode charging. Six Archive
+tests passed. Maximum complete-tree envelope remains open.
+
 Exact prior accepted body sharing cleared the retained refusal at 493.
 Measured 8 MiB sealed backing cleared Source bootstrap at 574. Accepted backing
 was 1,536 MiB, down 448 MiB. Rollback prunes dead claims after owner retirement

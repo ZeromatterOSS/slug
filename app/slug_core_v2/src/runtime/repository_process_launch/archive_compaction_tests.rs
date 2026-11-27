@@ -13,6 +13,9 @@ use crate::runtime::repository_physical_root::mount_lease::readonly_quota::Froze
 
 const TINY_ARCHIVE_BYTES: u64 = 8 * 1024 * 1024;
 
+#[path = "archive_envelope_tests.rs"]
+mod envelope;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Facts {
     bytes: u64,
@@ -55,6 +58,18 @@ fn initialized(
     let baseline = bank.snapshot().retained_bytes;
     let scope = scope(&selected);
     let runtime = runtime();
+    let (command, fd, identity) = launch_archive(&selected, &bank, &scope, &runtime);
+    (
+        temporary, selected, bank, baseline, scope, runtime, command, fd, identity,
+    )
+}
+
+fn launch_archive(
+    selected: &Arc<RepositoryWorkspaceReservation>,
+    bank: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+    runtime: &tokio::runtime::Runtime,
+) -> (RepositoryWorkspaceCommand, i32, RootIdentity) {
     let launch =
         BootstrapLaunch::new(selected.clone(), bank.clone(), scope.clone(), &|| true).unwrap();
     let (builder, seed) = runtime
@@ -71,11 +86,9 @@ fn initialized(
         &|| true,
     )
     .unwrap()
-    .reserve_root(builder, seed, &scope, &|| true)
+    .reserve_root(builder, seed, scope, &|| true)
     .unwrap();
-    (
-        temporary, selected, bank, baseline, scope, runtime, command, fd, identity,
-    )
+    (command, fd, identity)
 }
 fn apply(
     command: RepositoryWorkspaceCommand,

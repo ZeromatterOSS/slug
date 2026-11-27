@@ -306,6 +306,14 @@ inode bounds remain separate. A deleted64MiB+1 history is refused before Execute
 while its Archive-only tree can still seal. These are bounded mechanism tests,
 not full Archive-envelope exhaustion or equivalent-command memory evidence.
 
+The [native Archive decode test](../../../../app/slug_core_v2/src/runtime/repository_process_launch/archive_envelope_tests.rs)
+used the fixed bank and 27+3 clock. Verified gzip streams reached exactly
+512 MiB/call and 1 GiB cumulative. One extra byte in either case gave the
+corresponding materialization refusal and released the unpublished root. The
+original FD measured 1/1/2 pages for 4095/4096/4097-byte files and increased inode
+use for an admitted literal link. Exact success sealed on the same root with
+verified members and returned the bank to baseline. Maximum-tree evidence is open.
+
 Process snapshot bounds: **8192 entries INCLUDING root**, depth<=64 below root,
 each logical absolute demand/path<=4096 bytes (including display prefix), and
 aggregate root-relative path bytes plus literal link-target bytes<=1 MiB per
