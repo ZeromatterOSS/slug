@@ -11,6 +11,8 @@
  */
 
 use std::fmt;
+use std::io;
+use std::io::Write;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::Weak;
@@ -414,25 +416,23 @@ impl CommandOutputBuffer {
         &self.batches
     }
 
-    fn render_stderr(self) -> Vec<u8> {
+    fn write_stderr(&self, stderr: &mut impl Write) -> io::Result<()> {
         #[cfg(windows)]
         const LINE_SEPARATOR: &[u8] = b"\r\n";
         #[cfg(not(windows))]
         const LINE_SEPARATOR: &[u8] = b"\n";
-        let mut stderr = Vec::new();
         for batch in self.batches.iter() {
             for event in batch.events() {
                 let text = match event {
                     EvaluationEvent::StarlarkPrint { location, text } => {
-                        std::io::Write::write_fmt(&mut stderr, format_args!("DEBUG: {location}: "))
-                            .expect("writing into a Vec is infallible");
+                        write!(stderr, "DEBUG: {location}: ")?;
                         text
                     }
                     EvaluationEvent::Diagnostic { level, text } => {
-                        stderr.extend_from_slice(match level {
+                        stderr.write_all(match level {
                             EvaluationDiagnosticLevel::Warning => b"WARNING: ",
                             EvaluationDiagnosticLevel::Error => b"ERROR: ",
-                        });
+                        })?;
                         text
                     }
                     EvaluationEvent::RepositoryExecuteOutput {
@@ -440,18 +440,68 @@ impl CommandOutputBuffer {
                         stderr: bytes,
                         ..
                     } => {
-                        stderr.extend_from_slice(stdout);
-                        stderr.extend_from_slice(bytes);
+                        stderr.write_all(stdout)?;
+                        stderr.write_all(bytes)?;
                         continue;
                     }
                 };
-                stderr.extend_from_slice(text.as_bytes());
+                stderr.write_all(text.as_bytes())?;
                 if !text.ends_with('\n') {
-                    stderr.extend_from_slice(LINE_SEPARATOR);
+                    stderr.write_all(LINE_SEPARATOR)?;
                 }
             }
         }
+        Ok(())
+    }
+
+    fn prepend_bounded_stderr(
+        &self,
+        terminal_stderr: Vec<u8>,
+        max_stderr_bytes: usize,
+    ) -> io::Result<Vec<u8>> {
+        let event_limit = max_stderr_bytes
+            .checked_sub(terminal_stderr.len())
+            .ok_or(io::ErrorKind::FileTooLarge)?;
+        let mut count = StderrCounter {
+            bytes: 0,
+            limit: event_limit,
+        };
+        self.write_stderr(&mut count)?;
+        if count.bytes == 0 {
+            return Ok(terminal_stderr);
+        }
+
+        // Both passes replay the same immutable events. The first pass
+        // admits all event bytes and the terminal suffix without copying.
+        let total = count.bytes + terminal_stderr.len();
+        let mut stderr = Vec::new();
         stderr
+            .try_reserve_exact(total)
+            .map_err(|_| io::ErrorKind::OutOfMemory)?;
+        self.write_stderr(&mut stderr)?;
+        stderr.extend_from_slice(&terminal_stderr);
+        debug_assert_eq!(stderr.len(), total);
+        Ok(stderr)
+    }
+}
+
+struct StderrCounter {
+    bytes: usize,
+    limit: usize,
+}
+
+impl Write for StderrCounter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes.len())
+            .filter(|&total| total <= self.limit)
+            .ok_or(io::ErrorKind::FileTooLarge)?;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
@@ -528,8 +578,52 @@ impl<T> CommandOutput<T> {
                     stderr: terminal_stderr,
                 },
         } = self;
-        let mut stderr = events.render_stderr();
+        let mut stderr = Vec::new();
+        events
+            .write_stderr(&mut stderr)
+            .expect("writing into a Vec is infallible");
         stderr.extend_from_slice(&terminal_stderr);
+        PublishedCommand {
+            terminal,
+            exit_code,
+            stdout,
+            stderr,
+        }
+    }
+
+    /// Publish the accepted result with a byte limit on combined stderr.
+    /// An admitted publication preserves the projected stdout and exit code.
+    /// Refusal returns exit code 2 with a fixed diagnostic if it fits, and
+    /// discards both projected streams without emitting partial events.
+    pub fn publish_with_stderr_limit(self, max_stderr_bytes: usize) -> PublishedCommand<T> {
+        let Self {
+            terminal,
+            events,
+            output:
+                TerminalOutput {
+                    exit_code,
+                    stdout,
+                    stderr: terminal_stderr,
+                },
+        } = self;
+        let (exit_code, stdout, stderr) =
+            match events.prepend_bounded_stderr(terminal_stderr, max_stderr_bytes) {
+                Ok(stderr) => (exit_code, stdout, stderr),
+                Err(error) => {
+                    let message: &[u8] = if error.kind() == io::ErrorKind::FileTooLarge {
+                        b"ERROR: command stderr byte limit exceeded\n"
+                    } else {
+                        b"ERROR: command stderr publication failed\n"
+                    };
+                    let mut stderr = Vec::new();
+                    if message.len() <= max_stderr_bytes
+                        && stderr.try_reserve_exact(message.len()).is_ok()
+                    {
+                        stderr.extend_from_slice(message);
+                    }
+                    (2, String::new(), stderr)
+                }
+            };
         PublishedCommand {
             terminal,
             exit_code,
@@ -2116,6 +2210,9 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
     }
 }
 
+#[cfg(test)]
+#[path = "events/bounded_publication_tests.rs"]
+mod bounded_publication_tests;
 #[cfg(test)]
 #[path = "events/transient_root_tests.rs"]
 mod transient_root_tests;
