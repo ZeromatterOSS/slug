@@ -171,8 +171,9 @@ Bounded reads cover File short paths, Target fields, and retained user
 provider fields. String `endswith` and `format` and depset `to_list` use
 admitted native methods. Built-in indexing, `len`, and string-key dictionary
 construction use checked storage and work. Bounded module freeze preserves
-deferred definitions and captures. Wire the provider projection and bound
-remaining operations and diagnostics before activation.
+deferred definitions and captures. `print` and `fail` use bounded text.
+Wire the provider projection and bound remaining operations and terminal
+diagnostics before activation.
 Resource outcomes are Slug-native.
 Bazel 9.2's `StarlarkOutputFormatterCallback` and `configured_query_test.sh`
 define setup and partial-output semantics.

@@ -26,14 +26,16 @@ use crate as starlark;
 use crate::environment::GlobalsBuilder;
 use crate::eval::Evaluator;
 use crate::values::AllocValue;
+use crate::values::BoundedText;
 use crate::values::FrozenStringValue;
 use crate::values::Heap;
 use crate::values::UnpackValue;
 use crate::values::Value;
 use crate::values::ValueError;
 use crate::values::ValueLike;
+use crate::values::ValueTextMode;
 use crate::values::list::AllocList;
-use crate::values::tuple::UnpackTuple;
+use crate::values::tuple::TupleRef;
 use crate::values::typing::StarlarkIter;
 use crate::values::typing::never::StarlarkNever;
 use crate::values::typing::ty::AbstractType;
@@ -72,23 +74,47 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// # "#, "oops 1 False");
     /// ```
     fn fail<'v>(
-        #[starlark(args)] args: UnpackTuple<Value<'v>>,
-        #[starlark(require = named, default = "")] attr: &str,
+        #[starlark(args)] args: &'v TupleRef<'v>,
+        #[starlark(require = named, default = ValueOfUnchecked::new(FrozenStringValue::default().to_frozen_value().to_value()))]
+        attr: ValueOfUnchecked<'v, &'v str>,
+        heap: Heap<'v>,
     ) -> starlark::Result<StarlarkNever> {
-        let mut s = String::new();
-        for x in args.items {
-            s.push(' ');
-            match x.unpack_str() {
-                Some(x) => s.push_str(x),
-                None => x.collect_repr(&mut s),
+        let attr = attribute_name(attr.get(), heap)?;
+        // Bazel prefixes every argument and the optional attribute suffix with a space.
+        let message = if let Some(budget) = heap.bounded_operation_budget() {
+            let mut text = BoundedText::new(budget, usize::MAX);
+            for value in args.iter() {
+                text.push_str(" ")?;
+                if let Some(value) = value.unpack_str() {
+                    text.push_str(value)?;
+                } else {
+                    text.write_value(value, ValueTextMode::Repr)?;
+                }
             }
-        }
-        // Include attr info if provided (Bazel compatibility)
-        if !attr.is_empty() {
-            s.push_str(&format!(" (in attribute '{}')", attr));
-        }
+            if !attr.is_empty() {
+                text.push_str(" (in attribute '")?;
+                text.push_str(attr)?;
+                text.push_str("')")?;
+            }
+            text.finish()?
+        } else {
+            let mut text = String::new();
+            for value in args.iter() {
+                text.push(' ');
+                match value.unpack_str() {
+                    Some(value) => text.push_str(value),
+                    None => value.collect_repr(&mut text),
+                }
+            }
+            if !attr.is_empty() {
+                text.push_str(" (in attribute '");
+                text.push_str(attr);
+                text.push_str("')");
+            }
+            text
+        };
         Err(starlark::Error::new_kind(starlark::ErrorKind::Fail(
-            anyhow::Error::msg(s),
+            anyhow::Error::msg(message),
         )))
     }
 

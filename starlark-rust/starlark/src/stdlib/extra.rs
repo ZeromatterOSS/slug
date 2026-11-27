@@ -27,12 +27,15 @@ use starlark_syntax::codemap::Span;
 use crate as starlark;
 use crate::environment::GlobalsBuilder;
 use crate::eval::Evaluator;
+use crate::values::BoundedText;
 use crate::values::StringValue;
 use crate::values::Value;
 use crate::values::ValueOfUnchecked;
+use crate::values::ValueTextMode;
 use crate::values::function::StarlarkFunction;
 use crate::values::none::NoneOr;
 use crate::values::none::NoneType;
+use crate::values::tuple::TupleRef;
 use crate::values::tuple::UnpackTuple;
 use crate::values::typing::iter::StarlarkIter;
 
@@ -196,14 +199,25 @@ impl PrintHandler for StderrPrintHandler {
 #[starlark_module]
 pub fn print(builder: &mut GlobalsBuilder) {
     /// Print some values to the output.
-    fn print(
-        #[starlark(args)] args: UnpackTuple<Value>,
-        eval: &mut Evaluator,
+    fn print<'v>(
+        #[starlark(args)] args: &'v TupleRef<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        // In practice most users should want to put the print somewhere else, but this does for now
-        // Unfortunately, we can't use PrintWrapper because strings to_str() and Display are different.
-        let location = PrintLocation::from_evaluator(eval);
-        let text = args.items.iter().map(|x| x.to_str()).join(" ");
+        let (location, text) = if let Some(budget) = eval.heap().bounded_operation_budget() {
+            let mut text = BoundedText::new(budget, usize::MAX);
+            for (i, value) in args.iter().enumerate() {
+                if i != 0 {
+                    text.push_str(" ")?;
+                }
+                text.write_value(value, ValueTextMode::Str)?;
+            }
+            let text = text.finish()?;
+            (PrintLocation::from_evaluator(eval), text)
+        } else {
+            let location = PrintLocation::from_evaluator(eval);
+            let text = args.iter().map(Value::to_str).join(" ");
+            (location, text)
+        };
         eval.print_handler.println(location, &text)?;
         Ok(NoneType)
     }
@@ -261,6 +275,10 @@ pub fn prepr(builder: &mut GlobalsBuilder) {
         pretty_repr(a, eval)
     }
 }
+
+#[cfg(test)]
+#[path = "bounded_message_tests.rs"]
+mod bounded_message_tests;
 
 #[cfg(test)]
 mod tests {
