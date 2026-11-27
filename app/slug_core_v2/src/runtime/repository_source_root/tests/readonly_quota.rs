@@ -73,6 +73,104 @@ pub(super) fn assert_frozen_source(root: &RepositorySourceRoot, expected: Frozen
     assert_eq!(root.frozen_archive_quota(), Some(expected));
     assert_eq!(facts(root.file.as_raw_fd()), actual);
 }
+
+#[test]
+fn source_bootstrap_admits_exact_backing_budget_and_refuses_one_more_byte_before_launch() {
+    const BANK_BACKING: u64 = 8 * 1024 * 1024 * 1024;
+    // Model the two live capture allowances for an archive and its MODULE.
+    const CAPTURE_BACKING: u64 = 129 * 1024 * 1024;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let normalized = slug_workspace_v2::NormalizedAbsolutePath::new(workspace.path()).unwrap();
+    let resources = bank();
+    let baseline = resources.snapshot().retained_bytes;
+    let scope = scope(&normalized, &resources);
+    let actor = RepositoryMaterializer::new(normalized.clone());
+    let token = actor.begin_with_command_scope(Some(scope.clone())).unwrap();
+    actor.preflight_native(token, []).unwrap();
+    let bounds = slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits::new(
+        128,
+        16 * 1024 * 1024,
+        1024 * 1024 * 1024,
+    )
+    .unwrap();
+    let lease = actor
+        .begin_general_workspace(token, resources.clone(), bounds, &scope)
+        .unwrap();
+    let ticket = actor
+        .reserve_source_snapshot(token, request(workspace.path(), lease), &scope)
+        .unwrap();
+    let command = RepositoryWorkspaceCommand::new(
+        normalized,
+        lease,
+        bounds,
+        resources.clone(),
+        scope.clone(),
+        &|| true,
+    )
+    .unwrap();
+    let observer = command.retirement_observer();
+    let bootstrap = || {
+        SourceBootstrap::new(
+            ticket.reservation().clone(),
+            ticket.claim().clone(),
+            resources.clone(),
+            scope.clone(),
+            None,
+            observer.clone(),
+            &|| true,
+        )
+    };
+    let live = || {
+        let snapshot = resources.snapshot();
+        (
+            snapshot.retained_bytes,
+            snapshot.native_fds,
+            snapshot.backing_bytes,
+        )
+    };
+
+    let other_roots = resources
+        .reserve(0, 0, BANK_BACKING - CAPTURE_BACKING - ARCHIVE_BYTES)
+        .unwrap();
+    let capture = resources.reserve(0, 0, CAPTURE_BACKING).unwrap();
+    let exact = live();
+    assert_eq!(exact.2, BANK_BACKING - ARCHIVE_BYTES);
+
+    let extra = resources.reserve(0, 0, 1).unwrap();
+    let over = live();
+    assert!(matches!(bootstrap(), Err(PhysicalRootError::Resource)));
+    assert_eq!(live(), over);
+    assert_eq!(resources.snapshot().peak_backing_bytes, over.2);
+    drop(extra);
+    assert_eq!(live(), exact);
+
+    let launch = bootstrap().unwrap();
+    assert!(launch.root_identity().is_none());
+    assert_eq!(observer.owner_count_for_test(), 1);
+    let admitted = resources.snapshot();
+    assert_eq!(admitted.native_fds, exact.1 + 1);
+    assert_eq!(admitted.backing_bytes, BANK_BACKING);
+    assert_eq!(admitted.peak_backing_bytes, BANK_BACKING);
+    drop(launch);
+    assert_eq!(live(), exact);
+    drop(other_roots);
+    assert_eq!(resources.snapshot().backing_bytes, CAPTURE_BACKING);
+    drop(capture);
+    let counters = scope.snapshot();
+    assert_eq!((counters.source_attempts, counters.decoded_bytes), (0, 0));
+    scope.check().unwrap();
+
+    drop(command);
+    assert!(observer.wait_until(Instant::now()));
+    drop(observer);
+    drop(ticket);
+    actor.discard(token).unwrap();
+    drop(actor);
+    drop(scope);
+    assert_eq!(live(), (baseline, 0, 0));
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Fault {
     None,

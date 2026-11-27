@@ -134,11 +134,20 @@ impl RepositoryRootResources {
                 .checked_add(fds)
                 .filter(|v| *v <= self.limits.native_fds)
                 .ok_or(PhysicalRootError::Resource)?;
-            let next_backing = usage
+            let Some(next_backing) = usage
                 .backing
                 .checked_add(backing)
                 .filter(|v| *v <= self.limits.backing_bytes)
-                .ok_or(PhysicalRootError::Resource)?;
+            else {
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                let live = usage.backing;
+                drop(usage);
+                #[cfg(all(test, feature = "native-probe-observer"))]
+                if let Some(observer) = crate::runtime::probe_observer::capture() {
+                    observer.record_backing_refusal(live, backing, self.limits.backing_bytes);
+                }
+                return Err(PhysicalRootError::Resource);
+            };
             usage.fds = next_fds;
             usage.backing = next_backing;
             usage.peak_fds = usage.peak_fds.max(next_fds);

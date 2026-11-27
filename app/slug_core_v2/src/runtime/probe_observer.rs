@@ -380,6 +380,14 @@ impl Observer {
     }
 
     #[cfg(test)]
+    pub(crate) fn record_backing_refusal(&self, live: u64, requested: u64, limit: u64) {
+        self.workspace_progress
+            .lock()
+            .expect("workspace progress sampler poisoned")
+            .record_backing_refusal(live, requested, limit);
+    }
+
+    #[cfg(test)]
     pub(crate) fn record_activity_for_test(
         &self,
         kind: usize,

@@ -1241,13 +1241,16 @@ and preservation of existing mapped counters. The existing ignored original
 frontier supplies bounded attribution under unchanged inputs/caps/clocks; a
 stopped probe remains no public-command or memory-ratio proof.
 
-The native workspace observer shares the same ceiling. Its 4 KiB plus 256
+The native workspace observer shares the same ceiling. Its 4 KiB plus 512
 bytes come from the event allowance. Keep fixed synchronous wall intervals for
 Archive acquisition, closed-FD verification, rooted extraction, and snapshot completion.
 Start filesystem operation and snapshot spans after exact replay. Separate
 completed and aborted snapshots for both owners, with prior comparison and
 builder append nested in capture and record completion measured separately.
 Requested bytes describe the work presented to each owner, including refusals.
+For backing admission refusals on the observer thread, keep a count and the
+last live, requested and limit bytes. Copy the live value under the bank lock
+and record after release. This evidence belongs to the native backing bank.
 Off-boundary actual comparison callbacks share those outcome buckets.
 The runner measures polls after all three streams close, separately for
 bootstrap and Execute.

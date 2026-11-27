@@ -82,9 +82,16 @@ pub(super) struct Totals {
     invalid: bool,
     xz: [xz_calls::Work; 2],
     snapshots: [[snapshot_work::Work; 2]; 2],
+    backing_refusals: u64,
+    last_backing_refusal: Option<[u64; 3]>,
 }
 
 impl Totals {
+    pub(super) fn record_backing_refusal(&mut self, live: u64, requested: u64, limit: u64) {
+        self.backing_refusals = self.backing_refusals.saturating_add(1);
+        self.last_backing_refusal = Some([live, requested, limit]);
+    }
+
     fn record(&mut self, stage: Stage, completed: bool, wall_ns: Option<u64>) {
         let row = &mut self.rows[stage as usize];
         let column = if completed { 0 } else { 2 };
@@ -117,6 +124,10 @@ impl Totals {
             "columns": ["completed", "completed_wall_ns", "aborted", "aborted_wall_ns"],
             "rows": self.rows,
             "invalid_clock_or_overflow": self.invalid,
+            "backing_admission_refusals": self.backing_refusals,
+            "last_backing_admission_refusal": self.last_backing_refusal.map(|[live, requested, limit]| {
+                json!({"live_bytes": live, "requested_bytes": requested, "limit_bytes": limit})
+            }),
             "dispatch_completion_includes_replay": true,
             "archive_substages_are_nested_and_exclude_replay": true,
             "archive_acquire_and_verify_are_nested_in_verified_capture": true,
@@ -336,9 +347,13 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
             unaligned_chunks: u64::MAX,
             invalid: false,
         }; 2]; 2],
+        backing_refusals: u64::MAX,
+        last_backing_refusal: Some([u64::MAX; 3]),
     }
     .report();
     assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);
 }
 
-pub(crate) const REPORT_BYTES: usize = 4 * 1024 + 256;
+// The original probe subtracts this from its fixed event partition. Reserve
+// room for the backing refusal row even with maximum-width counters.
+pub(crate) const REPORT_BYTES: usize = 4 * 1024 + 512;
