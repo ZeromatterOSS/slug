@@ -187,9 +187,9 @@ edit and recovery on real providers. The inactive General driver matched
 pinned Rust formatter stdout for initial, warm, changed and restored editions.
 Daemon runtime construction precedes socket acquisition. Native setup opens
 and verifies the named inode and refuses set-ID modes and file capabilities.
-Public Rust still needs the protected production launcher and a successful
-comparison through both routes. Public action comparison and Rust REAPI
-follow this cquery gate.
+The protected launcher candidate passed the installed confinement fixture through
+both routes. Public Rust still requires the pinned cquery comparison through
+both routes, followed by public action comparison and Rust REAPI.
 
 Initial modules:
 

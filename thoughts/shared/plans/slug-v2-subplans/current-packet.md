@@ -12,9 +12,9 @@ Native retention stayed within the fixed bank and teardown refunded all credits.
 Scoped HTTPS freshness with an omitted checksum, repeated Workspace publication
 with retained readers, and the native Archive exact/+1 envelope passed.
 
-Qualify the installed launcher through ordinary one-shot and retained-daemon
-commands before comparing the public Rust cquery rows on both routes. The
-protected launcher and actual confined execution remain activation gates.
+The protected launcher candidate passed the confinement fixture on unprivileged
+Linux, one-shot and across two requests on one installed daemon. Compare the
+public Rust cquery rows through both routes on the qualifying image.
 
 Continue with the [Stage 8 public cquery formatter][stage8], followed by
 public action comparison and Rust REAPI. Keep atomic
