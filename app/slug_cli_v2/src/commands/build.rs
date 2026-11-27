@@ -394,7 +394,6 @@ pub(super) fn start_daemon(output_base: &std::path::Path) -> anyhow::Result<()> 
         .map_err(|e| anyhow::anyhow!("getting current dir for daemon: {e}"))?;
     let exe = std::env::current_exe()
         .map_err(|e| anyhow::anyhow!("getting current exe for daemon: {e}"))?;
-    let _ = std::fs::remove_file(&socket);
     let mut child = std::process::Command::new(&exe)
         .arg("--serve")
         .arg("--socket")
@@ -481,6 +480,27 @@ mod daemon_readiness_tests {
     use std::os::unix::process::ExitStatusExt;
 
     use super::*;
+
+    #[test]
+    fn failed_daemon_start_preserves_the_socket_path() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output_base =
+            std::env::temp_dir().join(format!("slug-daemon-start-{}-{nonce}", std::process::id()));
+        std::fs::create_dir(&output_base).unwrap();
+        let socket = slug_server_v2::socket_path(&output_base);
+        std::fs::write(&socket, b"existing socket path").unwrap();
+
+        // The libtest image exits on the daemon arguments before binding.
+        let result = start_daemon(&output_base);
+        let socket_bytes = std::fs::read(&socket);
+        std::fs::remove_dir_all(output_base).unwrap();
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("exited before becoming ready"));
+        assert_eq!(socket_bytes.unwrap(), b"existing socket path");
+    }
 
     #[test]
     fn controlled_child_exit_is_reported_before_the_deadline() {
