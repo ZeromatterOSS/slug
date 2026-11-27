@@ -2,13 +2,57 @@ use super::AllocImmutableList;
 use crate::environment::Globals;
 use crate::environment::Module;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::syntax::AstModule;
 use crate::syntax::Dialect;
 use crate::values::FrozenHeap;
+use crate::values::FrozenValue;
 use crate::values::ValueLike;
 use crate::values::list::AllocList;
 use crate::values::list::FrozenListRef;
 use crate::values::list::ListRef;
+
+#[test]
+fn budgeted_immutable_list_preserves_occurrences_and_exact_array_admission() {
+    let ordinary = FrozenHeap::new();
+    let elem = [FrozenValue::new_bool(true), FrozenValue::new_none()];
+    let object_bytes = (0..8)
+        .find_map(|_| {
+            let (reserved, available) = (ordinary.allocated_bytes(), ordinary.available_bytes());
+            ordinary.alloc(AllocImmutableList(elem));
+            (ordinary.allocated_bytes() == reserved).then(|| available - ordinary.available_bytes())
+        })
+        .expect("a list allocation in an open chunk");
+    let bytes = object_bytes + std::mem::size_of_val(&elem);
+
+    let heap = FrozenHeap::new();
+    let short = ExecutionBudget::new(128, bytes - 1, 8);
+    assert_eq!(
+        heap.alloc_budgeted_immutable_list(&short, &elem),
+        Err(ExecutionLimit::AllocationBytes)
+    );
+    assert_eq!(heap.allocated_bytes(), 0);
+
+    let exact = ExecutionBudget::new(128, bytes, 8);
+    let list = heap.alloc_budgeted_immutable_list(&exact, &elem).unwrap();
+    assert_eq!(FrozenListRef::from_frozen_value(list).unwrap().len(), 2);
+    assert_eq!(exact.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+
+    let empty_allocation = ExecutionBudget::new(128, 2 * object_bytes, 8);
+    let empty = heap
+        .alloc_budgeted_immutable_list(&empty_allocation, &[])
+        .unwrap();
+    let other = heap
+        .alloc_budgeted_immutable_list(&empty_allocation, &[])
+        .unwrap();
+    assert!(!empty.to_value().ptr_eq(other.to_value()));
+    assert!(empty.to_value().equals(other.to_value()).unwrap());
+    assert_eq!(
+        empty_allocation.charge(0, 1),
+        Err(ExecutionLimit::AllocationBytes)
+    );
+}
 
 #[test]
 fn frozen_immutable_list_allocation_preserves_occurrences_and_list_behavior() {

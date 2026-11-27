@@ -17,6 +17,7 @@
 
 //! Shallow immutable lists whose elements may still belong to an evaluator heap.
 
+use std::alloc::Layout;
 use std::fmt;
 
 use allocative::Allocative;
@@ -27,6 +28,8 @@ use super::value::display_list;
 use crate as starlark;
 use crate::any::ProvidesStaticType;
 use crate::coerce::coerce;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::typing::Ty;
 use crate::values::AllocFrozenValue;
 use crate::values::AllocValue;
@@ -117,6 +120,23 @@ where
     fn alloc_frozen_value(self, heap: &FrozenHeap) -> FrozenValue {
         let values = self.0.into_iter().map(|value| heap.alloc(value)).collect();
         heap.alloc_simple(ListGen(ImmutableListData::<FrozenValue>(values)))
+    }
+}
+
+impl FrozenHeap {
+    /// Allocate an immutable list after admitting the value and its owned elements.
+    /// Every call retains a distinct list occurrence, including the empty list.
+    /// The caller attaches any foreign frozen owners.
+    pub fn alloc_budgeted_immutable_list(
+        &self,
+        budget: &ExecutionBudget,
+        values: &[FrozenValue],
+    ) -> Result<FrozenValue, ExecutionLimit> {
+        let bytes = Layout::array::<FrozenValue>(values.len())
+            .map_err(|_| budget.refuse(ExecutionLimit::AllocationBytes))?
+            .size();
+        budget.charge(values.len(), bytes)?;
+        self.alloc_budgeted_simple(budget, || ListGen(ImmutableListData(Box::from(values))))
     }
 }
 
