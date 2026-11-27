@@ -34,9 +34,10 @@ The native Archive launcher verified 512 MiB/call and 1 GiB cumulative decode
 at exact and +1, physical page rounding and link inode charging. Six Archive
 tests passed. Maximum complete-tree envelope remains open.
 
-Repeated Workspace publication refused an absolute prior runfiles link before
-the second NativeLink transport start. The [selected design][design] routes
-contained output links through shared publication staging.
+Repeated Workspace publication passed cold, warm, changed and restored inputs
+with contained runfiles and alias links. The readonly child verified prior
+outputs. A survived runtime shutdown on its original reader and the last drop
+refunded the bank. An authored absolute link refused before transport.
 
 Exact prior accepted body sharing cleared the retained refusal at 493.
 Measured 8 MiB sealed backing cleared Source bootstrap at 574. Accepted backing
@@ -159,9 +160,9 @@ and justified public Rust cquery at a fresh unused destination. Independent
 final review precedes activation.
 
 The bounded six-archive gate and authored General glob cquery are accepted.
-The authentic inactive Rust driver and scoped HTTPS freshness gates have
-completed. Full Archive envelope, repeated Workspace publication, public Rust
-cquery, required public action comparison, Rust REAPI,
+The authentic inactive Rust driver, scoped HTTPS freshness and repeated
+Workspace publication gates have completed. Full Archive envelope, public
+Rust cquery, required public action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. Native credit,
 standalone timings and incomplete originals are each evidence for their own

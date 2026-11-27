@@ -28,29 +28,28 @@ fn components(path: &str) -> io::Result<Vec<&str>> {
 }
 
 impl RunfilesTopology {
-    fn new(workspace_name: &str, entries: &[(String, Option<String>)]) -> io::Result<Self> {
+    fn new(
+        workspace: &Path,
+        output: &ActionOutput,
+        workspace_name: &str,
+        entries: &[(String, Option<String>)],
+    ) -> io::Result<Self> {
         let mut result = Self {
             entries: SmallMap::new(),
             directories: SmallSet::new(),
         };
-        let workspace = components(workspace_name)?;
-        for count in 1..=workspace.len() {
-            result.directories.insert(workspace[..count].join("/"));
+        let prefix = components(workspace_name)?;
+        for count in 1..=prefix.len() {
+            result.directories.insert(prefix[..count].join("/"));
         }
+        let tree = Path::new(output.root().path()).join(output.root_relative_path());
         for (path, target) in entries {
             let parts = components(path)?;
-            if let Some(target) = target
-                && (!Path::new(target).is_absolute() || target.contains('\0'))
-            {
-                return Err(io::Error::other(
-                    "runfiles link target must be an absolute path",
-                ));
-            }
-            if result
-                .entries
-                .insert(path.clone(), target.clone())
-                .is_some()
-            {
+            let target = target
+                .as_deref()
+                .map(|target| published_link_target(workspace, &tree.join(path), target))
+                .transpose()?;
+            if result.entries.insert(path.clone(), target).is_some() {
                 return Err(io::Error::other("duplicate runfiles entry"));
             }
             for count in 1..parts.len() {
@@ -188,10 +187,12 @@ impl RunfilesTopology {
 
 /// Pure topology gate for whole-plan preflight, before backend or filesystem work.
 pub(in crate::runtime::action_output_staging) fn validate_runfiles(
+    workspace: &Path,
+    output: &ActionOutput,
     workspace_name: &str,
     entries: &[(String, Option<String>)],
 ) -> io::Result<()> {
-    RunfilesTopology::new(workspace_name, entries).map(|_| ())
+    RunfilesTopology::new(workspace, output, workspace_name, entries).map(|_| ())
 }
 
 impl Staging {
@@ -208,7 +209,7 @@ impl Staging {
                 "typed runfiles staging requires a RunfilesTree output",
             ));
         }
-        let topology = RunfilesTopology::new(workspace_name, entries)?;
+        let topology = RunfilesTopology::new(workspace, output, workspace_name, entries)?;
         // Reuse the physical directory allocation only. The wrapper retains the
         // original RunfilesTree declaration; no remote Directory result is made.
         let physical = ActionOutput::new(

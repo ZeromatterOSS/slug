@@ -21,16 +21,18 @@ pub(in crate::runtime) use source_backing::source_backing_path;
 mod linux;
 
 pub(in crate::runtime) fn validate_runfiles_layout(
-    workspace: &str,
+    workspace: &Path,
+    output: &ActionOutput,
+    workspace_name: &str,
     entries: &[(String, Option<String>)],
 ) -> io::Result<()> {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {
-        linux::validate_runfiles(workspace, entries)
+        linux::validate_runfiles(workspace, output, workspace_name, entries)
     }
     #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
     {
-        let _ = (workspace, entries);
+        let _ = (workspace, output, workspace_name, entries);
         Err(unsupported())
     }
 }

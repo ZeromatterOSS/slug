@@ -6,6 +6,7 @@ use std::io::{self};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::fs::OpenOptionsExt;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -56,6 +57,51 @@ fn component_path(path: &str) -> io::Result<Vec<&str>> {
     }
     Ok(parts)
 }
+
+/// Project an authenticated artifact target from the link's final parent.
+/// Staging directories are provisional and never supply the relative base.
+fn published_link_target(workspace: &Path, link: &Path, target: &str) -> io::Result<String> {
+    let target_path = Path::new(target);
+    if !target_path.is_absolute() || target.contains('\0') {
+        return Err(io::Error::other("output link requires an absolute target"));
+    }
+    let Ok(target_in_workspace) = target_path.strip_prefix(workspace) else {
+        return Ok(target.to_owned());
+    };
+    let parent = link
+        .parent()
+        .ok_or_else(|| io::Error::other("output link lacks a parent"))?;
+    if parent
+        .components()
+        .chain(target_in_workspace.components())
+        .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(io::Error::other("noncanonical contained output link"));
+    }
+    let common = parent
+        .components()
+        .zip(target_in_workspace.components())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let mut relative = PathBuf::new();
+    for _ in parent.components().skip(common) {
+        relative.push("..");
+    }
+    relative.extend(target_in_workspace.components().skip(common));
+    if relative.as_os_str().is_empty() {
+        relative.push(".");
+    }
+    // A long contained target may exceed the kernel argument limit only
+    // after adding the parent traversal. Preserve its existing spelling.
+    if relative.as_os_str().len() >= nix::libc::PATH_MAX as usize {
+        return Ok(target.to_owned());
+    }
+    relative
+        .into_os_string()
+        .into_string()
+        .map_err(|_| io::Error::other("output link path is not UTF-8"))
+}
+
 fn walk(parent: &File, parts: &[&str], create: bool) -> io::Result<File> {
     let mut current = parent.try_clone()?;
     for part in parts {

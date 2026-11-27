@@ -23,6 +23,20 @@ fn link(path: &str, target: &Path) -> (String, Option<String>) {
 }
 
 #[test]
+fn contained_link_keeps_a_representable_target_at_the_linux_path_limit() {
+    let workspace = Path::new("/workspace");
+    let link = PathBuf::from("d/".repeat(200)).join("link");
+    let directory = format!("{}/", "t".repeat(199));
+    let target = workspace.join(directory.repeat(18)).join("item");
+    let target = target.to_str().unwrap();
+    assert!(target.len() < nix::libc::PATH_MAX as usize);
+    assert_eq!(
+        published_link_target(workspace, &link, target).unwrap(),
+        target
+    );
+}
+
+#[test]
 fn typed_runfiles_tree_replaces_links_and_preserves_targets_modes_and_workspace() {
     let workspace = Workspace::new();
     let (config, _) = configurations();
@@ -61,8 +75,16 @@ fn typed_runfiles_tree_replaces_links_and_preserves_targets_modes_and_workspace(
     stage.publish(std::slice::from_ref(&output)).unwrap();
     drop(stage);
     let tree = root(&workspace, &config).join(output.root_relative_path());
-    assert_eq!(fs::read_link(tree.join("external/data")).unwrap(), target);
-    assert_eq!(fs::read_link(tree.join("MANIFEST")).unwrap(), manifest);
+    assert_eq!(
+        fs::read_link(tree.join("external/data")).unwrap(),
+        Path::new("../../../../../../target")
+    );
+    assert_eq!(
+        fs::read_link(tree.join("MANIFEST")).unwrap(),
+        Path::new("../../../../../input_manifest")
+    );
+    assert_eq!(fs::read(tree.join("external/data")).unwrap(), b"source");
+    assert_eq!(fs::read(tree.join("MANIFEST")).unwrap(), b"manifest");
     for directory in [&tree, &tree.join("main"), &tree.join("external")] {
         assert_eq!(
             fs::metadata(directory).unwrap().permissions().mode() & 0o777,
@@ -103,6 +125,9 @@ fn typed_runfiles_tree_replaces_links_and_preserves_targets_modes_and_workspace(
 
 #[test]
 fn runfiles_topology_rejects_leaf_prefix_manifest_and_workspace_conflicts_before_staging() {
+    let workspace = Workspace::new();
+    let output = output();
+    let validate = |entries: &[_]| validate_runfiles(workspace.path(), &output, "main", entries);
     let absolute = Some("/observed/target".to_owned());
     for entries in [
         vec![("a".into(), absolute.clone()), ("a/child".into(), None)],
@@ -113,23 +138,23 @@ fn runfiles_topology_rejects_leaf_prefix_manifest_and_workspace_conflicts_before
         vec![("main".into(), absolute.clone())],
         vec![("same".into(), None), ("same".into(), absolute.clone())],
     ] {
-        assert!(validate_runfiles("main", &entries).is_err());
+        assert!(validate(&entries).is_err());
     }
     for path in ["", "/absolute", "../escape", "a/./b", "a//b", "a\0b"] {
-        assert!(validate_runfiles("main", &[(path.into(), None)]).is_err());
+        assert!(validate(&[(path.into(), None)]).is_err());
     }
     for target in ["relative", "/absolute\0bad"] {
-        assert!(validate_runfiles("main", &[("main/link".into(), Some(target.into()))]).is_err());
+        assert!(validate(&[("main/link".into(), Some(target.into()))]).is_err());
     }
-    assert!(validate_runfiles("main", &[("main/back\\slash".into(), None)]).is_ok());
-    assert!(validate_runfiles("main", &[]).is_ok());
-    let workspace = Workspace::new();
+    assert!(validate(&[link("main/escape", &workspace.path().join("../outside"))]).is_err());
+    assert!(validate(&[("main/back\\slash".into(), None)]).is_ok());
+    assert!(validate(&[]).is_ok());
     let (config, _) = configurations();
     assert!(
         Staging::new_runfiles(
             workspace.path(),
             &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
-            &output(),
+            &output,
             "main",
             &[
                 ("MANIFEST".into(), absolute),

@@ -353,8 +353,16 @@ impl PreparedActionChainInputs {
             Some(self.target_path(&support.input_manifest, &declared)?),
         ));
         let workspace_name = support.runfiles.repository_prefix.to_string();
-        crate::runtime::action_output_staging::validate_runfiles_layout(&workspace_name, &entries)
-            .map_err(error)?;
+        let AnalysisArtifact::Derived { output, .. } = &support.tree else {
+            return Err(error("runfiles tree is not a derived output"));
+        };
+        crate::runtime::action_output_staging::validate_runfiles_layout(
+            self.workspace.as_path(),
+            output,
+            &workspace_name,
+            &entries,
+        )
+        .map_err(error)?;
         Ok(RunfilesLinks {
             workspace_name,
             entries,

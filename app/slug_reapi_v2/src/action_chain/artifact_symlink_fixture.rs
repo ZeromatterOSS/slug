@@ -5,8 +5,11 @@ use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::path::PathBuf;
 
+#[path = "published_link_fixture.rs"]
+mod published;
 #[path = "../../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod workspace;
+use published::read_contained_target;
 
 pub fn write(root: &Path) -> String {
     workspace::write(root);
@@ -62,14 +65,14 @@ pub fn replace_host_alias(root: &Path, regular: bool) {
 
 pub fn check_aliases(workspace: &Path, bin: &Path, bytes: &[u8]) -> PathBuf {
     assert_eq!(
-        fs::read_link(bin.join("host.alias")).unwrap(),
+        read_contained_target(workspace, &bin.join("host.alias")),
         workspace.join("input-link")
     );
     assert_eq!(
         fs::read_link(workspace.join("input-link")).unwrap(),
         PathBuf::from("input")
     );
-    let durable = fs::read_link(bin.join("material.alias")).unwrap();
+    let durable = read_contained_target(workspace, &bin.join("material.alias"));
     assert!(durable.starts_with(workspace.join("bazel-out/.slug-runfiles-sources/v1")));
     assert!(
         !fs::symlink_metadata(&durable)
@@ -82,11 +85,11 @@ pub fn check_aliases(workspace: &Path, bin: &Path, bytes: &[u8]) -> PathBuf {
         0o444
     );
     assert_eq!(
-        fs::read_link(bin.join("generated.alias")).unwrap(),
+        read_contained_target(workspace, &bin.join("generated.alias")),
         bin.join("generated.first")
     );
     assert_eq!(
-        fs::read_link(bin.join("generated.first")).unwrap(),
+        read_contained_target(workspace, &bin.join("generated.first")),
         bin.join("generated")
     );
     for name in [
@@ -106,11 +109,11 @@ pub fn check_manifest_alias(workspace: &Path, bin: &Path, bytes: &[u8]) {
     check_aliases(workspace, bin, bytes);
     let tree = bin.join("tools/source_binary.runfiles");
     assert_eq!(
-        fs::read_link(bin.join("manifest.alias")).unwrap(),
+        read_contained_target(workspace, &bin.join("manifest.alias")),
         tree.join("MANIFEST")
     );
     assert_eq!(
-        fs::read_link(tree.join("MANIFEST")).unwrap(),
+        read_contained_target(workspace, &tree.join("MANIFEST")),
         bin.join("tools/source_binary.runfiles_manifest")
     );
     assert!(fs::read(bin.join("manifest.alias")).unwrap().len() > 0);
@@ -118,11 +121,11 @@ pub fn check_manifest_alias(workspace: &Path, bin: &Path, bytes: &[u8]) {
         assert_eq!(fs::read(tree.join("_main").join(name)).unwrap(), bytes);
     }
     assert_eq!(
-        fs::read_link(bin.join("tools/source_binary")).unwrap(),
+        read_contained_target(workspace, &bin.join("tools/source_binary")),
         bin.join("tools/source_binary.first")
     );
     assert_eq!(
-        fs::read_link(bin.join("tools/source_binary.first")).unwrap(),
+        read_contained_target(workspace, &bin.join("tools/source_binary.first")),
         workspace.join("tools/source_script")
     );
     let output = workspace.join("after-exit.out");

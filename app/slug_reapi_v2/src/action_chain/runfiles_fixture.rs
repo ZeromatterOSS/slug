@@ -4,8 +4,12 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 
+#[path = "published_link_fixture.rs"]
+mod published;
 #[path = "../../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod workspace;
+
+pub use published::read_contained_target;
 
 pub fn write(root: &Path) -> String {
     workspace::write(root);
@@ -59,20 +63,21 @@ binary = rule(implementation = _impl, executable = True, attrs = {"input": attr.
 pub fn check_tree(workspace: &Path, root: &Path, bytes: &[u8]) -> [PathBuf; 2] {
     let tree = root.join("binary.runfiles");
     assert_eq!(
-        fs::read_link(tree.join("MANIFEST")).unwrap(),
+        read_contained_target(workspace, &tree.join("MANIFEST")),
         root.join("binary.runfiles_manifest")
     );
     assert_eq!(
-        fs::read_link(tree.join("_repo_mapping")).unwrap(),
+        read_contained_target(workspace, &tree.join("_repo_mapping")),
         root.join("binary.repo_mapping")
     );
     assert_eq!(
-        fs::read_link(tree.join("_main/hidden.txt")).unwrap(),
+        read_contained_target(workspace, &tree.join("_main/hidden.txt")),
         root.join("hidden.txt")
     );
     assert_eq!(fs::read(root.join("hidden.txt")).unwrap(), bytes);
-    let paths = ["data", "executable_data"]
-        .map(|name| fs::read_link(tree.join(format!("+repo+generated/{name}"))).unwrap());
+    let paths = ["data", "executable_data"].map(|name| {
+        read_contained_target(workspace, &tree.join(format!("+repo+generated/{name}")))
+    });
     assert_ne!(
         paths[0], paths[1],
         "equal bytes with different modes require separate backing"

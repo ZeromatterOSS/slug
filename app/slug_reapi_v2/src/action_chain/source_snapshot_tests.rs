@@ -36,7 +36,7 @@ impl Family {
             Self::Local => "@@source_payload+//:payload",
             Self::Archive => "@@source_archive+//:payload",
             Self::Builtin => "@@bazel_tools//tools/build_defs/repo:utils.bzl",
-            Self::Workspace => "//:input",
+            Self::Workspace => "//:workspace_input",
         }
     }
     fn repository(self) -> &'static str {
@@ -52,7 +52,7 @@ impl Family {
             Self::Local => "source_payload+/payload",
             Self::Archive => "source_archive+/payload",
             Self::Builtin => "bazel_tools/tools/build_defs/repo/utils.bzl",
-            Self::Workspace => "_main/input",
+            Self::Workspace => "_main/workspace_input",
         }
     }
     fn payload(self, generation: &str) -> Vec<u8> {
@@ -63,7 +63,7 @@ impl Family {
                 "../../../slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/repo/utils.bzl"
             )
             .to_vec(),
-            Self::Workspace => b"aaa".to_vec(),
+            Self::Workspace => format!("workspace:{generation}\n").into_bytes(),
         }
     }
 }
@@ -77,24 +77,50 @@ impl SourceFixture {
     fn new(family: Family) -> Self {
         let common = Fixture::new();
         let root = &common.root;
+        let workspace_check = if matches!(family, Family::Workspace) {
+            r#"    if ctx.execute(['/bin/sh', '-ec', '''
+base=${1%/*}
+prior=$2
+test "$(/bin/cat "$base/workspace_sentinel")" = "whole workspace captured"
+if [ -n "$prior" ]; then
+    set -- "$base"/bazel-out/*/bin/binary.runfiles
+    test "$#" -eq 1
+    tree=$1
+    for entry in MANIFEST _repo_mapping _main/hidden.txt _main/workspace_input; do
+        test -L "$tree/$entry" && test -s "$tree/$entry" || exit 1
+    done
+    test -L "$tree/../captured-alias"
+    test "$(/bin/cat "$tree/../captured-alias")" = aaa
+    test "$(/bin/cat "$tree/_main/workspace_input")" = "$prior"
+fi
+''', 'source', captured, ctx.attr.expected_prior]).return_code != 0: fail('whole workspace snapshot')
+"#
+        } else {
+            ""
+        };
         let prefix = format!(
             r#"    if ctx.execute(['/bin/true']).return_code != 0: fail('warmup')
     captured = Label('{}')
     path = ctx.path(captured)
     if not ctx.read(captured): fail('empty captured source')
     if ctx.execute(['/bin/sh', '-c', 'test -s "$1"', 'source', captured]).return_code != 0: fail('source view')
-    ctx.file('captured-display', str(path), executable=False)
+{workspace_check}    ctx.file('captured-display', str(path), executable=False)
 "#,
             family.label()
         );
-        fs::write(
-            root.join("repo.bzl"),
-            REPOSITORY.replace(
-                "    ctx.file('seed'",
-                &format!("{prefix}    ctx.file('seed'"),
-            ),
-        )
-        .unwrap();
+        let repository = REPOSITORY.replace(
+            "    ctx.file('seed'",
+            &format!("{prefix}    ctx.file('seed'"),
+        );
+        let repository = if matches!(family, Family::Workspace) {
+            repository.replace(
+                "'content': attr.string()",
+                "'content': attr.string(), 'expected_prior': attr.string()",
+            )
+        } else {
+            repository
+        };
+        fs::write(root.join("repo.bzl"), repository).unwrap();
         let mut build = fs::read_to_string(root.join("BUILD.bazel"))
             .unwrap()
             .replace(
@@ -110,6 +136,22 @@ impl SourceFixture {
                 &format!("tool='@@{}//:tool'", family.repository()),
             );
         }
+        if matches!(family, Family::Workspace) {
+            build.push_str("\nexports_files(['workspace_input'])\n");
+            fs::write(
+                root.join("workspace_sentinel"),
+                "whole workspace captured\n",
+            )
+            .unwrap();
+            let definitions = fs::read_to_string(root.join("defs.bzl"))
+                .unwrap()
+                .replace(
+                    "    files = [hidden]",
+                    "    alias = ctx.actions.declare_file('captured-alias')\n    ctx.actions.symlink(output=alias, target_file=hidden)\n    files = [hidden]",
+                )
+                .replace("files = depset([executable])", "files = depset([executable, alias])");
+            fs::write(root.join("defs.bzl"), definitions).unwrap();
+        }
         fs::write(root.join("BUILD.bazel"), build).unwrap();
         fs::write(
             root.join("tools/consumer"),
@@ -120,10 +162,10 @@ impl SourceFixture {
         )
         .unwrap();
         let fixture = Self { common, family };
-        fixture.generation("A");
+        fixture.generation("A", None);
         fixture
     }
-    fn generation(&self, generation: &str) {
+    fn generation(&self, generation: &str, previous: Option<&str>) {
         let root = &self.common.root;
         let mut module = self.common.module.clone();
         match self.family {
@@ -150,9 +192,31 @@ impl SourceFixture {
                 self.archive(generation);
                 module.push_str("\nbazel_dep(name='source_archive',version='1.0')\n");
             }
-            Family::Builtin | Family::Workspace => {}
+            Family::Workspace => {
+                fs::write(
+                    root.join("workspace_input"),
+                    self.family.payload(generation),
+                )
+                .unwrap();
+            }
+            Family::Builtin => {}
         }
         authored::content(root, &module, "aaa");
+        if let (Family::Workspace, Some(previous)) = (self.family, previous) {
+            let path = root.join("MODULE.bazel");
+            let module = fs::read_to_string(&path).unwrap();
+            let with_prior = module.replace(
+                "repo(name='generated', content='aaa')",
+                &format!(
+                    "repo(name='generated', content='aaa', expected_prior='workspace:{previous}')"
+                ),
+            );
+            assert_ne!(
+                module, with_prior,
+                "set the required prior-output expectation"
+            );
+            fs::write(path, with_prior).unwrap();
+        }
     }
     fn archive(&self, generation: &str) {
         let root = &self.common.root;
@@ -265,7 +329,7 @@ impl ActionChainTransport for SourceTransport {
                 source.label().package().repo().as_str() == self.family.repository()
                     && match self.family {
                         Family::Builtin => source.label().target().as_str() == "utils.bzl",
-                        Family::Workspace => source.label().target().as_str() == "input",
+                        Family::Workspace => source.label().target().as_str() == "workspace_input",
                         _ => source.label().target().as_str() == "payload",
                     }
             })
@@ -354,13 +418,13 @@ fn run(family: Family) {
     let transport = SourceTransport::new(family);
     let mut output_root = None;
     let generations: &[&str] = if matches!(family, Family::Workspace) {
-        &["A"]
+        &["A", "A", "B", "A"]
     } else {
         &["A", "A", "B"]
     };
     for (index, generation) in generations.iter().enumerate() {
         if index != 0 {
-            fixture.generation(generation);
+            fixture.generation(generation, Some(generations[index - 1]));
             *transport.expected.lock().unwrap() = family.payload(generation);
         }
         drop(
@@ -383,7 +447,7 @@ fn run(family: Family) {
                     assert_eq!(remotes.len(), 3);
                     let expected_hits = if index == 0 {
                         0
-                    } else if index == 1 || matches!(family, Family::Builtin) {
+                    } else if *generation == "A" || matches!(family, Family::Builtin) {
                         3
                     } else {
                         2
@@ -397,7 +461,7 @@ fn run(family: Family) {
                     );
                     if index == 0 {
                         assert!(transport.payload_uploads.load(Ordering::Relaxed) > 0);
-                    } else if index == 1 || matches!(family, Family::Builtin) {
+                    } else if *generation == "A" || matches!(family, Family::Builtin) {
                         assert!(
                             remotes
                                 .iter()
@@ -409,8 +473,10 @@ fn run(family: Family) {
                     let mut expected = b"aaa".repeat(3);
                     expected.extend_from_slice(&family.payload(generation));
                     assert_eq!(fs::read(root.join("consumer.out")).unwrap(), expected);
-                    let backing =
-                        fs::read_link(root.join("binary.runfiles").join(family.runfile())).unwrap();
+                    let backing = authored::read_contained_target(
+                        &fixture.common.root,
+                        &root.join("binary.runfiles").join(family.runfile()),
+                    );
                     assert!(
                         backing.starts_with(
                             fixture
@@ -428,6 +494,9 @@ fn run(family: Family) {
                     TerminalOutput::new(0, String::new(), String::new())
                 }),
         );
+        if matches!(family, Family::Workspace) {
+            transport.held.lock().unwrap().clear();
+        }
         let mut first = transport.first_reader.lock().unwrap();
         let reader = first.as_mut().unwrap();
         reader.seek(SeekFrom::Start(0)).unwrap();
@@ -450,10 +519,25 @@ fn run(family: Family) {
         );
     }
     drop(observed);
+    if matches!(family, Family::Workspace) {
+        let authored = fixture.common.root.join("authored-escape");
+        std::os::unix::fs::symlink(fixture.common.root.join("input"), &authored).unwrap();
+        let Err(error) = fixture.common.publish(&transport) else {
+            panic!("absolute authored Workspace link was admitted");
+        };
+        assert!(error.to_string().contains("invalid rooted literal link"));
+        assert_eq!(transport.starts.load(Ordering::Relaxed), generations.len());
+        fs::remove_file(authored).unwrap();
+    }
     drop(fixture.common.runtime.take());
     assert!(fixture.common.resources.snapshot().backing_bytes > 0);
     transport.held.lock().unwrap().clear();
-    transport.first_reader.lock().unwrap().take();
+    let mut reader = transport.first_reader.lock().unwrap().take().unwrap();
+    reader.seek(SeekFrom::Start(0)).unwrap();
+    let mut retired = Vec::new();
+    reader.read_to_end(&mut retired).unwrap();
+    assert_eq!(retired, family.payload("A"));
+    drop(reader);
     let now = fixture.common.resources.snapshot();
     assert_eq!(
         (now.native_fds, now.backing_bytes, now.retained_bytes),
@@ -479,6 +563,6 @@ fn nativelink_captured_builtin_sources_analysis_cas_runfiles_and_fresh_scope() {
 }
 #[test]
 #[ignore = "requires compiled CLI and supervised fresh verifying NativeLink"]
-fn nativelink_captured_workspace_sources_analysis_cas_runfiles_first_command() {
+fn nativelink_captured_workspace_sources_and_outputs_republish_whole_tree() {
     run(Family::Workspace);
 }

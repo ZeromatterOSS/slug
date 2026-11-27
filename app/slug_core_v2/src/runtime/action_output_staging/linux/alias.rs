@@ -13,14 +13,11 @@ impl Staging {
         target: &str,
         reserved: &starlark_map::small_set::SmallSet<&str>,
     ) -> io::Result<Self> {
-        if output.kind() != ActionOutputKind::File
-            || !Path::new(target).is_absolute()
-            || target.contains('\0')
-        {
-            return Err(io::Error::other(
-                "artifact alias requires File output and absolute target",
-            ));
+        if output.kind() != ActionOutputKind::File {
+            return Err(io::Error::other("artifact alias requires a File output"));
         }
+        let link = Path::new(root.path()).join(output.root_relative_path());
+        let target = published_link_target(workspace, &link, target)?;
         let mut staging = Self::new(workspace, root, std::slice::from_ref(output), reserved)?;
         let destination = &mut staging.destinations[0];
         // Replace only our owned hidden regular sibling, never the destination.
@@ -33,10 +30,14 @@ impl Staging {
             UnlinkatFlags::NoRemoveDir,
         )?;
         destination.cleanup = None;
-        symlinkat(target, &destination.parent, destination.name.as_str())?;
-        capture_link(destination, target)?;
+        symlinkat(
+            target.as_str(),
+            &destination.parent,
+            destination.name.as_str(),
+        )?;
+        capture_link(destination, &target)?;
         destination.created.store(true, Ordering::Relaxed);
-        staging.alias = Some(target.to_owned());
+        staging.alias = Some(target);
         Ok(staging)
     }
 

@@ -405,6 +405,7 @@ under final native source validation; established partial-publication errors rem
 For repeated Workspace capture, select one local publication projection for
 typed runfiles and artifact aliases. When a verified target lies within the
 Workspace, derive a contained relative literal from the final link parent.
+Use the verified absolute target if projection exceeds Linux's path limit.
 Validate and seal that literal through confined output staging. Its `readlink`
 spelling is Slug-native. The manifest owner emits absolute paths, and REAPI
 derives identity from the logical layout and input digests. External Host
