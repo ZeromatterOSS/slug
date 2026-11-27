@@ -34,6 +34,7 @@ use crate::docs::DocString;
 use crate::docs::DocStringKind;
 use crate::eval::Arguments;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionLimit;
 use crate::eval::ParametersSpec;
 use crate::private::Private;
 use crate::starlark_complex_value;
@@ -254,9 +255,15 @@ pub(crate) struct NativeMeth(
     #[allocative(skip)] // Not general enough
     pub(crate)  NativeMethFn,
     pub(crate) ParametersSpec<FrozenValue>,
+    pub(crate) bool,
 );
 
 impl NativeMeth {
+    #[inline]
+    pub(crate) fn is_bounded(&self) -> bool {
+        self.2
+    }
+
     #[inline]
     pub(crate) fn invoke<'v>(
         &self,
@@ -264,6 +271,17 @@ impl NativeMeth {
         this: Value<'v>,
         args: &Arguments<'v, '_>,
     ) -> crate::Result<Value<'v>> {
+        if let Some(budget) = eval.heap().bounded_attribute_budget() {
+            budget.check()?;
+            if !self.is_bounded() {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "method invocation",
+                        value_type: this.get_type(),
+                    })
+                    .into());
+            }
+        }
         (self.0)(eval, this, &self.1, args)
     }
 }
@@ -321,6 +339,14 @@ starlark_simple_value!(NativeAttribute);
 impl NativeAttribute {
     #[inline]
     pub(crate) fn invoke<'v>(&self, this: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        if let Some(budget) = heap.bounded_attribute_budget() {
+            return Err(budget
+                .refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "attribute access",
+                    value_type: this.get_type(),
+                })
+                .into());
+        }
         (self.callable)(self.data, this, heap)
     }
 }

@@ -24,6 +24,8 @@ use crate::collections::symbol::map::SymbolMap;
 use crate::collections::symbol::symbol::Symbol;
 use crate::docs::DocType;
 use crate::environment::common_documentation;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::ParametersSpec;
 use crate::typing::Ty;
 use crate::values::AllocFrozenValue;
@@ -82,6 +84,28 @@ impl Methods {
     #[inline]
     pub(crate) fn get_hashed(&self, name: Hashed<&str>) -> Option<&UnboundValue> {
         self.members.get_hashed_str(name)
+    }
+
+    /// Admit hashing and even a full scan of the initialized registry's raw table.
+    pub(crate) fn get_bounded(
+        &self,
+        name: &str,
+        budget: &ExecutionBudget,
+    ) -> Result<Option<&UnboundValue>, ExecutionLimit> {
+        let text_work = ExecutionBudget::text_work(name.len());
+        // Pinned hashbrown bounds buckets by 2 * (capacity + 1) in a table
+        // without deletions. Include up to 16 replicated control bytes.
+        let work = self
+            .members
+            .capacity()
+            .checked_add(1)
+            .and_then(|capacity| capacity.checked_mul(2))
+            .and_then(|buckets| buckets.checked_add(16))
+            .and_then(|candidates| candidates.checked_mul(1 + text_work))
+            .and_then(|lookup| lookup.checked_add(text_work))
+            .ok_or_else(|| budget.refuse(ExecutionLimit::Work))?;
+        budget.charge(work, 0)?;
+        Ok(self.get_hashed(Hashed::new(name)))
     }
 
     #[inline]
@@ -213,6 +237,7 @@ impl MethodsBuilder {
         name: &str,
         components: NativeCallableComponents,
         sig: ParametersSpec<FrozenValue>,
+        bounded_method: bool,
         f: NativeMethFn,
     ) {
         // TODO(nga): do not unwrap.
@@ -221,7 +246,7 @@ impl MethodsBuilder {
         self.members.insert(
             name,
             UnboundValue::Method(self.heap.alloc_simple_typed(NativeMethod {
-                function: NativeMeth(f, sig),
+                function: NativeMeth(f, sig, bounded_method),
                 name: name.to_owned(),
                 speculative_exec_safe: components.speculative_exec_safe,
                 docs: components.into_docs(None),
@@ -265,6 +290,11 @@ impl MethodsStatic {
         Self(OnceCell::new())
     }
 
+    /// Borrow the registry if it is already initialized.
+    pub fn get(&'static self) -> Option<&'static Methods> {
+        self.0.get()
+    }
+
     /// Populate the globals with a builder function. Always returns `Some`, but using this API
     /// to be a better fit for [`StarlarkValue.get_methods`](crate::values::StarlarkValue::get_methods).
     pub fn methods(&'static self, x: impl FnOnce(&mut MethodsBuilder)) -> Option<&'static Methods> {
@@ -294,8 +324,41 @@ mod tests {
     use crate::assert::Assert;
     use crate::environment::Methods;
     use crate::environment::MethodsStatic;
+    use crate::eval::ExecutionBudget;
+    use crate::eval::ExecutionLimit;
     use crate::starlark_simple_value;
     use crate::values::StarlarkValue;
+
+    #[test]
+    fn methods_static_get_only_observes_initialized_registry() {
+        static REGISTRY: MethodsStatic = MethodsStatic::new();
+        assert!(REGISTRY.get().is_none());
+        let initialized = REGISTRY.methods(|_| {}).unwrap();
+        assert!(std::ptr::eq(REGISTRY.get().unwrap(), initialized));
+    }
+
+    #[test]
+    fn bounded_method_lookup_admits_full_probe_and_text_work() {
+        let name = "member".repeat(80);
+        let methods = super::MethodsBuilder::new()
+            .with(|builder| {
+                builder.set_attribute(&name, 42i32, None);
+            })
+            .build();
+        let text = ExecutionBudget::text_work(name.len());
+        let required = (2 * (methods.members.capacity() + 1) + 16) * (1 + text) + text;
+
+        let short = ExecutionBudget::new(required - 1, 0, 8);
+        assert_eq!(
+            methods.get_bounded(&name, &short).unwrap_err(),
+            ExecutionLimit::Work
+        );
+        assert_eq!(short.check(), Err(ExecutionLimit::Work));
+
+        let exact = ExecutionBudget::new(required, 0, 8);
+        assert!(methods.get_bounded(&name, &exact).unwrap().is_some());
+        assert_eq!(exact.charge(1, 0), Err(ExecutionLimit::Work));
+    }
 
     #[test]
     fn test_set_attribute() {

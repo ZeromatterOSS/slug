@@ -18,6 +18,8 @@
 //! Methods for the `string` type.
 
 #[cfg(test)]
+mod bounded_endswith_tests;
+#[cfg(test)]
 mod bounded_format_tests;
 
 use std::cmp;
@@ -31,6 +33,8 @@ use crate as starlark;
 use crate::environment::MethodsBuilder;
 use crate::eval::Arguments;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionBudget;
+use crate::typing::Ty;
 use crate::values::Heap;
 use crate::values::StringValue;
 use crate::values::UnpackValue;
@@ -40,6 +44,7 @@ use crate::values::list::AllocList;
 use crate::values::list::UnpackList;
 use crate::values::none::NoneOr;
 use crate::values::string::dot_format;
+use crate::values::tuple::TupleRef;
 use crate::values::tuple::UnpackTuple;
 use crate::values::type_repr::StarlarkTypeRepr;
 use crate::values::types::string::iter::iterate_codepoints;
@@ -96,6 +101,62 @@ fn rsplitn_whitespace(s: &str, maxsplit: usize) -> Vec<&str> {
 enum StringOrTuple<'v> {
     String(&'v str),
     Tuple(UnpackTuple<&'v str>),
+}
+
+fn endswith_bounded(
+    this: &str,
+    suffix: Value<'_>,
+    budget: &ExecutionBudget,
+) -> crate::Result<bool> {
+    budget.charge(1, 0)?;
+    if let Some(suffix) = suffix.unpack_str() {
+        return endswith_str_bounded(this, suffix, budget);
+    }
+    let Some(tuple) = TupleRef::from_value(suffix) else {
+        return invalid_endswith_suffix(suffix, budget);
+    };
+    budget.charge(tuple.len(), 0)?;
+    if tuple.iter().any(|part| part.unpack_str().is_none()) {
+        return invalid_endswith_suffix(suffix, budget);
+    }
+
+    // Ordinary argument decoding validates all elements before trying any suffix.
+    let mut parts = tuple.content();
+    while let Some((part, remaining)) = parts.split_first() {
+        budget.charge(1, 0)?;
+        let part = part.unpack_str().expect("validated suffix tuple");
+        if endswith_str_bounded(this, part, budget)? {
+            return Ok(true);
+        }
+        parts = remaining;
+    }
+    Ok(false)
+}
+
+fn endswith_str_bounded(this: &str, suffix: &str, budget: &ExecutionBudget) -> crate::Result<bool> {
+    let compared = if suffix.len() <= this.len() {
+        suffix.len()
+    } else {
+        0
+    };
+    budget.charge(1 + ExecutionBudget::text_work(compared), 0)?;
+    Ok(this.ends_with(suffix))
+}
+
+#[cold]
+fn invalid_endswith_suffix(suffix: Value<'_>, budget: &ExecutionBudget) -> crate::Result<bool> {
+    #[derive(Debug, thiserror::Error)]
+    #[error("Type of parameter `suffix` doesn't match, expected `{expected}`, actual `{actual}`")]
+    struct SuffixTypeError {
+        expected: Ty,
+        actual: String,
+    }
+
+    let actual = suffix.bounded_type_description(budget)?;
+    Err(crate::Error::new_value(SuffixTypeError {
+        expected: StringOrTuple::starlark_type_repr(),
+        actual,
+    }))
 }
 
 #[starlark_module]
@@ -228,11 +289,17 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// # "#);
     /// ```
     #[starlark(speculative_exec_safe)]
-    fn endswith(
+    #[starlark(bounded_method)]
+    fn endswith<'v>(
         this: &str,
-        #[starlark(require = pos)] suffix: StringOrTuple,
-    ) -> anyhow::Result<bool> {
-        match suffix {
+        #[starlark(require = pos)] suffix: ValueOfUnchecked<'v, StringOrTuple<'v>>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<bool> {
+        let suffix = suffix.get();
+        if let Some(budget) = heap.execution_budget() {
+            return endswith_bounded(this, suffix, budget);
+        }
+        match StringOrTuple::unpack_named_param(suffix, "suffix")? {
             StringOrTuple::String(x) => Ok(this.ends_with(x)),
             StringOrTuple::Tuple(xs) => Ok(xs.items.iter().any(|x| this.ends_with(x))),
         }
@@ -327,6 +394,7 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// # "#);
     /// ```
     #[starlark(speculative_exec_safe)]
+    #[starlark(bounded_method)]
     fn format<'v>(
         this: &str,
         args: &Arguments<'v, '_>,

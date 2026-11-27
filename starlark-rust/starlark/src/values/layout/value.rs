@@ -132,6 +132,7 @@ use crate::values::types::list::value::FrozenListData;
 use crate::values::types::num::value::NumRef;
 use crate::values::types::tuple::value::FrozenTuple;
 use crate::values::types::tuple::value::Tuple;
+use crate::values::types::unbound::MemberOrValue;
 
 // We already import another `ValueError`, hence the odd name.
 #[derive(Debug, thiserror::Error)]
@@ -970,7 +971,10 @@ impl<'v> Value<'v> {
     /// Return the attribute with the given name.
     pub fn get_attr(self, attribute: &str, heap: Heap<'v>) -> crate::Result<Option<Value<'v>>> {
         if let Some(budget) = heap.bounded_attribute_budget() {
-            return self.get_attr_bounded(attribute, heap, budget);
+            return self
+                .get_member_bounded(attribute, heap, budget)?
+                .map(|member| member.bind(self, heap))
+                .transpose();
         }
         let aref = self.get_ref();
         if let Some(methods) = aref.vtable().methods() {
@@ -984,12 +988,12 @@ impl<'v> Value<'v> {
         }
     }
 
-    pub(crate) fn get_attr_bounded(
+    pub(crate) fn get_member_bounded(
         self,
         attribute: &str,
         heap: Heap<'v>,
         budget: &ExecutionBudget,
-    ) -> crate::Result<Option<Value<'v>>> {
+    ) -> crate::Result<Option<MemberOrValue<'v>>> {
         budget.charge(1 + ExecutionBudget::text_work(attribute.len()), 0)?;
         let aref = self.get_ref();
         let vtable = &aref.vtable().starlark_value;
@@ -1000,13 +1004,27 @@ impl<'v> Value<'v> {
             })
         };
 
-        // Native members take precedence over dynamic fields. Until a
-        // registry has an admitted lookup, it cannot be used to decide absence.
+        // Native members take precedence over dynamic fields. Use only the
+        // preinitialized registry explicitly admitted by this receiver type.
         if vtable.HAS_get_methods {
-            return Err(unsupported().into());
+            if !vtable.HAS_get_methods_bounded {
+                return Err(unsupported().into());
+            }
+            let Some(methods) = (vtable.get_methods_bounded)() else {
+                return Err(unsupported().into());
+            };
+            if let Some(member) = methods.get_bounded(attribute, budget)? {
+                return if member.is_bounded_method() {
+                    Ok(Some(MemberOrValue::Member(member)))
+                } else {
+                    Err(unsupported().into())
+                };
+            }
         }
         if vtable.HAS_get_attr_bounded {
-            return aref.get_attr_bounded(attribute, heap, budget);
+            return Ok(aref
+                .get_attr_bounded(attribute, heap, budget)?
+                .map(MemberOrValue::Value));
         }
         if vtable.HAS_get_attr || vtable.HAS_get_attr_hashed {
             return Err(unsupported().into());
@@ -1056,7 +1074,7 @@ impl<'v> Value<'v> {
                     })
                     .into());
             }
-            return Ok(self.get_attr_bounded(attribute, heap, budget)?.is_some());
+            return Ok(self.get_member_bounded(attribute, heap, budget)?.is_some());
         }
         let aref = self.get_ref();
         if let Some(methods) = aref.vtable().methods() {

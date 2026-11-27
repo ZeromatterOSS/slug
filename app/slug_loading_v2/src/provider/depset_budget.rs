@@ -131,6 +131,7 @@ mod tests {
     use crate::provider::StarlarkDepsetSuccessorGen;
     use crate::provider::alloc_starlark_depset_parts;
     use crate::provider::alloc_starlark_user_provider;
+    use crate::provider::prepare_bounded_depset_methods;
 
     fn install<'v>(
         module: &'v Module,
@@ -155,12 +156,12 @@ mod tests {
     }
 
     fn eval(module: &Module) -> starlark::Result<Value<'_>> {
-        let ast = AstModule::parse(
-            "depset-budget.star",
-            "data.to_list()".to_owned(),
-            &Dialect::Standard,
-        )
-        .unwrap();
+        eval_source(module, "data.to_list()")
+    }
+
+    fn eval_source<'v>(module: &'v Module, source: &str) -> starlark::Result<Value<'v>> {
+        let ast =
+            AstModule::parse("depset-budget.star", source.to_owned(), &Dialect::Standard).unwrap();
         Evaluator::new(module).eval_module(ast, &Globals::standard())
     }
 
@@ -197,6 +198,47 @@ mod tests {
                 })
                 .collect();
             assert_eq!(paths, ["pkg/b.rs", "pkg/a.rs"]);
+        }
+        assert_eq!(budget.check(), Ok(()));
+    }
+
+    #[test]
+    fn strict_depset_to_list_works_through_direct_bound_getattr_and_frozen_routes() {
+        prepare_bounded_depset_methods();
+        let producer = Module::new();
+        install(
+            &producer,
+            "File",
+            [
+                file(&producer, "@@//pkg:b.rs"),
+                file(&producer, "@@//pkg:a.rs"),
+                file(&producer, "@@//pkg:b.rs"),
+            ],
+        );
+        eval_source(&producer, "frozen_to_list = data.to_list").unwrap();
+        let frozen = producer.freeze().unwrap();
+
+        let budget = Arc::new(ExecutionBudget::new(50_000, 1 << 20, 16).with_bounded_attributes());
+        let module = Module::new_with_execution_budget(budget.clone());
+        module.import_public_symbols(&frozen);
+        for source in [
+            "data.to_list()",
+            "bound = data.to_list\nbound()",
+            "getattr(data, 'to_list')()",
+            "frozen_to_list()",
+        ] {
+            let result = eval_source(&module, source).unwrap();
+            let paths: Vec<_> = ListRef::from_value(result)
+                .unwrap()
+                .iter()
+                .map(|value| {
+                    AnalysisArtifactValue::from_starlark(value)
+                        .unwrap()
+                        .artifact()
+                        .short_path()
+                })
+                .collect();
+            assert_eq!(paths, ["pkg/b.rs", "pkg/a.rs"], "{source}");
         }
         assert_eq!(budget.check(), Ok(()));
     }

@@ -59,6 +59,7 @@ struct FnAttrs {
     starlark_ty_custom_function: Option<Expr>,
     special_builtin_function: Option<Expr>,
     speculative_exec_safe: bool,
+    bounded_method: bool,
     docstring: Option<String>,
     /// Rest attributes
     attrs: Vec<Attribute>,
@@ -200,6 +201,9 @@ fn parse_starlark_fn_attr(tokens: &Attribute, attrs: &mut FnAttrs) -> syn::Resul
             } else if ident == "speculative_exec_safe" {
                 attrs.speculative_exec_safe = true;
                 continue;
+            } else if ident == "bounded_method" {
+                attrs.bounded_method = true;
+                continue;
             } else if ident == "ty_custom_function" {
                 parser.parse::<Token![=]>()?;
                 attrs.starlark_ty_custom_function = Some(parser.parse::<Expr>()?);
@@ -215,6 +219,7 @@ fn parse_starlark_fn_attr(tokens: &Attribute, attrs: &mut FnAttrs) -> syn::Resul
                     `#[starlark(as_type = ImplStarlarkValue)]`, \
                     `#[starlark(ty_custom_function = MyTy)]`, \
                     `#[starlark(attribute)]`, \
+                    `#[starlark(bounded_method)]`, \
                     `#[starlark(speculative_exec_safe)]` attribute",
             ));
         }
@@ -296,11 +301,19 @@ pub(crate) fn parse_fun(func: ItemFn, module_kind: ModuleKind) -> syn::Result<St
         is_attribute,
         as_type,
         speculative_exec_safe,
+        bounded_method,
         docstring,
         starlark_ty_custom_function,
         special_builtin_function,
         attrs,
     } = parse_fn_attrs(func.span(), func.attrs)?;
+
+    if bounded_method && (module_kind != ModuleKind::Methods || is_attribute) {
+        return Err(syn::Error::new(
+            sig_span,
+            "`#[starlark(bounded_method)]` is only valid on methods",
+        ));
+    }
 
     let has_v = parse_fn_generics(&func.sig.generics)?;
 
@@ -451,6 +464,7 @@ pub(crate) fn parse_fun(func: ItemFn, module_kind: ModuleKind) -> syn::Result<St
             starlark_ty_custom_function,
             special_builtin_function,
             speculative_exec_safe,
+            bounded_method,
             body: *func.block,
             source,
             docstring,
@@ -779,4 +793,45 @@ fn parse_arg(
         default: param_attrs.default,
         source: StarArgSource::Unknown,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bounded_method_marker_is_independent_and_method_only() {
+        let method = syn::parse_quote! {
+            #[starlark(bounded_method)]
+            fn project(this: Value) -> anyhow::Result<i32> { Ok(1) }
+        };
+        let StarStmt::Fun(method) = parse_fun(method, ModuleKind::Methods).unwrap() else {
+            panic!("expected a method");
+        };
+        assert!(method.bounded_method);
+        assert!(!method.speculative_exec_safe);
+
+        for (kind, invalid) in [
+            (
+                ModuleKind::Globals,
+                syn::parse_quote! {
+                    #[starlark(bounded_method)]
+                    fn project() -> anyhow::Result<i32> { Ok(1) }
+                },
+            ),
+            (
+                ModuleKind::Methods,
+                syn::parse_quote! {
+                    #[starlark(attribute, bounded_method)]
+                    fn project(this: Value) -> anyhow::Result<i32> { Ok(1) }
+                },
+            ),
+        ] {
+            let error = parse_fun(invalid, kind).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "`#[starlark(bounded_method)]` is only valid on methods"
+            );
+        }
+    }
 }

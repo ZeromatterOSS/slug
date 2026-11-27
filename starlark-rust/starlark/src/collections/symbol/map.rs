@@ -105,6 +105,10 @@ impl<T> SymbolMap<T> {
         self.0.len()
     }
 
+    pub(crate) fn capacity(&self) -> usize {
+        self.0.capacity()
+    }
+
     pub(crate) fn iter<'a>(&'a self) -> impl ExactSizeIterator<Item = &'a (Symbol, T)> + 'a {
         self.0.iter()
     }

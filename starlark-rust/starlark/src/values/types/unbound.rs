@@ -23,6 +23,7 @@ use std::fmt::Formatter;
 
 use crate::eval::Arguments;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionLimit;
 use crate::eval::runtime::frame_span::FrameSpan;
 use crate::values::FrozenRef;
 use crate::values::FrozenValue;
@@ -43,6 +44,34 @@ pub(crate) enum UnboundValue {
     Attr(FrozenValueTyped<'static, NativeAttribute>),
 }
 
+pub(crate) enum MemberOrValue<'v> {
+    Member(&'static UnboundValue),
+    Value(Value<'v>),
+}
+
+impl<'v> MemberOrValue<'v> {
+    pub(crate) fn bind(self, this: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        match self {
+            Self::Member(member) => member.bind(this, heap),
+            Self::Value(value) => Ok(value),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn invoke(
+        self,
+        this: Value<'v>,
+        span: FrozenRef<'static, FrameSpan>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> crate::Result<Value<'v>> {
+        match self {
+            Self::Member(member) => member.invoke_method(this, span, args, eval),
+            Self::Value(value) => value.invoke_with_loc(Some(span), args, eval),
+        }
+    }
+}
+
 impl Debug for UnboundValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("MaybeUnboundValue").finish_non_exhaustive()
@@ -50,6 +79,10 @@ impl Debug for UnboundValue {
 }
 
 impl UnboundValue {
+    pub(crate) fn is_bounded_method(&self) -> bool {
+        matches!(self, Self::Method(m) if m.function.is_bounded())
+    }
+
     #[inline]
     pub(crate) fn to_frozen_value(&self) -> FrozenValue {
         match self {
@@ -63,6 +96,19 @@ impl UnboundValue {
     pub(crate) fn bind<'v>(&self, this: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
         match self {
             UnboundValue::Method(m) => {
+                if let Some(budget) = heap.bounded_attribute_budget() {
+                    if !m.function.is_bounded() {
+                        return Err(budget
+                            .refuse(ExecutionLimit::UnsupportedOperation {
+                                operation: "attribute access",
+                                value_type: this.get_type(),
+                            })
+                            .into());
+                    }
+                    return Ok(
+                        heap.alloc_budgeted_bound_method(BoundMethodGen::new(this, *m), budget)?
+                    );
+                }
                 Ok(heap.alloc_complex(BoundMethodGen::new(this.to_value(), *m)))
             }
             UnboundValue::Attr(a) => a.invoke(this, heap),

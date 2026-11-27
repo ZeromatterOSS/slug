@@ -42,6 +42,7 @@ use crate::values::Tracer;
 use crate::values::Value;
 use crate::values::dict::Dict;
 use crate::values::dict::value::MutableDict;
+use crate::values::function::BoundMethodGen;
 use crate::values::layout::avalue::AValue;
 use crate::values::layout::avalue::AValueImpl;
 use crate::values::layout::avalue::heap_copy_deferred;
@@ -143,6 +144,16 @@ where
 }
 
 impl<'v> Heap<'v> {
+    pub(crate) fn alloc_budgeted_bound_method(
+        self,
+        method: BoundMethodGen<Value<'v>>,
+        budget: &ExecutionBudget,
+    ) -> Result<Value<'v>, ExecutionLimit> {
+        let bytes = AValueComplex::<BoundMethodGen<Value<'v>>>::alloc_size_for_extra_len(0).bytes();
+        budget.charge(1, bytes as usize)?;
+        Ok(self.alloc_complex(method))
+    }
+
     /// Admit the map and mutable dictionary from admitted unique, prehashed rows.
     pub(crate) fn alloc_budgeted_dict_from_unique_rows(
         self,

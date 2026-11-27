@@ -154,6 +154,7 @@ impl StarFun {
         let special_builtin_function = self.special_builtin_function_expr();
 
         if self.is_method() {
+            let bounded_method = self.bounded_method;
             if self.as_type.is_some() {
                 return Err(syn::Error::new(
                     self.span(),
@@ -172,6 +173,7 @@ impl StarFun {
                     #name_str,
                     #components,
                     #param_spec,
+                    #bounded_method,
                     __starlark_invoke_outer #turbofish,
                 );
             })

@@ -1564,8 +1564,11 @@ where
     }
 
     fn get_methods() -> Option<&'static Methods> {
-        static METHODS: MethodsStatic = MethodsStatic::new();
-        METHODS.methods(starlark_depset_methods)
+        DEPSET_METHODS.methods(starlark_depset_methods)
+    }
+
+    fn get_methods_bounded() -> Option<&'static Methods> {
+        DEPSET_METHODS.get()
     }
 }
 
@@ -1580,8 +1583,16 @@ impl<'v, V: ValueLike<'v>> StarlarkStructuralValue for StarlarkDepsetGen<V> {
     }
 }
 
+static DEPSET_METHODS: MethodsStatic = MethodsStatic::new();
+
+/// Initialize the fixed depset method table before bounded formatter execution.
+pub fn prepare_bounded_depset_methods() {
+    let _ = DEPSET_METHODS.methods(starlark_depset_methods);
+}
+
 #[starlark_module]
 fn starlark_depset_methods(builder: &mut MethodsBuilder) {
+    #[starlark(bounded_method)]
     fn to_list<'v>(
         this: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,

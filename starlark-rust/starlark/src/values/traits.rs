@@ -314,6 +314,15 @@ pub trait StarlarkValue<'v>:
         None
     }
 
+    /// Return the same registry as `get_methods` after trusted initialization.
+    /// Bounded lookup must not initialize a registry for a script receiver.
+    fn get_methods_bounded() -> Option<&'static Methods>
+    where
+        Self: Sized,
+    {
+        None
+    }
+
     /// Return the documentation for this value.
     ///
     /// This should be the doc-item that is expected to be generated when this value appears as a

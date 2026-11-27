@@ -80,9 +80,11 @@ impl ExecutionBudget {
         }
     }
 
-    /// Require bounded field models and refuse unadmitted native member access
-    /// on every heap sharing this request.
+    /// Prepare the fixed core string method table and require admitted field
+    /// and member access on every heap sharing this request. Embedders prepare
+    /// any additional supported receiver tables before execution.
     pub fn with_bounded_attributes(mut self) -> Self {
+        let _ = crate::values::types::string::str_type::str_methods();
         self.bounded_attributes = true;
         self
     }

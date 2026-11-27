@@ -135,6 +135,7 @@ impl<'v> NativeBoundMethodInspection<'v> {
             && actual.name == canonical.name
             && actual.function.1.inspection_function_name()
                 == canonical.function.1.inspection_function_name()
+            && actual.function.is_bounded() == canonical.function.is_bounded()
             && actual.ty == canonical.ty
             && actual.speculative_exec_safe == canonical.speculative_exec_safe
             && actual.docs == canonical.docs

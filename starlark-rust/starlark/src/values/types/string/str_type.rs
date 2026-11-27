@@ -43,6 +43,8 @@ use crate as starlark;
 use crate::collections::aligned_padded_str::AlignedPaddedStr;
 use crate::environment::Methods;
 use crate::environment::MethodsStatic;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::private::Private;
 use crate::typing::Ty;
 use crate::values::Freeze;
@@ -227,9 +229,17 @@ impl Display for StarlarkStr {
     }
 }
 
+static STRING_METHODS: MethodsStatic = MethodsStatic::new();
+
 pub(crate) fn str_methods() -> Option<&'static Methods> {
-    static RES: MethodsStatic = MethodsStatic::new();
-    RES.methods(crate::values::types::string::methods::string_methods)
+    STRING_METHODS.methods(crate::values::types::string::methods::string_methods)
+}
+
+fn is_label_attribute(attribute: &str) -> bool {
+    matches!(
+        attribute,
+        "name" | "package" | "workspace_name" | "workspace_root"
+    )
 }
 
 #[starlark_value(type = STRING_TYPE)]
@@ -243,6 +253,10 @@ impl<'v> StarlarkValue<'v> for StarlarkStr {
 
     fn get_methods() -> Option<&'static Methods> {
         str_methods()
+    }
+
+    fn get_methods_bounded() -> Option<&'static Methods> {
+        STRING_METHODS.get()
     }
 
     fn collect_repr(&self, buffer: &mut String) {
@@ -277,14 +291,8 @@ impl<'v> StarlarkValue<'v> for StarlarkStr {
     // In Slug, Label() returns a string. We support attribute access on strings
     // that look like labels (contain "//" or ":").
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        if !matches!(
-            attribute,
-            "name" | "package" | "workspace_name" | "workspace_root"
-        ) {
-            return false;
-        }
         let s = self.as_str();
-        s.contains("//") || s.contains(':')
+        is_label_attribute(attribute) && (s.contains("//") || s.contains(':'))
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -332,6 +340,23 @@ impl<'v> StarlarkValue<'v> for StarlarkStr {
             "workspace_root" => Some(heap.alloc("")),
             _ => None,
         }
+    }
+
+    fn get_attr_bounded(
+        &self,
+        attribute: &str,
+        _heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Option<Value<'v>>> {
+        if is_label_attribute(attribute) {
+            return Err(budget
+                .refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "attribute access",
+                    value_type: STRING_TYPE,
+                })
+                .into());
+        }
+        Ok(None)
     }
 
     fn compare(&self, other: Value) -> crate::Result<Ordering> {

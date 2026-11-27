@@ -37,7 +37,6 @@ use crate::codemap::Spanned;
 use crate::collections::symbol::symbol::Symbol;
 use crate::environment::slots::ModuleSlotId;
 use crate::errors::did_you_mean::did_you_mean;
-use crate::eval::Arguments;
 use crate::eval::Evaluator;
 use crate::eval::compiler::Compiler;
 use crate::eval::compiler::args::ArgsCompiledValue;
@@ -87,6 +86,7 @@ use crate::values::types::list::value::ListData;
 use crate::values::types::string::dot_format::format_one;
 use crate::values::types::string::interpolation::percent_s_one;
 use crate::values::types::tuple::value::Tuple;
+use crate::values::types::unbound::MemberOrValue;
 use crate::values::types::unbound::UnboundValue;
 
 /// `bool` operation.
@@ -1136,40 +1136,20 @@ fn get_attr_no_attr_error<'v>(x: Value<'v>, attribute: &Symbol) -> crate::Error 
 }
 
 #[cold]
-fn get_attr_bounded_value<'v>(
+fn get_attr_bounded_member<'v>(
     x: Value<'v>,
     attribute: &str,
     heap: Heap<'v>,
     budget: &crate::eval::ExecutionBudget,
-) -> crate::Result<Value<'v>> {
-    x.get_attr_bounded(attribute, heap, budget)?.ok_or_else(|| {
-        let typ = x.get_type();
-        ValueError::bounded_message(
-            budget,
-            format_args!("Object of type `{typ}` has no attribute `{attribute}`"),
-        )
-    })
-}
-
-pub(crate) enum MemberOrValue<'v, 'a> {
-    Member(&'a UnboundValue),
-    Value(Value<'v>),
-}
-
-impl<'v, 'a> MemberOrValue<'v, 'a> {
-    #[inline]
-    pub(crate) fn invoke(
-        &self,
-        this: Value<'v>,
-        span: FrozenRef<'static, FrameSpan>,
-        args: &Arguments<'v, '_>,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> crate::Result<Value<'v>> {
-        match self {
-            MemberOrValue::Member(member) => member.invoke_method(this, span, args, eval),
-            MemberOrValue::Value(value) => value.invoke_with_loc(Some(span), args, eval),
-        }
-    }
+) -> crate::Result<MemberOrValue<'v>> {
+    x.get_member_bounded(attribute, heap, budget)?
+        .ok_or_else(|| {
+            let typ = x.get_type();
+            ValueError::bounded_message(
+                budget,
+                format_args!("Object of type `{typ}` has no attribute `{attribute}`"),
+            )
+        })
 }
 
 #[inline(always)]
@@ -1177,10 +1157,9 @@ pub(crate) fn get_attr_hashed_raw<'v>(
     x: Value<'v>,
     attribute: &Symbol,
     heap: Heap<'v>,
-) -> crate::Result<MemberOrValue<'v, 'static>> {
+) -> crate::Result<MemberOrValue<'v>> {
     if let Some(budget) = heap.bounded_attribute_budget() {
-        return get_attr_bounded_value(x, attribute.as_str(), heap, budget)
-            .map(MemberOrValue::Value);
+        return get_attr_bounded_member(x, attribute.as_str(), heap, budget);
     }
     let aref = x.get_ref();
     if let Some(methods) = aref.vtable().methods() {
@@ -1200,7 +1179,7 @@ pub(crate) fn get_attr_hashed_bind<'v>(
     heap: Heap<'v>,
 ) -> crate::Result<Value<'v>> {
     if let Some(budget) = heap.bounded_attribute_budget() {
-        return get_attr_bounded_value(x, attribute.as_str(), heap, budget);
+        return get_attr_bounded_member(x, attribute.as_str(), heap, budget)?.bind(x, heap);
     }
     let aref = x.get_ref();
     if let Some(methods) = aref.vtable().methods() {

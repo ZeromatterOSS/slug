@@ -1,23 +1,36 @@
+use std::sync::Arc;
+
 use super::*;
+use crate as starlark;
+use crate::collections::Hashed;
 use crate::docs::DocFunction;
 use crate::docs::DocItem;
 use crate::docs::DocMember;
 use crate::docs::DocString;
+use crate::environment::MethodsBuilder;
 use crate::environment::Module;
 use crate::eval::Arguments;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::ParametersSpec;
 use crate::eval::ParametersSpecParam;
+use crate::starlark_module;
 use crate::typing::Ty;
 use crate::values::FrozenHeap;
 use crate::values::FrozenValue;
 use crate::values::function::FrozenBoundMethod;
 use crate::values::function::NativeMeth;
 use crate::values::list::AllocList;
+use crate::values::types::unbound::UnboundValue;
 
 fn copy_method(method: &NativeMethod) -> NativeMethod {
     NativeMethod {
-        function: NativeMeth(method.function.0, method.function.1.clone()),
+        function: NativeMeth(
+            method.function.0,
+            method.function.1.clone(),
+            method.function.is_bounded(),
+        ),
         name: method.name.clone(),
         ty: method.ty.clone(),
         speculative_exec_safe: method.speculative_exec_safe,
@@ -63,7 +76,7 @@ fn bound_native_method_inspection_checks_every_fixed_wrapper_field() {
         Some("x-y")
     );
     let canonical = inspected.method;
-    for change in 0..6 {
+    for change in 0..7 {
         let mut changed = copy_method(canonical);
         match change {
             0 => changed.function.0 = counterfeit,
@@ -89,6 +102,7 @@ fn bound_native_method_inspection_checks_every_fixed_wrapper_field() {
                     false,
                 )
             }
+            6 => changed.function.2 = !changed.function.is_bounded(),
             _ => unreachable!(),
         }
         let wrapper = bind(&heap, receiver, changed);
@@ -158,4 +172,106 @@ fn bound_native_method_inspection_retains_actual_defaults_layout_and_frozen_rece
     assert_eq!(after.receiver().unpack_str(), Some("-"));
     assert_eq!(after.parameters().len(), parameters.len());
     assert!(after.matches_receiver_wrapper());
+}
+
+#[starlark_module]
+fn member_admission_fixture(builder: &mut MethodsBuilder) {
+    #[starlark(bounded_method)]
+    fn admitted(this: Value, #[starlark(require = pos)] argument: i32) -> anyhow::Result<i32> {
+        let _ = this;
+        Ok(argument)
+    }
+
+    #[starlark(speculative_exec_safe)]
+    fn unadmitted(this: Value, #[starlark(require = pos)] argument: i32) -> anyhow::Result<i32> {
+        let _ = this;
+        Ok(argument)
+    }
+
+    #[starlark(attribute)]
+    fn property(this: Value) -> anyhow::Result<i32> {
+        let _ = this;
+        panic!("strict attribute access invoked an unadmitted getter");
+    }
+}
+
+fn assert_refusal(error: crate::Error, budget: &ExecutionBudget, operation: &'static str) {
+    let expected = ExecutionLimit::UnsupportedOperation {
+        operation,
+        value_type: "int",
+    };
+    assert!(
+        matches!(
+            error.kind(),
+            crate::ErrorKind::Other(cause) if cause.downcast_ref::<ExecutionLimit>() == Some(&expected)
+        ),
+        "{error}"
+    );
+    assert_eq!(budget.check(), Err(expected));
+}
+
+#[test]
+fn native_member_admission_controls_frozen_bound_invocation_before_unpack() {
+    let methods = MethodsBuilder::new().with(member_admission_fixture).build();
+    let heap = FrozenHeap::new();
+    let receiver = heap.alloc(0i32);
+    let [admitted, unadmitted] = ["admitted", "unadmitted"].map(|name| {
+        let UnboundValue::Method(method) = methods.get_hashed(Hashed::new(name)).unwrap() else {
+            panic!("expected a native method");
+        };
+        heap.alloc(FrozenBoundMethod::new(receiver, *method))
+    });
+    let admitted_descriptor = inspect_native_bound_method(admitted.to_value())
+        .unwrap()
+        .method;
+    assert!(admitted_descriptor.function.is_bounded());
+    assert!(!admitted_descriptor.speculative_exec_safe);
+    let unadmitted_descriptor = inspect_native_bound_method(unadmitted.to_value())
+        .unwrap()
+        .method;
+    assert!(!unadmitted_descriptor.function.is_bounded());
+    assert!(unadmitted_descriptor.speculative_exec_safe);
+
+    let positional = [receiver.to_value()];
+    let ordinary_budget = Arc::new(ExecutionBudget::new(1000, 4096, 8));
+    let ordinary = Module::new_with_execution_budget(ordinary_budget.clone());
+    assert_eq!(
+        Evaluator::new(&ordinary)
+            .eval_function(unadmitted.to_value(), &positional, &[])
+            .unwrap()
+            .unpack_i32(),
+        Some(0)
+    );
+    assert_eq!(ordinary_budget.check(), Ok(()));
+
+    let budget = Arc::new(ExecutionBudget::new(1000, 4096, 8).with_bounded_attributes());
+    let module = Module::new_with_execution_budget(budget.clone());
+    let mut evaluator = Evaluator::new(&module);
+    assert_eq!(
+        evaluator
+            .eval_function(admitted.to_value(), &positional, &[])
+            .unwrap()
+            .unpack_i32(),
+        Some(0)
+    );
+    // A missing argument ordinarily fails in generated arity checks. The
+    // unadmitted method must instead refuse before entering that wrapper.
+    let error = evaluator
+        .eval_function(unadmitted.to_value(), &[], &[])
+        .unwrap_err();
+    assert_refusal(error, &budget, "method invocation");
+}
+
+#[test]
+fn native_attribute_invocation_refuses_before_getter() {
+    let methods = MethodsBuilder::new().with(member_admission_fixture).build();
+    let UnboundValue::Attr(attribute) = methods.get_hashed(Hashed::new("property")).unwrap() else {
+        panic!("expected a native attribute");
+    };
+    let budget = Arc::new(ExecutionBudget::new(1000, 4096, 8).with_bounded_attributes());
+    let module = Module::new_with_execution_budget(budget.clone());
+    let error = attribute
+        .invoke(Value::testing_new_int(0), module.heap())
+        .unwrap_err();
+    assert_refusal(error, &budget, "attribute access");
 }
