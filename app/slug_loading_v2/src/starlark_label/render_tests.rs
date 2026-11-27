@@ -1,4 +1,7 @@
 use starlark::environment::Module;
+use starlark::eval::ExecutionBudget;
+use starlark::values::BoundedText;
+use starlark::values::list::AllocList;
 
 use super::*;
 
@@ -18,6 +21,30 @@ fn collectors_preserve_prefixed_root_external_unicode_and_long_text() {
         drop(label);
         assert_eq!(plain, format!("existing: {raw}"));
         assert_eq!(representation, format!("existing: Label(\"{raw}\")"));
+    }
+}
+
+#[test]
+fn bounded_label_text_preserves_repr_and_container_display() {
+    let module = Module::new();
+    let heap = module.heap();
+    let raw = "@@dep+//pkg:é雪";
+    let label = heap.alloc_simple(StarlarkLabel::new(CanonicalLabel::parse(raw).unwrap()));
+    let list = heap.alloc(AllocList([label]));
+    for (value, mode, expected) in [
+        (label, ValueTextMode::Str, raw.to_owned()),
+        (label, ValueTextMode::Repr, format!("Label(\"{raw}\")")),
+        (list, ValueTextMode::Repr, format!("[Label(\"{raw}\")]")),
+        (
+            heap.alloc((list,)),
+            ValueTextMode::Repr,
+            format!("([{raw}],)"),
+        ),
+    ] {
+        let budget = ExecutionBudget::new(1024, 1024, 8);
+        let mut text = BoundedText::new(&budget, expected.len());
+        text.write_value(value, mode).unwrap();
+        assert_eq!(text.finish().unwrap(), expected);
     }
 }
 

@@ -17,6 +17,7 @@
 
 //! Implementation of `repr()`.
 
+use std::fmt;
 use std::mem;
 
 use crate::hint::unlikely;
@@ -55,21 +56,24 @@ unsafe fn chunk_non_ascii_or_need_escape<V: Vector>(chunk: V) -> bool {
 
 #[inline(always)]
 fn push_escape(to_escape: char, buffer: &mut String) {
+    write_escape(to_escape, buffer).unwrap();
+}
+
+#[inline(always)]
+fn write_escape(to_escape: char, output: &mut impl fmt::Write) -> fmt::Result {
     // Starlark behavior of `repr` is underspecified,
     // so use mix of Starlark spec and PEP-3138.
 
-    use std::fmt::Write;
-
     match to_escape {
-        '\n' => buffer.push_str("\\n"),
-        '\r' => buffer.push_str("\\r"),
-        '\t' => buffer.push_str("\\t"),
-        '\\' => buffer.push_str("\\\\"),
-        '"' => buffer.push_str("\\\""),
+        '\n' => output.write_str("\\n"),
+        '\r' => output.write_str("\\r"),
+        '\t' => output.write_str("\\t"),
+        '\\' => output.write_str("\\\\"),
+        '"' => output.write_str("\\\""),
         // `write!` is slow, but these branches are rare.
-        c if (c as u32) < 0x100 => write!(buffer, "\\x{:02x}", c as u32).unwrap(),
-        c if (c as u32) < 0x10000 => write!(buffer, "\\u{:04x}", c as u32).unwrap(),
-        c => write!(buffer, "\\U{:08x}", c as u32).unwrap(),
+        c if (c as u32) < 0x100 => write!(output, "\\x{:02x}", c as u32),
+        c if (c as u32) < 0x10000 => write!(output, "\\u{:04x}", c as u32),
+        c => write!(output, "\\U{:08x}", c as u32),
     }
 }
 
@@ -89,6 +93,25 @@ fn need_escape(c: char) -> bool {
         // but `is_alphanumeric` is practically enough for now.
         c => !c.is_alphanumeric(),
     }
+}
+
+/// Write a quoted string to a fallible sink. The caller accounts for scanning `value`.
+pub(crate) fn write_string_repr(value: &str, output: &mut impl fmt::Write) -> fmt::Result {
+    output.write_char('"')?;
+    let mut start = 0;
+    for (index, c) in value.char_indices() {
+        if need_escape(c) {
+            if start != index {
+                output.write_str(&value[start..index])?;
+            }
+            write_escape(c, output)?;
+            start = index + c.len_utf8();
+        }
+    }
+    if start != value.len() {
+        output.write_str(&value[start..])?;
+    }
+    output.write_char('"')
 }
 
 pub(crate) fn string_repr(str: &str, buffer: &mut String) {
@@ -243,6 +266,7 @@ mod tests {
 
     use crate::assert;
     use crate::values::types::string::repr::string_repr;
+    use crate::values::types::string::repr::write_string_repr;
 
     #[test]
     fn test_to_repr() {
@@ -257,9 +281,7 @@ mod tests {
     #[test]
     fn test_string_repr() {
         fn test(expected: &str, input: &str) {
-            let mut repr = String::new();
-            string_repr(input, &mut repr);
-            assert_eq!(expected, &repr);
+            assert_eq!(expected, string_repr_for_test(input));
         }
         test(r#""\x12""#, "\x12");
         test(r#""\x7f""#, "\x7f");
@@ -273,6 +295,27 @@ mod tests {
         test(r#""Hello, 世界""#, "Hello, 世界");
         // Largest unicode number.
         test(r#""\U0010ffff""#, "\u{10ffff}");
+        test(
+            r#""a\n\r\t\\\x00\xe9世界\u200b\U0001f63f""#,
+            "a\n\r\t\\\0é世界\u{200b}😿",
+        );
+    }
+
+    #[test]
+    fn write_string_repr_propagates_escape_failure() {
+        use std::fmt;
+
+        struct RefuseEscape;
+        impl fmt::Write for RefuseEscape {
+            fn write_str(&mut self, text: &str) -> fmt::Result {
+                if text.starts_with('\\') {
+                    return Err(fmt::Error);
+                }
+                Ok(())
+            }
+        }
+
+        assert!(write_string_repr("prefix\u{200b}suffix", &mut RefuseEscape).is_err());
     }
 
     #[test]
@@ -289,6 +332,9 @@ mod tests {
     fn string_repr_for_test(s: &str) -> String {
         let mut r = String::new();
         string_repr(s, &mut r);
+        let mut written = String::new();
+        write_string_repr(s, &mut written).unwrap();
+        assert_eq!(r, written);
         r
     }
 

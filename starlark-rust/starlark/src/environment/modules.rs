@@ -23,6 +23,7 @@
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::mem;
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -44,6 +45,7 @@ use crate::environment::slots::FrozenSlots;
 use crate::environment::slots::ModuleSlotId;
 use crate::environment::slots::MutableSlots;
 use crate::errors::did_you_mean::did_you_mean;
+use crate::eval::ExecutionBudget;
 use crate::eval::ProfileData;
 use crate::eval::runtime::profile::heap::RetainedHeapProfileMode;
 use crate::values::Freeze;
@@ -392,7 +394,7 @@ impl Default for Module {
 impl Module {
     /// Create a new module environment with no contents.
     pub fn new() -> Self {
-        Self::new_with_compilation_mode(false)
+        Self::new_with_heap(OwnedHeap::new(), false)
     }
 
     /// Create an empty module that defers operations on script values until execution.
@@ -401,12 +403,18 @@ impl Module {
     /// Use an untyped dialect without static typechecking. The caller remains
     /// responsible for bounding parsing, compilation, freezing, and execution.
     pub fn new_with_deferred_script_operations() -> Self {
-        Self::new_with_compilation_mode(true)
+        Self::new_with_heap(OwnedHeap::new(), true)
     }
 
-    fn new_with_compilation_mode(defer_script_operations: bool) -> Self {
+    /// Create a deferred module whose cooperating runtime operations share
+    /// this request's work and allocation credits.
+    pub fn new_with_execution_budget(budget: Arc<ExecutionBudget>) -> Self {
+        Self::new_with_heap(OwnedHeap::new_with_execution_budget(Some(budget)), true)
+    }
+
+    fn new_with_heap(heap: OwnedHeap, defer_script_operations: bool) -> Self {
         Self {
-            heap: OwnedHeap::new(),
+            heap,
             frozen_heap: FrozenHeap::new(),
             defer_script_operations,
             names: MutableNames::new(),

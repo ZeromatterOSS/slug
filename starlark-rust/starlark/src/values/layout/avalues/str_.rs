@@ -20,6 +20,8 @@ use std::ptr::copy_nonoverlapping;
 use starlark_map::Hashed;
 
 use crate::collections::StarlarkHashValue;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
 use crate::values::FrozenHeap;
@@ -31,6 +33,7 @@ use crate::values::StringValueLike as _;
 use crate::values::Tracer;
 use crate::values::Value;
 use crate::values::constant_string;
+use crate::values::layout::aligned_size::AlignedSize;
 use crate::values::layout::avalue::AValue;
 use crate::values::layout::avalue::AValueImpl;
 use crate::values::layout::heap::repr::AValueHeader;
@@ -139,6 +142,27 @@ impl FrozenHeap {
 }
 
 impl<'v> Heap<'v> {
+    /// Charge the work and aligned object bytes for a native result string
+    /// before copying it to this heap.
+    pub fn alloc_budgeted_str(self, text: &str) -> Result<StringValue<'v>, ExecutionLimit> {
+        let Some(budget) = self.execution_budget() else {
+            return Ok(self.alloc_str(text));
+        };
+        budget.check()?;
+        if let Some(value) = constant_string(text) {
+            return Ok(value.to_string_value());
+        }
+        let max_aligned = (isize::MAX as usize & !(AValueHeader::ALIGN - 1))
+            .min(AlignedSize::MAX_SIZE.bytes() as usize);
+        if text.len() > max_aligned - AValueRepr::<StarlarkStrAValue>::offset_of_extra() {
+            return Err(budget.refuse(ExecutionLimit::AllocationBytes));
+        }
+        let payload = StarlarkStr::payload_len_for_len(text.len());
+        let bytes = StarlarkStrAValue::alloc_size_for_extra_len(payload).bytes() as usize;
+        budget.charge(1 + ExecutionBudget::text_work(text.len()), bytes)?;
+        Ok(self.alloc_str(text))
+    }
+
     /// Allocate a string on the heap.
     pub fn alloc_str(self, x: &str) -> StringValue<'v> {
         if let Some(x) = constant_string(x) {

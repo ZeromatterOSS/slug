@@ -30,6 +30,7 @@
 //! hold several values.
 
 use std::cmp::Ordering;
+use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Write;
@@ -61,6 +62,7 @@ use crate::values::Heap;
 use crate::values::Trace;
 use crate::values::Value;
 use crate::values::ValueError;
+use crate::values::ValueTextMode;
 use crate::values::demand::Demand;
 use crate::values::error::ControlError;
 use crate::values::function::FUNCTION_TYPE;
@@ -367,6 +369,17 @@ pub trait StarlarkValue<'v>:
     /// override this without changing their debug representation.
     fn collect_str(&self, collector: &mut String) {
         self.collect_repr(collector)
+    }
+
+    /// Opt in to bounded rendering of this value. Implementations must write
+    /// directly to `output` without unmetered temporary allocations or work.
+    /// Return `None` when this representation has no admitted writer.
+    fn write_bounded_text(
+        &self,
+        _mode: ValueTextMode,
+        _output: &mut dyn fmt::Write,
+    ) -> Option<fmt::Result> {
+        None
     }
 
     /// Invoked to print `repr` when a cycle is the object stack is detected.

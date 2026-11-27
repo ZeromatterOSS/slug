@@ -51,7 +51,7 @@ pub(crate) struct AlignedSize {
 impl AlignedSize {
     pub(crate) const ZERO: AlignedSize = AlignedSize::new_bytes(0);
 
-    const MAX_SIZE: AlignedSize =
+    pub(crate) const MAX_SIZE: AlignedSize =
         AlignedSize::new_bytes(u32::MAX as usize - AValueHeader::ALIGN + 1);
 
     #[track_caller]

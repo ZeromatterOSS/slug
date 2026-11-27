@@ -19,6 +19,7 @@
 //! [`eval_module`](Evaluator::eval_module).
 
 pub(crate) mod bc;
+mod budget;
 pub(crate) mod compiler;
 mod function_symbol;
 mod params;
@@ -30,6 +31,8 @@ use std::mem;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
+pub use budget::ExecutionBudget;
+pub use budget::ExecutionLimit;
 pub use compiler::def::inspection::CaptureCell;
 pub use compiler::def::inspection::DefCodeInspection;
 pub use compiler::def::inspection::DefDependency;

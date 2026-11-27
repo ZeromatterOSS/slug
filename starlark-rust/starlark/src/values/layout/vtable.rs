@@ -47,6 +47,7 @@ use crate::values::Heap;
 use crate::values::StarlarkValue;
 use crate::values::Tracer;
 use crate::values::Value;
+use crate::values::ValueTextMode;
 use crate::values::demand::Demand;
 use crate::values::int::pointer_i32::PointerI32;
 use crate::values::layout::avalue::AValue;
@@ -503,6 +504,14 @@ impl<'v> AValueDyn<'v> {
     #[inline]
     pub(crate) fn collect_str(self, collector: &mut String) {
         (self.vtable.starlark_value.collect_str)(self.value, collector)
+    }
+
+    pub(crate) fn write_bounded_text(
+        self,
+        mode: ValueTextMode,
+        output: &mut dyn fmt::Write,
+    ) -> Option<fmt::Result> {
+        (self.vtable.starlark_value.write_bounded_text)(self.value, mode, output)
     }
 
     #[inline]

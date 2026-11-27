@@ -27,6 +27,7 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::ValueTextMode;
 use starlark::values::starlark_value;
 use starlark_map::StarlarkHasher;
 
@@ -56,6 +57,10 @@ impl StarlarkLabel {
     pub(crate) fn canonical(&self) -> &CanonicalLabel {
         &self.0
     }
+
+    fn write_repr(&self, output: &mut (impl fmt::Write + ?Sized)) -> fmt::Result {
+        write!(output, "Label(\"{}\")", self.0)
+    }
 }
 
 impl fmt::Display for StarlarkLabel {
@@ -73,9 +78,19 @@ impl<'v> StarlarkValue<'v> for StarlarkLabel {
     }
 
     fn collect_repr(&self, collector: &mut String) {
-        collector.push_str("Label(\"");
-        write!(collector, "{}", self.0).unwrap();
-        collector.push_str("\")");
+        self.write_repr(collector).unwrap();
+    }
+
+    fn write_bounded_text(
+        &self,
+        mode: ValueTextMode,
+        output: &mut dyn fmt::Write,
+    ) -> Option<fmt::Result> {
+        Some(if mode == ValueTextMode::Repr {
+            self.write_repr(output)
+        } else {
+            write!(output, "{}", self.0)
+        })
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {

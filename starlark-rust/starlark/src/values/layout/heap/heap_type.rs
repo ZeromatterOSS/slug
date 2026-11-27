@@ -39,6 +39,7 @@ use starlark_map::small_set::SmallSet;
 use crate::cast;
 use crate::cast::transmute;
 use crate::collections::StarlarkHashValue;
+use crate::eval::ExecutionBudget;
 use crate::eval::runtime::profile::instant::ProfilerInstant;
 use crate::values::AllocFrozenValue;
 use crate::values::AllocValue;
@@ -89,6 +90,7 @@ pub struct OwnedHeap {
     peak_allocated: Cell<usize>,
     arena: FastCell<Arena<Bump>>,
     str_interner: RefCell<StringValueInterner<'static>>,
+    execution_budget: Option<Arc<ExecutionBudget>>,
 }
 
 impl Debug for OwnedHeap {
@@ -106,10 +108,17 @@ impl Default for OwnedHeap {
 impl OwnedHeap {
     /// Create a new [`OwnedHeap`].
     pub fn new() -> Self {
+        Self::new_with_execution_budget(None)
+    }
+
+    pub(crate) fn new_with_execution_budget(
+        execution_budget: Option<Arc<ExecutionBudget>>,
+    ) -> Self {
         Self {
             peak_allocated: Default::default(),
             arena: Default::default(),
             str_interner: Default::default(),
+            execution_budget,
         }
     }
 
@@ -137,6 +146,11 @@ impl<'v> Debug for Heap<'v> {
 }
 
 impl<'v> Heap<'v> {
+    /// Monotone account shared by all cooperating heaps in this request.
+    pub fn execution_budget(self) -> Option<&'v ExecutionBudget> {
+        self.0.execution_budget.as_deref()
+    }
+
     /// Create a heap and use it within the closure
     ///
     /// Heap is discarded at the end of the closure.

@@ -47,6 +47,8 @@ pub use crate::any::ProvidesStaticType;
 pub use crate::coerce::Coerce;
 pub use crate::values::alloc_value::AllocFrozenValue;
 pub use crate::values::alloc_value::AllocValue;
+pub use crate::values::bounded_text::BoundedText;
+pub use crate::values::bounded_text::ValueTextMode;
 pub use crate::values::demand::Demand;
 pub use crate::values::error::ValueError;
 pub use crate::values::freeze::Freeze;
@@ -114,6 +116,7 @@ pub use crate::values::value_of_unchecked::ValueOfUnchecked;
 pub use crate::values::value_of_unchecked::ValueOfUncheckedGeneric;
 
 mod alloc_value;
+mod bounded_text;
 mod comparison;
 pub(crate) mod demand;
 pub(crate) mod error;
