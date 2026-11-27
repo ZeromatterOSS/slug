@@ -35,8 +35,9 @@ at exact and +1, physical page rounding and link inode charging. Complete-tree
 paths sealed at 4 MiB and refused +1 with full retirement. A matched archive
 reorder sealed 81,921 entries in one order and hit the 16 MiB history limit in
 the other. The body test sealed 1 GiB and independently refused +1 in the
-current tree and retained history. Nine native Archive checks passed. The
-standalone maximum-entry sampler and raw kernel quotas remain open.
+current tree and retained history. The standalone sampler admitted 131,072
+entries and refused one more. Fresh mounts enforced 2 GiB and 262,144 charged
+inodes. Twelve native checks close the Archive envelope.
 
 Repeated Workspace publication passed cold, warm, changed and restored inputs
 with contained runfiles and alias links. The readonly child verified prior
@@ -164,9 +165,9 @@ and justified public Rust cquery at a fresh unused destination. Independent
 final review precedes activation.
 
 The bounded six-archive gate and authored General glob cquery are accepted.
-The authentic inactive Rust driver, scoped HTTPS freshness and repeated
-Workspace publication gates have completed. Full Archive envelope, public
-Rust cquery, required public action comparison, Rust REAPI,
+The authentic inactive Rust driver, scoped HTTPS freshness, repeated Workspace
+publication and Archive envelope gates have completed. Public Rust cquery,
+required public action comparison, Rust REAPI,
 full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. Native credit,
 standalone timings and incomplete originals are each evidence for their own

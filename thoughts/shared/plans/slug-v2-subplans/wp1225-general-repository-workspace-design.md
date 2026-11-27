@@ -322,8 +322,12 @@ would retain at least 327,680 entry occurrences across four states, exceeding
 16 MiB in entry and path storage alone. Two verified dense archives and a File
 filled 1 GiB in both the complete tree and history, with a 24,982,778-byte peak
 retained charge. A new byte in the complete tree and a distinct retained byte
-in a smaller tree each gave its owning refusal and refunded the bank. The
-standalone entry sampler and raw kernel quotas remain open.
+in a smaller tree each gave its owning refusal and refunded the bank. The same
+launcher supplied a standalone sampler root. It accepted 131,072 entries at
+143,616 charged inodes and refused 131,073 after the extra directory succeeded.
+Separate mounts filled 2 GiB of pages and all 262,144 charged inode units.
+One more page or inode gave repeated `ENOSPC` with stable facts. All three
+roots closed their FDs and refunded the bank without transcript publication.
 
 Process snapshot bounds: **8192 entries INCLUDING root**, depth<=64 below root,
 each logical absolute demand/path<=4096 bytes (including display prefix), and

@@ -15,6 +15,8 @@ const MIB: u64 = 1024 * 1024;
 
 #[path = "archive_body_limit_tests.rs"]
 mod bodies;
+#[path = "archive_root_limit_tests.rs"]
+mod root_limits;
 #[path = "archive_tree_history_tests.rs"]
 mod tree_history;
 
@@ -81,7 +83,7 @@ impl ArchiveInput {
     }
 }
 
-fn command_scope(
+fn command_inputs(
     id: u64,
 ) -> (
     tempfile::TempDir,
@@ -90,9 +92,6 @@ fn command_scope(
     usize,
     Arc<SourceServiceScope>,
     tokio::runtime::Runtime,
-    RepositoryWorkspaceCommand,
-    i32,
-    RootIdentity,
 ) {
     let temporary = tempfile::tempdir().unwrap();
     let selected = reservation_with_limits(
@@ -112,6 +111,23 @@ fn command_scope(
         bank.clone(),
     )
     .unwrap();
+    (temporary, selected, bank, baseline, scope, runtime)
+}
+
+fn command_scope(
+    id: u64,
+) -> (
+    tempfile::TempDir,
+    Arc<RepositoryWorkspaceReservation>,
+    Arc<RepositoryRootResources>,
+    usize,
+    Arc<SourceServiceScope>,
+    tokio::runtime::Runtime,
+    RepositoryWorkspaceCommand,
+    i32,
+    RootIdentity,
+) {
+    let (temporary, selected, bank, baseline, scope, runtime) = command_inputs(id);
     let (command, fd, identity) = launch_archive(&selected, &bank, &scope, &runtime);
     (
         temporary, selected, bank, baseline, scope, runtime, command, fd, identity,

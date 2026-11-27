@@ -70,11 +70,7 @@ fn launch_archive(
     scope: &Arc<SourceServiceScope>,
     runtime: &tokio::runtime::Runtime,
 ) -> (RepositoryWorkspaceCommand, i32, RootIdentity) {
-    let launch =
-        BootstrapLaunch::new(selected.clone(), bank.clone(), scope.clone(), &|| true).unwrap();
-    let (builder, seed) = runtime
-        .block_on(process_owner::run(launch, platform(), &|| true))
-        .unwrap();
+    let (builder, seed) = bootstrap_archive(selected, bank, scope, runtime);
     let fd = builder.file.as_raw_fd();
     let identity = builder.identity;
     let command = RepositoryWorkspaceCommand::new(
@@ -89,6 +85,19 @@ fn launch_archive(
     .reserve_root(builder, seed, scope, &|| true)
     .unwrap();
     (command, fd, identity)
+}
+
+fn bootstrap_archive(
+    selected: &Arc<RepositoryWorkspaceReservation>,
+    bank: &Arc<RepositoryRootResources>,
+    scope: &Arc<SourceServiceScope>,
+    runtime: &tokio::runtime::Runtime,
+) -> (RepositoryPhysicalRootBuilder, InitialRepositoryMount) {
+    let launch =
+        BootstrapLaunch::new(selected.clone(), bank.clone(), scope.clone(), &|| true).unwrap();
+    runtime
+        .block_on(process_owner::run(launch, platform(), &|| true))
+        .unwrap()
 }
 fn apply(
     command: RepositoryWorkspaceCommand,
