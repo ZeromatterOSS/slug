@@ -77,6 +77,7 @@ pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i3
             );
         return run_daemon(
             &output_base,
+            &workspace,
             request,
             output,
             bzlmod,
@@ -161,6 +162,7 @@ fn capture_output(mode: &CqueryOutputMode) -> Result<CqueryOutput, String> {
 
 fn run_daemon(
     output_base: &str,
+    workspace: &std::path::Path,
     request: CqueryRequest,
     output: CqueryOutput,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
@@ -171,13 +173,12 @@ fn run_daemon(
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return emit_error(&error.to_string(), "daemon");
     }
-    let socket = match startup.daemon_socket(output_base) {
-        Ok(socket) => socket,
+    let daemon = match startup.daemon_connection(output_base, workspace) {
+        Ok(daemon) => daemon,
         Err(error) => return emit_error(&error.to_string(), "daemon"),
     };
-    match slug_server_v2::send_cquery_request(
-        &socket,
-        &slug_server_v2::CqueryRequest {
+    match daemon.send(slug_server_v2::DaemonRequest::Cquery(
+        slug_server_v2::CqueryRequest {
             expression: request.expression,
             include_implicit: request.include_implicit,
             include_tool: request.include_tool,
@@ -187,7 +188,7 @@ fn run_daemon(
             bzlmod,
             repository_environment,
         },
-    ) {
+    )) {
         Ok(response) => {
             print!("{}", response.stdout);
             if super::write_stderr(&response.stderr).is_err() {

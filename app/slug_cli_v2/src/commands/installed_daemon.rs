@@ -26,6 +26,8 @@ use std::time::Duration;
 use std::time::Instant;
 
 use anyhow::Context;
+use slug_server_v2::ManagedDaemonConnection;
+use slug_server_v2::ManagedWorkspace;
 
 use super::RuntimeStartup;
 
@@ -52,7 +54,24 @@ pub(super) fn pid_path(base: &Path) -> PathBuf {
     base.join(CONTROL).join(LIVE).join(PID)
 }
 
-pub(super) fn ensure(base: &Path) -> anyhow::Result<PathBuf> {
+pub(super) fn connect(base: &Path, workspace: &Path) -> anyhow::Result<ManagedDaemonConnection> {
+    let workspace = ManagedWorkspace::pin(
+        workspace,
+        open_workspace_root(Path::new("."))?,
+        open_workspace_root,
+    )?;
+    let socket = ensure(base, &workspace)?;
+    ManagedDaemonConnection::connect(&socket, workspace)
+}
+
+fn open_workspace_root(workspace: &Path) -> io::Result<File> {
+    OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(workspace)
+}
+
+fn ensure(base: &Path, workspace: &ManagedWorkspace) -> anyhow::Result<PathBuf> {
     let base = protected_base(base)?;
     let socket = socket_path(&base);
     let deadline = Instant::now() + DEADLINE;
@@ -63,19 +82,19 @@ pub(super) fn ensure(base: &Path) -> anyhow::Result<PathBuf> {
         }
         // The current child may still be publishing or may have failed before
         // bind. A vacant lock permits another exact-child startup attempt.
-        if lock_vacant(&base)? && start(&base, deadline)? {
+        if lock_vacant(&base)? && start(&base, workspace, deadline)? {
             return Ok(socket);
         }
         std::thread::sleep(left.min(Duration::from_millis(20)));
     }
 }
 
-fn start(base: &Path, deadline: Instant) -> anyhow::Result<bool> {
+fn start(base: &Path, workspace: &ManagedWorkspace, deadline: Instant) -> anyhow::Result<bool> {
     let (parent, child) = UnixStream::pair()?;
     let mut child = Command::new("/proc/self/exe")
         .arg(CHILD_ROLE)
         .arg(base)
-        .arg(std::env::current_dir()?)
+        .arg(workspace.path())
         .stdin(Stdio::from(OwnedFd::from(child)))
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -87,12 +106,9 @@ fn start(base: &Path, deadline: Instant) -> anyhow::Result<bool> {
     };
     let mut committed = false;
     let result = (|| {
-        match channel.receive()? {
-            BUSY => return Ok(false),
-            BOUND => {}
-            _ => anyhow::bail!("unexpected installed daemon pre-commit status"),
+        if !commit_child_binding(workspace, &mut channel)? {
+            return Ok(false);
         }
-        channel.send(COMMIT, "")?;
         committed = true;
         anyhow::ensure!(
             channel.receive()? == READY,
@@ -129,6 +145,20 @@ fn start(base: &Path, deadline: Instant) -> anyhow::Result<bool> {
     }
 }
 
+fn commit_child_binding(
+    workspace: &ManagedWorkspace,
+    channel: &mut Channel,
+) -> anyhow::Result<bool> {
+    match channel.receive()? {
+        BUSY => return Ok(false),
+        BOUND => {}
+        _ => anyhow::bail!("unexpected installed daemon pre-commit status"),
+    }
+    workspace.require_peer_binding(channel)?;
+    channel.send(COMMIT, "")?;
+    Ok(true)
+}
+
 pub(super) fn child(args: &[String]) -> anyhow::Result<()> {
     let stream = take_channel()?;
     let mut channel = Channel {
@@ -141,7 +171,7 @@ pub(super) fn child(args: &[String]) -> anyhow::Result<()> {
             "invalid installed daemon startup arguments"
         )),
     };
-    let (listener, socket, runtime, _generation) = match prepared {
+    let (listener, socket, runtime, workspace, _generation) = match prepared {
         Ok(Some(prepared)) => prepared,
         Ok(None) => return Ok(()),
         Err(error) => {
@@ -156,13 +186,14 @@ pub(super) fn child(args: &[String]) -> anyhow::Result<()> {
     };
     let _ = channel.send(READY, "");
     drop(channel);
-    slug_server_v2::serve_published_listener(listener, &socket, runtime)
+    slug_server_v2::serve_managed_listener(listener, &socket, runtime, workspace)
 }
 
 type Prepared = (
     UnixListener,
     PathBuf,
     slug_core_v2::runtime::WorkspaceRuntime,
+    ManagedWorkspace,
     Generation,
 );
 
@@ -189,9 +220,15 @@ fn prepare(
         Err(fs::TryLockError::Error(error)) => return Err(error.into()),
     }
 
+    let workspace = ManagedWorkspace::pin(
+        workspace,
+        open_workspace_root(workspace)?,
+        open_workspace_root,
+    )?;
     let runtime = RuntimeStartup::Installed
-        .new_runtime(workspace)
+        .new_runtime(workspace.path())
         .map_err(anyhow::Error::msg)?;
+    workspace.require_runtime_workspace(runtime.workspace())?;
     let stage = control.join(STAGE);
     let live = control.join(LIVE);
     // Only the lifetime lock holder may retire a previous generation. Socket
@@ -207,8 +244,14 @@ fn prepare(
     let listener =
         UnixListener::bind(generation.path.join(SOCKET)).context("binding installed daemon")?;
     write_pid(&generation.path)?;
-    generation.commit(live, channel)?;
-    Ok(Some((listener, socket_path(&base), runtime, generation)))
+    generation.commit(live, channel, &workspace, runtime.workspace())?;
+    Ok(Some((
+        listener,
+        socket_path(&base),
+        runtime,
+        workspace,
+        generation,
+    )))
 }
 
 fn write_pid(stage: &Path) -> anyhow::Result<()> {
@@ -250,13 +293,13 @@ struct Channel {
 impl Channel {
     fn send(&mut self, kind: u8, text: &str) -> io::Result<()> {
         let [high, low] = (text.len() as u16).to_be_bytes();
-        self.write(&[1, kind, high, low])?;
-        self.write(text.as_bytes())
+        self.write_all(&[1, kind, high, low])?;
+        self.write_all(text.as_bytes())
     }
 
     fn receive(&mut self) -> anyhow::Result<u8> {
         let mut header = [0; 4];
-        self.read(&mut header)?;
+        self.read_exact(&mut header)?;
         let [version, kind, high, low] = header;
         let len = usize::from(u16::from_be_bytes([high, low]));
         anyhow::ensure!(
@@ -268,48 +311,30 @@ impl Channel {
         );
         if kind == FAILED {
             let mut bytes = [0; MAX_FAILURE_BYTES];
-            self.read(&mut bytes[..len])?;
+            self.read_exact(&mut bytes[..len])?;
             anyhow::bail!("{}", std::str::from_utf8(&bytes[..len])?);
         }
         Ok(kind)
     }
+}
 
-    fn read(&mut self, mut bytes: &mut [u8]) -> io::Result<()> {
-        while !bytes.is_empty() {
-            self.stream
-                .set_read_timeout(Some(remaining(self.deadline)?))?;
-            match self.stream.read(bytes) {
-                Ok(0) => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::UnexpectedEof,
-                        "installed daemon startup channel closed",
-                    ));
-                }
-                Ok(count) => bytes = &mut bytes[count..],
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-                Err(error) => return Err(error),
-            }
-        }
-        Ok(())
+impl Read for Channel {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        self.stream
+            .set_read_timeout(Some(remaining(self.deadline)?))?;
+        self.stream.read(bytes)
+    }
+}
+
+impl Write for Channel {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.stream
+            .set_write_timeout(Some(remaining(self.deadline)?))?;
+        self.stream.write(bytes)
     }
 
-    fn write(&mut self, mut bytes: &[u8]) -> io::Result<()> {
-        while !bytes.is_empty() {
-            self.stream
-                .set_write_timeout(Some(remaining(self.deadline)?))?;
-            match self.stream.write(bytes) {
-                Ok(0) => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::WriteZero,
-                        "installed daemon startup channel closed",
-                    ));
-                }
-                Ok(count) => bytes = &bytes[count..],
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-                Err(error) => return Err(error),
-            }
-        }
-        Ok(())
+    fn flush(&mut self) -> io::Result<()> {
+        self.stream.flush()
     }
 }
 
@@ -550,12 +575,20 @@ struct Generation {
 }
 
 impl Generation {
-    fn commit(&mut self, live: PathBuf, channel: &mut Channel) -> anyhow::Result<()> {
+    fn commit(
+        &mut self,
+        live: PathBuf,
+        channel: &mut Channel,
+        workspace: &ManagedWorkspace,
+        runtime_workspace: &Path,
+    ) -> anyhow::Result<()> {
         channel.send(BOUND, "")?;
+        workspace.write_binding(channel)?;
         anyhow::ensure!(
             channel.receive()? == COMMIT,
             "invalid installed daemon commit"
         );
+        workspace.require_runtime_workspace(runtime_workspace)?;
         publish(&self.path, &live)?;
         self.path = live;
         Ok(())
@@ -627,16 +660,29 @@ mod tests {
         )
     }
 
+    fn pin_workspace(path: &Path) -> ManagedWorkspace {
+        ManagedWorkspace::pin(
+            path,
+            open_workspace_root(path).unwrap(),
+            open_workspace_root,
+        )
+        .unwrap()
+    }
+
     #[test]
     fn commit_publishes_the_bound_listener_and_pid_as_one_generation() {
         let root = TestRoot::new();
         let (mut generation, listener) = root.stage();
         let live = root.0.join(LIVE);
         let (mut parent, mut child) = channel_pair();
+        let workspace = pin_workspace(&root.0);
         assert!(!live.exists());
         parent.send(COMMIT, "").unwrap();
-        generation.commit(live.clone(), &mut child).unwrap();
+        generation
+            .commit(live.clone(), &mut child, &workspace, workspace.path())
+            .unwrap();
         assert_eq!(parent.receive().unwrap(), BOUND);
+        workspace.require_peer_binding(&mut parent).unwrap();
         assert_eq!(fs::read(live.join(PID)).unwrap(), b"123");
         UnixStream::connect(live.join(SOCKET)).unwrap();
         let contender = open_lock(&root.0, false).unwrap();
@@ -656,12 +702,46 @@ mod tests {
         let (mut generation, listener) = root.stage();
         let live = root.0.join(LIVE);
         let (mut parent, mut child) = channel_pair();
+        let workspace = pin_workspace(&root.0);
         parent.stream.shutdown(Shutdown::Write).unwrap();
-        assert!(generation.commit(live.clone(), &mut child).is_err());
+        assert!(
+            generation
+                .commit(live.clone(), &mut child, &workspace, workspace.path())
+                .is_err()
+        );
         assert_eq!(parent.receive().unwrap(), BOUND);
+        workspace.require_peer_binding(&mut parent).unwrap();
         assert!(!live.exists());
         drop(listener);
         drop(generation);
+        assert!(!root.0.join(STAGE).exists());
+    }
+
+    #[test]
+    fn parent_refuses_replacement_workspace_before_commit() {
+        let root = TestRoot::new();
+        let (mut generation, listener) = root.stage();
+        let workspace = root.0.join("workspace");
+        fs::create_dir(&workspace).unwrap();
+        let expected = pin_workspace(&workspace);
+        fs::rename(&workspace, root.0.join("moved")).unwrap();
+        fs::create_dir(&workspace).unwrap();
+        let actual = pin_workspace(&workspace);
+        assert_eq!(expected.path(), actual.path());
+
+        let live = root.0.join(LIVE);
+        let child_live = live.clone();
+        let (mut parent, mut child) = channel_pair();
+        let worker = std::thread::spawn(move || {
+            let result = generation.commit(child_live, &mut child, &actual, actual.path());
+            drop(listener);
+            result
+        });
+        let error = commit_child_binding(&expected, &mut parent).unwrap_err();
+        assert_eq!(error.to_string(), "managed daemon workspace mismatch");
+        drop(parent);
+        assert!(worker.join().unwrap().is_err());
+        assert!(!live.exists());
         assert!(!root.0.join(STAGE).exists());
     }
 
@@ -706,7 +786,7 @@ mod tests {
     fn oversized_failure_frame_is_rejected_before_reading_payload() {
         let (mut parent, mut child) = channel_pair();
         let [high, low] = ((MAX_FAILURE_BYTES + 1) as u16).to_be_bytes();
-        child.write(&[1, FAILED, high, low]).unwrap();
+        child.write_all(&[1, FAILED, high, low]).unwrap();
         assert!(
             parent
                 .receive()

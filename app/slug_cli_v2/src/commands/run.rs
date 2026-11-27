@@ -76,6 +76,7 @@ pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i3
             );
         return run_daemon(
             &output_base,
+            &workspace,
             request,
             bzlmod,
             repository_environment,
@@ -141,6 +142,7 @@ pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i3
 
 fn run_daemon(
     output_base: &str,
+    workspace: &Path,
     request: RunRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
@@ -151,8 +153,8 @@ fn run_daemon(
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return run_error(&error.to_string(), "daemon", 2);
     }
-    let socket = match startup.daemon_socket(output_base) {
-        Ok(socket) => socket,
+    let daemon = match startup.daemon_connection(output_base, workspace) {
+        Ok(daemon) => daemon,
         Err(error) => return run_error(&error.to_string(), "daemon", 2),
     };
     let daemon_request = slug_server_v2::BuildRequest {
@@ -162,7 +164,7 @@ fn run_daemon(
         bzlmod,
         repository_environment,
     };
-    match slug_server_v2::send_run_request(&socket, &daemon_request) {
+    match daemon.send(slug_server_v2::DaemonRequest::Run(daemon_request)) {
         Ok(response) => finish_build(
             response.exit_code,
             response.stdout,

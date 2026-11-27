@@ -103,6 +103,7 @@ pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i3
             );
         return run_daemon_build(
             &output_base,
+            &workspace,
             request,
             bzlmod,
             repository_environment,
@@ -327,6 +328,7 @@ pub(super) fn extract_output_base(argv: &[String]) -> Option<String> {
 /// builds so `.bzl` edits are invalidated and replayed in the same process.
 fn run_daemon_build(
     output_base: &str,
+    workspace: &std::path::Path,
     request: BuildRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
@@ -335,8 +337,8 @@ fn run_daemon_build(
 ) -> i32 {
     let output_base_path = std::path::Path::new(output_base);
     let _ = std::fs::create_dir_all(output_base_path);
-    let socket = match startup.daemon_socket(output_base_path) {
-        Ok(socket) => socket,
+    let daemon = match startup.daemon_connection(output_base_path, workspace) {
+        Ok(daemon) => daemon,
         Err(error) => {
             eprintln!(
                 "{{\"error\":\"daemon_start_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\"}}",
@@ -354,7 +356,7 @@ fn run_daemon_build(
         repository_environment,
     };
 
-    match slug_server_v2::send_build_request(&socket, &daemon_request) {
+    match daemon.send(slug_server_v2::DaemonRequest::Build(daemon_request)) {
         Ok(response) => {
             if !response.stdout.is_empty() {
                 print!("{}", response.stdout);

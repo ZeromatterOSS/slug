@@ -1016,6 +1016,10 @@ pub use server::CqueryOutput;
 pub use server::CqueryRequest;
 pub use server::DaemonRequest;
 pub use server::DaemonResponse;
+#[cfg(target_os = "linux")]
+pub use server::ManagedDaemonConnection;
+#[cfg(target_os = "linux")]
+pub use server::ManagedWorkspace;
 pub use server::QueryRequest;
 pub use server::RUN_ENVIRONMENT_TO_CLEAR;
 pub use server::RemoteRequest;
@@ -1030,6 +1034,8 @@ pub use server::send_query_request;
 pub use server::send_run_request;
 pub use server::send_shutdown;
 pub use server::serve;
+#[cfg(target_os = "linux")]
+pub use server::serve_managed_listener;
 pub use server::serve_published_listener;
 pub use server::socket_path;
 

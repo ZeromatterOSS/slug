@@ -33,6 +33,46 @@ use slug_commands_v2::CommandPlaceholderError;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::WorkspaceRuntime;
+use slug_server_v2::DaemonRequest;
+use slug_server_v2::DaemonResponse;
+
+enum DaemonConnection {
+    Generic(PathBuf),
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    Managed(slug_server_v2::ManagedDaemonConnection),
+}
+
+impl DaemonConnection {
+    fn send(self, request: DaemonRequest) -> anyhow::Result<DaemonResponse> {
+        match self {
+            Self::Generic(socket) => match request {
+                DaemonRequest::Build(request) => {
+                    slug_server_v2::send_build_request(&socket, &request)
+                }
+                DaemonRequest::Run(request) => slug_server_v2::send_run_request(&socket, &request),
+                DaemonRequest::Query(request) => {
+                    slug_server_v2::send_query_request(&socket, &request)
+                }
+                DaemonRequest::Aquery(request) => {
+                    slug_server_v2::send_aquery_request(&socket, &request)
+                }
+                DaemonRequest::Cquery(request) => {
+                    slug_server_v2::send_cquery_request(&socket, &request)
+                }
+            },
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            Self::Managed(connection) => connection.send(request),
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(crate) enum RuntimeStartup {
@@ -79,7 +119,11 @@ impl RuntimeStartup {
         }
     }
 
-    fn daemon_socket(self, output_base: &Path) -> anyhow::Result<PathBuf> {
+    fn daemon_connection(
+        self,
+        output_base: &Path,
+        _workspace: &Path,
+    ) -> anyhow::Result<DaemonConnection> {
         // Keep an existing daemon's authority tied to its startup policy.
         match self {
             Self::Generic => {
@@ -87,14 +131,16 @@ impl RuntimeStartup {
                 if std::os::unix::net::UnixStream::connect(&socket).is_err() {
                     build::start_daemon(output_base)?;
                 }
-                Ok(socket)
+                Ok(DaemonConnection::Generic(socket))
             }
             #[cfg(all(
                 target_os = "linux",
                 target_arch = "x86_64",
                 target_pointer_width = "64"
             ))]
-            Self::Installed => installed_daemon::ensure(output_base),
+            Self::Installed => {
+                installed_daemon::connect(output_base, _workspace).map(DaemonConnection::Managed)
+            }
         }
     }
 }

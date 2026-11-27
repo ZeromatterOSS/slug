@@ -3660,3 +3660,122 @@ fn cquery_distdirs_round_trip_defaults_and_normalize_per_request() {
 fn stderr_text(bytes: &[u8]) -> &str {
     std::str::from_utf8(bytes).expect("this fixture expects text-only stderr")
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn managed_listener_checks_the_retained_workspace_on_the_command_stream() {
+    use std::io::Read;
+    use std::io::Write;
+    use std::net::Shutdown;
+    use std::os::unix::net::UnixListener;
+    use std::os::unix::net::UnixStream;
+
+    use slug_core_v2::runtime::ProcessHostOwner;
+    use slug_core_v2::runtime::WorkspaceRuntime;
+
+    fn open_directory(path: &Path) -> std::io::Result<fs::File> {
+        // The fixture owns its path mutations and never replaces a directory
+        // with a special file. Production supplies its O_PATH opener.
+        let file = fs::File::open(path)?;
+        if !file.metadata()?.is_dir() {
+            return Err(std::io::Error::other("expected fixture directory"));
+        }
+        Ok(file)
+    }
+
+    let home = tempfile::tempdir().unwrap();
+    let fixture = FixtureWorkspace::new("query-path-topology").unwrap();
+    let workspace = fixture.path().to_path_buf();
+    let retired = tempfile::tempdir_in(workspace.parent().unwrap()).unwrap();
+    let moved = retired.path().join("moved");
+    let foreign = tempfile::tempdir().unwrap();
+    let socket = home.path().join("s");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let server_path = socket.clone();
+    let server_workspace = workspace.clone();
+    let server = std::thread::spawn(move || {
+        let runtime = WorkspaceRuntime::new(&server_workspace, ProcessHostOwner::native()).unwrap();
+        let workspace = crate::ManagedWorkspace::pin(
+            runtime.workspace(),
+            open_directory(runtime.workspace()).unwrap(),
+            open_directory,
+        )
+        .unwrap();
+        crate::serve_managed_listener(listener, &server_path, runtime, workspace).unwrap();
+    });
+    let connect = |path: &Path| {
+        let workspace =
+            crate::ManagedWorkspace::pin(path, open_directory(path).unwrap(), open_directory)
+                .unwrap();
+        crate::ManagedDaemonConnection::connect(&socket, workspace)
+    };
+    let query = || {
+        DaemonRequest::Query(QueryRequest {
+            expression: "allpaths(//:linear_start, //:linear_end)".into(),
+            order_output: "full".into(),
+            output: "label".into(),
+            graph_factored: true,
+            strict_test_suite: false,
+            bzlmod: Default::default(),
+            repository_environment: Default::default(),
+        })
+    };
+    let cold = connect(&workspace).unwrap().send(query()).unwrap();
+    assert_eq!(cold.exit_code, 0, "{cold:?}");
+    assert_eq!(
+        cold.stdout,
+        "//:linear_start\n//:linear_mid\n//:linear_end\n"
+    );
+    assert!(cold.stderr.is_empty());
+
+    let mismatch = |path: &Path| {
+        let error = connect(path).err().expect("foreign workspace refused");
+        assert_eq!(error.to_string(), "managed daemon workspace mismatch");
+    };
+    mismatch(foreign.path());
+
+    // Empty readiness probes and the legacy raw command body carry no
+    // workspace proof. The managed listener must not dispatch either.
+    drop(UnixStream::connect(&socket).unwrap());
+    let mut raw = UnixStream::connect(&socket).unwrap();
+    raw.write_all(b"{").unwrap();
+    raw.shutdown(Shutdown::Write).unwrap();
+    let mut refusal = [0; 5];
+    raw.read_exact(&mut refusal).unwrap();
+    assert_eq!(&refusal, b"SWK\x01\x01");
+
+    // The old stream was admitted while A still occupied this name. Swap the
+    // binding before sending its body, then also try new connections to both
+    // physical directories. Neither route may use the old retained runtime.
+    let admitted = connect(&workspace).unwrap();
+    fs::rename(&workspace, &moved).unwrap();
+    fs::create_dir(&workspace).unwrap();
+    let stale = admitted.send(query()).unwrap();
+    assert_eq!(stale.exit_code, 2);
+    assert!(stale.stdout.is_empty());
+    assert_eq!(stale.invalidated_files, 0);
+    assert_eq!(
+        stale.stderr,
+        b"{\"error\":\"daemon_workspace_binding_changed\"}\n"
+    );
+    mismatch(&workspace);
+    mismatch(&moved);
+
+    fs::remove_dir(&workspace).unwrap();
+    fs::rename(&moved, &workspace).unwrap();
+    let warm = connect(&workspace).unwrap().send(query()).unwrap();
+    assert_eq!(warm.exit_code, 0, "{warm:?}");
+    assert_eq!(warm.stdout, cold.stdout);
+    assert_eq!(warm.invalidated_files, 0);
+    assert!(warm.stderr.is_empty());
+
+    // The owner can retire its server after the workspace binding is stale.
+    fs::rename(&workspace, &moved).unwrap();
+    crate::send_shutdown(&socket).unwrap();
+    server.join().unwrap();
+    fs::rename(&moved, &workspace).unwrap();
+    assert!(
+        socket.exists(),
+        "managed listener leaves pathname cleanup to its owner"
+    );
+}

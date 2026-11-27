@@ -623,6 +623,12 @@ pub type BuildResponse = DaemonResponse;
 #[cfg(test)]
 mod formatter_input_tests;
 mod frame;
+#[cfg(target_os = "linux")]
+mod managed_workspace;
+#[cfg(target_os = "linux")]
+pub use managed_workspace::ManagedDaemonConnection;
+#[cfg(target_os = "linux")]
+pub use managed_workspace::ManagedWorkspace;
 
 /// Run the daemon server on the given Unix socket path. Blocks until a
 /// `shutdown` request is received or the process is killed.
@@ -635,7 +641,14 @@ fn serve_daemon(socket_path: &Path, daemon: Daemon) -> anyhow::Result<()> {
     let _ = std::fs::remove_file(socket_path);
     let listener = UnixListener::bind(socket_path)
         .with_context(|| format!("binding daemon socket {}", socket_path.display()))?;
-    serve_listener(listener, socket_path, daemon, true)
+    serve_listener(
+        listener,
+        socket_path,
+        daemon,
+        true,
+        #[cfg(target_os = "linux")]
+        None,
+    )
 }
 
 /// Serve an already published listener. The caller owns path retirement.
@@ -650,7 +663,31 @@ pub fn serve_published_listener(
         #[cfg(test)]
         None,
     );
-    serve_listener(listener, socket_path, daemon, false)
+    serve_listener(
+        listener,
+        socket_path,
+        daemon,
+        false,
+        #[cfg(target_os = "linux")]
+        None,
+    )
+}
+
+#[cfg(target_os = "linux")]
+#[doc(hidden)]
+pub fn serve_managed_listener(
+    listener: UnixListener,
+    socket_path: &Path,
+    runtime: slug_core_v2::runtime::WorkspaceRuntime,
+    workspace: ManagedWorkspace,
+) -> anyhow::Result<()> {
+    workspace.require_runtime_workspace(runtime.workspace())?;
+    let daemon = Daemon::from_runtime(
+        runtime,
+        #[cfg(test)]
+        None,
+    );
+    serve_listener(listener, socket_path, daemon, false, Some(&workspace))
 }
 
 fn serve_listener(
@@ -658,6 +695,7 @@ fn serve_listener(
     socket_path: &Path,
     mut daemon: Daemon,
     unlink_on_shutdown: bool,
+    #[cfg(target_os = "linux")] binding: Option<&ManagedWorkspace>,
 ) -> anyhow::Result<()> {
     eprintln!(
         "{{\"daemon\":\"started\",\"socket\":\"{}\"}}",
@@ -665,7 +703,24 @@ fn serve_listener(
     );
     for stream in listener.incoming() {
         let mut stream = stream.context("accepting daemon connection")?;
-        let line = match read_line(&mut stream) {
+        #[cfg(target_os = "linux")]
+        let line = if let Some(workspace) = binding {
+            match workspace.admit(&mut stream) {
+                Ok(managed_workspace::Ingress::Shutdown) => {
+                    eprintln!("{{\"daemon\":\"shutdown\"}}");
+                    return Ok(());
+                }
+                Ok(managed_workspace::Ingress::Request(deadline)) => {
+                    managed_workspace::read_request(&mut stream, deadline)
+                }
+                Ok(managed_workspace::Ingress::Closed) | Err(_) => continue,
+            }
+        } else {
+            read_line(&mut stream)
+        };
+        #[cfg(not(target_os = "linux"))]
+        let line = read_line(&mut stream);
+        let line = match line {
             Ok(line) => line,
             Err(error) => {
                 eprintln!("{{\"daemon\":\"read_error\",\"message\":\"{error}\"}}");
@@ -679,6 +734,11 @@ fn serve_listener(
             eprintln!("{{\"daemon\":\"shutdown\"}}");
             return Ok(());
         }
+        #[cfg(target_os = "linux")]
+        let response = binding
+            .and_then(ManagedWorkspace::stale_response)
+            .unwrap_or_else(|| handle_request(&mut daemon, &line));
+        #[cfg(not(target_os = "linux"))]
         let response = handle_request(&mut daemon, &line);
         let Ok(json) = frame::response(&response, frame::MAX_FRAME_BYTES) else {
             continue;
