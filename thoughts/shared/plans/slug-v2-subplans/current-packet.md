@@ -34,11 +34,17 @@ The pinned default build passed 129 focused tests, five native guards and the
 six-archive gate in 9.38 seconds. Core/Bzlmod test and CLI builds took 37.51
 and 95.06 seconds. The 5.07-second offline Bazel repin changed only the catalog
 checksum across 503 identical records. The fresh no-repin check took 1.00 second.
-The next authentic run reached 834 computes, 55 roots and 117 records, including
-File 7, before SourceWorkDeadline, then retired to the exact baseline.
-Measure the remaining acquisition, capture and repeated request work before
-selecting another change. Preserve codec roundtrips, rooted comparisons and
-history checks.
+The new profile reached 834 computes, 55 roots and 117 records, including
+File 7. Follow-up attribution stopped at the same frontier during File 8's
+snapshot. Six archive acquisitions took 3.28 seconds and closed-file
+verification took 0.079 seconds. Completed filesystem captures spent 0.755
+of 0.770 seconds comparing prior bodies after 0.004 seconds in operations.
+The follow-up Core build took 69.51 seconds. All 28 focused tests and five native
+guards passed, and the 27.12-second original retired to 168 retained bytes,
+zero FDs and zero backing. The report used 130,095 of 524,288 bytes.
+Discriminate repeated full-block decoding and registration row work before
+selecting another change. Preserve exact rooted comparisons, codec roundtrips
+and history checks.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,

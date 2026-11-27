@@ -1241,6 +1241,14 @@ and preservation of existing mapped counters. The existing ignored original
 frontier supplies bounded attribution under unchanged inputs/caps/clocks; a
 stopped probe remains no public-command or memory-ratio proof.
 
+The native workspace observer shares the same ceiling. Its 4 KiB slice comes
+from the event allowance. Keep fixed synchronous wall intervals for Archive
+acquisition, closed-FD verification, rooted extraction, and snapshot completion.
+Start filesystem operation and snapshot spans after exact replay. Separate
+completed and aborted snapshots for both owners, with prior comparison and
+builder append nested in capture and record completion measured separately.
+Requested bytes describe the work presented to each owner, including refusals.
+
 The [result-cutoff receipt](wp1225-materialization-cutoff-acceptance-2026-11-08.json)
 joins attribution, the selected causal regression and the semantic cutoff below.
 Use observed reachability plus a causal regression before subsequent graph

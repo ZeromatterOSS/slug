@@ -20,6 +20,16 @@ pub(crate) enum Stage {
     ArchiveCapture,
     ArchiveExtract,
     ArchiveSnapshot,
+    ArchiveAcquire,
+    ArchiveVerifyCapture,
+    FilesystemOperation,
+    FilesystemSnapshot,
+}
+
+#[derive(Clone, Copy)]
+enum SnapshotKind {
+    Archive,
+    Filesystem,
 }
 
 impl Stage {
@@ -35,9 +45,17 @@ impl Stage {
             | RepositoryWorkspaceOperation::Delete(_) => Self::Filesystem,
         }
     }
+
+    fn snapshot_kind(self) -> Option<SnapshotKind> {
+        match self {
+            Self::ArchiveSnapshot => Some(SnapshotKind::Archive),
+            Self::FilesystemSnapshot => Some(SnapshotKind::Filesystem),
+            _ => None,
+        }
+    }
 }
 
-const LABELS: [&str; 9] = [
+const LABELS: [&str; 13] = [
     "preflight",
     "reserve_and_initialize",
     "source_snapshot",
@@ -47,6 +65,10 @@ const LABELS: [&str; 9] = [
     "archive_verified_capture",
     "archive_rooted_extract",
     "archive_snapshot_and_record",
+    "archive_acquire",
+    "archive_verify_closed_capture",
+    "filesystem_operation",
+    "filesystem_snapshot_and_record",
 ];
 
 #[derive(Default)]
@@ -55,7 +77,7 @@ pub(super) struct Totals {
     rows: [[u64; 4]; LABELS.len()],
     invalid: bool,
     xz: [xz_calls::Work; 2],
-    snapshot: [snapshot_work::Work; 2],
+    snapshots: [[snapshot_work::Work; 2]; 2],
 }
 
 impl Totals {
@@ -72,6 +94,18 @@ impl Totals {
         }
     }
 
+    fn snapshot_report(&self, kind: SnapshotKind) -> Value {
+        let [completed, aborted] = self.snapshots[kind as usize];
+        json!({
+            "phases": snapshot_work::LABELS,
+            "columns": ["calls", "wall_ns", "requested_bytes"],
+            "completed_snapshots": completed.rows,
+            "aborted_snapshots": aborted.rows,
+            "invalid_clock_or_overflow": completed.invalid || aborted.invalid,
+            "compare_and_append_nested_in_capture": true,
+        })
+    }
+
     pub(super) fn report(&self) -> Value {
         json!({
             "stages": LABELS,
@@ -80,6 +114,8 @@ impl Totals {
             "invalid_clock_or_overflow": self.invalid,
             "dispatch_completion_includes_replay": true,
             "archive_substages_are_nested_and_exclude_replay": true,
+            "archive_acquire_and_verify_are_nested_in_verified_capture": true,
+            "filesystem_substages_are_nested_and_exclude_replay": true,
             "overlaps_outer_progress_wall": true,
             "archive_stages_use_probe_thread": true,
             "xz_calls_within_rooted_extract": {
@@ -89,14 +125,8 @@ impl Totals {
                 "invalid_clock_counts_or_buffer_deltas": self.xz.iter().any(|work| work.invalid),
                 "decode_intervals_include_buffer_bookkeeping": true,
             },
-            "archive_snapshot_work": {
-                "phases": snapshot_work::LABELS,
-                "columns": ["calls", "wall_ns", "requested_bytes"],
-                "completed_snapshots": self.snapshot[0].rows,
-                "aborted_snapshots": self.snapshot[1].rows,
-                "invalid_clock_or_overflow": self.snapshot.iter().any(|work| work.invalid),
-                "compare_and_append_nested_in_capture": true,
-            },
+            "archive_snapshot_work": self.snapshot_report(SnapshotKind::Archive),
+            "filesystem_snapshot_work": self.snapshot_report(SnapshotKind::Filesystem),
         })
     }
 }
@@ -110,7 +140,7 @@ pub(crate) struct Span<'a> {
     start: Instant,
     completed: bool,
     xz: Option<xz_calls::Scope>,
-    snapshot: Option<snapshot_work::Scope>,
+    snapshot: Option<(SnapshotKind, snapshot_work::Scope)>,
 }
 
 impl<'a> Span<'a> {
@@ -121,7 +151,9 @@ impl<'a> Span<'a> {
             start: Instant::now(),
             completed: false,
             xz: matches!(stage, Stage::ArchiveExtract).then(xz_calls::Scope::begin),
-            snapshot: matches!(stage, Stage::ArchiveSnapshot).then(snapshot_work::Scope::begin),
+            snapshot: stage
+                .snapshot_kind()
+                .map(|kind| (kind, snapshot_work::Scope::begin())),
         }
     }
 
@@ -136,7 +168,10 @@ impl Drop for Span<'_> {
             .checked_duration_since(self.start)
             .and_then(|duration| u64::try_from(duration.as_nanos()).ok());
         let xz_work = self.xz.take().map(xz_calls::Scope::finish);
-        let snapshot_work = self.snapshot.take().map(snapshot_work::Scope::finish);
+        let snapshot_work = self
+            .snapshot
+            .take()
+            .map(|(kind, scope)| (kind, scope.finish()));
         let mut totals = self
             .totals
             .lock()
@@ -145,8 +180,8 @@ impl Drop for Span<'_> {
         if let Some(work) = xz_work {
             totals.xz[usize::from(!self.completed)].merge(work);
         }
-        if let Some(work) = snapshot_work {
-            totals.snapshot[usize::from(!self.completed)].merge(work);
+        if let Some((kind, work)) = snapshot_work {
+            totals.snapshots[kind as usize][usize::from(!self.completed)].merge(work);
         }
     }
 }
@@ -217,7 +252,7 @@ fn workspace_progress_folds_only_in_scope_lib_lzma_calls_into_extract_outcomes()
 }
 
 #[test]
-fn workspace_progress_snapshot_work_stays_in_the_archive_and_outcome_that_started_it() {
+fn workspace_progress_snapshot_work_stays_in_the_operation_and_outcome_that_started_it() {
     use snapshot_work::Phase;
     use snapshot_work::span;
 
@@ -238,19 +273,39 @@ fn workspace_progress_snapshot_work_stays_in_the_archive_and_outcome_that_starte
         let _capture = span(Phase::Capture, 0).unwrap();
         drop(span(Phase::BuilderAppend, 56).unwrap());
     }
+    let snapshot = Span::start(&totals, Stage::FilesystemSnapshot);
+    {
+        let _capture = span(Phase::Capture, 0).unwrap();
+        drop(span(Phase::PriorCompare, 78).unwrap());
+    }
+    drop(span(Phase::Record, 0).unwrap());
+    snapshot.finish();
+    {
+        let _snapshot = Span::start(&totals, Stage::FilesystemSnapshot);
+        let _capture = span(Phase::Capture, 0).unwrap();
+        drop(span(Phase::PriorCompare, 90).unwrap());
+    }
     assert!(span(Phase::Capture, 0).is_none());
 
     let totals = totals.into_inner().unwrap();
-    let [complete, abort] = totals.snapshot;
-    assert!(!complete.invalid && !abort.invalid);
+    let [[archive, archive_abort], [filesystem, filesystem_abort]] = totals.snapshots;
+    assert!(totals.snapshots.iter().flatten().all(|work| !work.invalid));
     let calls_and_bytes = |rows: [[u64; 3]; 4]| rows.map(|[calls, _, bytes]| (calls, bytes));
     assert_eq!(
-        calls_and_bytes(complete.rows),
+        calls_and_bytes(archive.rows),
         [(1, 0), (1, 0), (1, 12), (1, 34)]
     );
     assert_eq!(
-        calls_and_bytes(abort.rows),
+        calls_and_bytes(archive_abort.rows),
         [(1, 0), (0, 0), (0, 0), (1, 56)]
+    );
+    assert_eq!(
+        calls_and_bytes(filesystem.rows),
+        [(1, 0), (1, 0), (1, 78), (0, 0)]
+    );
+    assert_eq!(
+        calls_and_bytes(filesystem_abort.rows),
+        [(1, 0), (0, 0), (1, 90), (0, 0)]
     );
 }
 
@@ -263,13 +318,13 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
             row: [u64::MAX; xz_calls::COLUMNS.len()],
             invalid: false,
         }; 2],
-        snapshot: [snapshot_work::Work {
+        snapshots: [[snapshot_work::Work {
             rows: [[u64::MAX; 3]; snapshot_work::LABELS.len()],
             invalid: false,
-        }; 2],
+        }; 2]; 2],
     }
     .report();
     assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);
 }
 
-pub(crate) const REPORT_BYTES: usize = 3 * 1024;
+pub(crate) const REPORT_BYTES: usize = 4 * 1024;

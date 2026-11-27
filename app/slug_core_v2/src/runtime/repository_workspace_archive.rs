@@ -16,6 +16,10 @@ use slug_bzlmod_v2::RepositoryWorkspaceResult;
 
 use super::*;
 use crate::runtime::ArchiveDistdirPolicy;
+#[cfg(all(test, feature = "native-probe-observer"))]
+use crate::runtime::probe_observer::capture;
+#[cfg(all(test, feature = "native-probe-observer"))]
+use crate::runtime::probe_observer::workspace_progress::Stage;
 use crate::runtime::repository_archive_http::capture_workspace_generated_archive;
 
 const CAPTURE_BYTES: u64 = 128 * 1024 * 1024;
@@ -117,14 +121,33 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
             owned.push_str(url);
             urls.push(owned);
         }
-        let captured = capture_workspace_generated_archive(
-            &urls,
-            archive.expected_sha256(),
-            runtime,
-            active,
-            scope,
-            distdirs,
-        );
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let observer = capture();
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let span = |stage| {
+            observer
+                .as_ref()
+                .and_then(|observer| observer.workspace_progress_span(stage))
+        };
+        let captured = {
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            let acquisition = span(Stage::ArchiveAcquire);
+            let captured = capture_workspace_generated_archive(
+                &urls,
+                archive.expected_sha256(),
+                runtime,
+                active,
+                scope,
+                distdirs,
+            );
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if let Some(acquisition) = acquisition
+                && captured.is_ok()
+            {
+                acquisition.finish();
+            }
+            captured
+        };
         // Retire copied URL storage before the later owner's failure cleanup
         // can return the control credit that paid for these allocations.
         drop(urls);
@@ -152,7 +175,13 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
         }
         let file = owner.capture.as_ref().unwrap().as_file();
         let frame = file.metadata()?;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let verification = span(Stage::ArchiveVerifyCapture);
         let sha256 = verify_capture(file, &frame, archive.expected_sha256(), scope, active)?;
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(verification) = verification {
+            verification.finish();
+        }
         owner.frame = Some(frame);
         owner.sha256 = sha256;
         check(scope, active)?;

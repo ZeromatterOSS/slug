@@ -15,6 +15,10 @@ use super::body_coverage::NativeBodyCandidates;
 use super::body_coverage::NativeBodyLedger;
 use super::snapshot::CreditedWorkspaceTranscript;
 use super::*;
+#[cfg(all(test, feature = "native-probe-observer"))]
+use crate::runtime::probe_observer::capture;
+#[cfg(all(test, feature = "native-probe-observer"))]
+use crate::runtime::probe_observer::workspace_progress::Stage;
 use crate::runtime::repository_filesystem_progress::deletion::DeleteWork;
 use crate::runtime::repository_root_io::WriteMode;
 
@@ -178,10 +182,6 @@ impl RepositoryWorkspaceProgress {
             return Ok(self);
         }
         // The test installs its observer on the synchronous dispatch thread.
-        #[cfg(all(test, feature = "native-probe-observer"))]
-        use crate::runtime::probe_observer::capture;
-        #[cfg(all(test, feature = "native-probe-observer"))]
-        use crate::runtime::probe_observer::workspace_progress::Stage;
         #[cfg(all(test, feature = "native-probe-observer"))]
         let observer = capture();
         #[cfg(all(test, feature = "native-probe-observer"))]
@@ -381,6 +381,16 @@ impl RepositoryWorkspaceProgress {
         {
             return Ok(self);
         }
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let observer = capture();
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let span = |stage| {
+            observer
+                .as_ref()
+                .and_then(|observer| observer.workspace_progress_span(stage))
+        };
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let operation = span(Stage::FilesystemOperation);
         let mut captured_read = None;
         let result = {
             let _scratch = self.builder.resources.reserve(IO_SCRATCH, 3, 0)?;
@@ -482,7 +492,19 @@ impl RepositoryWorkspaceProgress {
                 }
             }
         };
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(operation) = operation {
+            operation.finish();
+        }
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        let snapshot = span(Stage::FilesystemSnapshot);
         let completed = self.complete_snapshot(incoming, result, scope, active);
+        #[cfg(all(test, feature = "native-probe-observer"))]
+        if let Some(snapshot) = snapshot
+            && completed.is_ok()
+        {
+            snapshot.finish();
+        }
         drop(captured_read);
         completed
     }

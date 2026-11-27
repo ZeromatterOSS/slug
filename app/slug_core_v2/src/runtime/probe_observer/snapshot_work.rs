@@ -1,4 +1,4 @@
-//! Test-only work inside the synchronous archive snapshot boundary.
+//! Test-only work inside a synchronous rooted snapshot.
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -49,7 +49,7 @@ impl Scope {
         WORK.with(|work| {
             assert!(
                 work.get().is_none(),
-                "archive snapshot probe scopes cannot nest"
+                "rooted snapshot probe scopes cannot nest"
             );
             work.set(Some(Work::default()));
         });
@@ -57,7 +57,7 @@ impl Scope {
     }
 
     pub(super) fn finish(self) -> Work {
-        WORK.with(|work| work.take().expect("active archive snapshot probe"))
+        WORK.with(|work| work.take().expect("active rooted snapshot probe"))
     }
 }
 
