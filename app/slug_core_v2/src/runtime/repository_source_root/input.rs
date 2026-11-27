@@ -213,6 +213,20 @@ fn same_metadata(a: &std::fs::Metadata, b: &std::fs::Metadata) -> bool {
         && a.ctime_nsec() == b.ctime_nsec()
 }
 impl SourceRootInput {
+    #[cfg(all(test, feature = "native-probe-observer"))]
+    pub(in crate::runtime::repository_physical_root) fn backing_bytes_for_probe(&self) -> u64 {
+        let Input::Archive(archive) = &self.input else {
+            return 0;
+        };
+        [&archive.archive, &archive.module]
+            .into_iter()
+            .chain(&archive.overlays)
+            .chain(&archive.patches)
+            .filter_map(|capture| capture.storage.as_ref())
+            .map(ResourceCredit::backing_bytes_for_probe)
+            .sum()
+    }
+
     pub(in crate::runtime) fn capture(
         request: Arc<Request>,
         resources: &Arc<RepositoryRootResources>,

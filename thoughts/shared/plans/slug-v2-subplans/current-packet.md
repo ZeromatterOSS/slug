@@ -12,7 +12,7 @@ The original reached 999 computes, 57 roots and 153 records, with the pinned
 It transferred 67,201,371 bytes, then refused the 2,048 MiB Source bootstrap
 with 7,937 MiB live under the 8,192 MiB backing cap. No decoding began and
 scope had no first error. The exact/+1 constructor test passed. Cleanup returned
-to 168 bytes, zero FDs and zero backing. The report used 128,413 bytes with
+to 168 bytes, zero FDs and zero backing. The report used 128,936 bytes with
 its prefix. Full Rust and completed-command latency/RSS remain open.
 
 The [Archive writer receipt][archive-writes] preserves rooted reads through EOF
@@ -51,11 +51,14 @@ liblzma. Bzlmod dev/test `-O3` passed CPU/wall at 0.936/0.935 (`f33c1690a`).
 XZ and LZ4 `-O3` and the stored observation-map hash fell short of their gates.
 The previous detailed checkpoint is in `ff79543a2`.
 
-Measure live mutable and sealed Archive backing and physical usage before
-choosing an admission change. The Source bootstrap needs 1,793 MiB of headroom
-plus its launcher allowance. Keep the existing bank, deadline, launcher/PID1,
-rooted comparison, codec and history checks. Compare equal work for timing.
-The earlier refusal at compute 859 remains unattributed.
+The live inventory accounts for all 7,937 MiB. One mutable Archive and one
+sealed General Archive hold 2 GiB each. The sealed full root uses 820,174,848
+bytes and 189 inode units. There are also 57 compact Archives, one sealed
+Process and 129 MiB in captures. The full sealed root alone cannot supply
+the required 1,793 MiB plus launcher allowance. Evaluate measured size classes
+across all sealed Archives. Keep the existing bank, mutable quotas, deadline,
+launcher/PID1, rooted comparison, codec and history checks. The earlier refusal
+at compute 859 remains unattributed.
 The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,

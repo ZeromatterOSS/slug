@@ -49,6 +49,14 @@ pub(super) fn facts_for_quota(
         used_inodes: vfs.f_files as u64 - vfs.f_ffree as u64,
     })
 }
+
+#[cfg(all(test, feature = "native-probe-observer"))]
+pub(in crate::runtime::repository_physical_root) fn full_archive_usage_for_probe(
+    file: &File,
+) -> Result<(u64, u64), PhysicalRootError> {
+    let facts = facts_for_quota(file, quota(RepositoryWorkspaceMode::Archive))?;
+    Ok((facts.allocated, facts.used_inodes))
+}
 fn admit_physical(value: QuotaFacts) -> Result<(), PhysicalRootError> {
     if value.allocated > PROCESS_BYTES || value.used_inodes > 8192 {
         return Err(PhysicalRootError::Backing);

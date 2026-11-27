@@ -71,7 +71,14 @@ impl RepositoryWorkspaceCommand {
                 self.mount_domain.clone(),
                 observer.clone(),
                 active,
-            )?;
+            );
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if matches!(&launch, Err(PhysicalRootError::Resource))
+                && let Some(probe) = crate::runtime::probe_observer::capture()
+            {
+                probe.record_backing_inventory(self.backing_inventory_for_probe(&input));
+            }
+            let launch = launch?;
             let builder =
                 process_owner::run(launch, super::super::super::initialize::platform()?, active)
                     .await?;

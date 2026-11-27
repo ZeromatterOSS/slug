@@ -188,6 +188,13 @@ pub(in crate::runtime) struct ResourceCredit {
     slots: SlotCredit,
 }
 
+#[cfg(all(test, feature = "native-probe-observer"))]
+impl ResourceCredit {
+    pub(super) fn backing_bytes_for_probe(&self) -> u64 {
+        self.slots.backing
+    }
+}
+
 /// Shared lifetime credit for ONE selected backing. Contains no descriptor,
 /// reader, mutation or namespace authority and never enters DICE.
 #[derive(Debug)]

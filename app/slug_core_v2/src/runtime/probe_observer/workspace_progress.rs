@@ -75,6 +75,45 @@ const LABELS: [&str; 15] = [
     "execute_closed_stream_poll",
 ];
 
+#[derive(Clone, Copy)]
+pub(crate) struct SealedArchiveBacking {
+    pub(crate) family: u64,
+    pub(crate) slot: u64,
+    pub(crate) allocated_bytes: Option<u64>,
+    pub(crate) used_inodes: Option<u64>,
+}
+
+pub(crate) struct BackingInventory {
+    pub(crate) root_counts: [u64; 6],
+    pub(crate) root_debit_bytes: u64,
+    pub(crate) bank_live_bytes: u64,
+    pub(crate) held_source_capture_bytes: u64,
+    pub(crate) unassigned_backing_bytes: Option<u64>,
+    pub(crate) sealed_full: [Option<SealedArchiveBacking>; 4],
+    pub(crate) complete: bool,
+}
+
+impl BackingInventory {
+    fn report(&self) -> Value {
+        let sealed_full = self
+            .sealed_full
+            .map(|row| row.map(|r| json!([r.family, r.slot, r.allocated_bytes, r.used_inodes])));
+        json!({
+            "root_kinds": ["mutable_archive", "mutable_process", "sealed_process",
+                "sealed_archive_compact", "sealed_general_archive_full", "sealed_source_archive_full"],
+            "root_counts": self.root_counts,
+            "root_debit_bytes": self.root_debit_bytes,
+            "bank_live_bytes": self.bank_live_bytes,
+            "held_source_capture_bytes": self.held_source_capture_bytes,
+            "unassigned_backing_bytes": self.unassigned_backing_bytes,
+            "sealed_full_columns": ["family", "slot", "allocated_bytes", "used_inodes"],
+            "families": ["general", "source"],
+            "sealed_full": sealed_full,
+            "complete": self.complete,
+        })
+    }
+}
+
 #[derive(Default)]
 pub(super) struct Totals {
     // Two independent outcomes per stage. Column pairs are calls and wall ns.
@@ -84,12 +123,17 @@ pub(super) struct Totals {
     snapshots: [[snapshot_work::Work; 2]; 2],
     backing_refusals: u64,
     last_backing_refusal: Option<[u64; 3]>,
+    backing_inventory: Option<BackingInventory>,
 }
 
 impl Totals {
     pub(super) fn record_backing_refusal(&mut self, live: u64, requested: u64, limit: u64) {
         self.backing_refusals = self.backing_refusals.saturating_add(1);
         self.last_backing_refusal = Some([live, requested, limit]);
+    }
+
+    pub(super) fn record_backing_inventory(&mut self, inventory: BackingInventory) {
+        self.backing_inventory = Some(inventory);
     }
 
     fn record(&mut self, stage: Stage, completed: bool, wall_ns: Option<u64>) {
@@ -128,6 +172,7 @@ impl Totals {
             "last_backing_admission_refusal": self.last_backing_refusal.map(|[live, requested, limit]| {
                 json!({"live_bytes": live, "requested_bytes": requested, "limit_bytes": limit})
             }),
+            "last_source_bootstrap_backing_inventory": self.backing_inventory.as_ref().map(BackingInventory::report),
             "dispatch_completion_includes_replay": true,
             "archive_substages_are_nested_and_exclude_replay": true,
             "archive_acquire_and_verify_are_nested_in_verified_capture": true,
@@ -349,11 +394,25 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
         }; 2]; 2],
         backing_refusals: u64::MAX,
         last_backing_refusal: Some([u64::MAX; 3]),
+        backing_inventory: Some(BackingInventory {
+            root_counts: [u64::MAX; 6],
+            root_debit_bytes: u64::MAX,
+            bank_live_bytes: u64::MAX,
+            held_source_capture_bytes: u64::MAX,
+            unassigned_backing_bytes: Some(u64::MAX),
+            sealed_full: [Some(SealedArchiveBacking {
+                family: u64::MAX,
+                slot: u64::MAX,
+                allocated_bytes: Some(u64::MAX),
+                used_inodes: Some(u64::MAX),
+            }); 4],
+            complete: false,
+        }),
     }
     .report();
     assert!(json!({"workspace_progress": report}).to_string().len() < REPORT_BYTES);
 }
 
 // The original probe subtracts this from its fixed event partition. Reserve
-// room for the backing refusal row even with maximum-width counters.
-pub(crate) const REPORT_BYTES: usize = 4 * 1024 + 512;
+// room for the backing refusal and its live inventory at maximum width.
+pub(crate) const REPORT_BYTES: usize = 5 * 1024 + 512;

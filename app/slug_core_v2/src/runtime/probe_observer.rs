@@ -388,6 +388,14 @@ impl Observer {
     }
 
     #[cfg(test)]
+    pub(crate) fn record_backing_inventory(&self, inventory: workspace_progress::BackingInventory) {
+        self.workspace_progress
+            .lock()
+            .expect("workspace progress sampler poisoned")
+            .record_backing_inventory(inventory);
+    }
+
+    #[cfg(test)]
     pub(crate) fn record_activity_for_test(
         &self,
         kind: usize,

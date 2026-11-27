@@ -1080,6 +1080,14 @@ impl RepositoryWorkspaceCommand {
     }
 }
 
+#[cfg(all(
+    test,
+    feature = "native-probe-observer",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+#[path = "repository_workspace_backing_inventory.rs"]
+mod backing_inventory;
 #[path = "repository_workspace_body_admission.rs"]
 mod body_admission;
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
