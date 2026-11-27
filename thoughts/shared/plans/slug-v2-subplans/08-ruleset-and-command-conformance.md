@@ -184,6 +184,8 @@ define setup and partial-output semantics.
 The isolated command routes passed setup failure, partial output, formatter
 edit and recovery on real providers. The inactive General driver matched
 pinned Rust formatter stdout for initial, warm, changed and restored editions.
+Daemon runtime construction precedes socket acquisition. Native setup opens
+and verifies the named inode and refuses set-ID modes and file capabilities.
 Public Rust still needs the protected production launcher and a successful
 comparison through both routes. Public action comparison and Rust REAPI
 follow this cquery gate.

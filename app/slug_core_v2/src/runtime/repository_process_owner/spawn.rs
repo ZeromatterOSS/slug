@@ -328,8 +328,9 @@ pub(super) fn launch(
 ) -> Result<Spawned, PhysicalRootError> {
     let closefrom =
         closefrom_with(|name| unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) })?;
-    let bwrap_image = pin_image(&platform.bwrap, plan, !platform.test_images, false)?;
-    let helper_image = pin_image(&platform.helper, plan, false, !platform.test_images)?;
+    let display = Path::new(OsStr::from_bytes(plan.display.as_bytes()));
+    let bwrap_image = pin_image(&platform.bwrap, display, !platform.test_images, false)?;
+    let helper_image = pin_image(&platform.helper, display, false, !platform.test_images)?;
     let argv = arguments(platform, plan, namespace.is_some())?;
     let pointers: Vec<*mut libc::c_char> = argv
         .iter()
@@ -428,21 +429,14 @@ pub(super) fn launch(
     })
 }
 
-fn pin_image(path: &Path, plan: &RunPlan, root_owned: bool, current: bool) -> io::Result<File> {
+fn pin_image(path: &Path, display: &Path, root_owned: bool, current: bool) -> io::Result<File> {
     use std::os::unix::fs::MetadataExt;
-    if !path.is_absolute()
-        || path.starts_with(Path::new(OsStr::from_bytes(plan.display.as_bytes())))
-    {
+    if !path.is_absolute() || path.starts_with(display) {
         return Err(invalid("invalid native setup image"));
     }
     let canonical = path.canonicalize()?;
-    let meta = canonical.metadata()?;
-    if canonical.starts_with(Path::new(OsStr::from_bytes(plan.display.as_bytes())))
-        || !meta.is_file()
-        || meta.mode() & 0o111 == 0
-        || meta.mode() & 0o022 != 0
-        || (root_owned && meta.uid() != 0)
-        || (!root_owned && meta.uid() != 0 && meta.uid() != unsafe { libc::geteuid() })
+    let named = canonical.metadata()?;
+    if canonical.starts_with(display) || !admitted_image_mode(named.mode(), named.uid(), root_owned)
     {
         return Err(invalid("untrusted native setup image"));
     }
@@ -452,18 +446,30 @@ fn pin_image(path: &Path, plan: &RunPlan, root_owned: bool, current: bool) -> io
         CString::new(canonical.as_os_str().as_bytes())
             .map_err(|_| invalid("invalid trusted image"))?
     };
-    let raw = unsafe { libc::open(source.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
+    // Only the kernel's live executable reference needs to follow a link. A
+    // concurrent replacement with a FIFO must not block trusted setup.
+    let flags = libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NONBLOCK;
+    let flags = if current {
+        flags
+    } else {
+        flags | libc::O_NOFOLLOW
+    };
+    let raw = unsafe { libc::open(source.as_ptr(), flags) };
     if raw < 0 {
         return Err(io::Error::last_os_error());
     }
     let file = unsafe { File::from_raw_fd(raw) };
     let actual = stat(file.as_fd())?;
-    if actual.st_dev as u64 != meta.dev()
-        || actual.st_ino as u64 != meta.ino()
-        || actual.st_mode != meta.mode()
+    if actual.st_dev as u64 != named.dev()
+        || actual.st_ino as u64 != named.ino()
+        || actual.st_mode != named.mode()
+        || actual.st_uid != named.uid()
+        || actual.st_ctime != named.ctime()
+        || actual.st_ctime_nsec != named.ctime_nsec()
     {
         return Err(invalid("trusted image identity changed"));
     }
+    require_no_file_capabilities(file.as_fd())?;
     use std::os::unix::fs::FileExt;
     let mut magic = [0u8; 4];
     file.read_exact_at(&mut magic, 0)?;
@@ -471,6 +477,32 @@ fn pin_image(path: &Path, plan: &RunPlan, root_owned: bool, current: bool) -> io
         return Err(invalid("trusted setup image is not ELF"));
     }
     Ok(file)
+}
+
+fn admitted_image_mode(mode: libc::mode_t, uid: libc::uid_t, root_owned: bool) -> bool {
+    mode & libc::S_IFMT == libc::S_IFREG
+        && mode & 0o111 != 0
+        && mode & (libc::S_ISUID | libc::S_ISGID | 0o022) == 0
+        && (uid == 0 || (!root_owned && uid == unsafe { libc::geteuid() }))
+}
+
+fn require_no_file_capabilities(fd: BorrowedFd<'_>) -> io::Result<()> {
+    let size = unsafe {
+        libc::fgetxattr(
+            fd.as_raw_fd(),
+            c"security.capability".as_ptr(),
+            ptr::null_mut(),
+            0,
+        )
+    };
+    if size >= 0 {
+        return Err(invalid("native setup image has file capabilities"));
+    }
+    let error = io::Error::last_os_error();
+    match error.raw_os_error() {
+        Some(libc::ENODATA | libc::EOPNOTSUPP) => Ok(()),
+        _ => Err(error),
+    }
 }
 fn arguments(
     platform: &ProcessPlatform,
@@ -572,4 +604,64 @@ fn arguments(
     add(helper.as_bytes())?;
     add(wire::HELPER_ARGUMENT.as_bytes())?;
     Ok(args)
+}
+
+#[cfg(test)]
+mod image_tests {
+    use std::os::unix::fs::PermissionsExt;
+
+    use super::*;
+
+    #[test]
+    fn setup_image_modes_require_the_right_owner_and_no_elevated_bits() {
+        let executable = libc::S_IFREG | 0o755;
+        assert!(admitted_image_mode(executable, 0, true));
+        assert!(!admitted_image_mode(executable, 1, true));
+        assert!(admitted_image_mode(
+            executable,
+            unsafe { libc::geteuid() },
+            false
+        ));
+        for mode in [
+            executable | libc::S_ISUID,
+            executable | libc::S_ISGID,
+            executable | 0o020,
+            executable | 0o002,
+            libc::S_IFREG | 0o644,
+            libc::S_IFIFO | 0o755,
+        ] {
+            assert!(!admitted_image_mode(mode, 0, true), "{mode:o}");
+        }
+    }
+
+    #[test]
+    fn pinned_image_checks_the_opened_executable_and_excludes_display_roots() {
+        let directory = tempfile::tempdir().unwrap();
+        let display = directory.path().join("display");
+        let named = directory.path().join("named");
+        let current = std::env::current_exe().unwrap();
+        pin_image(&current, &display, false, true).unwrap();
+        pin_image(&current, &display, false, false).unwrap();
+
+        std::fs::write(&named, b"not an ELF image").unwrap();
+        std::fs::set_permissions(&named, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(
+            pin_image(&named, &display, false, false)
+                .unwrap_err()
+                .to_string(),
+            "trusted setup image is not ELF"
+        );
+        assert_eq!(
+            pin_image(&named, &display, false, true)
+                .unwrap_err()
+                .to_string(),
+            "trusted image identity changed"
+        );
+        assert_eq!(
+            pin_image(&named, directory.path(), false, false)
+                .unwrap_err()
+                .to_string(),
+            "invalid native setup image"
+        );
+    }
 }
