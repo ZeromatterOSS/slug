@@ -13,6 +13,7 @@ use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceResult;
 use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
 
+use super::body_coverage::AcceptedBodyComparison;
 use super::body_coverage::NativeBodyAdmission;
 use super::body_coverage::NativeBodyCandidates;
 use super::body_coverage::NativeBodyLedger;
@@ -20,7 +21,7 @@ use super::progress::command::ArchiveWriteOrigin;
 use super::*;
 
 #[path = "repository_workspace_snapshot/body_recovery.rs"]
-mod body_recovery;
+pub(super) mod body_recovery;
 #[path = "repository_workspace_snapshot/packed.rs"]
 mod packed;
 
@@ -323,7 +324,7 @@ pub(super) fn capture_with_sources<'prior>(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
-    capture_builder(builder, prior, sources, None, scope, active, None)
+    capture_builder(builder, prior, sources, None, scope, active, None, None)
 }
 pub(super) fn capture_with_candidates<'prior>(
     builder: &RepositoryPhysicalRootBuilder,
@@ -333,6 +334,7 @@ pub(super) fn capture_with_candidates<'prior>(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
     write_proof: Option<&SnapshotWriteProof<'_>>,
+    accepted: Option<&mut AcceptedBodyComparison<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     candidates
         .ledger()
@@ -345,6 +347,7 @@ pub(super) fn capture_with_candidates<'prior>(
         scope,
         active,
         write_proof,
+        accepted,
     )
 }
 fn capture_builder<'prior>(
@@ -355,6 +358,7 @@ fn capture_builder<'prior>(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
     write_proof: Option<&SnapshotWriteProof<'_>>,
+    accepted: Option<&mut AcceptedBodyComparison<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != builder.reservation.as_ref() {
@@ -389,6 +393,7 @@ fn capture_builder<'prior>(
         Some(&sources),
         candidates,
         write_proof,
+        accepted,
     )?;
     if backing_identity(&builder.file, builder.mode)? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
@@ -423,6 +428,7 @@ fn capture_at<'prior>(
         None,
         None,
         None,
+        None,
     )
 }
 #[allow(clippy::too_many_arguments)]
@@ -438,6 +444,7 @@ fn capture_at_with_sources<'prior>(
     sources: Option<&SourceLinkSet>,
     mut candidates: Option<&mut NativeBodyCandidates>,
     write_proof: Option<&SnapshotWriteProof<'_>>,
+    mut accepted: Option<&mut AcceptedBodyComparison<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != reservation {
@@ -570,6 +577,7 @@ fn capture_at_with_sources<'prior>(
                     &mut capture.credit,
                     candidates.as_deref_mut(),
                     write_proof,
+                    accepted.as_deref_mut(),
                     scope,
                     active,
                 )?;
@@ -714,7 +722,9 @@ fn capture_body(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<RepositoryWorkspaceBody, PhysicalRootError> {
-    capture_body_covered(io, path, framed, prior, credit, None, None, scope, active)
+    capture_body_covered(
+        io, path, framed, prior, credit, None, None, None, scope, active,
+    )
 }
 fn capture_body_covered(
     io: &RootIo<'_>,
@@ -724,6 +734,7 @@ fn capture_body_covered(
     credit: &mut resources::ResourceCredit,
     mut candidates: Option<&mut NativeBodyCandidates>,
     write_proof: Option<&SnapshotWriteProof<'_>>,
+    accepted: Option<&mut AcceptedBodyComparison<'_>>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<RepositoryWorkspaceBody, PhysicalRootError> {
@@ -770,6 +781,16 @@ fn capture_body_covered(
         }
     }
     if let Some(candidates) = candidates {
+        let local = match previous {
+            Some((RepositoryWorkspaceNode::File(body), _)) => Some(body),
+            _ => None,
+        };
+        if let Some(accepted) = accepted
+            && let Some(body) =
+                accepted.capture(candidates, io, path, framed, length, local, scope, active)?
+        {
+            return Ok(body);
+        }
         return packed::capture(io, path, framed, candidates, scope, active);
     }
     let mut body = Arc::<[u8]>::new_uninit_slice(length);

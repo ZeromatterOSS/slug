@@ -904,12 +904,18 @@ pinned edition-2024 Bazel comparison verified the target, ordered actions,
 owners, Rustc host platform and selected tool arguments. Full action identity
 comparison, the public command and matched latency/RSS remain open.
 
-The same-runtime edition fixture passed initial CrateInfo and three typed action
-checks. Warm replay reached attempt 493 and failed scoped Allocation during
-trusted repository progress. The fixed retained bank needs at least 63,489,531
-more bytes of headroom at the sampled refusal. Keep the prior accepted roots
-and readers valid through atomic replacement. The warm, changed and restored
-comparisons remain open under the same bank.
+The same-runtime fixture passed initial CrateInfo and typed action checks.
+Fresh trusted snapshots may compare one prior accepted final file at the same
+stable workspace key, bank, relative path and length. Prefer the current
+predecessor. Charge at most 1 GiB of extra comparison per command and verify
+the full fresh bytes, EOF and name/FD frames before sharing the existing body
+allocation. Exact replay bypasses selection. Canonical completion keeps only
+the body lease. Prior roots and readers remain valid through atomic replacement.
+
+Warm passed the retained refusal at 493 and stopped at Source bootstrap 574.
+The fixed 8 GiB backing bank denied a 2 GiB request with 6,510,608,384 live.
+The Source capture set held 129 MiB. Fresh bootstrap quota selection and
+rollback claim accounting remain separate gates.
 
 The [frontier receipt](wp1225-rust-frontier-acceptance-2026-11-08.json) establishes
 a genuine admission conflict:43 initial states plus85 completed records fill

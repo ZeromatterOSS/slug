@@ -11,6 +11,7 @@ use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceResult;
 use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
 
+use super::body_coverage::AcceptedBodyComparison;
 use super::body_coverage::NativeBodyCandidates;
 use super::body_coverage::NativeBodyLedger;
 use super::snapshot::CreditedWorkspaceTranscript;
@@ -144,7 +145,7 @@ impl RepositoryWorkspaceProgress {
         // refuses before capture or mutation.
         let candidates = self.body_ledger().candidates()?;
         self.apply_archive_with_candidates(
-            request, candidates, runtime, distdirs, scope, active, None,
+            request, candidates, runtime, distdirs, scope, active, None, None,
         )
     }
     pub(super) fn apply_archive_with_candidates(
@@ -156,6 +157,7 @@ impl RepositoryWorkspaceProgress {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
         write_origin: Option<command::ArchiveWriteOrigin>,
+        accepted: Option<&mut AcceptedBodyComparison<'_>>,
     ) -> Result<Self, PhysicalRootError> {
         let mut incoming = IncomingOperation {
             request,
@@ -237,6 +239,7 @@ impl RepositoryWorkspaceProgress {
             scope,
             active,
             writes.map(CompletedWrites::Archive),
+            accepted,
         )?;
         #[cfg(all(test, feature = "native-probe-observer"))]
         if let Some(span) = snapshot_span {
@@ -252,6 +255,7 @@ impl RepositoryWorkspaceProgress {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
         writes: Option<CompletedWrites<'_>>,
+        accepted: Option<&mut AcceptedBodyComparison<'_>>,
     ) -> Result<Self, PhysicalRootError> {
         // Result (which can own a newly captured body) precedes incoming
         // candidates, including capture refusal before completion is entered.
@@ -290,6 +294,7 @@ impl RepositoryWorkspaceProgress {
             scope,
             active,
             write_proof.as_ref(),
+            accepted,
         )?;
         drop(writes);
         #[cfg(all(test, feature = "native-probe-observer"))]
@@ -345,7 +350,7 @@ impl RepositoryWorkspaceProgress {
             incoming.candidates.absorb(bodies, active)?;
         }
         incoming.cover(active)?;
-        self.complete_snapshot(incoming, result, scope, active, None)
+        self.complete_snapshot(incoming, result, scope, active, None, None)
     }
     pub(super) fn admit_link_sources(
         &mut self,
@@ -378,7 +383,7 @@ impl RepositoryWorkspaceProgress {
         self.check_scope(scope)?;
         check(scope, active)?;
         let candidates = self.body_ledger().candidates()?;
-        self.apply_with_candidates(request, candidates, scope, active, None)
+        self.apply_with_candidates(request, candidates, scope, active, None, None)
     }
     pub(super) fn apply_with_candidates(
         mut self,
@@ -387,6 +392,7 @@ impl RepositoryWorkspaceProgress {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
         write_origin: Option<command::ArchiveWriteOrigin>,
+        accepted: Option<&mut AcceptedBodyComparison<'_>>,
     ) -> Result<Self, PhysicalRootError> {
         let mut incoming = IncomingOperation {
             request,
@@ -543,6 +549,7 @@ impl RepositoryWorkspaceProgress {
             scope,
             active,
             write_origin.map(CompletedWrites::Filesystem),
+            accepted,
         );
         #[cfg(all(test, feature = "native-probe-observer"))]
         if let Some(snapshot) = snapshot

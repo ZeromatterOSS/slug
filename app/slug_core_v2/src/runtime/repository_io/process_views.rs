@@ -5,6 +5,7 @@ use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceReservation;
 
 use super::*;
+use crate::runtime::repository_physical_root::AcceptedFinalBodySource;
 use crate::runtime::repository_physical_root::NativeReadViewData;
 use crate::runtime::repository_physical_root::PhysicalRootError;
 use crate::runtime::repository_physical_root::RepositoryPhysicalRoot;
@@ -490,12 +491,61 @@ impl RepositoryMaterializer {
             command.source_links_for_declared(&snapshot, declared_sources, scope, active)?;
         snapshot.current_sources = Some(current);
         snapshot.recheck(self)?;
-        let command =
-            command.apply_with_sources(request, sources, runtime, distdirs, scope, &|| {
-                active() && self.session_is_active(token)
-            })?;
+        let command = command.apply_with_sources(
+            request,
+            sources,
+            runtime,
+            distdirs,
+            scope,
+            &|| active() && self.session_is_active(token),
+            |reservation| self.previous_final_bodies(token, reservation, &snapshot.resources),
+        )?;
         snapshot.recheck(self)?;
         Ok(command)
+    }
+
+    fn previous_final_bodies(
+        &self,
+        token: RepositorySessionToken,
+        reservation: &Arc<RepositoryWorkspaceReservation>,
+        resources: &Arc<RepositoryRootResources>,
+    ) -> Result<Option<AcceptedFinalBodySource>, PhysicalRootError> {
+        let prior = {
+            let state = self
+                .state
+                .lock()
+                .map_err(|_| PhysicalRootError::Reservation)?;
+            let active = matching_validated_active(&state, token)
+                .map_err(|_| PhysicalRootError::Reservation)?;
+            if active.workspace_lease != reservation.lease() {
+                return Err(PhysicalRootError::Reservation);
+            }
+            let mut prior = None;
+            for row in &state.accepted_roots {
+                if &row.request.id.canonical_repo != reservation.repository() {
+                    continue;
+                }
+                let (
+                    RetainedRootOwner::Physical(root),
+                    RepositoryMaterializationKind::GeneralWorkspace(realization),
+                ) = (&row.root, &row.request.kind)
+                else {
+                    continue;
+                };
+                if row.observation_instance != root.reservation().instance() || prior.is_some() {
+                    return Err(PhysicalRootError::Reservation);
+                }
+                prior = Some((root.clone(), realization.reservation().clone()));
+            }
+            prior
+        };
+        let Some((root, association)) = prior else {
+            return Ok(None);
+        };
+        if &association != root.reservation() {
+            return Err(PhysicalRootError::Reservation);
+        }
+        Ok(root.accepted_final_body_source(reservation, resources))
     }
     async fn execute_workspace_impl(
         &self,

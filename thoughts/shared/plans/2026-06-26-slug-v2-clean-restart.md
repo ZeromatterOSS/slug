@@ -40,7 +40,8 @@ The [active contract](./slug-v2-subplans/current-packet.md) has General
 repository execution Disabled in production. Both GCC and Homebrew profiles
 have retired. The authentic Rust cquery completed through the inactive Native
 driver, and its edition-2024 action projection matched pinned Bazel. Its
-same-runtime warm case hit the retained bank. Resolve that admission before
+same-runtime warm case passed the retained-bank refusal and stopped at Source
+bootstrap backing admission. Resolve that admission before
 continuing the edition comparison and public-command gates.
 
 Public Rust cquery, required action comparison, Rust REAPI execution,

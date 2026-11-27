@@ -22,12 +22,13 @@ while both runfiles keys stayed stable. The inactive Slug edition-2024 result
 matched the target, ordered action names, owners, Rustc host platform and
 selected tool arguments. Its bounded projection adds no raw action text.
 
-The retained-runtime edition regression passed the initial CrateInfo and
-action checks. Warm attempt 493 stopped with a native retained-bank
-allocation refusal. The bank denied 67,109,504 bytes with 533,250,939 sampled
-live under the 512 MiB limit. Abort recovered FDs and backing and retained
-17,880 extra bytes until runtime drop, which returned all credits to baseline.
-The changed and restored edition cases are pending.
+Fresh trusted snapshots can share verified final file-body allocations with
+the prior accepted generation. Warm Rust passed the retained-bank refusal at
+493 and peaked at 406,173,582 retained bytes. At 574, Source bootstrap asked
+for 2 GiB with 6,510,608,384 backing bytes live, 65 MiB over the 8 GiB bank.
+Captured inputs held 129 MiB. Abort restored FDs and backing, with 18,944
+extra retained bytes until runtime drop. The final refund was exact.
+The initial edition passed. Warm completion and both mutation cases are pending.
 
 Matched Source manifests reuse validated entry paths and modes and count closed
 state capacities directly. The 7,935-entry native fixture used 0.886 of control
@@ -54,9 +55,10 @@ backing was again 6,301 MiB. Across the three earlier identical compute
 prefixes, Archive acquisition ranged from 3.061 to 3.795 seconds. Preserve
 the [bounded phase and typed scope cause][attribution] for exact attribution.
 
-Resolve warm retained-bank admission under the fixed policy while preserving
-atomic publication and existing readers. Complete the pinned edition comparison,
-public-command and activation gates. Keep native quotas,
+Resolve warm Source bootstrap backing admission under the fixed bank. Review
+fresh writable Source quota selection from actual input bounds and account for
+rollback claim storage. Complete the pinned edition comparison, public-command
+and activation gates. Keep atomic publication, existing readers, native quotas,
 clocks, launcher/PID1, rooted reads, codec and history checks. Compare equal
 work for timing.
 Private message parsing, blind repeats, presumed API repair,

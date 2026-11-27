@@ -108,6 +108,7 @@ fn apply(
             &crate::runtime::ArchiveDistdirPolicy::default(),
             scope,
             &|| true,
+            |_| Ok(None),
         )
         .unwrap()
 }

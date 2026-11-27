@@ -179,6 +179,7 @@ pub(in crate::runtime) struct RepositoryWorkspaceCommand {
     scope: Arc<SourceServiceScope>,
     resources: Arc<RepositoryRootResources>,
     max_roots: usize,
+    accepted_body_comparison_bytes: usize,
     #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
     process_probe: Option<RepositoryWorkspaceProcessProbe>,
     _control: resources::ResourceCredit,
@@ -239,6 +240,7 @@ impl RepositoryWorkspaceCommand {
             scope,
             resources,
             max_roots: limits.max_roots(),
+            accepted_body_comparison_bytes: 0,
             #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
             process_probe: None,
             _control: control,
@@ -638,7 +640,9 @@ impl RepositoryWorkspaceCommand {
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
         let sources = SourceLinkSet::empty(&self.resources, scope, active)?;
-        self.apply_with_sources(request, sources, runtime, distdirs, scope, active)
+        self.apply_with_sources(request, sources, runtime, distdirs, scope, active, |_| {
+            Ok(None)
+        })
     }
     pub(in crate::runtime) fn apply_with_sources(
         mut self,
@@ -648,6 +652,10 @@ impl RepositoryWorkspaceCommand {
         distdirs: &crate::runtime::ArchiveDistdirPolicy,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
+        accepted_source: impl FnOnce(
+            &Arc<RepositoryWorkspaceReservation>,
+        )
+            -> Result<Option<AcceptedFinalBodySource>, PhysicalRootError>,
     ) -> Result<Self, PhysicalRootError> {
         self.check_scope(scope, active)?;
         let mut bodies = self.request_body_candidates(&request, scope, active)?;
@@ -741,16 +749,41 @@ impl RepositoryWorkspaceCommand {
         } else {
             None
         };
+        let accepted = accepted_source(request.reservation())?;
+        let mut comparison = accepted
+            .as_ref()
+            .map(|source| {
+                source.compare_with(
+                    request.reservation(),
+                    &mut self.accepted_body_comparison_bytes,
+                )
+            })
+            .transpose()?;
         let progress = if matches!(
             request.operation(),
             RepositoryWorkspaceOperation::Archive(_)
         ) {
             progress.apply_archive_with_candidates(
-                request, bodies, runtime, distdirs, scope, active, origin,
+                request,
+                bodies,
+                runtime,
+                distdirs,
+                scope,
+                active,
+                origin,
+                comparison.as_mut(),
             )?
         } else {
-            progress.apply_with_candidates(request, bodies, scope, active, origin)?
+            progress.apply_with_candidates(
+                request,
+                bodies,
+                scope,
+                active,
+                origin,
+                comparison.as_mut(),
+            )?
         };
+        drop(accepted);
         if let Some(lease) = self.roots[slot].lease.take() {
             self.roots[slot].lease = Some(
                 lease

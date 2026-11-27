@@ -190,15 +190,19 @@ fn native_original_rust_toolchain_action_edition_comparison() {
                     let (_, progress) = profile.finish();
                     println!(
                         "WP425_RUST_BANK_REFUSAL {}",
-                        progress["last_retained_admission_refusal"]
+                        json!({
+                            "retained": progress["last_retained_admission_refusal"],
+                            "backing": progress["last_backing_admission_refusal"],
+                            "source_inventory": progress["last_source_bootstrap_backing_inventory"],
+                        })
                     );
                 }
-                assert_eq!(after.native_fds, before.native_fds);
-                assert_eq!(after.backing_bytes, before.backing_bytes);
-                assert_eq!(after.retained_bytes, before.retained_bytes);
                 assert_eq!(cleanup.native_fds, 0);
                 assert_eq!(cleanup.backing_bytes, 0);
                 assert_eq!(cleanup.retained_bytes, baseline);
+                assert_eq!(after.native_fds, before.native_fds);
+                assert_eq!(after.backing_bytes, before.backing_bytes);
+                assert_eq!(after.retained_bytes, before.retained_bytes);
                 panic!("{case} command failed");
             }
         };

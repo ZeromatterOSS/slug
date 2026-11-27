@@ -755,6 +755,7 @@ fn covered_snapshot_completion_shares_one_actual_body_allocation_with_history() 
         None,
         Some(&mut candidates),
         None,
+        None,
     )
     .unwrap();
     let actual = body(captured.entries(), "large").clone();

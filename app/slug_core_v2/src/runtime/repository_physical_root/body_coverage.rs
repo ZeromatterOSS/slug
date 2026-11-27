@@ -11,6 +11,10 @@ use starlark_map::small_map::SmallMap;
 
 use super::*;
 
+mod accepted;
+pub(super) use accepted::AcceptedBodyComparison;
+pub(in crate::runtime) use accepted::AcceptedFinalBodySource;
+
 mod recovery;
 pub(in crate::runtime) use recovery::NativeBodyAdmission;
 pub(in crate::runtime) use recovery::NativeBodyRefusal;

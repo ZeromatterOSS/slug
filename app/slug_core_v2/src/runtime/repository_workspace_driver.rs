@@ -809,6 +809,10 @@ mod native {
                     .map_err(NativeDemandSessionError::Repository)?;
                 #[cfg(all(test, feature = "native-probe-observer"))]
                 let capture = span(Stage::SourceInputCapture);
+                #[cfg(test)]
+                runtime
+                    .native_demand_sessions
+                    .mark_workspace_stage("source_capture");
                 let input =
                     crate::runtime::repository_physical_root::source::SourceRootInput::capture(
                         request.clone(),
@@ -827,6 +831,10 @@ mod native {
                     .command
                     .take()
                     .ok_or_else(|| refusal("workspace command was consumed"))?;
+                #[cfg(test)]
+                runtime
+                    .native_demand_sessions
+                    .mark_workspace_stage("source_bootstrap");
                 let (command, sealed) = runtime
                     .runtime
                     .block_on(command.initialize_source_snapshot(

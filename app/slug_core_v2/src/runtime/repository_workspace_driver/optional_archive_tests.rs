@@ -63,7 +63,9 @@ ext = module_extension(implementation=_extension)
         .unwrap();
     let mut bindings = Vec::new();
     let mut identities = Vec::new();
+    let mut allocations = Vec::new();
     for (ordinal, (compressed, payload)) in [
+        (a.as_slice(), b"payload:A\n".as_slice()),
         (a.as_slice(), b"payload:A\n".as_slice()),
         (b.as_slice(), b"payload:B\n".as_slice()),
         (a.as_slice(), b"payload:A\n".as_slice()),
@@ -155,6 +157,9 @@ ext = module_extension(implementation=_extension)
             panic!("actual extracted regular payload")
         };
         assert!(extracted.equals_slice(payload));
+        // The old accepted owner remains live through the new snapshot, so
+        // equality here witnesses a shared allocation, not allocator reuse.
+        allocations.push(extracted.allocation_identity());
         let reads = realization
             .transcript()
             .records()
@@ -201,8 +206,12 @@ ext = module_extension(implementation=_extension)
             assert_eq!(binding.2, other.2);
         }
     }
-    assert_ne!(identities[0], identities[1]);
-    assert_eq!(identities[0], identities[2]);
+    assert_eq!(identities[0], identities[1]);
+    assert_ne!(identities[1], identities[2]);
+    assert_eq!(identities[0], identities[3]);
+    assert_eq!(allocations[0], allocations[1]);
+    assert_ne!(allocations[1], allocations[2]);
+    assert_ne!(allocations[2], allocations[3]);
     drop(runtime);
     assert_eq!(resources.snapshot().native_fds, 0);
     assert_eq!(resources.snapshot().backing_bytes, 0);

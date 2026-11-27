@@ -46,6 +46,7 @@ fn fresh_raw_and_packed_contents_streams_preserve_identity_frames_and_retirement
             None,
             candidates.as_mut(),
             None,
+            None,
         )
         .unwrap();
         observations.push(witness.snapshot());
@@ -157,6 +158,7 @@ fn fresh_raw_and_packed_contents_streams_preserve_identity_frames_and_retirement
                 initial.current(),
                 &mut credit,
                 failed_candidates.as_mut(),
+                None,
                 None,
                 &scope,
                 &|| true,

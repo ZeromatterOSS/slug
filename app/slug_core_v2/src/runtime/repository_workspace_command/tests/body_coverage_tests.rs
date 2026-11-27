@@ -9,6 +9,7 @@ use std::time::Instant;
 use sha2::Digest;
 use slug_bzlmod_v2::GeneratedRepositoryArchiveEffect;
 use slug_bzlmod_v2::GeneratedRepositoryArchiveFormat;
+use slug_workspace_v2::PathObservationInstanceId;
 
 use super::*;
 use crate::runtime::dice::source_service::SourceServiceLimits;
@@ -267,6 +268,51 @@ fn native_archive_rereads_untouched_packed_body_without_comparing_it() {
         .unwrap();
     let (request, root, history) = sealed.into_parts();
     assert_eq!(root.identity, identity);
+    let new_reservation = |ordinal| {
+        Arc::new(
+            RepositoryWorkspaceReservation::new(
+                selected.workspace().clone(),
+                selected.owner().clone(),
+                selected.repository().clone(),
+                ordinal,
+                selected.expected_repo_spec().clone(),
+                selected.display_root().clone(),
+                PathObservationInstanceId::new(selected.instance().value() + 1),
+                selected.lease() + 1,
+                selected.limits(),
+            )
+            .unwrap(),
+        )
+    };
+    let next = new_reservation(selected.ordinal());
+    let foreign = new_reservation(selected.ordinal() + 1);
+    assert!(
+        root.clone()
+            .accepted_final_body_source(&selected, &bank)
+            .is_none()
+    );
+    assert!(
+        root.clone()
+            .accepted_final_body_source(&foreign, &bank)
+            .is_none()
+    );
+    assert!(
+        root.clone()
+            .accepted_final_body_source(&next, &self::bank())
+            .is_none()
+    );
+    {
+        let source = root
+            .clone()
+            .accepted_final_body_source(&next, &bank)
+            .unwrap();
+        let mut compared = 0;
+        assert!(matches!(
+            source.compare_with(&foreign, &mut compared),
+            Err(PhysicalRootError::Reservation)
+        ));
+        assert!(source.compare_with(&next, &mut compared).is_ok());
+    }
     let weak_root = Arc::downgrade(&root);
     let mut reader = root.open_member("kept", &scope, &|| true).unwrap();
     drop((command, request, root));

@@ -32,7 +32,7 @@ pub(super) fn capture_existing(
 
 /// Shared with ordinary same-path reuse. The snapshot scratch owner covers the
 /// existing RootIo buffer; this helper adds no allocation or discovery authority.
-pub(super) fn observed_equal(
+pub(in crate::runtime::repository_physical_root) fn observed_equal(
     io: &RootIo<'_>,
     path: &Path,
     framed: &libc::stat,
