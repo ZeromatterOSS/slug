@@ -1385,10 +1385,7 @@ fn classify_host_path_exists(
 ) -> Result<bool, CompactString> {
     match result {
         Ok(path) => match path.state() {
-            ResolvedPathState::Missing if path.symlinks().is_empty() => Ok(false),
-            ResolvedPathState::Missing => {
-                Err("repository_ctx.path host exists does not support a dangling symlink".into())
-            }
+            ResolvedPathState::Missing => Ok(false),
             ResolvedPathState::Present(metadata)
                 if matches!(
                     metadata.kind(),
@@ -2876,7 +2873,9 @@ ext = module_extension(implementation = impl)
                     .any(|candidate| path == Path::new(candidate))
                 {
                     Some(PathNodeKind::Directory)
-                } else if path == Path::new("/host/a/.netrc") {
+                } else if path == Path::new("/host/a/.netrc")
+                    || path == Path::new("/host/b/missingfile")
+                {
                     direct_kind
                 } else if path == Path::new("/host/b/.netrc") {
                     Some(PathNodeKind::Symlink)
@@ -2932,6 +2931,7 @@ ext = module_extension(implementation = impl)
 
     async fn revise_host_exists_lstat(
         mut transaction: dice::DiceTransaction,
+        path: &Path,
         kind: Option<PathNodeKind>,
     ) -> dice::DiceTransaction {
         let epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
@@ -2940,7 +2940,8 @@ ext = module_extension(implementation = impl)
             .observations()
             .iter()
             .map(|(demand, result)| {
-                if demand.path().as_path() == Path::new("/host/a/.netrc") {
+                if demand.path().as_path() == path {
+                    assert_eq!(demand.operation(), PathObservationOperation::Lstat);
                     found = true;
                     (
                         demand.dupe(),
@@ -3069,7 +3070,8 @@ ext = module_extension(implementation = impl)
         .enumerate()
         {
             if index > 0 {
-                transaction = revise_host_exists_lstat(transaction, kind).await;
+                transaction =
+                    revise_host_exists_lstat(transaction, Path::new("/host/a/.netrc"), kind).await;
             }
             let observed = loop {
                 match transaction.compute(&key).await.unwrap() {
@@ -3096,7 +3098,7 @@ ext = module_extension(implementation = impl)
     }
 
     #[tokio::test]
-    async fn selected_repository_host_path_exists_rejects_dangling_and_cycle() {
+    async fn selected_repository_host_path_exists_observes_a_dangling_target_and_refuses_cycles() {
         const EXTENSION: &str = r#"
 def write(ctx):
     ctx.file("exists", str(ctx.path(ctx.os.environ["HOME"] + "/.netrc").exists))
@@ -3123,38 +3125,54 @@ ext = module_extension(implementation = impl)
             .await;
             let owner = owner(&mut transaction).await;
             let key = HostSelectedRepositoryFileEffectObservationKey::new(workspace, owner, 0);
-            let mut rejected = false;
+            let mut terminal = None;
             for _ in 0..32 {
                 match transaction.compute(&key).await.unwrap() {
                     SourcePreparationOutcome::Need(need) => {
                         transaction =
                             update_host_exists_need(transaction, &need, None, link_target).await;
                     }
-                    SourcePreparationOutcome::Complete(Ok(value))
-                        if matches!(
-                            value.result().as_ref(),
-                            Err(HostSelectedRepositoryFileEffectError::HostInput { message, .. })
-                                if message.to_string() == if link_target == "missingfile" {
-                                    "repository_ctx.path host exists does not support a dangling symlink"
-                                } else {
-                                    "repository_ctx.path host exists does not support symlink cycles"
-                                }
-                        ) =>
-                    {
-                        rejected = true;
+                    SourcePreparationOutcome::Complete(Ok(value)) => {
+                        terminal = Some(value);
                         break;
                     }
-                    SourcePreparationOutcome::Complete(Ok(value)) => panic!(
-                        "{link_target} unexpectedly completed with {:?}",
-                        value.result().as_ref().as_ref().unwrap().plan().effects()[0].content()
-                    ),
                     terminal => panic!("{link_target} did not complete: {terminal:?}"),
                 }
             }
-            assert!(
-                rejected,
-                "{link_target} did not reach an unsupported terminal"
-            );
+            let observed = terminal.expect("host path observation must complete");
+            if link_target == ".netrc" {
+                assert!(matches!(
+                    observed.result().as_ref(),
+                    Err(HostSelectedRepositoryFileEffectError::HostInput { message, .. })
+                        if message.as_str() == "repository_ctx.path host exists does not support symlink cycles"
+                ));
+                continue;
+            }
+            let content = |observed: &ObservedHostSelectedRepositoryFileEffect| {
+                observed
+                    .result()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .plan()
+                    .effects()[0]
+                    .content()
+                    .to_vec()
+            };
+            assert_eq!(content(&observed), b"False");
+            let target = Path::new("/host/b/missingfile");
+            for (kind, expected) in [
+                (Some(PathNodeKind::RegularFile), b"True".as_slice()),
+                (None, b"False".as_slice()),
+            ] {
+                transaction = revise_host_exists_lstat(transaction, target, kind).await;
+                let SourcePreparationOutcome::Complete(Ok(observed)) =
+                    transaction.compute(&key).await.unwrap()
+                else {
+                    panic!("changing only the symlink destination must complete");
+                };
+                assert_eq!(content(&observed), expected);
+            }
         }
     }
 
