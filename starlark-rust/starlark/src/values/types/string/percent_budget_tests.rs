@@ -11,7 +11,7 @@ use crate::syntax::Dialect;
 fn eval<'v>(module: &'v Module, source: &str) -> crate::Result<Value<'v>> {
     let ast =
         AstModule::parse("percent-budget.star", source.to_owned(), &Dialect::Standard).unwrap();
-    Evaluator::new(module).eval_module(ast, &Globals::standard())
+    Evaluator::new_with_reused_call_storage_for_test(module).eval_module(ast, &Globals::standard())
 }
 
 fn assert_limit(error: crate::Error, expected: ExecutionLimit) {
@@ -153,7 +153,7 @@ fn frozen_ordinary_percent_intrinsic_uses_the_callers_budget() {
         .get("affixed")
         .unwrap()
         .owned_value(consumer.frozen_heap());
-    let mut eval = Evaluator::new(&consumer);
+    let mut eval = Evaluator::new_with_reused_call_storage_for_test(&consumer);
     assert!(
         eval.eval_function(plain, &[heap.alloc((arg,))], &[])
             .unwrap()

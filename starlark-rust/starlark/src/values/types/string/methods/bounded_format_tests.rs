@@ -13,7 +13,8 @@ use crate::values::ValueLike;
 
 fn eval<'v>(module: &'v Module, text: &str) -> crate::Result<Value<'v>> {
     let source = AstModule::parse("format.star", text.to_owned(), &Dialect::Standard).unwrap();
-    Evaluator::new(module).eval_module(source, &Globals::standard())
+    Evaluator::new_with_reused_call_storage_for_test(module)
+        .eval_module(source, &Globals::standard())
 }
 
 #[test]
@@ -66,7 +67,11 @@ fn frozen_format_one_uses_the_callers_budget() {
     let caller = Module::new_with_execution_budget(budget.clone());
     let owned = program.owned_value(caller.frozen_heap());
     let input = caller.heap().alloc_list(&[caller.heap().alloc("é snow")]);
-    let result = Evaluator::new(&caller).eval_function(owned, &[input], &[]);
+    let result = Evaluator::new_with_reused_call_storage_for_test(&caller).eval_function(
+        owned,
+        &[input],
+        &[],
+    );
     assert!(result.is_err());
     assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
 }

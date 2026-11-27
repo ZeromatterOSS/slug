@@ -801,7 +801,7 @@ where
                 self.parameters.collect_inline(args, slots, eval.heap())?;
                 self.invoke_raw(me, eval)
             },
-        )
+        )?
     }
 
     pub(crate) fn invoke_with_args<'a, A: ArgumentsImpl<'v, 'a>>(

@@ -95,7 +95,8 @@ pub(crate) fn eval_prepared_module<'v>(
             bc.max_stack_size,
             bc.max_loop_depth,
             |eval| eval.eval_bc(const_frozen_string!("module").to_value(), bc),
-        )?;
+        )
+        .map_err(|limit| add_span_to_expr_error(limit.into(), statement.span, eval))??;
         export_bindings(eval, &statement.exports, statement.span)?;
     }
     Ok(last)
@@ -239,7 +240,8 @@ impl<'v> Compiler<'v, '_, '_, '_> {
             bc.max_stack_size,
             bc.max_loop_depth,
             |eval| eval.eval_bc(const_frozen_string!("module").to_value(), &bc),
-        )?;
+        )
+        .map_err(|limit| add_span_to_expr_error(limit.into(), export_span, self.eval))??;
         export_bindings(self.eval, &exports, export_span)?;
         Ok(result)
     }

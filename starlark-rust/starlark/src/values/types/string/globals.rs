@@ -195,7 +195,11 @@ mod tests {
         input: Value<'v>,
     ) -> crate::Result<Value<'v>> {
         module.frozen_heap().add_reference(globals.heap());
-        Evaluator::new(module).eval_function(globals.get(name).unwrap(), &[input], &[])
+        Evaluator::new_with_reused_call_storage_for_test(module).eval_function(
+            globals.get(name).unwrap(),
+            &[input],
+            &[],
+        )
     }
 
     fn assert_allocation_limit(error: crate::Error) {
@@ -217,7 +221,7 @@ mod tests {
             r#"(str("hé\n"), repr("hé\n"), str([None, ("hé\n",)]), repr([None, ("hé\n",)]))"#;
         let evaluate = |module: &Module| {
             let ast = AstModule::parse("text.star", source.to_owned(), &Dialect::Standard).unwrap();
-            Evaluator::new(module)
+            Evaluator::new_with_reused_call_storage_for_test(module)
                 .eval_module(ast, &globals)
                 .unwrap()
                 .to_repr()

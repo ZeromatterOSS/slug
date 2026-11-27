@@ -61,6 +61,37 @@ fn spread<'v: 'a, 'a>(kwargs: Value<'v>) -> Arguments<'v, 'a> {
 }
 
 #[test]
+fn bounded_parameter_parser_admits_dynamic_slots_before_binding() {
+    let spec = ParametersSpec::<FrozenValue>::new_named_only(
+        "optional",
+        [("key", ParametersSpecParam::Optional)],
+    );
+    for (work, bytes, expected) in [
+        (0, 1024, Some(ExecutionLimit::Work)),
+        (1024, 0, Some(ExecutionLimit::AllocationBytes)),
+        (1024, 1024, None),
+    ] {
+        let budget = Arc::new(ExecutionBudget::new(work, bytes, 16));
+        let module = Module::new_with_execution_budget(budget.clone());
+        let mut eval = Evaluator::new(&module);
+        let mut entered = false;
+        let result = spec.parser(&Arguments::default(), &mut eval, |parser, _| {
+            entered = true;
+            parser.next_opt::<Value>()
+        });
+        if let Some(limit) = expected {
+            assert!(result.is_err());
+            assert_eq!(budget.check(), Err(limit));
+            assert!(!entered);
+        } else {
+            assert!(result.unwrap().is_none());
+            assert!(entered);
+            assert_eq!(budget.check(), Ok(()));
+        }
+    }
+}
+
+#[test]
 fn bounded_signature_keywords_match_dynamic_resolved_and_generated_calls() {
     const SOURCE: &str = r#"
 def capture(pos, /, first, *args, named, **kwargs):

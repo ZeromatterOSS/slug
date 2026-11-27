@@ -27,6 +27,8 @@ use std::ptr::NonNull;
 use std::slice;
 
 use crate::collections::maybe_uninit_backport::maybe_uninit_write_slice_cloned;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::hint::likely;
 use crate::hint::unlikely;
 
@@ -38,9 +40,13 @@ struct Buffer {
 
 impl Buffer {
     fn alloc(layout: Layout) -> Buffer {
-        let ptr = unsafe { alloc(layout) };
-        let ptr = NonNull::new(ptr).unwrap();
-        Buffer { ptr, layout }
+        Self::try_alloc(layout).unwrap()
+    }
+
+    fn try_alloc(layout: Layout) -> Option<Buffer> {
+        debug_assert_ne!(layout.size(), 0);
+        let ptr = NonNull::new(unsafe { alloc(layout) })?;
+        Some(Buffer { ptr, layout })
     }
 
     fn ptr(&self) -> *mut u8 {
@@ -79,12 +85,29 @@ const INITIAL_SIZE: usize = 1000000; // ~ 1Mb
 type Align = u64;
 const ALIGN: usize = mem::size_of::<Align>();
 
+struct RestoreCursor<'a> {
+    alloca: &'a Alloca,
+    start: *mut Align,
+    stop: *mut Align,
+    buffer_end: *mut Align,
+}
+
+impl Drop for RestoreCursor<'_> {
+    fn drop(&mut self) {
+        self.alloca
+            .restore_cursor(self.start, self.stop, self.buffer_end);
+    }
+}
+
 impl Alloca {
     pub fn new() -> Self {
         Self::with_capacity(INITIAL_SIZE)
     }
 
     pub fn with_capacity(size_bytes: usize) -> Self {
+        if size_bytes == 0 {
+            return Self::new_lazy();
+        }
         let size_words = size_bytes.div_ceil(ALIGN);
         let layout = Layout::array::<Align>(size_words).unwrap();
         let buffer = Buffer::alloc(layout);
@@ -92,6 +115,15 @@ impl Alloca {
             alloc: Cell::new(buffer.ptr().cast()),
             end: Cell::new(buffer.end().cast()),
             buffers: RefCell::new(vec![buffer]),
+        }
+    }
+
+    /// Start without allocating a buffer or its metadata.
+    pub(crate) fn new_lazy() -> Self {
+        Self {
+            alloc: Cell::new(ptr::null_mut()),
+            end: Cell::new(ptr::null_mut()),
+            buffers: RefCell::new(Vec::new()),
         }
     }
 
@@ -110,16 +142,62 @@ impl Alloca {
     fn allocate_more(&self, len: usize, one: Layout) {
         let want =
             Layout::from_size_align(one.size().checked_mul(len).unwrap(), one.align()).unwrap();
-        assert!(want.align() <= mem::size_of::<Align>());
-        let size_words =
-            self.buffers.borrow().last().unwrap().size_words() * 2 + want.size() / ALIGN;
+        assert!(want.align() <= mem::align_of::<Align>());
+        let mut buffers = self.buffers.borrow_mut();
+        let size_words = match buffers.last() {
+            Some(buffer) => buffer.size_words() * 2 + want.size() / ALIGN,
+            None => INITIAL_SIZE
+                .div_ceil(ALIGN)
+                .max(want.size().div_ceil(ALIGN)),
+        };
         let layout = Layout::array::<Align>(size_words).unwrap();
-        let buffer = Buffer::alloc(layout);
+        self.push_buffer(&mut buffers, Buffer::alloc(layout));
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn try_allocate_more(
+        &self,
+        required_words: usize,
+        budget: &ExecutionBudget,
+    ) -> Result<(), ExecutionLimit> {
+        let mut buffers = self.buffers.borrow_mut();
+        let old_words = buffers.last().map_or(0, Buffer::size_words);
+        let size_words = old_words
+            .checked_mul(2)
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?
+            .max(required_words);
+        let layout = Layout::array::<Align>(size_words)
+            .map_err(|_| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        let len = buffers
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+
+        // Pay for the backing buffer and the metadata write before reserving either.
+        budget.charge(1, layout.size())?;
+        budget.reserve_vec(&mut buffers, len)?;
+        let buffer = Buffer::try_alloc(layout)
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationFailed))?;
+        self.push_buffer(&mut buffers, buffer);
+        Ok(())
+    }
+
+    fn push_buffer(&self, buffers: &mut Vec<Buffer>, buffer: Buffer) {
         let pointer = buffer.ptr().cast();
         let end = buffer.end().cast();
-        self.buffers.borrow_mut().push(buffer);
+        buffers.push(buffer);
         self.alloc.set(pointer);
         self.end.set(end);
+    }
+
+    #[inline(always)]
+    fn restore_cursor(&self, start: *mut Align, stop: *mut Align, buffer_end: *mut Align) {
+        // Nonempty retained buffers have distinct ends. A nested allocation can leave
+        // the cursor at an adjacent buffer's start, which might equal the old stop.
+        if likely(ptr::eq(self.alloc.get(), stop) && ptr::eq(self.end.get(), buffer_end)) {
+            self.alloc.set(start);
+        }
     }
 
     /// Convert remaining capacity in words to remaining capacity in `T`.
@@ -146,11 +224,18 @@ impl Alloca {
     /// or you call it yourself.
     #[inline(always)]
     pub fn alloca_uninit<T, R>(&self, len: usize, k: impl FnOnce(&mut [MaybeUninit<T>]) -> R) -> R {
-        self.assert_state();
-
-        assert!(mem::align_of::<T>() <= ALIGN);
+        if mem::size_of::<T>() == 0 {
+            // SAFETY: The non-null, aligned pointer is never dereferenced for bytes.
+            return k(unsafe { slice::from_raw_parts_mut(NonNull::dangling().as_ptr(), len) });
+        }
+        assert!(mem::align_of::<T>() <= mem::align_of::<Align>());
 
         let mut start = self.alloc.get();
+        if unlikely(start.is_null()) {
+            self.allocate_more(len, Layout::new::<T>());
+            start = self.alloc.get();
+        }
+        self.assert_state();
 
         let rem_words = unsafe { self.end.get().offset_from(start) as usize };
         let rem_in_t = Self::rem_in_words_to_rem_in_t::<T>(rem_words);
@@ -162,38 +247,97 @@ impl Alloca {
         let size_words = Self::len_in_to_to_len_in_words::<T>(len);
 
         let stop = start.wrapping_add(size_words);
-        let old = start;
+        let buffer_end = self.end.get();
         self.alloc.set(stop);
         let data = start as *mut MaybeUninit<T>;
         let slice = unsafe { slice::from_raw_parts_mut(data, len) };
         let res = k(slice);
 
-        // If the pointer changed, it means a callback called alloca again,
-        // which allocated a new buffer. So we are abandoning the current allocation here,
-        // and new allocations will use the new buffer even if the current buffer has space.
-        if likely(std::ptr::eq(self.alloc.get(), stop)) {
-            self.alloc.set(old);
-        }
-
+        self.restore_cursor(start, stop, buffer_end);
         self.assert_state();
 
         res
+    }
+
+    /// Admit any new storage before lending an uninitialized slice. The caller pays
+    /// for work that initializes and uses the slice. Nonempty storage requires `T`
+    /// to fit the arena's alignment.
+    pub(crate) fn try_alloca_uninit<T, R>(
+        &self,
+        len: usize,
+        budget: &ExecutionBudget,
+        k: impl FnOnce(&mut [MaybeUninit<T>]) -> R,
+    ) -> Result<R, ExecutionLimit> {
+        let layout =
+            Layout::array::<T>(len).map_err(|_| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        if layout.size() == 0 {
+            budget.check()?;
+            // SAFETY: The slice requires an aligned pointer but occupies no bytes.
+            let slice = unsafe { slice::from_raw_parts_mut(NonNull::dangling().as_ptr(), len) };
+            return Ok(k(slice));
+        }
+        assert!(layout.align() <= mem::align_of::<Align>());
+
+        let words = layout.size().div_ceil(ALIGN);
+        let mut start = self.alloc.get();
+        let remaining = if start.is_null() {
+            0
+        } else {
+            // SAFETY: Both cursors are in the same current buffer.
+            unsafe { self.end.get().offset_from(start) as usize }
+        };
+        if words > remaining {
+            self.try_allocate_more(words, budget)?;
+            start = self.alloc.get();
+        } else {
+            budget.check()?;
+        }
+
+        // SAFETY: The checked word count fits in the current aligned buffer.
+        let stop = unsafe { start.add(words) };
+        let _restore = RestoreCursor {
+            alloca: self,
+            start,
+            stop,
+            buffer_end: self.end.get(),
+        };
+        self.alloc.set(stop);
+        // SAFETY: The rounded allocation covers the full slice and nested calls use
+        // later words or a new buffer. The scope guard rewinds after the loan ends.
+        let slice = unsafe { slice::from_raw_parts_mut(start.cast(), len) };
+        Ok(k(slice))
     }
 
     #[inline(always)]
     pub fn alloca_init<T, R>(
         &self,
         len: usize,
-        mut init: impl FnMut() -> T,
+        init: impl FnMut() -> T,
         k: impl FnOnce(&mut [T]) -> R,
     ) -> R {
-        self.alloca_uninit(len, |data| {
-            for x in data.iter_mut() {
-                x.write(init());
-            }
-            let data = unsafe { &mut *(data as *mut [MaybeUninit<T>] as *mut [T]) };
-            k(data)
-        })
+        self.alloca_uninit(len, |data| k(Self::init_slice(data, init)))
+    }
+
+    /// Charge one unit per initialization before running the fixed-work,
+    /// allocation-free initializer.
+    pub(crate) fn try_alloca_init<T: Copy, R>(
+        &self,
+        len: usize,
+        budget: &ExecutionBudget,
+        init: impl FnMut() -> T,
+        k: impl FnOnce(&mut [T]) -> R,
+    ) -> Result<R, ExecutionLimit> {
+        budget.charge(len, 0)?;
+        self.try_alloca_uninit(len, budget, |data| k(Self::init_slice(data, init)))
+    }
+
+    #[inline(always)]
+    fn init_slice<T>(data: &mut [MaybeUninit<T>], mut init: impl FnMut() -> T) -> &mut [T] {
+        for x in data.iter_mut() {
+            x.write(init());
+        }
+        // SAFETY: Every element has been initialized above.
+        unsafe { &mut *(data as *mut [MaybeUninit<T>] as *mut [T]) }
     }
 
     #[allow(dead_code)] // Dead, but morally a sensible API to provide, and useful for testing
@@ -248,6 +392,9 @@ impl Alloca {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::AssertUnwindSafe;
+    use std::panic::catch_unwind;
+
     use super::*;
 
     #[allow(clippy::identity_op)]
@@ -346,5 +493,149 @@ mod tests {
         a.alloca_concat(&x, &y, |xy| {
             assert_eq!(&["ab".to_owned(), "cd".to_owned()], xy);
         });
+    }
+
+    #[test]
+    fn lazy_alloca_charges_first_buffer_and_metadata() {
+        let allocation_bytes = ALIGN + mem::size_of::<Buffer>();
+        let arena = Alloca::new_lazy();
+        let short = ExecutionBudget::new(1, allocation_bytes - 1, 1);
+        assert_eq!(
+            arena.try_alloca_uninit::<u8, ()>(1, &short, |_| unreachable!()),
+            Err(ExecutionLimit::AllocationBytes),
+        );
+        assert_eq!(arena.buffers.borrow().capacity(), 0);
+        assert!(arena.alloc.get().is_null());
+
+        let exact = ExecutionBudget::new(1, allocation_bytes, 1);
+        let first = arena
+            .try_alloca_uninit::<u8, _>(1, &exact, |slice| slice.as_ptr())
+            .unwrap();
+        let reused = arena
+            .try_alloca_uninit::<Align, _>(1, &exact, |slice| slice.as_ptr())
+            .unwrap();
+        assert_eq!(first.cast::<()>(), reused.cast::<()>());
+        assert_eq!(arena.buffers.borrow().len(), 1);
+        assert_eq!(exact.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+    }
+
+    #[test]
+    fn lazy_alloca_precharges_init_on_reuse() {
+        let arena = Alloca::with_capacity(ALIGN);
+        let short = ExecutionBudget::new(2, 0, 1);
+        assert_eq!(
+            arena.try_alloca_init(3, &short, || -> u8 { unreachable!() }, |_| unreachable!()),
+            Err::<(), _>(ExecutionLimit::Work),
+        );
+
+        let exact = ExecutionBudget::new(3, 0, 1);
+        let initials = [11u8, 12u8, 13u8];
+        let mut next = initials.into_iter();
+        arena
+            .try_alloca_init(
+                3,
+                &exact,
+                || next.next().unwrap(),
+                |slice| {
+                    assert_eq!(slice, &initials);
+                },
+            )
+            .unwrap();
+        assert_eq!(exact.charge(1, 0), Err(ExecutionLimit::Work));
+    }
+
+    #[test]
+    fn lazy_alloca_accepts_zero_size_and_rejects_layout_overflow() {
+        #[repr(align(32))]
+        struct Empty;
+
+        let arena = Alloca::new_lazy();
+        let budget = ExecutionBudget::new(0, 0, 1);
+        arena
+            .try_alloca_uninit::<Align, _>(0, &budget, |slice| assert!(slice.is_empty()))
+            .unwrap();
+        arena
+            .try_alloca_uninit::<Empty, _>(7, &budget, |slice| {
+                assert_eq!(slice.len(), 7);
+                assert_eq!(slice.as_ptr(), NonNull::dangling().as_ptr());
+            })
+            .unwrap();
+        assert_eq!(
+            arena.try_alloca_uninit::<Align, ()>(usize::MAX, &budget, |_| unreachable!()),
+            Err(ExecutionLimit::AllocationBytes),
+        );
+        assert_eq!(
+            arena.try_alloca_uninit::<Align, ()>(0, &budget, |_| unreachable!()),
+            Err(ExecutionLimit::AllocationBytes),
+        );
+        assert_eq!(arena.buffers.borrow().capacity(), 0);
+        assert!(arena.alloc.get().is_null());
+    }
+
+    #[test]
+    fn lazy_alloca_nested_growth_retains_outer_on_error_and_unwind() {
+        let arena = Alloca::new_lazy();
+        let budget = ExecutionBudget::new(6, 3 * ALIGN + 3 * mem::size_of::<Buffer>(), 1);
+        let second_start = Cell::new(ptr::null_mut());
+        let result = arena
+            .try_alloca_init(
+                1,
+                &budget,
+                || 17 as Align,
+                |outer| {
+                    let unwind = catch_unwind(AssertUnwindSafe(|| {
+                        arena
+                            .try_alloca_init(
+                                2,
+                                &budget,
+                                || 42 as Align,
+                                |inner| {
+                                    assert_eq!([42, 42], inner);
+                                    second_start.set(inner.as_mut_ptr());
+                                    panic!("nested callback");
+                                },
+                            )
+                            .unwrap();
+                    }));
+                    assert!(unwind.is_err());
+                    assert_eq!([17], outer);
+                    assert_eq!(arena.alloc.get(), second_start.get());
+                    Err::<(), _>("outer callback failed")
+                },
+            )
+            .unwrap();
+        assert_eq!(result, Err("outer callback failed"));
+        assert_eq!(arena.alloc.get(), second_start.get());
+        assert_eq!(arena.buffers.borrow().len(), 2);
+
+        arena
+            .try_alloca_uninit::<Align, _>(2, &budget, |slice| {
+                assert_eq!(slice.as_mut_ptr().cast::<Align>(), second_start.get());
+            })
+            .unwrap();
+        assert_eq!(budget.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+    }
+
+    #[test]
+    fn lazy_alloca_switches_between_ordinary_and_budgeted() {
+        let arena = Alloca::new_lazy();
+        let budget = ExecutionBudget::new(0, 0, 1);
+        arena.alloca_fill(1, 17 as Align, |outer| {
+            arena
+                .try_alloca_uninit::<Align, _>(1, &budget, |inner| {
+                    assert_ne!(outer.as_ptr(), inner.as_ptr().cast::<Align>());
+                    inner[0].write(42);
+                })
+                .unwrap();
+            assert_eq!([17], outer);
+        });
+        arena
+            .try_alloca_uninit::<Align, _>(1, &budget, |outer| {
+                arena.alloca_fill(1, 42 as Align, |inner| {
+                    assert_ne!(outer.as_ptr().cast::<Align>(), inner.as_ptr());
+                });
+            })
+            .unwrap();
+        assert_eq!(arena.buffers.borrow().len(), 1);
     }
 }

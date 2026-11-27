@@ -136,7 +136,7 @@ mod tests {
         module: &'v Module,
         element_type: &str,
         leaves: impl IntoIterator<Item = starlark::values::FrozenValue>,
-    ) {
+    ) -> Value<'v> {
         let value = alloc_starlark_depset_parts(
             module.frozen_heap(),
             DepsetOrder::Preorder,
@@ -149,7 +149,9 @@ mod tests {
                 .map(StarlarkDepsetSuccessorGen::Direct)
                 .collect(),
         );
-        module.set("data", value.to_value());
+        let value = value.to_value();
+        module.set("data", value);
+        value
     }
 
     fn eval(module: &Module) -> starlark::Result<Value<'_>> {
@@ -246,8 +248,8 @@ mod tests {
     fn bounded_native_to_list_refuses_scratch_and_unmodeled_leaves() {
         let budget = Arc::new(ExecutionBudget::new(10_000, 0, 16));
         let module = Module::new_with_execution_budget(budget.clone());
-        install(&module, "File", [file(&module, "@@//pkg:a.rs")]);
-        assert!(eval(&module).is_err());
+        let value = install(&module, "File", [file(&module, "@@//pkg:a.rs")]);
+        assert!(flatten(value, &budget).is_err());
         assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
 
         let budget = Arc::new(ExecutionBudget::new(10_000, 10_000, 16));

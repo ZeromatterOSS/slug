@@ -152,7 +152,8 @@ mod tests {
 
     fn evaluate<'v>(module: &'v Module, source: &str) -> crate::Result<Value<'v>> {
         let ast = AstModule::parse("sorted.star", source.to_owned(), &Dialect::Standard).unwrap();
-        Evaluator::new(module).eval_module(ast, &Globals::standard())
+        Evaluator::new_with_reused_call_storage_for_test(module)
+            .eval_module(ast, &Globals::standard())
     }
 
     #[test]

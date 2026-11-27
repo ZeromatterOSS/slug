@@ -15,8 +15,12 @@
  * limitations under the License.
  */
 
+use std::alloc::Layout;
+use std::alloc::alloc;
 use std::fmt;
 use std::fmt::Debug;
+use std::mem::MaybeUninit;
+use std::ptr::NonNull;
 use std::vec;
 
 use dupe::Dupe;
@@ -26,6 +30,8 @@ use starlark_syntax::slice_vec_ext::SliceExt;
 
 use crate::errors::Frame;
 use crate::eval::CallStack;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::runtime::frame_span::FrameSpan;
 use crate::eval::runtime::inlined_frame::InlinedFrames;
 use crate::hint::unlikely;
@@ -130,24 +136,55 @@ impl<'v> CheapCallStack<'v> {
     // * Linux default stack size is 8MB
     // * [tokio default stack size is 2MB][1]
     // [1] https://docs.rs/tokio/0.2.1/tokio/runtime/struct.Builder.html#method.thread_stack_size
-    pub(crate) fn alloc_if_needed(&mut self, max_size: usize) -> anyhow::Result<()> {
+    pub(crate) fn alloc_if_needed(
+        &mut self,
+        max_size: usize,
+        budget: Option<&ExecutionBudget>,
+    ) -> crate::Result<()> {
         if !self.stack.is_empty() {
-            return if self.stack.len() == max_size {
-                Ok(())
-            } else {
-                Err(CallStackError::AlreadyAllocated.into())
-            };
+            if self.stack.len() != max_size {
+                return Err(crate::Error::new_other(CallStackError::AlreadyAllocated));
+            }
+            if let Some(budget) = budget {
+                budget.check()?;
+            }
+            return Ok(());
         }
 
-        self.stack = vec![
-            CheapFrame {
-                function: Value::new_none(),
-                span: None,
-            };
-            max_size
-        ]
-        .into_boxed_slice();
+        let empty = CheapFrame {
+            function: Value::new_none(),
+            span: None,
+        };
+        self.stack = match budget {
+            Some(budget) => Self::alloc_budgeted(max_size, empty, budget)?,
+            None => vec![empty; max_size].into_boxed_slice(),
+        };
         Ok(())
+    }
+
+    fn alloc_budgeted(
+        max_size: usize,
+        empty: CheapFrame<'v>,
+        budget: &ExecutionBudget,
+    ) -> Result<Box<[CheapFrame<'v>]>, ExecutionLimit> {
+        let layout = Layout::array::<CheapFrame<'v>>(max_size)
+            .map_err(|_| budget.refuse(ExecutionLimit::AllocationBytes))?;
+        budget.charge(max_size, layout.size())?;
+        if max_size == 0 {
+            return Ok(Box::new([]));
+        }
+
+        // SAFETY: The checked layout has nonzero size. The allocation uses the
+        // global allocator and matches the boxed slice's layout exactly.
+        let memory = NonNull::new(unsafe { alloc(layout) })
+            .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationFailed))?;
+        let slice =
+            NonNull::slice_from_raw_parts(memory.cast::<MaybeUninit<CheapFrame<'v>>>(), max_size);
+        // SAFETY: The uninitialized elements are valid MaybeUninit values.
+        let mut frames = unsafe { Box::from_raw(slice.as_ptr()) };
+        frames.fill(MaybeUninit::new(empty));
+        // SAFETY: Every element was initialized above.
+        Ok(unsafe { frames.assume_init() })
     }
 
     /// Push an element to the stack. It is important the each `push` is paired
@@ -258,5 +295,64 @@ impl<'v> CheapCallStack<'v> {
     /// List the entries on the stack as values
     pub(crate) fn to_function_values(&self) -> Vec<Value<'v>> {
         self.stack[1..self.count].map(|x| x.function)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_limit(error: crate::Error, expected: ExecutionLimit) {
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::Other(error) if error.downcast_ref::<ExecutionLimit>() == Some(&expected)
+        ));
+    }
+
+    #[test]
+    fn budgeted_call_stack_admits_exact_initialization_and_reuses_storage() {
+        let frames = 3;
+        let bytes = Layout::array::<CheapFrame<'_>>(frames).unwrap().size();
+        for (work, bytes, refusal) in [
+            (frames, bytes, None),
+            (frames, bytes - 1, Some(ExecutionLimit::AllocationBytes)),
+            (frames - 1, bytes, Some(ExecutionLimit::Work)),
+        ] {
+            let budget = ExecutionBudget::new(work, bytes, 8);
+            let mut stack = CheapCallStack::default();
+            let result = stack.alloc_if_needed(frames, Some(&budget));
+            assert_eq!(stack.count(), 0);
+            if let Some(refusal) = refusal {
+                assert_limit(result.unwrap_err(), refusal);
+                assert!(stack.stack.is_empty());
+                assert_eq!(budget.check(), Err(refusal));
+                continue;
+            }
+
+            result.unwrap();
+            assert_eq!(stack.stack.len(), frames);
+            assert!(
+                stack
+                    .stack
+                    .iter()
+                    .all(|frame| frame.function.is_none() && frame.span.is_none())
+            );
+            let storage = stack.stack.as_ptr();
+            stack.alloc_if_needed(frames, Some(&budget)).unwrap();
+            assert_eq!(stack.stack.as_ptr(), storage);
+            assert_eq!(budget.check(), Ok(()));
+            assert!(stack.alloc_if_needed(frames + 1, Some(&budget)).is_err());
+            assert_eq!(stack.stack.as_ptr(), storage);
+        }
+    }
+
+    #[test]
+    fn budgeted_call_stack_refuses_layout_overflow_before_allocation() {
+        let budget = ExecutionBudget::new(usize::MAX, usize::MAX, 8);
+        let mut stack = CheapCallStack::default();
+        let result = stack.alloc_if_needed(usize::MAX, Some(&budget));
+        assert_limit(result.unwrap_err(), ExecutionLimit::AllocationBytes);
+        assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
+        assert!(stack.stack.is_empty());
     }
 }

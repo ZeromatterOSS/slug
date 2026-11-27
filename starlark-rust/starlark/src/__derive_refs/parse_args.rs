@@ -150,7 +150,7 @@ mod tests {
     fn eval<'v>(module: &'v Module, source: &str) -> crate::Result<Value<'v>> {
         let globals = GlobalsBuilder::new().with(globals).build();
         let ast = AstModule::parse("call.star", source.to_owned(), &Dialect::Standard).unwrap();
-        Evaluator::new(module).eval_module(ast, &globals)
+        Evaluator::new_with_reused_call_storage_for_test(module).eval_module(ast, &globals)
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
             .dump_debug();
         assert!(bytecode.contains("CallFrozenNative"), "{bytecode}");
         let program = program.owned_value(caller.frozen_heap());
-        let result = Evaluator::new(&caller)
+        let result = Evaluator::new_with_reused_call_storage_for_test(&caller)
             .eval_function(program, &[tail], &[])
             .unwrap();
         assert!(result.ptr_eq(value));
@@ -271,7 +271,7 @@ mod tests {
             .dump_debug();
         assert!(bytecode.contains("CallFrozenNative"), "{bytecode}");
         let program = program.owned_value(caller.frozen_heap());
-        let frozen_call = Evaluator::new(&caller)
+        let frozen_call = Evaluator::new_with_reused_call_storage_for_test(&caller)
             .eval_function(program, &[tail], &[])
             .unwrap();
 

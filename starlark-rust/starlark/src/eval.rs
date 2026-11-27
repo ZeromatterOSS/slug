@@ -120,6 +120,14 @@ impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
         Ok(())
     }
 
+    fn alloc_call_stack_if_needed(&mut self) -> crate::Result<()> {
+        let budget = self.heap().execution_budget();
+        let max_size = self
+            .max_callstack_size
+            .unwrap_or(evaluator::DEFAULT_STACK_SIZE);
+        self.call_stack.alloc_if_needed(max_size, budget)
+    }
+
     fn with_module<R>(
         &mut self,
         module: &'v Module,
@@ -244,10 +252,7 @@ impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
         let initial_call = self.call_stack_count() == 0;
         self.with_module(prepared.module, !initial_call, |eval| {
             if initial_call {
-                eval.call_stack.alloc_if_needed(
-                    eval.max_callstack_size
-                        .unwrap_or(evaluator::DEFAULT_STACK_SIZE),
-                )?;
+                eval.alloc_call_stack_if_needed()?;
                 eval.call_stack.push(Value::new_none(), None)?;
             }
             let old_def_info = mem::replace(&mut eval.module_def_info, prepared.def_info);
@@ -302,6 +307,7 @@ impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
         let local_names = self.frozen_heap().alloc_any_slice(&scope_names.used);
 
         self.module_env.slots().ensure_slots(module_slot_count);
+        self.alloc_call_stack_if_needed()?;
         let old_def_info = mem::replace(
             &mut self.module_def_info,
             self.module_env.frozen_heap().alloc_any(DefInfo::for_module(
@@ -313,11 +319,6 @@ impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
                 globals,
             )),
         );
-
-        self.call_stack.alloc_if_needed(
-            self.max_callstack_size
-                .unwrap_or(evaluator::DEFAULT_STACK_SIZE),
-        )?;
 
         // Set up the world to allow evaluation (do NOT use ? from now on)
 
@@ -365,10 +366,7 @@ impl<'v, 'a, 'e> Evaluator<'v, 'a, 'e> {
             args: None,
             kwargs: None,
         });
-        self.call_stack.alloc_if_needed(
-            self.max_callstack_size
-                .unwrap_or(evaluator::DEFAULT_STACK_SIZE),
-        )?;
+        self.alloc_call_stack_if_needed()?;
         // eval_module pushes an "empty" call stack frame. other places expect that first frame to be ignorable, and
         // so we push an empty frame too (otherwise things would ignore this function's own frame).
         self.with_call_stack(Value::new_none(), None, |this| {
@@ -383,6 +381,8 @@ mod deferred_script_operations_tests;
 
 #[cfg(test)]
 mod prepared_module_tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate as starlark;
     use crate::environment::GlobalsBuilder;
@@ -413,6 +413,74 @@ mod prepared_module_tests {
 
     fn parse(name: &str, source: &str) -> AstModule {
         AstModule::parse(name, source.to_owned(), &Dialect::Standard).unwrap()
+    }
+
+    fn assert_stack_allocation_refusal(result: crate::Result<Value<'_>>, budget: &ExecutionBudget) {
+        let error = result.unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                crate::ErrorKind::Other(detail)
+                    if detail.downcast_ref::<ExecutionLimit>() == Some(&ExecutionLimit::AllocationBytes)
+            ),
+            "{error}"
+        );
+        assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
+    }
+
+    #[test]
+    fn prepared_call_stack_allocation_uses_active_module_budget_and_restores_parent() {
+        let root = Module::new();
+        let budget = Arc::new(ExecutionBudget::new(1000, 0, 8));
+        let child = Module::new_with_execution_budget(budget.clone());
+        let globals = Globals::standard();
+        let mut evaluator = Evaluator::new(&root);
+        let original = evaluator.module_def_info;
+        let prepared = evaluator
+            .prepare_module_in(&child, parse("child", "value = 1"), &globals)
+            .unwrap();
+        assert_eq!(budget.check(), Ok(()));
+
+        assert_stack_allocation_refusal(evaluator.eval_prepared_module(&prepared), &budget);
+        assert!(std::ptr::eq(evaluator.module(), &root));
+        assert!(std::ptr::eq(
+            evaluator.module_def_info.as_ref(),
+            original.as_ref()
+        ));
+        assert!(!evaluator.disable_gc);
+        assert_eq!(evaluator.call_stack_count(), 0);
+        assert!(child.get("value").is_none());
+
+        evaluator
+            .eval_module(parse("root", "value = 2"), &globals)
+            .unwrap();
+        assert_eq!(root.get("value").unwrap().unpack_i32(), Some(2));
+    }
+
+    #[test]
+    fn module_call_stack_allocation_refuses_before_replacing_definition_info() {
+        let budget = Arc::new(ExecutionBudget::new(1000, 0, 8));
+        let module = Module::new_with_execution_budget(budget.clone());
+        let mut evaluator = Evaluator::new(&module);
+        let original = evaluator.module_def_info;
+        let result = evaluator.eval_module(parse("root", "value = 1"), &Globals::standard());
+        assert_stack_allocation_refusal(result, &budget);
+        assert!(std::ptr::eq(
+            evaluator.module_def_info.as_ref(),
+            original.as_ref()
+        ));
+        assert_eq!(evaluator.call_stack_count(), 0);
+        assert!(module.get("value").is_none());
+    }
+
+    #[test]
+    fn host_function_call_stack_allocation_refuses_before_invocation() {
+        let budget = Arc::new(ExecutionBudget::new(1000, 0, 8));
+        let module = Module::new_with_execution_budget(budget.clone());
+        let mut evaluator = Evaluator::new(&module);
+        let result = evaluator.eval_function(Value::new_none(), &[], &[]);
+        assert_stack_allocation_refusal(result, &budget);
+        assert_eq!(evaluator.call_stack_count(), 0);
     }
 
     #[test]

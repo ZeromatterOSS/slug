@@ -65,7 +65,7 @@ fn invoke<'v>(
         .get("run")
         .unwrap()
         .owned_value(caller.frozen_heap());
-    Evaluator::new(caller).eval_function(run, args, &[])
+    Evaluator::new_with_reused_call_storage_for_test(caller).eval_function(run, args, &[])
 }
 
 #[test]
@@ -178,7 +178,8 @@ fn bounded_bytecode_checks_the_iterable_after_instruction_hooks() {
             eval.current_frame.set_bc_slot(BcSlot(0).to_out(), list);
             bc.run(eval, &mut callback)
         },
-    );
+    )
+    .unwrap();
     assert!(result.is_err());
     assert_eq!(callback.calls, 1);
     assert_eq!(

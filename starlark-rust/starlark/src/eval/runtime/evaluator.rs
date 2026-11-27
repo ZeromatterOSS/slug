@@ -37,6 +37,8 @@ use crate::environment::FrozenModuleData;
 use crate::environment::Module;
 use crate::environment::slots::ModuleSlotId;
 use crate::eval::CallStack;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::eval::FileLoader;
 use crate::eval::SoftErrorHandler;
 use crate::eval::bc::addr::BcPtrAddr;
@@ -292,7 +294,11 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             prepared_modules: None,
             next_gc_level: GC_THRESHOLD,
             disable_gc: false,
-            alloca: Alloca::new(),
+            alloca: if module.heap().execution_budget().is_some() {
+                Alloca::new_lazy()
+            } else {
+                Alloca::new()
+            },
             profile_or_instrumentation_mode: ProfileOrInstrumentationMode::None,
             heap_profile: HeapProfile::new(),
             stmt_profile: StmtProfile::new(),
@@ -311,6 +317,20 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             is_cancelled: Box::new(|| false),
             infrequent_instr_check_counter: 0,
         }
+    }
+
+    /// Isolate an operation's credits from reusable call storage in budget tests.
+    /// Separate evaluator tests cover first-use frame and call-stack admission.
+    #[cfg(test)]
+    pub(crate) fn new_with_reused_call_storage_for_test(module: &'v Module) -> Self {
+        let mut eval = Self::new(module);
+        if module.heap().execution_budget().is_some() {
+            eval.alloca = Alloca::new();
+            eval.call_stack
+                .alloc_if_needed(DEFAULT_STACK_SIZE, None)
+                .unwrap();
+        }
+        eval
     }
 
     /// Disables garbage collection from now onwards. Cannot be re-enabled.
@@ -1036,14 +1056,22 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     /// Note that the `Drop` for the `T` will not be called. That's safe if there is no `Drop`,
     /// or you call it yourself.
     #[inline(always)]
-    pub(crate) fn alloca_uninit<T, R, F>(&mut self, len: usize, k: F) -> R
+    pub(crate) fn try_alloca_uninit<T, R, F>(
+        &mut self,
+        len: usize,
+        budget: Option<&ExecutionBudget>,
+        k: F,
+    ) -> Result<R, ExecutionLimit>
     where
         F: FnOnce(&mut [MaybeUninit<T>], &mut Self) -> R,
     {
         // We want to be able to access the evaluator underneath the alloca.
         // We know that the alloca will be used in a stacked way, so that's fine.
         let alloca = unsafe { cast::ptr_lifetime(&self.alloca) };
-        alloca.alloca_uninit(len, |xs| k(xs, self))
+        match budget {
+            Some(budget) => alloca.try_alloca_uninit(len, budget, |xs| k(xs, self)),
+            None => Ok(alloca.alloca_uninit(len, |xs| k(xs, self))),
+        }
     }
 
     /// Allocate `len` elements, initialize them with `init` function, and invoke
@@ -1055,6 +1083,26 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     {
         let alloca = unsafe { cast::ptr_lifetime(&self.alloca) };
         alloca.alloca_init(len, init, |xs| k(xs, self))
+    }
+
+    /// Allocate and initialize fixed-work slots using the active module's budget.
+    #[inline(always)]
+    pub(crate) fn try_alloca_init<T: Copy, R, F>(
+        &mut self,
+        len: usize,
+        init: impl Fn() -> T,
+        k: F,
+    ) -> Result<R, ExecutionLimit>
+    where
+        F: FnOnce(&mut [T], &mut Self) -> R,
+    {
+        match self.heap().execution_budget() {
+            Some(budget) => {
+                let alloca = unsafe { cast::ptr_lifetime(&self.alloca) };
+                alloca.try_alloca_init(len, budget, init, |xs| k(xs, self))
+            }
+            None => Ok(self.alloca_init(len, init, k)),
+        }
     }
 
     /// Concat two slices and invoke the callback with the result.

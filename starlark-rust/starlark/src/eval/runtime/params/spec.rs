@@ -953,7 +953,7 @@ impl<'v> ParametersSpec<Value<'v>> {
     where
         F: FnOnce(&mut ParametersParser<'v, '_>, &mut Evaluator<'v, '_, '_>) -> crate::Result<R>,
     {
-        eval.alloca_init(
+        eval.try_alloca_init(
             self.len(),
             || None,
             |slots, eval| {
@@ -968,7 +968,7 @@ impl<'v> ParametersSpec<Value<'v>> {
                 }
                 Ok(r)
             },
-        )
+        )?
     }
 }
 

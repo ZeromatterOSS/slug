@@ -14,7 +14,7 @@ use crate::values::tuple::TupleRef;
 fn run<'v>(module: &'v Module, source: &str, spread: Value<'v>) -> crate::Result<Value<'v>> {
     let ast = AstModule::parse("call.star", source.to_owned(), &Dialect::Standard).unwrap();
     module.set("spread", spread);
-    Evaluator::new(module).eval_module(ast, &Globals::standard())
+    Evaluator::new_with_reused_call_storage_for_test(module).eval_module(ast, &Globals::standard())
 }
 
 fn spread(module: &Module, count: i32) -> Value<'_> {
