@@ -17,8 +17,14 @@
 
 //! Define a common set of errors.
 
+use std::fmt;
+use std::fmt::Write;
+
 use thiserror::Error;
 
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
+use crate::values::BoundedText;
 use crate::values::StarlarkValue;
 use crate::values::Value;
 
@@ -77,6 +83,21 @@ pub(crate) enum ControlError {
 }
 
 impl ValueError {
+    #[cold]
+    pub(crate) fn bounded_message(
+        budget: &ExecutionBudget,
+        message: fmt::Arguments<'_>,
+    ) -> crate::Error {
+        let mut output = BoundedText::new(budget, usize::MAX);
+        if output.write_fmt(message).is_err() {
+            return budget.refuse(ExecutionLimit::TextFormatting).into();
+        }
+        match output.finish() {
+            Ok(message) => crate::Error::new_value(anyhow::Error::msg(message)),
+            Err(limit) => limit.into(),
+        }
+    }
+
     #[cold]
     pub(crate) fn unsupported_owned<T>(
         left: &str,

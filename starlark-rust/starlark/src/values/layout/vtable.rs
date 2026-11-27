@@ -37,6 +37,7 @@ use crate::docs::DocItem;
 use crate::environment::Methods;
 use crate::eval::Arguments;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionBudget;
 use crate::private::Private;
 use crate::typing::Ty;
 use crate::values::FreezeResult;
@@ -369,6 +370,15 @@ impl<'v> AValueDyn<'v> {
     #[inline]
     pub(crate) fn get_attr_hashed(self, name: Hashed<&str>, heap: Heap<'v>) -> Option<Value<'v>> {
         (self.vtable.starlark_value.get_attr_hashed)(self.value, name, heap)
+    }
+
+    pub(crate) fn get_attr_bounded(
+        self,
+        name: &str,
+        heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Option<Value<'v>>> {
+        (self.vtable.starlark_value.get_attr_bounded)(self.value, name, heap, budget)
     }
 
     #[inline]

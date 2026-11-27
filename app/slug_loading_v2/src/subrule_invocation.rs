@@ -38,6 +38,8 @@ use starlark::environment::MethodsStatic;
 use starlark::environment::Module;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
+use starlark::eval::ExecutionBudget;
+use starlark::eval::ExecutionLimit;
 use starlark::starlark_complex_value;
 use starlark::starlark_module;
 use starlark::values::Coerce;
@@ -668,6 +670,20 @@ impl fmt::Display for AnalysisArtifactValue {
 
 starlark::starlark_simple_value!(AnalysisArtifactValue);
 
+const FILE_ATTRS: [&str; 11] = [
+    "basename",
+    "dirname",
+    "extension",
+    "is_source",
+    "is_directory",
+    "is_symlink",
+    "label",
+    "owner",
+    "path",
+    "root",
+    "short_path",
+];
+
 #[starlark_value(type = "File")]
 impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
@@ -734,22 +750,31 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
         }
     }
 
+    fn get_attr_bounded(
+        &self,
+        name: &str,
+        heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> starlark::Result<Option<Value<'v>>> {
+        if name == "short_path" {
+            let parts = self.artifact.short_path_parts();
+            return Ok(Some(
+                heap.alloc_budgeted_str_parts(parts.as_slice())?.to_value(),
+            ));
+        }
+        if FILE_ATTRS.contains(&name) {
+            return Err(budget
+                .refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "attribute access",
+                    value_type: "File",
+                })
+                .into());
+        }
+        Ok(None)
+    }
+
     fn dir_attr(&self) -> Vec<String> {
-        [
-            "basename",
-            "dirname",
-            "extension",
-            "is_source",
-            "is_directory",
-            "is_symlink",
-            "label",
-            "owner",
-            "path",
-            "root",
-            "short_path",
-        ]
-        .map(str::to_owned)
-        .to_vec()
+        FILE_ATTRS.into_iter().map(str::to_owned).collect()
     }
 }
 

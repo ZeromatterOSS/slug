@@ -1321,6 +1321,9 @@ pub(crate) fn before_stmt(
 }
 
 #[cfg(test)]
+mod bounded_attributes_tests;
+
+#[cfg(test)]
 mod refusal_tests;
 
 #[cfg(test)]

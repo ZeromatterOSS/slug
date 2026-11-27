@@ -1135,6 +1135,22 @@ fn get_attr_no_attr_error<'v>(x: Value<'v>, attribute: &Symbol) -> crate::Error 
     }
 }
 
+#[cold]
+fn get_attr_bounded_value<'v>(
+    x: Value<'v>,
+    attribute: &str,
+    heap: Heap<'v>,
+    budget: &crate::eval::ExecutionBudget,
+) -> crate::Result<Value<'v>> {
+    x.get_attr_bounded(attribute, heap, budget)?.ok_or_else(|| {
+        let typ = x.get_type();
+        ValueError::bounded_message(
+            budget,
+            format_args!("Object of type `{typ}` has no attribute `{attribute}`"),
+        )
+    })
+}
+
 pub(crate) enum MemberOrValue<'v, 'a> {
     Member(&'a UnboundValue),
     Value(Value<'v>),
@@ -1162,6 +1178,10 @@ pub(crate) fn get_attr_hashed_raw<'v>(
     attribute: &Symbol,
     heap: Heap<'v>,
 ) -> crate::Result<MemberOrValue<'v, 'static>> {
+    if let Some(budget) = heap.bounded_attribute_budget() {
+        return get_attr_bounded_value(x, attribute.as_str(), heap, budget)
+            .map(MemberOrValue::Value);
+    }
     let aref = x.get_ref();
     if let Some(methods) = aref.vtable().methods() {
         if let Some(v) = methods.get_frozen_symbol(attribute) {
@@ -1179,6 +1199,9 @@ pub(crate) fn get_attr_hashed_bind<'v>(
     attribute: &Symbol,
     heap: Heap<'v>,
 ) -> crate::Result<Value<'v>> {
+    if let Some(budget) = heap.bounded_attribute_budget() {
+        return get_attr_bounded_value(x, attribute.as_str(), heap, budget);
+    }
     let aref = x.get_ref();
     if let Some(methods) = aref.vtable().methods() {
         if let Some(v) = methods.get_frozen_symbol(attribute) {

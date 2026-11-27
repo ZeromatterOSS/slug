@@ -969,6 +969,9 @@ impl<'v> Value<'v> {
 
     /// Return the attribute with the given name.
     pub fn get_attr(self, attribute: &str, heap: Heap<'v>) -> crate::Result<Option<Value<'v>>> {
+        if let Some(budget) = heap.bounded_attribute_budget() {
+            return self.get_attr_bounded(attribute, heap, budget);
+        }
         let aref = self.get_ref();
         if let Some(methods) = aref.vtable().methods() {
             let attribute = Hashed::new(attribute);
@@ -981,24 +984,87 @@ impl<'v> Value<'v> {
         }
     }
 
+    pub(crate) fn get_attr_bounded(
+        self,
+        attribute: &str,
+        heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Option<Value<'v>>> {
+        budget.charge(1 + ExecutionBudget::text_work(attribute.len()), 0)?;
+        let aref = self.get_ref();
+        let vtable = &aref.vtable().starlark_value;
+        let unsupported = || {
+            budget.refuse(ExecutionLimit::UnsupportedOperation {
+                operation: "attribute access",
+                value_type: self.get_type(),
+            })
+        };
+
+        // Native members take precedence over dynamic fields. Until a
+        // registry has an admitted lookup, it cannot be used to decide absence.
+        if vtable.HAS_get_methods {
+            return Err(unsupported().into());
+        }
+        if vtable.HAS_get_attr_bounded {
+            return aref.get_attr_bounded(attribute, heap, budget);
+        }
+        if vtable.HAS_get_attr || vtable.HAS_get_attr_hashed {
+            return Err(unsupported().into());
+        }
+        Ok(None)
+    }
+
     /// Like `get_attr` but return an error if the attribute is not available.
     pub fn get_attr_error(self, attribute: &str, heap: Heap<'v>) -> crate::Result<Value<'v>> {
         match self.get_attr(attribute, heap)? {
-            None => ValueError::unsupported_owned(self.get_type(), &format!(".{attribute}"), None),
+            None => Err(self.attribute_not_supported(attribute, heap)),
             Some(x) => Ok(x),
+        }
+    }
+
+    pub(crate) fn attribute_not_supported(self, attribute: &str, heap: Heap<'v>) -> crate::Error {
+        let typ = self.get_type();
+        if let Some(budget) = heap.bounded_attribute_budget() {
+            ValueError::bounded_message(
+                budget,
+                format_args!("Operation `.{attribute}` not supported on type `{typ}`"),
+            )
+        } else {
+            ValueError::OperationNotSupported {
+                op: format!(".{attribute}"),
+                typ: typ.to_owned(),
+            }
+            .into()
         }
     }
 
     /// Query whether an attribute exists on a type. Should be equivalent to whether
     /// [`get_attr`](Value::get_attr) succeeds, but potentially more efficient.
+    /// On a bounded heap a refusal is recorded in its budget and returns false.
     pub fn has_attr(self, attribute: &str, heap: Heap<'v>) -> bool {
+        self.try_has_attr(attribute, heap).unwrap_or(false)
+    }
+
+    pub(crate) fn try_has_attr(self, attribute: &str, heap: Heap<'v>) -> crate::Result<bool> {
+        if let Some(budget) = heap.bounded_attribute_budget() {
+            let vtable = &self.vtable().starlark_value;
+            if vtable.HAS_has_attr && !vtable.HAS_get_attr_bounded {
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "attribute access",
+                        value_type: self.get_type(),
+                    })
+                    .into());
+            }
+            return Ok(self.get_attr_bounded(attribute, heap, budget)?.is_some());
+        }
         let aref = self.get_ref();
         if let Some(methods) = aref.vtable().methods() {
             if methods.get(attribute).is_some() {
-                return true;
+                return Ok(true);
             }
         }
-        aref.has_attr(attribute, heap)
+        Ok(aref.has_attr(attribute, heap))
     }
 
     /// Get a list of all the attributes this function supports, used to implement the

@@ -2,6 +2,7 @@
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::WorkspaceStatusArtifacts;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use starlark::environment::Globals;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 use starlark::values::FrozenHeap;
@@ -168,4 +169,74 @@ fn file_properties_preserve_bytes_type_hash_errors_and_frozen_results() {
         errors.push(error);
     }
     println!("FILE_PATH_ERRORS={errors:?}");
+}
+
+#[test]
+fn bounded_file_short_path_matches_ordinary_dot_getattr_and_host_access() {
+    for artifact in artifacts() {
+        let expected = artifact.short_path();
+        let ordinary = Module::new();
+        let budget = Arc::new(ExecutionBudget::new(4096, 1 << 20, 16).with_bounded_attributes());
+        let bounded = Module::new_with_execution_budget(budget.clone());
+        for module in [&ordinary, &bounded] {
+            let heap = module.heap();
+            let file = heap.alloc_simple(AnalysisArtifactValue::new(artifact.clone()));
+            let host = file.get_attr("short_path", heap).unwrap().unwrap();
+            assert_eq!(host.unpack_str(), Some(expected.as_ref()));
+            assert!(file.get_attr("unknown", heap).unwrap().is_none());
+
+            module.set("file", file);
+            let ast = AstModule::parse(
+                "file.bzl",
+                "(file.short_path, getattr(file, 'short_path'), getattr(file, 'unknown', 'fallback'))"
+                    .to_owned(),
+                &Dialect::Bazel,
+            )
+            .unwrap();
+            let value = Evaluator::new(module)
+                .eval_module(ast, &Globals::standard())
+                .unwrap();
+            let result = TupleRef::from_value(value).unwrap();
+            assert!(result.iter().map(|value| value.unpack_str()).eq([
+                Some(expected.as_ref()),
+                Some(expected.as_ref()),
+                Some("fallback"),
+            ]));
+        }
+        assert_eq!(budget.check(), Ok(()));
+    }
+}
+
+#[test]
+fn bounded_file_refuses_known_unadmitted_attribute_through_every_read_route() {
+    let artifact = AnalysisArtifact::Source(CanonicalLabel::parse("@@//pkg:file").unwrap());
+    let refused = ExecutionLimit::UnsupportedOperation {
+        operation: "attribute access",
+        value_type: "File",
+    };
+    for source in [None, Some("file.path"), Some("getattr(file, 'path', None)")] {
+        let budget = Arc::new(ExecutionBudget::new(4096, 1 << 20, 16).with_bounded_attributes());
+        let module = Module::new_with_execution_budget(budget.clone());
+        let heap = module.heap();
+        let file = heap.alloc_simple(AnalysisArtifactValue::new(artifact.clone()));
+        let error = match source {
+            Some(source) => {
+                module.set("file", file);
+                Evaluator::new(&module)
+                    .eval_module(
+                        AstModule::parse("file.bzl", source.to_owned(), &Dialect::Bazel).unwrap(),
+                        &Globals::standard(),
+                    )
+                    .unwrap_err()
+            }
+            None => file.get_attr("path", heap).unwrap_err(),
+        };
+        match error.kind() {
+            starlark::ErrorKind::Native(error) | starlark::ErrorKind::Other(error) => {
+                assert_eq!(error.downcast_ref::<ExecutionLimit>(), Some(&refused));
+            }
+            error => panic!("unexpected error: {error:?}"),
+        }
+        assert_eq!(budget.check(), Err(refused));
+    }
 }

@@ -28,6 +28,7 @@ use crate::eval::Evaluator;
 use crate::values::AllocValue;
 use crate::values::FrozenStringValue;
 use crate::values::Heap;
+use crate::values::UnpackValue;
 use crate::values::Value;
 use crate::values::ValueError;
 use crate::values::ValueLike;
@@ -39,6 +40,22 @@ use crate::values::typing::ty::AbstractType;
 use crate::values::value_of_unchecked::ValueOfUnchecked;
 
 mod sorted_budget;
+
+fn attribute_name<'v>(value: Value<'v>, heap: Heap<'v>) -> crate::Result<&'v str> {
+    let Some(budget) = heap.bounded_attribute_budget() else {
+        return <&str>::unpack_named_param(value, "attr");
+    };
+    budget.charge(1, 0)?;
+    value.unpack_str().ok_or_else(|| {
+        let typ = value.get_type();
+        ValueError::bounded_message(
+            budget,
+            format_args!(
+                "Type of parameter `attr` doesn't match, expected `string`, actual `{typ}`"
+            ),
+        )
+    })
+}
 
 #[starlark_module]
 pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
@@ -144,7 +161,18 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// # "#);
     /// ```
     #[starlark(speculative_exec_safe)]
-    fn dir(#[starlark(require = pos)] x: Value) -> anyhow::Result<Vec<String>> {
+    fn dir<'v>(
+        #[starlark(require = pos)] x: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Vec<String>> {
+        if let Some(budget) = heap.bounded_attribute_budget() {
+            return Err(budget
+                .refuse(crate::eval::ExecutionLimit::UnsupportedOperation {
+                    operation: "attribute enumeration",
+                    value_type: x.get_type(),
+                })
+                .into());
+        }
         Ok(x.dir_attr())
     }
 
@@ -199,16 +227,17 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     #[starlark(speculative_exec_safe)]
     fn getattr<'v>(
         #[starlark(require = pos)] a: Value<'v>,
-        #[starlark(require = pos)] attr: &str,
+        #[starlark(require = pos)] attr: ValueOfUnchecked<'v, &'v str>,
         #[starlark(require = pos)] default: Option<Value<'v>>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
+        let attr = attribute_name(attr.get(), heap)?;
         // TODO(nga): this doesn't cache string hash, so it is suboptimal.
         match a.get_attr(attr, heap)? {
             Some(v) => Ok(v),
             None => match default {
                 Some(x) => Ok(x),
-                None => ValueError::unsupported_owned(a.get_type(), &format!(".{attr}"), None),
+                None => Err(a.attribute_not_supported(attr, heap)),
             },
         }
     }
@@ -222,10 +251,10 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     #[starlark(speculative_exec_safe)]
     fn hasattr<'v>(
         #[starlark(require = pos)] a: Value<'v>,
-        #[starlark(require = pos)] attr: &str,
+        #[starlark(require = pos)] attr: ValueOfUnchecked<'v, &'v str>,
         heap: Heap<'v>,
-    ) -> anyhow::Result<bool> {
-        Ok(a.has_attr(attr, heap))
+    ) -> starlark::Result<bool> {
+        a.try_has_attr(attribute_name(attr.get(), heap)?, heap)
     }
 
     /// [hash](

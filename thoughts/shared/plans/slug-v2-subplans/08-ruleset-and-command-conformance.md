@@ -167,8 +167,9 @@ runtime and preserve original bytecode after freeze. The parser bounds bytes,
 grammar tokens, and integer digits. Shared sticky runtime credits cover text,
 interpolation, stable sort, ordered depsets with structural provider identity,
 argument binding, evaluator frames, and bytecode dispatch with loop cleanup.
-Bound freeze, projections, diagnostics, and remaining native and collection
-operations before activation.
+Bounded field access projects File short paths from borrowed pieces. Admit
+other projections, native methods, freeze, diagnostics, and remaining
+collection operations before activation.
 Resource outcomes are Slug-native.
 Bazel 9.2's `StarlarkOutputFormatterCallback` and `configured_query_test.sh`
 define setup and partial-output semantics.

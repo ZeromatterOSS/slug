@@ -49,6 +49,7 @@ use crate::docs::DocProperty;
 use crate::environment::Methods;
 use crate::eval::Arguments;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionBudget;
 use crate::private::Private;
 use crate::typing::Ty;
 use crate::typing::TyBasic;
@@ -623,6 +624,18 @@ pub trait StarlarkValue<'v>:
     /// [`get_attr`](Self::get_attr).
     fn get_attr_hashed(&self, attribute: Hashed<&str>, heap: Heap<'v>) -> Option<Value<'v>> {
         self.get_attr(attribute.key(), heap)
+    }
+
+    /// Project a field during bounded attribute lookup. Return `None` for a
+    /// missing field and refuse existing fields without a bounded projection.
+    /// The implementation must admit its work and allocations before use.
+    fn get_attr_bounded(
+        &self,
+        _attribute: &str,
+        _heap: Heap<'v>,
+        _budget: &ExecutionBudget,
+    ) -> crate::Result<Option<Value<'v>>> {
+        Ok(None)
     }
 
     /// Return true if an attribute of name `attribute` exists for the current

@@ -159,6 +159,58 @@ impl<'v> Heap<'v> {
         Ok(self.alloc_str(text))
     }
 
+    /// Allocate the concatenated result directly in the heap, charging for each
+    /// pass over the parts and the aligned result before touching either.
+    pub fn alloc_budgeted_str_parts(
+        self,
+        parts: &[&str],
+    ) -> Result<StringValue<'v>, ExecutionLimit> {
+        let budget = self.execution_budget();
+        if let Some(budget) = budget {
+            budget.charge(parts.len(), 0)?;
+        }
+        let overflow = || {
+            budget.map_or(ExecutionLimit::AllocationBytes, |budget| {
+                budget.refuse(ExecutionLimit::AllocationBytes)
+            })
+        };
+        let mut len = 0usize;
+        let mut last_nonempty = "";
+        for &part in parts {
+            len = len.checked_add(part.len()).ok_or_else(overflow)?;
+            if !part.is_empty() {
+                last_nonempty = part;
+            }
+        }
+        if len <= 1 {
+            return Ok(self.alloc_str(last_nonempty));
+        }
+
+        let payload = StarlarkStr::payload_len_for_len(len);
+        let bytes = StarlarkStrAValue::checked_alloc_size_for_extra_len(payload)
+            .ok_or_else(overflow)?
+            .bytes() as usize;
+        if let Some(budget) = budget {
+            let work = parts
+                .len()
+                .checked_add(1 + ExecutionBudget::text_work(len))
+                .ok_or_else(|| budget.refuse(ExecutionLimit::Work))?;
+            budget.charge(work, bytes)?;
+        }
+        Ok(
+            self.alloc_str_init(len, StarlarkStr::UNINIT_HASH, |mut dest| {
+                for part in parts {
+                    // SAFETY: The checked length is the sum of the UTF-8 parts.
+                    // The fresh allocation is disjoint from all input slices.
+                    unsafe {
+                        copy_nonoverlapping(part.as_ptr(), dest, part.len());
+                        dest = dest.add(part.len());
+                    }
+                }
+            }),
+        )
+    }
+
     /// Allocate a string on the heap.
     pub fn alloc_str(self, x: &str) -> StringValue<'v> {
         if let Some(x) = constant_string(x) {
@@ -225,5 +277,57 @@ impl<'v> Heap<'v> {
         let mut dst = [0; 4];
         let res = x.encode_utf8(&mut dst);
         self.alloc_str(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::environment::Module;
+
+    #[test]
+    fn string_parts_precharge_both_passes_and_aligned_bytes() {
+        let prefix = "a".repeat(254);
+        let parts = ["", prefix.as_str(), "é", "", "雪/"];
+        let expected = format!("{prefix}é雪/");
+        let payload = StarlarkStr::payload_len_for_len(expected.len());
+        let bytes = StarlarkStrAValue::checked_alloc_size_for_extra_len(payload)
+            .unwrap()
+            .bytes() as usize;
+        let work = 2 * parts.len() + 1 + 2;
+        for (work, bytes, refused) in [
+            (work - 1, bytes, Some(ExecutionLimit::Work)),
+            (work, bytes - 1, Some(ExecutionLimit::AllocationBytes)),
+            (work, bytes, None),
+        ] {
+            let budget = Arc::new(ExecutionBudget::new(work, bytes, 1));
+            let module = Module::new_with_execution_budget(budget.clone());
+            let actual = module.heap().alloc_budgeted_str_parts(&parts);
+            if let Some(refused) = refused {
+                assert_eq!(actual.err(), Some(refused));
+                assert_eq!(budget.check(), Err(refused));
+            } else {
+                assert_eq!(actual.unwrap().as_str(), expected);
+                assert_eq!(budget.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+            }
+        }
+    }
+
+    #[test]
+    fn empty_and_one_byte_parts_use_static_strings() {
+        let budget = Arc::new(ExecutionBudget::new(5, 0, 1));
+        let module = Module::new_with_execution_budget(budget.clone());
+        let heap = module.heap();
+        for (parts, expected) in [(&["", ""][..], ""), (&["", "x", ""][..], "x")] {
+            let actual = heap.alloc_budgeted_str_parts(parts).unwrap();
+            assert_eq!(actual.as_str(), expected);
+            assert_eq!(
+                actual.as_str().as_ptr(),
+                heap.alloc_str(expected).as_str().as_ptr()
+            );
+        }
+        assert_eq!(budget.charge(1, 0), Err(ExecutionLimit::Work));
     }
 }

@@ -63,6 +63,7 @@ struct Credits {
 pub struct ExecutionBudget {
     state: Mutex<Result<Credits, ExecutionLimit>>,
     text_depth: usize,
+    bounded_attributes: bool,
 }
 
 impl ExecutionBudget {
@@ -75,7 +76,19 @@ impl ExecutionBudget {
                 allocation_bytes,
             })),
             text_depth,
+            bounded_attributes: false,
         }
+    }
+
+    /// Require bounded field models and refuse unadmitted native member access
+    /// on every heap sharing this request.
+    pub fn with_bounded_attributes(mut self) -> Self {
+        self.bounded_attributes = true;
+        self
+    }
+
+    pub(crate) fn bounds_attributes(&self) -> bool {
+        self.bounded_attributes
     }
 
     /// Admit work and the full requested allocation before either occurs.

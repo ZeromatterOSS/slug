@@ -1648,6 +1648,9 @@ fn call_maybe_known_method_common<'v>(
     span: FrozenRef<'static, FrameSpan>,
     target: BcSlotOut,
 ) -> crate::Result<()> {
+    if eval.heap().bounded_attribute_budget().is_some() {
+        return call_method_common(eval, frame, this, symbol, arguments, span, target);
+    }
     if let Some(methods) = this.vtable().methods() {
         // Instead of method lookup by name, we compare `Methods` pointers.
         // If pointers are equal, getattr would return the same method
