@@ -8,7 +8,10 @@ use std::os::unix::fs::OpenOptionsExt;
 
 use super::*;
 
-const CONFIG_SHA: &str = "933102028a1dd729d5dd0f6ab5988c91ef2dcfb67ccfaf60de1415f0019af203";
+const PINNED_INVENTORY: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/native-inputs.json"
+));
 const MAX_CONFIG: u64 = 128 * 1024;
 const MAX_COMPRESSED: u64 = 128 * 1024 * 1024;
 const SENTINEL: &[u8] = b"six original archives completed through the generic owner\n";
@@ -75,6 +78,59 @@ struct Input {
     digest: [u8; 32],
     operation: RepositoryWorkspaceOperation,
 }
+
+fn verified_inventory(staged: &serde_json::Value) -> Result<serde_json::Value, &'static str> {
+    let pinned: serde_json::Value = serde_json::from_slice(PINNED_INVENTORY).unwrap();
+    let fixture = pinned["fixture"].as_str().unwrap();
+    let digest = hex::encode(sha2::Sha256::digest(PINNED_INVENTORY));
+    if staged["fixture"].as_str() != Some(fixture) {
+        return Err("staged inventory fixture name differs from pinned inventory");
+    }
+    if staged["inventory_sha256"].as_str() != Some(digest.as_str()) {
+        return Err("staged inventory SHA-256 differs from pinned inventory");
+    }
+    if staged["objects"] != pinned["objects"] {
+        return Err("staged inventory objects differ from pinned inventory");
+    }
+    Ok(pinned)
+}
+
+#[test]
+fn staged_inventory_accepts_relocation_and_refuses_tampered_pins() {
+    let pinned: serde_json::Value = serde_json::from_slice(PINNED_INVENTORY).unwrap();
+    let staged = |root: &str| {
+        serde_json::json!({
+            "fixture": pinned["fixture"],
+            "inventory_sha256": hex::encode(sha2::Sha256::digest(PINNED_INVENTORY)),
+            "objects": pinned["objects"],
+            "workspace": format!("{root}/workspace"),
+            "registry_uri": format!("file://{root}/registry/"),
+            "distdirs": [format!("{root}/flat-distdir")],
+        })
+    };
+    assert_eq!(verified_inventory(&staged("/first")).unwrap(), pinned);
+    assert_eq!(verified_inventory(&staged("/second")).unwrap(), pinned);
+
+    let mut wrong_fixture = staged("/first");
+    wrong_fixture["fixture"] = serde_json::json!("different-fixture");
+    assert_eq!(
+        verified_inventory(&wrong_fixture),
+        Err("staged inventory fixture name differs from pinned inventory")
+    );
+    let mut wrong_digest = staged("/first");
+    wrong_digest["inventory_sha256"] = serde_json::json!("0".repeat(64));
+    assert_eq!(
+        verified_inventory(&wrong_digest),
+        Err("staged inventory SHA-256 differs from pinned inventory")
+    );
+    let mut wrong_objects = staged("/first");
+    wrong_objects["objects"][0]["sha256"] = serde_json::json!("0".repeat(64));
+    assert_eq!(
+        verified_inventory(&wrong_objects),
+        Err("staged inventory objects differ from pinned inventory")
+    );
+}
+
 fn inputs() -> (std::path::PathBuf, Frame, Vec<Input>) {
     let config_path = std::path::PathBuf::from(
         std::env::var_os("SLUG_NATIVE_RUST_INPUTS").expect("pinned source-only inventory required"),
@@ -88,10 +144,12 @@ fn inputs() -> (std::path::PathBuf, Frame, Vec<Input>) {
         .read_to_end(&mut bytes)
         .unwrap();
     assert_eq!(bytes.len() as u64, config_frame.size);
-    assert_eq!(hex::encode(sha2::Sha256::digest(&bytes)), CONFIG_SHA);
     unchanged(&config_path, &config_file, config_frame);
-    let config: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    let rows = config["objects"].as_array().unwrap();
+    let staged = serde_json::from_slice(&bytes).unwrap();
+    // Staging locations depend on the destination. The checked-in rows supply
+    // archive expectations, and their paths resolve beside the staged inventory.
+    let pinned = verified_inventory(&staged).expect("source-only inventory required");
+    let rows = pinned["objects"].as_array().unwrap();
     let mut inputs = Vec::with_capacity(INPUTS.len());
     for (stem, component) in INPUTS {
         let relative = format!("distdir/rust/{stem}.tar.xz");
