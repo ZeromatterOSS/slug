@@ -1091,6 +1091,11 @@ where
         Ok(true)
     }
 
+    fn equals_none_bounded(&self) -> Option<bool> {
+        // Ordinary equality rejects a non-provider before inspecting fields.
+        Some(false)
+    }
+
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         if !self.is_structurally_immutable() {
             return Err(starlark::Error::new_other(anyhow::anyhow!(

@@ -139,6 +139,8 @@ use crate::values::types::tuple::value::FrozenTuple;
 use crate::values::types::tuple::value::Tuple;
 use crate::values::types::unbound::MemberOrValue;
 
+mod predicates;
+
 // We already import another `ValueError`, hence the odd name.
 #[derive(Debug, thiserror::Error)]
 enum ValueValueError {

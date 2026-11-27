@@ -1327,6 +1327,9 @@ mod bounded_attributes_tests;
 mod bounded_method_dispatch_tests;
 
 #[cfg(test)]
+mod bounded_predicates_tests;
+
+#[cfg(test)]
 mod refusal_tests;
 
 #[cfg(test)]

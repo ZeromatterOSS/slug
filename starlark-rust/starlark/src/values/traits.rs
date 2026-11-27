@@ -454,6 +454,13 @@ pub trait StarlarkValue<'v>:
         Ok(false)
     }
 
+    /// Compare an already distinct value to `None` during bounded evaluation.
+    /// Opt in only when this matches ordinary equality without allocation or
+    /// more than constant work. Return `None` when that comparison is unmodeled.
+    fn equals_none_bounded(&self) -> Option<bool> {
+        None
+    }
+
     /// Compare `self` with `other`.
     /// This method returns a result of type [`Ordering`], or an [`Err`]
     /// if the two types differ.

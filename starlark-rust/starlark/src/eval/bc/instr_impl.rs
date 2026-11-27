@@ -469,8 +469,8 @@ pub(crate) type InstrEqInt = InstrNoFlow<InstrEqIntImpl>;
 
 impl InstrBinOpImpl for InstrEqImpl {
     #[inline(always)]
-    fn eval<'v>(v0: Value<'v>, v1: Value<'v>, _heap: Heap<'v>) -> crate::Result<Value<'v>> {
-        v0.equals(v1).map(Value::new_bool)
+    fn eval<'v>(v0: Value<'v>, v1: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        v0.equals_in_heap(v1, heap).map(Value::new_bool)
     }
 }
 
@@ -479,13 +479,17 @@ impl InstrNoFlowImpl for InstrEqConstImpl {
 
     #[inline(always)]
     fn run_with_args<'v>(
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
         frame: BcFramePtr<'v>,
         _ip: BcPtrAddr,
         (a, b, target): &(BcSlotIn, FrozenValueNotSpecial, BcSlotOut),
     ) -> crate::Result<()> {
         let a = frame.get_bc_slot(*a);
-        let r = b.equals(a)?;
+        let r = if let Some(budget) = eval.heap().bounded_operation_budget() {
+            b.to_value().equals_bounded(a, budget)?
+        } else {
+            b.equals(a)?
+        };
         frame.set_bc_slot(*target, Value::new_bool(r));
         Ok(())
     }
@@ -513,13 +517,15 @@ impl InstrNoFlowImpl for InstrEqIntImpl {
 
     #[inline(always)]
     fn run_with_args<'v>(
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
         frame: BcFramePtr<'v>,
         _ip: BcPtrAddr,
         (a, b, target): &(BcSlotIn, FrozenValueTyped<'static, PointerI32>, BcSlotOut),
     ) -> crate::Result<()> {
         let a = frame.get_bc_slot(*a);
-        let r = if let Some(a) = a.unpack_int_value() {
+        let r = if let Some(budget) = eval.heap().bounded_operation_budget() {
+            b.to_frozen_value().to_value().equals_bounded(a, budget)?
+        } else if let Some(a) = a.unpack_int_value() {
             a.as_ref() == b.as_ref()
         } else {
             b.equals(a)?
@@ -534,13 +540,15 @@ impl InstrNoFlowImpl for InstrEqStrImpl {
 
     #[inline(always)]
     fn run_with_args<'v>(
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
         frame: BcFramePtr<'v>,
         _ip: BcPtrAddr,
         (a, b, target): &(BcSlotIn, FrozenStringValue, BcSlotOut),
     ) -> crate::Result<()> {
         let a = frame.get_bc_slot(*a);
-        let r = if let Some(a) = StringValue::new(a) {
+        let r = if let Some(budget) = eval.heap().bounded_operation_budget() {
+            b.to_frozen_value().to_value().equals_bounded(a, budget)?
+        } else if let Some(a) = StringValue::new(a) {
             a == b.to_string_value()
         } else {
             false
@@ -562,8 +570,8 @@ pub(crate) type InstrBitNot = InstrUnOp<InstrBitNotImpl>;
 
 impl InstrUnOpImpl for InstrNotImpl {
     #[inline(always)]
-    fn eval<'v>(v: Value<'v>, _heap: Heap<'v>) -> crate::Result<Value<'v>> {
-        Ok(Value::new_bool(!v.to_bool()))
+    fn eval<'v>(v: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        Ok(Value::new_bool(!v.truth_in_heap(heap)?))
     }
 }
 
@@ -1208,16 +1216,16 @@ impl BcInstr for InstrIfBr {
 
     #[inline(always)]
     fn run<'v, 'b>(
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
         frame: BcFramePtr<'v>,
         ip: BcPtrAddr<'b>,
         (cond, target): &(BcSlotIn, BcAddrOffset),
     ) -> InstrControl<'v, 'b> {
         let cond = frame.get_bc_slot(*cond);
-        if cond.to_bool() {
-            InstrControl::Next(ip.add_rel(*target))
-        } else {
-            InstrControl::Next(ip.add_instr::<Self>())
+        match cond.truth_in_heap(eval.heap()) {
+            Ok(true) => InstrControl::Next(ip.add_rel(*target)),
+            Ok(false) => InstrControl::Next(ip.add_instr::<Self>()),
+            Err(error) => InstrControl::Err(error),
         }
     }
 }
@@ -1227,16 +1235,16 @@ impl BcInstr for InstrIfNotBr {
 
     #[inline(always)]
     fn run<'v, 'b>(
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
         frame: BcFramePtr<'v>,
         ip: BcPtrAddr<'b>,
         (cond, target): &(BcSlotIn, BcAddrOffset),
     ) -> InstrControl<'v, 'b> {
         let cond = frame.get_bc_slot(*cond);
-        if !cond.to_bool() {
-            InstrControl::Next(ip.add_rel(*target))
-        } else {
-            InstrControl::Next(ip.add_instr::<Self>())
+        match cond.truth_in_heap(eval.heap()) {
+            Ok(false) => InstrControl::Next(ip.add_rel(*target)),
+            Ok(true) => InstrControl::Next(ip.add_instr::<Self>()),
+            Err(error) => InstrControl::Err(error),
         }
     }
 }

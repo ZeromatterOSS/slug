@@ -544,6 +544,15 @@ impl<'v> AValueDyn<'v> {
         (self.vtable.starlark_value.equals)(self.value, other)
     }
 
+    pub(crate) fn equals_none_bounded(self) -> Option<bool> {
+        let vtable = &self.vtable.starlark_value;
+        if vtable.HAS_equals_none_bounded {
+            (vtable.equals_none_bounded)(self.value)
+        } else {
+            None
+        }
+    }
+
     #[inline]
     pub(crate) fn compare(self, other: Value<'v>) -> crate::Result<Ordering> {
         (self.vtable.starlark_value.compare)(self.value, other)

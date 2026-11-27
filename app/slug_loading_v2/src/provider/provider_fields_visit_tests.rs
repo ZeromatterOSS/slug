@@ -1,5 +1,8 @@
 //! Borrowed field visits and lookup cover actual moving and frozen provider owners.
+use starlark::environment::Globals;
 use starlark::environment::Module;
+use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
 
 use super::*;
 
@@ -50,6 +53,46 @@ fn bounded_user_provider_lookup_preserves_live_field_identity_and_absence() {
             assert!(provider.get_attr(missing, heap).unwrap().is_none());
         }
     }
+    assert_eq!(budget.check(), Ok(()));
+}
+
+#[test]
+fn bounded_provider_inequality_with_none_preserves_live_and_frozen_values() {
+    let source = Module::new();
+    source.set(
+        "frozen_provider",
+        user_provider(&source, None, &[("value", Value::new_bool(true))]),
+    );
+    let source = source.freeze().unwrap();
+    let frozen_provider = source.get("frozen_provider").unwrap();
+
+    let budget = Arc::new(ExecutionBudget::new(100_000, 1 << 20, 16).with_bounded_operations());
+    let module = Module::new_with_execution_budget(budget.clone());
+    module.set(
+        "live_provider",
+        user_provider(
+            &module,
+            Some(&["value"]),
+            &[("value", Value::new_bool(true))],
+        ),
+    );
+    module.set(
+        "frozen_provider",
+        frozen_provider.owned_value(module.frozen_heap()),
+    );
+    let ast = AstModule::parse(
+        "provider_predicates.star",
+        "live_provider != None and frozen_provider != None and None != live_provider".to_owned(),
+        &Dialect::Standard,
+    )
+    .unwrap();
+    assert_eq!(
+        Evaluator::new(&module)
+            .eval_module(ast, &Globals::standard())
+            .unwrap()
+            .unpack_bool(),
+        Some(true)
+    );
     assert_eq!(budget.check(), Ok(()));
 }
 
