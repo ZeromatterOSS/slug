@@ -39,6 +39,16 @@ impl<'v> Heap<'v> {
         value: Value<'v>,
         operation: &'static str,
     ) -> crate::Result<StarlarkIterator<'v>> {
+        self.admit_bounded_iteration(value, operation)?;
+        value.iterate(self)
+    }
+
+    /// Admit startup and fixed-cost steps for the bytecode loop owner.
+    pub(crate) fn admit_bounded_iteration(
+        self,
+        value: Value<'v>,
+        operation: &'static str,
+    ) -> crate::Result<()> {
         if let Some(budget) = self.execution_budget() {
             budget.charge(1, 0)?;
             if !TyStarlarkValue::is_iterable(&value.vtable().starlark_value) {
@@ -59,7 +69,7 @@ impl<'v> Heap<'v> {
                     .into());
             }
         }
-        value.iterate(self)
+        Ok(())
     }
 }
 

@@ -37,6 +37,8 @@ use crate::eval::compiler::add_span_to_expr_error;
 use crate::eval::runtime::evaluator::EvaluationCallbacks;
 use crate::values::Value;
 
+mod bounded;
+
 /// Ready to execute bytecode.
 #[derive(Default)]
 pub(crate) struct Bc {
@@ -99,6 +101,9 @@ impl Bc {
     ) -> Result<Value<'v>, EvalException> {
         debug_assert!(eval.current_frame.is_inititalized());
         debug_assert_eq!(self.max_stack_size, eval.current_frame.max_stack_size());
+        if let Some(budget) = eval.heap().execution_budget() {
+            return bounded::run_block(self, eval, ec, budget);
+        }
         run_block(eval, ec, self.instrs.start_ptr())
     }
 
@@ -123,8 +128,19 @@ fn step<'v, 'b, EC: EvaluationCallbacks>(
     ip: BcPtrAddr<'b>,
 ) -> InstrControl<'v, 'b> {
     let opcode = ip.get_opcode();
-    // println!("{}: {:?}", self.current_ip, opcode);
+    match ec.before_instr(eval, ip, opcode) {
+        Ok(()) => dispatch(eval, frame, ip, opcode),
+        Err(e) => InstrControl::Err(e),
+    }
+}
 
+#[cfg_attr(not(debug_assertions), inline(always))]
+fn dispatch<'v, 'b>(
+    eval: &mut Evaluator<'v, '_, '_>,
+    frame: BcFramePtr<'v>,
+    ip: BcPtrAddr<'b>,
+    opcode: BcOpcode,
+) -> InstrControl<'v, 'b> {
     struct HandlerImpl<'v, 'a, 'e, 'y, 'b> {
         eval: &'y mut Evaluator<'v, 'a, 'e>,
         frame: BcFramePtr<'v>,
@@ -140,10 +156,6 @@ fn step<'v, 'b, EC: EvaluationCallbacks>(
         }
     }
 
-    match ec.before_instr(eval, ip, opcode) {
-        Ok(()) => {}
-        Err(e) => return InstrControl::Err(e),
-    }
     opcode.dispatch(HandlerImpl { eval, frame, ip })
 }
 
