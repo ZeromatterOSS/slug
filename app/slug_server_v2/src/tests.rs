@@ -65,6 +65,18 @@ fn write(path: &Path, content: &str) {
 }
 
 #[test]
+fn serve_keeps_socket_path_when_runtime_construction_fails() {
+    let root = tempfile::tempdir().unwrap();
+    let socket = crate::socket_path(root.path());
+    let sentinel = b"existing socket path";
+    fs::write(&socket, sentinel).unwrap();
+
+    let error = crate::serve(&socket, root.path().join("missing-workspace")).unwrap_err();
+    assert!(error.to_string().contains("canonicalizing workspace"));
+    assert_eq!(fs::read(&socket).unwrap(), sentinel);
+}
+
+#[test]
 fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
     let workspace = scratch("repository-environment-wire");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

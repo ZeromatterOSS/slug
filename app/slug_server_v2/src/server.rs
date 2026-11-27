@@ -379,12 +379,14 @@ mod frame;
 /// Run the daemon server on the given Unix socket path. Blocks until a
 /// `shutdown` request is received or the process is killed.
 pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyhow::Result<()> {
-    let socket_path = socket_path.as_ref();
-    let workspace = workspace.as_ref();
+    let daemon = Daemon::new(workspace)?;
+    serve_daemon(socket_path.as_ref(), daemon)
+}
+
+fn serve_daemon(socket_path: &Path, mut daemon: Daemon) -> anyhow::Result<()> {
     let _ = std::fs::remove_file(socket_path);
     let listener = UnixListener::bind(socket_path)
         .with_context(|| format!("binding daemon socket {}", socket_path.display()))?;
-    let mut daemon = Daemon::new(workspace)?;
     eprintln!(
         "{{\"daemon\":\"started\",\"socket\":\"{}\"}}",
         socket_path.display()
