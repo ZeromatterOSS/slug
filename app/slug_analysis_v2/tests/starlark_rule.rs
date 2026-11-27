@@ -3595,6 +3595,220 @@ optional_target = rule(implementation = _first, attrs = {{"marker": attr.string(
     }
 }
 
+#[derive(Default)]
+struct ToolchainRegistrationTracker {
+    dependencies: Mutex<Vec<(ConfiguredNodeAnalysisObservationKey, Vec<String>)>>,
+    families: Mutex<Vec<&'static str>>,
+}
+
+impl ToolchainRegistrationTracker {
+    fn dependencies(&self, key: &ConfiguredNodeAnalysisObservationKey) -> Vec<String> {
+        self.dependencies
+            .lock()
+            .unwrap()
+            .iter()
+            .rev()
+            .find_map(|(candidate, dependencies)| (candidate == key).then(|| dependencies.clone()))
+            .unwrap()
+    }
+}
+
+impl ActivationTracker for ToolchainRegistrationTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
+        _activation: ActivationData,
+    ) {
+        if let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisObservationKey>() {
+            self.dependencies
+                .lock()
+                .unwrap()
+                .push((key.clone(), deps.map(ToString::to_string).collect()));
+        }
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        true
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, _activation: RichActivation<'_>) {
+        let family = if key
+            .downcast_ref::<ConfiguredNodeAnalysisObservationKey>()
+            .is_some()
+        {
+            "analysis/observed"
+        } else if key
+            .downcast_ref::<HostPackageInventoryObservationKey>()
+            .is_some()
+        {
+            "package/observed"
+        } else if key
+            .downcast_ref::<slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey>()
+            .is_some()
+        {
+            "anchor/observed"
+        } else if key
+            .downcast_ref::<ModuleRegistrationExpansionObservationKey>()
+            .is_some()
+        {
+            "registration/observed"
+        } else if key
+            .downcast_ref::<CommandRegistrationExpansionObservationKey>()
+            .is_some()
+        {
+            "registration/command-observed"
+        } else if key.downcast_ref::<ConfiguredNodeAnalysisKey>().is_some()
+            || key.downcast_ref::<HostPackageInventoryKey>().is_some()
+            || key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some()
+            || key
+                .downcast_ref::<slug_workspace_v2::ResolvedPathKey>()
+                .is_some()
+            || key
+                .downcast_ref::<ModuleRegistrationExpansionKey>()
+                .is_some()
+            || key
+                .downcast_ref::<CommandRegistrationExpansionKey>()
+                .is_some()
+        {
+            "analysis-closure/legacy"
+        } else {
+            return;
+        };
+        self.families.lock().unwrap().push(family);
+    }
+}
+
+const OBSERVED_TOOLCHAIN_MODULE: &str = r#"module(name = "root")
+register_execution_platforms("//:platform")
+register_toolchains("//:toolchain")
+"#;
+const OBSERVED_TOOLCHAIN_DEFS: &str = r#"ConsumerInfo = provider(fields = {"value": ""})
+def _implementation(ctx):
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+def _request(ctx):
+    return [ConsumerInfo(value = ctx.toolchains["//:type"].marker)]
+implementation = rule(implementation = _implementation, attrs = {"marker": attr.string(mandatory = True)})
+request = rule(implementation = _request, toolchains = ["//:type"])
+"#;
+const OBSERVED_TOOLCHAIN_BUILD: &str = r#"load(":defs.bzl", "implementation", "request")
+constraint_setting(name = "setting")
+constraint_value(name = "linux", constraint_setting = ":setting")
+platform(name = "platform", constraint_values = [":linux"])
+toolchain_type(name = "type")
+implementation(name = "implementation", marker = "selected")
+toolchain(name = "toolchain", toolchain_type = ":type", toolchain = ":implementation", exec_compatible_with = [":linux"])
+request(name = "request")
+"#;
+
+#[tokio::test]
+async fn observed_toolchain_closure_depends_on_both_sources_and_families_once() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), OBSERVED_TOOLCHAIN_MODULE).unwrap();
+    fs::write(workspace.join("defs.bzl"), OBSERVED_TOOLCHAIN_DEFS).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), OBSERVED_TOOLCHAIN_BUILD).unwrap();
+    ensure_host_platform_fixture(&workspace);
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(ToolchainRegistrationTracker::default());
+    let (data, host) = builtin_fixture::request_data(&workspace, None, true);
+    let mut updater = dice.updater_with_data(data);
+    let mut saved = builtin_fixture::capture_generated_inputs(&updater, &workspace)
+        .await
+        .unwrap();
+    host.inject(&mut updater);
+    let entries = inject_ready_root_target_inputs(
+        &mut updater,
+        &workspace,
+        root_epoch(&workspace),
+        &[],
+        &mut saved,
+    );
+    let mut transaction = builtin_fixture::ready_transaction(
+        updater.commit().await,
+        &workspace,
+        entries,
+        Some(tracker.clone()),
+        true,
+        saved,
+    )
+    .await
+    .unwrap();
+    let prepared = slug_analysis_v2::prepare_configured_node_analysis_observed(
+        &mut transaction,
+        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+        CanonicalLabel::parse("@@//:request").unwrap(),
+        test_configuration(),
+    )
+    .await;
+    let AnalysisPreparationOutcome::Complete(Ok(Ok(key))) = prepared else {
+        panic!("observed root target preparation did not complete: {prepared:#?}");
+    };
+    let outcome = transaction.compute(&key).await.unwrap();
+    let AnalysisPreparationOutcome::Complete(Ok(value)) = outcome else {
+        panic!("observed root target did not complete: {outcome:#?}");
+    };
+    let result = value.as_ref().as_ref().unwrap();
+    let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
+    assert_eq!(
+        result
+            .providers()
+            .user(&consumer)
+            .unwrap()
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
+        Some("selected")
+    );
+    let dependencies = tracker.dependencies(&key);
+    let registrations = dependencies
+        .iter()
+        .filter(|dependency| dependency.contains("registration-expansion:"))
+        .collect::<Vec<_>>();
+    assert_eq!(registrations.len(), 4, "{dependencies:#?}");
+    assert!(registrations[0].starts_with("observed-command-registration-expansion:"));
+    assert!(registrations[0].ends_with(":execution-platforms"));
+    assert!(registrations[1].starts_with("observed-module-registration-expansion:"));
+    assert!(registrations[1].ends_with(":execution-platforms"));
+    assert!(registrations[2].starts_with("observed-command-registration-expansion:"));
+    assert!(registrations[2].ends_with(":toolchains"));
+    assert!(registrations[3].starts_with("observed-module-registration-expansion:"));
+    assert!(registrations[3].ends_with(":toolchains"));
+    assert!(
+        dependencies
+            .iter()
+            .all(|dependency| !dependency.starts_with("observed-root-module-loading-anchor:"))
+    );
+    let families = tracker.families.lock().unwrap();
+    assert!(families.iter().any(|family| *family == "anchor/observed"));
+    assert!(
+        families
+            .iter()
+            .filter(|family| **family == "registration/observed")
+            .count()
+            >= 2
+    );
+    assert!(
+        families
+            .iter()
+            .filter(|family| **family == "registration/command-observed")
+            .count()
+            >= 2
+    );
+    assert!(families.iter().any(|family| *family == "package/observed"));
+    assert!(
+        families
+            .iter()
+            .filter(|family| **family == "analysis/observed")
+            .count()
+            >= 2
+    );
+    assert!(
+        families.iter().all(|family| !family.ends_with("/legacy")),
+        "{families:#?}"
+    );
+    fs::remove_dir_all(workspace).unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn selected_toolchain_request_observed_need_cancellation_and_error_recover() {
     let workspace = selected_request_workspace();

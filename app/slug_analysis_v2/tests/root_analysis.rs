@@ -2,6 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use async_trait::async_trait;
 use dice::ActivationData;
 use dice::ActivationKind;
 use dice::ActivationTracker;
@@ -30,23 +31,24 @@ use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
-use slug_bzlmod_v2::OverrideAttributeValue;
-use slug_bzlmod_v2::RepoRuleId;
-use slug_bzlmod_v2::RepoSpec;
-use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
-use slug_bzlmod_v2::RepositoryMaterializationKind;
-use slug_bzlmod_v2::RepositoryMaterializationRequest;
-use slug_bzlmod_v2::RepositoryMaterializationRequestId;
-use slug_bzlmod_v2::RepositoryMaterializationResult;
+use slug_bzlmod_v2::RegistryFileUrl;
+use slug_bzlmod_v2::RegistryIo;
+use slug_bzlmod_v2::RegistryIoOutcome;
+use slug_bzlmod_v2::RegistryRequestGeneration;
+use slug_bzlmod_v2::RegistryTransportError;
+use slug_bzlmod_v2::RegistryUrls;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
-use slug_bzlmod_v2::RepositoryMaterializationSuccess;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
+use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_bzlmod_v2::install_registry_io;
 use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::native::host::ActionEnvironmentHost;
+use slug_configuration_v2::native::host::ActionEnvironmentHostOs;
 use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
 use slug_configuration_v2::native::host::HostPathFlavor;
@@ -54,7 +56,6 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
-use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::CommandRegistrationExpansionKey;
 use slug_loading_v2::CommandRegistrationExpansionObservationKey;
 use slug_loading_v2::HostPackageInventoryKey;
@@ -84,8 +85,58 @@ use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::small_map::SmallMap;
 
+#[path = "builtin_module_pins.rs"]
+mod builtin_module_pins;
+use builtin_module_pins::BUILTIN_MODULES;
+
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
+}
+
+const FIXTURE_REGISTRY: &str = "https://registry.invalid";
+
+struct FixtureRegistry(SmallMap<String, Arc<[u8]>>);
+
+#[async_trait]
+impl RegistryIo for FixtureRegistry {
+    async fn read_exact(
+        &self,
+        url: &RegistryFileUrl,
+    ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+        Ok(self
+            .0
+            .get(url.as_str())
+            .cloned()
+            .map_or(RegistryIoOutcome::NotFound, RegistryIoOutcome::Found))
+    }
+}
+
+fn fixture_dice() -> Arc<Dice> {
+    // The builtin repository keeps its bundled source and routing. The
+    // registry supplies only metadata for its directly declared dependencies.
+    let mut registry = SmallMap::new();
+    registry.insert(
+        format!("{FIXTURE_REGISTRY}/bazel_registry.json"),
+        Arc::from(b"{}".as_slice()),
+    );
+    for (name, version) in BUILTIN_MODULES {
+        let prefix = format!("{FIXTURE_REGISTRY}/modules/{name}/{version}");
+        registry.insert(
+            format!("{prefix}/MODULE.bazel"),
+            format!("module(name={name:?}, version={version:?})\n")
+                .into_bytes()
+                .into(),
+        );
+        registry.insert(
+            format!("{prefix}/source.json"),
+            format!("{{\"url\":\"https://origin.invalid/{name}.tgz\",\"integrity\":\"sha256-a\"}}")
+                .into_bytes()
+                .into(),
+        );
+    }
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, Arc::new(FixtureRegistry(registry)));
+    builder.build(DetectCycles::Enabled)
 }
 
 #[derive(Default)]
@@ -191,13 +242,6 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
         builder.file("/workspace/rules/defs.bzl", definitions, variant);
         builder.package("parent", &parent_build, variant);
         builder.package(".slug_test_host", "platform(name = \"host\")\n", variant);
-        builder.directory("/workspace/.slug_builtin", variant);
-        builder.directory("/workspace/.slug_builtin/bazel_tools", variant);
-        builder.file(
-            "/workspace/.slug_builtin/bazel_tools/MODULE.bazel",
-            "module(name = \"bazel_tools\")\n",
-            variant,
-        );
         builder
     }
 
@@ -416,7 +460,10 @@ fn configured(label: &str) -> ConfiguredTargetKey {
             Arc::from([]),
             Arc::from([]),
         )
-        .unwrap(),
+        .unwrap()
+        .with_action_environment_host(ActionEnvironmentHost::without_environment(
+            ActionEnvironmentHostOs::Linux,
+        )),
     )
     .unwrap()
     .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap());
@@ -462,57 +509,26 @@ async fn transaction(
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
-    let mut attributes = SmallMap::new();
-    attributes.insert(
-        "path".into(),
-        OverrideAttributeValue::String("/workspace/.slug_builtin/bazel_tools".into()),
-    );
-    let request = Arc::new(RepositoryMaterializationRequest {
-        id: RepositoryMaterializationRequestId {
-            workspace: workspace(),
-            canonical_repo: CanonicalRepoName::new("bazel_tools+").unwrap(),
-        },
-        repo_spec: RepoSpec {
-            rule_id: RepoRuleId {
-                bzl_file: CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
-                    .unwrap(),
-                rule_name: "local_repository".into(),
-            },
-            attributes: Arc::new(attributes),
-        },
-        kind: RepositoryMaterializationKind::Local {
-            logical_root: NormalizedAbsolutePath::new("/workspace/.slug_builtin/bazel_tools")
-                .unwrap(),
-        },
-    });
     updater
         .changed_to(vec![(
             RepositoryMaterializationResultEpochKey {
                 workspace: workspace(),
             },
-            RepositoryMaterializationResultEpoch::new(
-                workspace(),
-                [RepositoryMaterializationEpochEntry {
-                    request,
-                    result: RepositoryMaterializationResult::Success(
-                        RepositoryMaterializationSuccess::Local,
-                    ),
-                }],
-            )
-            .unwrap(),
+            RepositoryMaterializationResultEpoch::new(workspace(), []).unwrap(),
         )])
         .unwrap();
     inject_root_package_policy_inputs(&mut updater, package_policy()).unwrap();
+    inject_registry_request_inputs(
+        &mut updater,
+        workspace().as_path(),
+        RegistryUrls::new([FIXTURE_REGISTRY]),
+        RegistryRequestGeneration(1),
+    )
+    .unwrap();
     inject_root_module_request_inputs(
         &mut updater,
         workspace().as_path(),
-        BzlmodCommandPolicyKey::from_flags_with_module_overrides(
-            None,
-            false,
-            workspace().as_path(),
-            ["bazel_tools=/workspace/.slug_builtin/bazel_tools"],
-        )
-        .unwrap(),
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
     )
@@ -527,6 +543,7 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
         .map(|event| match event {
             EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
             EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+            EvaluationEvent::RepositoryExecuteOutput { .. } => "<repository execute output>",
         })
         .collect()
 }
@@ -626,7 +643,7 @@ fn observed_marker_value(
 
 #[tokio::test]
 async fn root_analysis_preserves_typed_direct_target_missing() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let key =
         ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:missing")).unwrap();
@@ -651,7 +668,7 @@ async fn root_analysis_preserves_typed_direct_target_missing() {
 
 #[tokio::test]
 async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let key = parent_key();
     assert_ne!(
@@ -692,7 +709,10 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
     complete_epoch.add_leaf("right", 2);
     let mut complete_transaction = transaction(&dice, complete_epoch.build(), tracker.dupe()).await;
     let complete = complete_transaction.compute(&key).await.unwrap();
-    assert!(ConfiguredNodeAnalysisKey::validity(&complete));
+    assert!(
+        ConfiguredNodeAnalysisKey::validity(&complete),
+        "{complete:#?}"
+    );
     assert!(ConfiguredNodeAnalysisKey::equality(&complete, &complete));
     let warm = complete_transaction.compute(&key).await.unwrap();
     let (
@@ -774,7 +794,7 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
 
 #[tokio::test]
 async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let mut epoch = EpochBuilder::base("observed-", &["//right:right", "//left:left"], 10);
     epoch.add_leaf("left", 10);
@@ -788,7 +808,10 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
     );
 
     let first = observed_transaction.compute(&key).await.unwrap();
-    assert!(ConfiguredNodeAnalysisObservationKey::validity(&first));
+    assert!(
+        ConfiguredNodeAnalysisObservationKey::validity(&first),
+        "{first:#?}"
+    );
     assert!(ConfiguredNodeAnalysisObservationKey::equality(
         &first, &first
     ));
@@ -890,7 +913,7 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
             .any(|family| family == "registration/command-observed")
     );
 
-    let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let legacy_dice = fixture_dice();
     let legacy_tracker = Arc::new(AnalysisTracker::default());
     let mut legacy_transaction = transaction(&legacy_dice, epoch, legacy_tracker.dupe()).await;
     let legacy = legacy_transaction.compute(&parent_key()).await.unwrap();
@@ -927,7 +950,7 @@ async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
 
 #[tokio::test]
 async fn observed_null_source_uses_only_observed_resolution() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let mut epoch = EpochBuilder::base("source-", &[], 20);
     epoch.package(
@@ -957,101 +980,9 @@ parent(name = "declares", deps = [":data.txt"])
     );
 }
 
-const OBSERVED_TOOLCHAIN_MODULE: &str = r#"module(name = "root")
-register_execution_platforms("//:platform")
-register_toolchains("//:toolchain")
-"#;
-const OBSERVED_TOOLCHAIN_DEFS: &str = r#"ConsumerInfo = provider(fields = {"value": ""})
-def _implementation(ctx):
-    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
-def _request(ctx):
-    return [ConsumerInfo(value = ctx.toolchains["//:type"].marker)]
-implementation = rule(implementation = _implementation, attrs = {"marker": attr.string(mandatory = True)})
-request = rule(implementation = _request, toolchains = ["//:type"])
-"#;
-const OBSERVED_TOOLCHAIN_BUILD: &str = r#"load(":defs.bzl", "implementation", "request")
-constraint_setting(name = "setting")
-constraint_value(name = "linux", constraint_setting = ":setting")
-platform(name = "platform", constraint_values = [":linux"])
-toolchain_type(name = "type")
-implementation(name = "implementation", marker = "selected")
-toolchain(name = "toolchain", toolchain_type = ":type", toolchain = ":implementation", exec_compatible_with = [":linux"])
-request(name = "request")
-"#;
-
-#[tokio::test]
-async fn observed_toolchain_closure_depends_on_both_sources_and_families_once() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let tracker = Arc::new(AnalysisTracker::default());
-    let mut epoch = EpochBuilder::base("toolchain-", &[], 30);
-    epoch.file("/workspace/MODULE.bazel", OBSERVED_TOOLCHAIN_MODULE, 30);
-    epoch.file("/workspace/defs.bzl", OBSERVED_TOOLCHAIN_DEFS, 30);
-    epoch.file("/workspace/BUILD.bazel", OBSERVED_TOOLCHAIN_BUILD, 30);
-    let mut transaction = transaction(&dice, epoch.build(), tracker.dupe()).await;
-    let key = observed_key(&mut transaction, "@@//:request").await;
-    let outcome = transaction.compute(&key).await.unwrap();
-    let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
-    assert_eq!(
-        observed_result(&outcome)
-            .providers()
-            .user(&consumer)
-            .unwrap()
-            .field("value")
-            .and_then(slug_build_api_v2::AnalysisValue::as_str),
-        Some("selected")
-    );
-    let dependencies = tracker.dependencies(&key);
-    let registrations = dependencies
-        .iter()
-        .filter(|dependency| dependency.contains("registration-expansion:"))
-        .collect::<Vec<_>>();
-    assert_eq!(registrations.len(), 4, "{dependencies:#?}");
-    assert!(registrations[0].starts_with("observed-command-registration-expansion:"));
-    assert!(registrations[0].ends_with(":execution-platforms"));
-    assert!(registrations[1].starts_with("observed-module-registration-expansion:"));
-    assert!(registrations[1].ends_with(":execution-platforms"));
-    assert!(registrations[2].starts_with("observed-command-registration-expansion:"));
-    assert!(registrations[2].ends_with(":toolchains"));
-    assert!(registrations[3].starts_with("observed-module-registration-expansion:"));
-    assert!(registrations[3].ends_with(":toolchains"));
-    assert!(
-        dependencies
-            .iter()
-            .all(|dependency| !dependency.starts_with("observed-root-module-loading-anchor:"))
-    );
-    let families = tracker.take_families();
-    assert!(families.iter().any(|family| family == "anchor/observed"));
-    assert!(
-        families
-            .iter()
-            .filter(|family| family.as_str() == "registration/observed")
-            .count()
-            >= 2
-    );
-    assert!(
-        families
-            .iter()
-            .filter(|family| family.as_str() == "registration/command-observed")
-            .count()
-            >= 2
-    );
-    assert!(families.iter().any(|family| family == "package/observed"));
-    assert!(
-        families
-            .iter()
-            .filter(|family| family.as_str() == "analysis/observed")
-            .count()
-            >= 2
-    );
-    assert!(
-        families.iter().all(|family| !family.ends_with("/legacy")),
-        "{families:#?}"
-    );
-}
-
 #[tokio::test]
 async fn observed_analysis_unions_needs_without_publishing_events() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let epoch = EpochBuilder::base("need-", &["//right:right", "//left:left"], 40).build();
     let mut transaction = transaction(&dice, epoch, tracker.dupe()).await;
@@ -1078,7 +1009,7 @@ async fn observed_analysis_unions_needs_without_publishing_events() {
 
 #[tokio::test]
 async fn observed_outer_wins_need_and_semantic_while_semantic_error_publishes_once() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let mut epoch = EpochBuilder::base(
         "terminal-",
@@ -1138,7 +1069,7 @@ async fn observed_outer_wins_need_and_semantic_while_semantic_error_publishes_on
 
 #[tokio::test]
 async fn combined_detector_preserves_bzl_cycle_diagnostics() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let mut epoch = EpochBuilder::base("cycle-", &[], 41);
     epoch.file(
@@ -1167,7 +1098,7 @@ async fn combined_detector_preserves_bzl_cycle_diagnostics() {
 
 #[tokio::test]
 async fn legacy_alias_cycle_fails_and_same_graph_repair_recovers() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let mut cycle = EpochBuilder::base("cycle-", &[], 42);
     cycle.file(
@@ -1219,7 +1150,7 @@ async fn legacy_alias_cycle_fails_and_same_graph_repair_recovers() {
 
 #[tokio::test]
 async fn observed_alias_and_generated_edges_do_not_escape_the_family() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let mut epoch = EpochBuilder::base("shape-", &[], 43);
     epoch.file(
@@ -1257,7 +1188,7 @@ alias(name = "alias", actual = ":producer")
 
 #[tokio::test]
 async fn observed_cancellation_publishes_no_parent_and_recovers() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let mut epoch = EpochBuilder::base("cancel-", &["//left:left"], 44);
     epoch.add_leaf("left", 44);
@@ -1313,7 +1244,7 @@ consumer(name = "consumer")
 
 #[tokio::test]
 async fn observed_analysis_preserves_typed_configuration_and_restore_lifecycle() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let dice = fixture_dice();
     let tracker = Arc::new(AnalysisTracker::default());
     let provider = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
 
