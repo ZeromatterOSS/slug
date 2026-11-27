@@ -136,3 +136,80 @@ fn bounded_rows_refuse_mismatched_counts_and_unrepresentable_storage() {
         BoundedMapError::SizeOverflow,
     );
 }
+
+#[test]
+fn bounded_overwrites_match_ordinary_order_under_full_hash_collisions() {
+    for count in [4, NO_INDEX_THRESHOLD + 2] {
+        let input = || rows(count - 1).chain([(Hashed::new(Colliding(count - 2)), count)]);
+        let mut expected = SmallMap::with_capacity(count);
+        for (key, value) in input() {
+            expected.insert_hashed(key, value);
+        }
+        let mut bytes = 0;
+        let map = SmallMap::try_from_hashed_rows(
+            count,
+            input().map(Ok),
+            |left, right| Ok(left == right),
+            |_, allocated| {
+                bytes += allocated;
+                Ok::<_, Refusal>(())
+            },
+        )
+        .unwrap();
+        assert!(map.eq_ordered(&expected));
+        assert_eq!(map.len(), count - 1);
+        assert_eq!(map.get(&Colliding(count - 2)), Some(&count));
+        assert_eq!(map.index.is_some(), count > NO_INDEX_THRESHOLD);
+        map.assert_invariants();
+
+        let produced = Cell::new(0);
+        let error = SmallMap::try_from_hashed_rows(
+            count,
+            input()
+                .inspect(|_| produced.set(produced.get() + 1))
+                .map(Ok),
+            |left, right| Ok(left == right),
+            |_, allocated| {
+                if allocated >= bytes {
+                    Err(Refusal::Allocation)
+                } else {
+                    Ok(())
+                }
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error, BoundedMapError::Operation(Refusal::Allocation));
+        assert_eq!(produced.get(), 0);
+    }
+}
+
+#[test]
+fn bounded_overwrites_stop_before_more_rows_after_an_indexed_comparison_refuses() {
+    let count = NO_INDEX_THRESHOLD + 2;
+    let produced = Cell::new(0);
+    let compared = Cell::new(0);
+    let error = SmallMap::try_from_hashed_rows(
+        count,
+        rows(count)
+            .inspect(|_| produced.set(produced.get() + 1))
+            .map(Ok),
+        |_, _| {
+            compared.set(compared.get() + 1);
+            Err(Refusal::Work)
+        },
+        |_, _| Ok(()),
+    )
+    .unwrap_err();
+    assert_eq!(error, BoundedMapError::Operation(Refusal::Work));
+    assert_eq!((produced.get(), compared.get()), (2, 1));
+
+    let input = rows(count).map(Ok).chain([Err(Refusal::Work)]);
+    let error = SmallMap::try_from_hashed_rows(
+        count,
+        input,
+        |left, right| Ok(left == right),
+        |_, _| Ok(()),
+    )
+    .unwrap_err();
+    assert_eq!(error, BoundedMapError::Operation(Refusal::Work));
+}

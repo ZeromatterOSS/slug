@@ -70,7 +70,7 @@ const NO_INDEX_THRESHOLD: usize = 16;
 /// A bounded construction failure. No partial map is returned.
 #[derive(Debug, PartialEq, Eq)]
 pub enum BoundedMapError<E> {
-    /// The caller's work or allocation budget refused.
+    /// The caller's row production, comparison or admission failed.
     Operation(E),
     /// The requested layout or cumulative allocation size overflowed.
     SizeOverflow,
@@ -145,6 +145,64 @@ impl<K, V> SmallMap<K, V> {
         rows: impl IntoIterator<Item = (Hashed<K>, V)>,
         mut charge: impl FnMut(usize, usize) -> Result<(), E>,
     ) -> Result<Self, BoundedMapError<E>> {
+        let mut map = Self::try_with_capacity_bounded(count, &mut charge)?;
+        let mut rows = rows.into_iter();
+        for _ in 0..count {
+            charge(1, 0).map_err(BoundedMapError::Operation)?;
+            let (key, value) = rows.next().ok_or(BoundedMapError::RowCountMismatch)?;
+            map.push_fresh_hashed_row(key, value, &mut charge)?;
+        }
+        charge(1, 0).map_err(BoundedMapError::Operation)?;
+        if rows.next().is_some() {
+            return Err(BoundedMapError::RowCountMismatch);
+        }
+        Ok(map)
+    }
+
+    /// Build an insertion-ordered map from fallible rows with canonical hashes.
+    /// An equal key keeps its original slot and key and receives the last value.
+    ///
+    /// `charge` admits storage, row advances and lookup work. `keys_equal` must
+    /// agree with the canonical hashes. Admit row production and input-dependent
+    /// work in `keys_equal` separately.
+    /// The iterator must yield exactly `count` successful rows on success.
+    pub fn try_from_hashed_rows<E>(
+        count: usize,
+        rows: impl IntoIterator<Item = Result<(Hashed<K>, V), E>>,
+        mut keys_equal: impl FnMut(&K, &K) -> Result<bool, E>,
+        mut charge: impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<Self, BoundedMapError<E>> {
+        let mut map = Self::try_with_capacity_bounded(count, &mut charge)?;
+        let mut rows = rows.into_iter();
+        for _ in 0..count {
+            charge(1, 0).map_err(BoundedMapError::Operation)?;
+            let (key, value) = rows
+                .next()
+                .ok_or(BoundedMapError::RowCountMismatch)?
+                .map_err(BoundedMapError::Operation)?;
+            if let Some(i) = map.find_fresh_hashed_row(&key, &mut keys_equal, &mut charge)? {
+                // SAFETY: The lookup returned a live row of this map.
+                *unsafe { map.entries.get_unchecked_mut(i).1 } = value;
+            } else {
+                map.push_fresh_hashed_row(key, value, &mut charge)?;
+            }
+        }
+        charge(1, 0).map_err(BoundedMapError::Operation)?;
+        if rows
+            .next()
+            .transpose()
+            .map_err(BoundedMapError::Operation)?
+            .is_some()
+        {
+            return Err(BoundedMapError::RowCountMismatch);
+        }
+        Ok(map)
+    }
+
+    fn try_with_capacity_bounded<E>(
+        count: usize,
+        charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<Self, BoundedMapError<E>> {
         let indexed = count > NO_INDEX_THRESHOLD;
         let (index_work, index_bytes) = if indexed {
             Index::fresh_allocation(count).ok_or(BoundedMapError::SizeOverflow)?
@@ -156,27 +214,56 @@ impl<K, V> SmallMap<K, V> {
             .ok_or(BoundedMapError::SizeOverflow)?;
         charge(index_work, bytes).map_err(BoundedMapError::Operation)?;
 
-        let mut entries = VecMap::try_with_capacity(count).map_err(|error| match error {
+        let entries = VecMap::try_with_capacity(count).map_err(|error| match error {
             Vec2AllocationError::SizeOverflow => BoundedMapError::SizeOverflow,
             Vec2AllocationError::AllocationFailed => BoundedMapError::AllocationFailed,
         })?;
-        let mut index = indexed
+        let index = indexed
             .then(|| Index::try_with_capacity::<E>(count))
             .transpose()?;
-        let mut rows = rows.into_iter();
-        for i in 0..count {
-            charge(1, 0).map_err(BoundedMapError::Operation)?;
-            let (key, value) = rows.next().ok_or(BoundedMapError::RowCountMismatch)?;
-            if let Some(index) = &mut index {
-                index.insert_fresh(key.hash().promote(), i, &mut charge)?;
-            }
-            entries.insert_hashed_unique_unchecked(key, value);
-        }
-        charge(1, 0).map_err(BoundedMapError::Operation)?;
-        if rows.next().is_some() {
-            return Err(BoundedMapError::RowCountMismatch);
-        }
         Ok(Self { entries, index })
+    }
+
+    fn push_fresh_hashed_row<E>(
+        &mut self,
+        key: Hashed<K>,
+        value: V,
+        charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<(), BoundedMapError<E>> {
+        if let Some(index) = &mut self.index {
+            index.insert_fresh(key.hash().promote(), self.entries.len(), charge)?;
+        }
+        self.entries.insert_hashed_unique_unchecked(key, value);
+        Ok(())
+    }
+
+    fn find_fresh_hashed_row<E>(
+        &self,
+        key: &Hashed<K>,
+        keys_equal: &mut impl FnMut(&K, &K) -> Result<bool, E>,
+        charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<Option<usize>, BoundedMapError<E>> {
+        if let Some(index) = &self.index {
+            index.charge_fresh_probe(charge)?;
+        } else {
+            charge(self.entries.len(), 0).map_err(BoundedMapError::Operation)?;
+        }
+        let mut failure = None;
+        let slot = self.get_index_of_hashed_raw(key.hash(), |existing| {
+            match charge(1, 0).and_then(|()| keys_equal(existing, key.key())) {
+                Ok(equal) => equal,
+                Err(error) => {
+                    // Stop the underlying bool-only lookup immediately and
+                    // return the refusal before using the lookup result.
+                    failure = Some(error);
+                    true
+                }
+            }
+        });
+        match failure {
+            Some(error) => Err(BoundedMapError::Operation(error)),
+            None => Ok(slot),
+        }
     }
 
     /// Verify that the map is internally consistent.

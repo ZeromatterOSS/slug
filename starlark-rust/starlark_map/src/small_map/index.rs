@@ -102,14 +102,21 @@ impl Index {
             occupied < self.table.capacity(),
             "fresh index must have spare capacity"
         );
-        // Pinned hashbrown 0.14.5's triangular probe visits disjoint control
-        // groups until finding a vacant bucket. Each failed group contains
-        // at least MIN_GROUP_WIDTH live entries. Include the successful
-        // group and the possible extra small-table fixup load.
-        charge(occupied / MIN_GROUP_WIDTH + 2, 0).map_err(BoundedMapError::Operation)?;
+        self.charge_fresh_probe(charge)?;
         self.table
             .insert_unique(hash, value, |_| unreachable!("fresh index must not grow"));
         Ok(())
+    }
+
+    pub(super) fn charge_fresh_probe<E>(
+        &self,
+        charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<(), BoundedMapError<E>> {
+        // Pinned hashbrown 0.14.5's triangular probe visits disjoint control
+        // groups until a match or vacancy. Every prior group is full in this
+        // fresh table. Include the terminal group and the possible extra
+        // small-table fixup load on insertion.
+        charge(self.table.len() / MIN_GROUP_WIDTH + 2, 0).map_err(BoundedMapError::Operation)
     }
 
     pub(super) fn len(&self) -> usize {

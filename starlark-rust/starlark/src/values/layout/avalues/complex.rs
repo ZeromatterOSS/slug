@@ -25,6 +25,7 @@ use starlark_map::small_map::BoundedMapError;
 use starlark_map::small_map::SmallMap;
 
 use super::simple::AValueSimple;
+use crate::coerce::coerce;
 use crate::eval::ExecutionBudget;
 use crate::eval::ExecutionLimit;
 use crate::eval::compiler::def::FrozenDef;
@@ -37,6 +38,7 @@ use crate::values::FrozenValue;
 use crate::values::Heap;
 use crate::values::HeapSendable;
 use crate::values::StarlarkValue;
+use crate::values::StringValue;
 use crate::values::Trace;
 use crate::values::Tracer;
 use crate::values::Value;
@@ -164,9 +166,47 @@ impl<'v> Heap<'v> {
         let rows = SmallMap::try_from_unique_hashed_rows(count, rows, |work, bytes| {
             budget.charge(work, bytes)
         });
+        self.alloc_budgeted_dict_from_map(rows, budget)
+    }
+
+    /// Admit a mutable Starlark dictionary from exactly `count` trusted rows.
+    /// Equal string keys keep the first key and slot and receive the last value.
+    /// The caller admits production of each key and value. This operation admits
+    /// the map, row advances, hashing, equality, and the final arena object.
+    pub fn alloc_budgeted_str_dict_from_rows(
+        self,
+        count: usize,
+        rows: impl IntoIterator<Item = crate::Result<(StringValue<'v>, Value<'v>)>>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Value<'v>> {
+        let rows = rows.into_iter().map(|row| -> crate::Result<_> {
+            let (key, value) = row?;
+            budget.charge(1 + ExecutionBudget::text_work(key.len()), 0)?;
+            Ok((key.get_hashed(), value))
+        });
+        let rows = SmallMap::try_from_hashed_rows(
+            count,
+            rows,
+            |left, right| {
+                if left.len() != right.len() {
+                    return Ok(false);
+                }
+                budget.charge_text_work(left.len())?;
+                Ok(left.as_str() == right.as_str())
+            },
+            |work, bytes| Ok(budget.charge(work, bytes)?),
+        );
+        self.alloc_budgeted_dict_from_map(rows.map(coerce), budget)
+    }
+
+    fn alloc_budgeted_dict_from_map(
+        self,
+        rows: Result<SmallMap<Value<'v>, Value<'v>>, BoundedMapError<impl Into<crate::Error>>>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Value<'v>> {
         let rows = match rows {
             Ok(rows) => rows,
-            Err(BoundedMapError::Operation(limit)) => return Err(limit.into()),
+            Err(BoundedMapError::Operation(error)) => return Err(error.into()),
             Err(BoundedMapError::SizeOverflow) => {
                 return Err(budget.refuse(ExecutionLimit::AllocationBytes).into());
             }
@@ -209,3 +249,7 @@ impl<'v> Heap<'v> {
             .to_value()
     }
 }
+
+#[cfg(test)]
+#[path = "budgeted_str_dict_tests.rs"]
+mod budgeted_str_dict_tests;
