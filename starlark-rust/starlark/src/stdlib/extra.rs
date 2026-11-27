@@ -27,6 +27,8 @@ use starlark_syntax::codemap::Span;
 use crate as starlark;
 use crate::environment::GlobalsBuilder;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::values::BoundedText;
 use crate::values::StringValue;
 use crate::values::Value;
@@ -132,34 +134,47 @@ pub struct PrintLocation {
 
 impl PrintLocation {
     fn from_evaluator(eval: &Evaluator<'_, '_, '_>) -> Self {
+        Self::from_evaluator_with_budget(eval, None).expect("unmetered print location")
+    }
+
+    fn from_evaluator_with_budget(
+        eval: &Evaluator<'_, '_, '_>,
+        budget: Option<&ExecutionBudget>,
+    ) -> Result<Self, ExecutionLimit> {
         static BUILTIN: Lazy<Arc<str>> = Lazy::new(|| Arc::from("<builtin>"));
 
         let Some(location) = eval.call_stack_top_location() else {
-            return Self {
+            return Ok(Self {
                 file: BUILTIN.dupe(),
                 line: 0,
                 column: 0,
-            };
+            });
         };
         if location.file.is_native() {
-            return Self {
+            return Ok(Self {
                 file: BUILTIN.dupe(),
                 line: 0,
                 column: 0,
-            };
+            });
         };
 
+        if let Some(budget) = budget {
+            budget.charge(location.file.find_line_comparison_bound(), 0)?;
+        }
         let point = location.span.begin();
         let line = location.file.find_line(point);
         let line_span = location.file.line_span(line);
         let prefix = location
             .file
             .source_span(Span::new(line_span.begin(), point));
-        Self {
+        if let Some(budget) = budget {
+            budget.charge_text_work(prefix.len())?;
+        }
+        Ok(Self {
             file: location.file.filename_shared(),
             line: (line + 1) as u32,
             column: (prefix.encode_utf16().count() + 1) as u32,
-        }
+        })
     }
 
     /// Consume this location into its apparent filename, line, and column.
@@ -213,7 +228,10 @@ pub fn print(builder: &mut GlobalsBuilder) {
                 text.write_value(value, ValueTextMode::Str)?;
             }
             let text = text.finish()?;
-            (PrintLocation::from_evaluator(eval), text)
+            (
+                PrintLocation::from_evaluator_with_budget(eval, Some(budget))?,
+                text,
+            )
         } else {
             let location = PrintLocation::from_evaluator(eval);
             let text = args.iter().map(Value::to_str).join(" ");

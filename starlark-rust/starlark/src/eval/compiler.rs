@@ -63,6 +63,9 @@ pub(crate) fn add_lazy_span_to_expr_error(
     if let Some(limit) = eval.execution_refusal(&e) {
         return EvalException::new_unknown_span(limit.into());
     }
+    if eval.uses_closed_formatter_bytecode() {
+        return EvalException::new_unknown_span(e);
+    }
     let span = span();
     EvalException::new_with_callstack(e, span.span.span(), &span.span.file(), || {
         eval.call_stack.to_diagnostic_frames(span.inlined_frames)

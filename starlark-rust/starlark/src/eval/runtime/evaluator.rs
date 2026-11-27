@@ -728,8 +728,10 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             if let Some(limit) = me.execution_refusal(&e) {
                 return limit.into();
             }
-            // Make sure we capture the call_stack before popping things off it
-            e.set_call_stack(|| me.call_stack.to_diagnostic_frames(InlinedFrames::default()));
+            if !me.uses_closed_formatter_bytecode() {
+                // Capture diagnostics before popping the failing frame.
+                e.set_call_stack(|| me.call_stack.to_diagnostic_frames(InlinedFrames::default()));
+            }
             e
         }
 
@@ -759,6 +761,12 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             | crate::ErrorKind::Internal(cause) => cause.downcast_ref().copied(),
             _ => None,
         }
+    }
+
+    pub(crate) fn uses_closed_formatter_bytecode(&self) -> bool {
+        self.heap()
+            .execution_budget()
+            .is_some_and(ExecutionBudget::bounds_formatter_bytecode)
     }
 
     /// The active heap where [`Value`]s are allocated.

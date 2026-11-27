@@ -104,22 +104,66 @@ fn typed_refusal_skips_diagnostics_after_its_ledger_is_restored() {
 }
 
 #[test]
+fn closed_failure_skips_new_diagnostics_and_keeps_typed_refusal_precedence() {
+    for refusal in [None, Some(ExecutionLimit::Work)] {
+        let budget = Arc::new(ExecutionBudget::new(100, 4096, 16).with_closed_formatter_bytecode());
+        let module = Module::new_with_execution_budget(budget.clone());
+        let mut eval = Evaluator::new(&module);
+        eval.call_stack.alloc_if_needed(2, Some(&budget)).unwrap();
+        eval.call_stack.push(Value::new_none(), None).unwrap();
+        let canary = module.heap().alloc(UnadmittedFrameName);
+        let error = eval
+            .with_call_stack(canary, None, |eval| {
+                if let Some(refusal) = refusal {
+                    budget.refuse(refusal);
+                }
+                let child = crate::Error::new_value(anyhow::anyhow!("formatter error"));
+                Err::<(), _>(
+                    add_lazy_span_to_expr_error(
+                        child,
+                        || panic!("closed evaluation accessed unused span metadata"),
+                        eval,
+                    )
+                    .into_error(),
+                )
+            })
+            .unwrap_err();
+        if let Some(refusal) = refusal {
+            assert_refusal(error, refusal);
+            assert_eq!(budget.check(), Err(refusal));
+        } else {
+            assert!(matches!(error.kind(), crate::ErrorKind::Value(_)));
+            assert_eq!(error.without_diagnostic().to_string(), "formatter error");
+            assert!(!error.has_diagnostic());
+            assert_eq!(budget.check(), Ok(()));
+        }
+        assert_eq!(eval.call_stack.count(), 1);
+        eval.call_stack.pop();
+    }
+}
+
+#[test]
 fn ordinary_failure_keeps_diagnostics_in_budgeted_evaluation() {
-    let budget = Arc::new(ExecutionBudget::new(100, 4096, 16));
-    let module = Module::new_with_execution_budget(budget.clone());
-    let mut eval = Evaluator::new(&module);
-    eval.call_stack.alloc_if_needed(2, Some(&budget)).unwrap();
-    eval.call_stack.push(Value::new_none(), None).unwrap();
-    let error = eval
-        .with_call_stack(Value::new_none(), None, |eval| {
-            let child = crate::Error::new_value(anyhow::anyhow!("ordinary error"));
-            Err::<(), _>(add_span_to_expr_error(child, FrameSpan::default(), eval).into_error())
-        })
-        .unwrap_err();
-    assert!(error.span().is_some());
-    assert!(!error.call_stack().is_empty());
-    assert_eq!(budget.check(), Ok(()));
-    assert_eq!(eval.call_stack.count(), 1);
-    eval.call_stack.pop();
-    assert_eq!(eval.call_stack.count(), 0);
+    for budget in [
+        ExecutionBudget::new(100, 4096, 16),
+        ExecutionBudget::new(100, 4096, 16).with_bounded_operations(),
+    ] {
+        let budget = Arc::new(budget);
+        let module = Module::new_with_execution_budget(budget.clone());
+        let mut eval = Evaluator::new(&module);
+        eval.call_stack.alloc_if_needed(2, Some(&budget)).unwrap();
+        eval.call_stack.push(Value::new_none(), None).unwrap();
+        let error = eval
+            .with_call_stack(Value::new_none(), None, |eval| {
+                let child = crate::Error::new_value(anyhow::anyhow!("ordinary error"));
+                Err::<(), _>(add_span_to_expr_error(child, FrameSpan::default(), eval).into_error())
+            })
+            .unwrap_err();
+        assert!(error.span().is_some());
+        assert!(!error.call_stack().is_empty());
+        assert_eq!(budget.check(), Ok(()));
+        assert_eq!(eval.call_stack.count(), 1);
+        eval.call_stack.pop();
+        assert_eq!(eval.call_stack.count(), 0);
+    }
 }

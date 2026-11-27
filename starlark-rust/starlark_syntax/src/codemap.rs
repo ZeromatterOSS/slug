@@ -409,6 +409,20 @@ impl CodeMap {
         }
     }
 
+    /// Maximum line-start comparisons in a lookup within this codemap.
+    #[doc(hidden)]
+    pub fn find_line_comparison_bound(&self) -> usize {
+        match &self.0 {
+            // The real line table contains at least the first line. Slice
+            // binary search rounds each halving up, then checks the final candidate.
+            CodeMapImpl::Real(data) => {
+                let last_index = data.lines.len() - 1;
+                (usize::BITS - last_index.leading_zeros()) as usize + 1
+            }
+            CodeMapImpl::Native(_) => 0,
+        }
+    }
+
     /// Gets the line and column of a Pos.
     ///
     /// Panics if `pos` is not with this file's span or
