@@ -511,6 +511,16 @@ pub(crate) fn parse_bool_flag(flag: &ParsedFlag, negated: bool) -> Result<bool, 
     Ok(if negated { !parsed } else { parsed })
 }
 
+pub(crate) fn validate_bare_boolean_flag(flag: &ParsedFlag) -> Result<(), CommandParseError> {
+    if flag.value.is_some() {
+        return Err(CommandParseError::InvalidFlagValue {
+            flag: flag.raw.clone(),
+            message: "Unexpected value after boolean option".to_owned(),
+        });
+    }
+    Ok(())
+}
+
 /// Classify the only command occurrences admitted to structural
 /// configuration. Contextual declaration/type checks remain DICE-owned.
 pub(crate) fn command_configuration_occurrence(

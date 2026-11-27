@@ -29,6 +29,7 @@ use crate::common::parse_bool_flag;
 use crate::common::parse_query_expression_for;
 use crate::common::repository_environment_overrides;
 use crate::common::split_args;
+use crate::common::validate_bare_boolean_flag;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueryRequest {
@@ -187,14 +188,7 @@ fn validate_query_flags(
             "nostrict_test_suite" => {
                 policy.strict_test_suite = parse_bool_flag(flag, true)?;
             }
-            "noshow_progress" => {
-                if flag.value.is_some() {
-                    return Err(CommandParseError::InvalidFlagValue {
-                        flag: flag.raw.clone(),
-                        message: "Unexpected value after boolean option".to_owned(),
-                    });
-                }
-            }
+            "noshow_progress" => validate_bare_boolean_flag(flag)?,
             _ => {
                 return Err(CommandParseError::InvalidFlagValue {
                     flag: flag.raw.clone(),

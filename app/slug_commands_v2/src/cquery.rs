@@ -28,6 +28,7 @@ use crate::common::command_configuration_occurrence;
 use crate::common::parse_bool_flag;
 use crate::common::repository_environment_overrides;
 use crate::common::split_args;
+use crate::common::validate_bare_boolean_flag;
 
 const LABEL_EXPRESSION: &str = "str(target.label)";
 
@@ -149,6 +150,7 @@ impl CqueryRequest {
                     graph_unfactored = !parse_bool_flag(flag, true)?;
                     saw_graph_unfactored = true;
                 }
+                "noshow_progress" => validate_bare_boolean_flag(flag)?,
                 "allow_yanked_versions"
                 | "ignore_dev_dependency"
                 | "noignore_dev_dependency"
@@ -251,6 +253,27 @@ fn unsupported(message: &str) -> CommandParseError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn noshow_progress_is_compatible_with_existing_cquery_output() {
+        for mut args in [
+            vec!["//pkg:probe", "--output=label"],
+            vec![
+                "//pkg:probe",
+                "--output=starlark",
+                "--starlark:expr=str(target.label)",
+            ],
+        ] {
+            let baseline = CqueryRequest::parse(&args).unwrap();
+            args.push("--noshow_progress");
+            assert_eq!(CqueryRequest::parse(&args).unwrap(), baseline);
+        }
+        assert!(matches!(
+            CqueryRequest::parse(&["//pkg:probe", "--noshow_progress=false"]),
+            Err(CommandParseError::InvalidFlagValue { flag, .. })
+                if flag == "--noshow_progress=false"
+        ));
+    }
 
     #[test]
     fn distdirs_parse_in_order_and_stay_out_of_configuration() {
