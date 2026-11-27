@@ -5426,6 +5426,34 @@ root_rule(name = "root", deps = [":left", ":right"])
     );
 }
 
+#[test]
+fn aquery_spawn_text_matches_one_shot_and_daemon() {
+    let (workspace, registry) = local_cli_workspace("aquery-spawn", "aquery_spawn", "");
+    let (_cleanup, output_base) = daemon_fixture();
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let run = |base: Option<&str>| {
+        let output = slug()
+            .current_dir(&workspace)
+            .args(base)
+            .args(["aquery", "//:one", "--output=text"])
+            .arg(&registry)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert!(output.stderr.is_empty(), "{output:?}");
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let text = run(None);
+    assert_eq!(text, run(Some(&output_base_arg)));
+    assert!(text.starts_with("action 'Action shared.out'\n"), "{text}");
+    assert!(
+        text.contains("  Mnemonic: Action\n  Target: //:one\n"),
+        "{text}"
+    );
+    assert!(text.contains("  Command Line: (exec "), "{text}");
+    assert!(text.contains("parameter)\n"), "{text}");
+}
+
 mod configured_action_conflicts {
     use std::sync::Arc;
     use std::sync::atomic::AtomicBool;
@@ -5776,7 +5804,8 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
     fn validated_shared_closure_keeps_semantic_owners_and_lowers_one_reapi_plan() {
         let workspace = workspace();
         let registry = registry_flag(&workspace);
-        let request = BuildRequest::parse(&[registry.as_str(), "//:root"]).unwrap();
+        let request =
+            BuildRequest::parse(&[registry.as_str(), "//:writer_a", "//:writer_b"]).unwrap();
         let accepted = evaluate_workspace_build_command_with_bzlmod_inputs(
             &workspace,
             &request.targets,
@@ -5794,7 +5823,7 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
                 .unwrap();
             let shared_semantic = semantic
                 .iter()
-                .filter(|view| view.action().output().path() == "shared.txt")
+                .filter(|view| view.action().output().root_relative_path() == "shared.txt")
                 .collect::<Vec<_>>();
             assert_eq!(shared_semantic.len(), 2);
             assert_ne!(
@@ -5807,7 +5836,7 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
                 .unwrap();
             let shared_execution = execution
                 .iter()
-                .filter(|view| view.action().output().path() == "shared.txt")
+                .filter(|view| view.action().output().root_relative_path() == "shared.txt")
                 .collect::<Vec<_>>();
             assert_eq!(shared_execution.len(), 1);
             let plan = slug_reapi_v2::FileWriteReapiPlan::from_resolved(
@@ -5815,7 +5844,10 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
                 &std::collections::BTreeMap::new(),
             )
             .unwrap();
-            assert_eq!(plan.command().output_files, ["shared.txt"]);
+            assert_eq!(
+                plan.command().output_files,
+                [shared_execution[0].action().output().path()]
+            );
             TerminalOutput::new(0, String::new(), String::new())
         });
         assert_eq!(projected.publish().into_parts().1, 0);

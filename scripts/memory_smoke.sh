@@ -4,6 +4,7 @@
 # Examples:
 #   scripts/memory_smoke.sh --pgrep slugd
 #   scripts/memory_smoke.sh --pid 12345
+#   scripts/memory_smoke.sh --include-pid 12345 -- target/debug/slug cquery //...
 #   scripts/memory_smoke.sh --include-pgrep 'slugd\\[my-repo\\]' -- target/debug/slug build //...
 
 set -euo pipefail
@@ -13,12 +14,12 @@ usage() {
 Usage:
   scripts/memory_smoke.sh [--interval SEC] --pid PID
   scripts/memory_smoke.sh [--interval SEC] --pgrep PATTERN
-  scripts/memory_smoke.sh [--interval SEC] [--include-pgrep PATTERN] -- COMMAND [ARG...]
+  scripts/memory_smoke.sh [--interval SEC] [--include-pid PID] [--include-pgrep PATTERN] -- COMMAND [ARG...]
   scripts/memory_smoke.sh [--interval SEC] -- COMMAND [ARG...]
 
 Reports peak and final RSS in KiB. In command mode, samples the command
-process, its descendants, and any extra --include-pgrep matches while the
-command is running.
+process, its descendants, the trees rooted at any --include-pid values, and
+any extra --include-pgrep matches while the command is running.
 EOF
 }
 
@@ -27,6 +28,7 @@ mode=
 pid=
 pattern=
 include_pgrep=()
+include_pids=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -46,6 +48,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --include-pgrep)
             include_pgrep+=("${2:?missing pattern}")
+            shift 2
+            ;;
+        --include-pid)
+            if [[ ! "${2:-}" =~ ^[1-9][0-9]*$ ]]; then
+                usage
+                exit 2
+            fi
+            include_pids+=("$2")
             shift 2
             ;;
         --)
@@ -107,6 +117,12 @@ current_pids() {
             ;;
     esac
     local include
+    for include in "${include_pids[@]}"; do
+        if ps -p "${include}" >/dev/null 2>&1; then
+            printf '%s\n' "${include}"
+            descendants "${include}"
+        fi
+    done
     for include in "${include_pgrep[@]}"; do
         pgrep -f "${include}" 2>/dev/null || true
     done
