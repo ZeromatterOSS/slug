@@ -20,6 +20,9 @@ use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
 mod fixture_support;
 use fixture_support::FixtureWorkspace;
 
+#[path = "../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
+mod source_staging_workspace;
+
 fn slug() -> Command {
     let executable = std::path::PathBuf::from(env!("CARGO_BIN_EXE_slug"));
     Command::new(if executable.is_absolute() {
@@ -5280,6 +5283,37 @@ root_rule(name = "root", deps = [":left", ":right"])
         std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
         baseline_pid
     );
+}
+
+#[test]
+fn aquery_spawn_text_matches_one_shot_and_daemon() {
+    let workspace = scratch("aquery-spawn");
+    source_staging_workspace::write(&workspace);
+    let registry = format!("--registry=file://{}/empty-registry", workspace.display());
+    let output_base = scratch("aquery-spawn-daemon");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let run = |base: Option<&str>| {
+        let output = slug()
+            .current_dir(&workspace)
+            .args(base)
+            .args(["aquery", "//:one", "--output=text"])
+            .arg(&registry)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert!(output.stderr.is_empty(), "{output:?}");
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let text = run(None);
+    assert_eq!(text, run(Some(&output_base_arg)));
+    assert!(text.starts_with("action 'Action shared.out'\n"), "{text}");
+    assert!(
+        text.contains("  Mnemonic: Action\n  Target: //:one\n"),
+        "{text}"
+    );
+    assert!(text.contains("  Command Line: (exec "), "{text}");
+    assert!(text.contains("parameter)\n"), "{text}");
 }
 
 mod configured_action_conflicts {

@@ -189,6 +189,7 @@ Daemon runtime construction precedes socket acquisition. Native setup opens
 and verifies the named inode and refuses set-ID modes and file capabilities.
 The protected launcher candidate passed confinement and matched all four pinned
 CrateInfo cases through both public routes. Retained requests used one daemon.
+One-shot and daemon aquery share the admitted text formatter.
 Production activation, public action comparison and Rust REAPI remain open.
 
 Initial modules:
