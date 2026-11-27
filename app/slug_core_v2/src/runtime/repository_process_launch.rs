@@ -21,7 +21,7 @@ pub(in crate::runtime::repository_physical_root) enum ExecuteDecision {
 }
 pub(in crate::runtime::repository_physical_root) enum SelectedExecuteDecision {
     Replay(RepositoryWorkspaceCommand),
-    Launch(SelectedExecuteLaunch),
+    Launch(SelectedExecuteLaunch, RepositoryWorkspaceLauncher),
 }
 pub(in crate::runtime::repository_physical_root) struct SelectedExecuteLaunch {
     root: ExecuteLaunch,

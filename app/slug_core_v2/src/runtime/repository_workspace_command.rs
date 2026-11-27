@@ -178,6 +178,8 @@ pub(in crate::runtime) struct RepositoryWorkspaceCommand {
     source_dependencies: Arc<NativeReadViewDependencies>,
     scope: Arc<SourceServiceScope>,
     resources: Arc<RepositoryRootResources>,
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    launcher: RepositoryWorkspaceLauncher,
     max_roots: usize,
     accepted_body_comparison_bytes: usize,
     #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
@@ -188,6 +190,7 @@ pub(in crate::runtime) struct RepositoryWorkspaceCommand {
 }
 
 impl RepositoryWorkspaceCommand {
+    #[cfg(test)]
     pub(in crate::runtime) fn new(
         workspace: NormalizedAbsolutePath,
         lease: u64,
@@ -196,8 +199,39 @@ impl RepositoryWorkspaceCommand {
         scope: Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<Self, PhysicalRootError> {
+        Self::new_with_launcher(
+            workspace,
+            lease,
+            limits,
+            resources,
+            scope,
+            #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+            RepositoryWorkspaceLauncher::TestFixture,
+            active,
+        )
+    }
+
+    #[cfg(any(test, all(target_arch = "x86_64", target_pointer_width = "64")))]
+    pub(in crate::runtime) fn new_with_launcher(
+        workspace: NormalizedAbsolutePath,
+        lease: u64,
+        limits: RepositoryWorkspaceRetentionLimits,
+        resources: Arc<RepositoryRootResources>,
+        scope: Arc<SourceServiceScope>,
+        #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+        launcher: RepositoryWorkspaceLauncher,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Self, PhysicalRootError> {
         check(&scope, active)?;
         check_bank(&scope, &resources)?;
+        #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+        match &launcher {
+            RepositoryWorkspaceLauncher::Installed(images) => {
+                images.verify_resources(&resources)?
+            }
+            #[cfg(any(test, feature = "repository-workspace-test-support"))]
+            RepositoryWorkspaceLauncher::TestFixture => {}
+        }
         if &workspace != scope.workspace() {
             return Err(PhysicalRootError::SourceService(
                 SourceServiceError::ForeignScope,
@@ -239,6 +273,8 @@ impl RepositoryWorkspaceCommand {
             source_dependencies: dependencies,
             scope,
             resources,
+            #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+            launcher,
             max_roots: limits.max_roots(),
             accepted_body_comparison_bytes: 0,
             #[cfg(all(test, target_arch = "x86_64", target_pointer_width = "64"))]
@@ -246,6 +282,12 @@ impl RepositoryWorkspaceCommand {
             _control: control,
             _retirement: retirement,
         })
+    }
+    #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+    pub(in crate::runtime::repository_physical_root) fn launcher(
+        &self,
+    ) -> &RepositoryWorkspaceLauncher {
+        &self.launcher
     }
     pub(in crate::runtime) fn retirement_observer(&self) -> RepositoryWorkspaceRetirementObserver {
         RepositoryWorkspaceRetirementObserver {

@@ -56,7 +56,7 @@ impl std::fmt::Debug for RepositoryWorkspaceIntegrationTestResources {
 impl WorkspaceRuntime {
     /// Trusted test-only activation with the same fixed bounds as native owner
     /// probes. The opt-in feature also uses their existing SLUG_V2_BIN compiled
-    /// CLI binding; default builds continue to select their own executable.
+    /// CLI binding when a native launch is needed.
     pub fn enable_general_repository_workspaces_for_integration_test(
         &mut self,
     ) -> anyhow::Result<RepositoryWorkspaceIntegrationTestResources> {
@@ -78,7 +78,7 @@ impl WorkspaceRuntime {
             16 * 1024 * 1024,
             1024 * 1024 * 1024,
         )?;
-        self.configure_general_repository_workspaces(resources.clone(), retention)?;
+        self.enable_general_repository_workspaces_for_test(resources.clone(), retention)?;
         Ok(RepositoryWorkspaceIntegrationTestResources {
             resources,
             baseline,

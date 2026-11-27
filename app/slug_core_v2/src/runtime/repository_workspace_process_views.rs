@@ -395,11 +395,13 @@ impl RepositoryWorkspaceCommand {
             resources,
         )?;
         let mode = self.roots[slot].progress.as_ref().unwrap().builder.mode;
+        let launcher = self.launcher().clone();
         let admission = self.admit_native_covered(covered, mode, &scope, active)?;
         let root = ExecuteLaunch::new(admission, active)?;
-        Ok(SelectedExecuteDecision::Launch(SelectedExecuteLaunch::new(
-            root, batch,
-        )?))
+        Ok(SelectedExecuteDecision::Launch(
+            SelectedExecuteLaunch::new(root, batch)?,
+            launcher,
+        ))
     }
     pub(in crate::runtime) async fn execute_selected_sources(
         self,
