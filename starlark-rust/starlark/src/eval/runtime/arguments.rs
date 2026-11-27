@@ -454,6 +454,10 @@ impl<'v, 'a> Arguments<'v, 'a> {
         &self,
         heap: Heap<'v>,
     ) -> crate::Result<([Value<'v>; REQUIRED], [Option<Value<'v>>; OPTIONAL])> {
+        if let Some(budget) = heap.execution_budget() {
+            return self.bounded_optional(heap, budget);
+        }
+
         #[cold]
         #[inline(never)]
         fn rare<'v, const REQUIRED: usize, const OPTIONAL: usize>(

@@ -18,6 +18,7 @@
 use starlark_syntax::slice_vec_ext::SliceExt;
 
 use crate::collections::maybe_uninit_backport::maybe_uninit_write_slice;
+use crate::eval::ExecutionLimit;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
 use crate::values::FrozenHeap;
@@ -192,6 +193,24 @@ impl FrozenHeap {
 }
 
 impl<'v> Heap<'v> {
+    /// Admit the aligned tuple object and copying its elements.
+    pub(crate) fn alloc_budgeted_tuple(
+        self,
+        elems: &[Value<'v>],
+    ) -> Result<Value<'v>, ExecutionLimit> {
+        if let Some(budget) = self.execution_budget() {
+            let bytes = if elems.is_empty() {
+                0
+            } else {
+                AValueTuple::checked_alloc_size_for_extra_len(elems.len())
+                    .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?
+                    .bytes() as usize
+            };
+            budget.charge(1 + elems.len(), bytes)?;
+        }
+        Ok(self.alloc_tuple(elems))
+    }
+
     /// Allocate a tuple with the given elements.
     pub(crate) fn alloc_tuple(self, elems: &[Value<'v>]) -> Value<'v> {
         if elems.is_empty() {

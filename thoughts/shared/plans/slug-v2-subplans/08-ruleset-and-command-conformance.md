@@ -165,10 +165,10 @@ Public admission requires a closed evaluator with no loader and finite source,
 heap, work and output admission. Untyped modules defer script operations to
 runtime and preserve original bytecode after freeze. The parser bounds bytes,
 grammar tokens, and integer digits. Shared sticky runtime credits cover text,
-interpolation, stable sort, and ordered depset traversal, including structural
-provider identity. Bound value freeze, native call packing, attribute
-projections, diagnostics, and remaining collection operations before
-activation. Resource outcomes are Slug-native. Bazel 9.2's
+interpolation, stable sort, ordered depset traversal with structural provider
+identity, and positional argument expansion. Bound value freeze, bytecode work,
+keyword packing, attribute projections, diagnostics, and remaining collection
+operations before activation. Resource outcomes are Slug-native. Bazel 9.2's
 `StarlarkOutputFormatterCallback` and `configured_query_test.sh` define setup
 and partial-output semantics.
 

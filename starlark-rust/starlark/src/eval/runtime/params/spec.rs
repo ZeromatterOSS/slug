@@ -57,6 +57,9 @@ use crate::values::ValueLike;
 use crate::values::dict::Dict;
 use crate::values::dict::DictRef;
 
+#[cfg(test)]
+mod star_budget_tests;
+
 /// Describe parameter for [`ParametersSpec`].
 #[derive(
     Debug, Clone, Copy, Dupe, PartialEq, Eq, PartialOrd, Ord, Trace, Freeze, Allocative
@@ -609,6 +612,9 @@ impl<'v> ParametersSpec<Value<'v>> {
             && args.args().is_none()
             && args.kwargs().is_none()
         {
+            if let Some(budget) = heap.execution_budget() {
+                budget.charge(args.pos().len(), 0)?;
+            }
             for (v, s) in args.pos().iter().zip(slots.iter_mut()) {
                 *s = Some(*v);
             }
@@ -676,7 +682,24 @@ impl<'v> ParametersSpec<Value<'v>> {
         // We might do unchecked stuff later on, so make sure we have as many slots as we expect
         assert!(slots.len() >= len);
 
+        let budget = heap.execution_budget();
+        if let Some(budget) = budget {
+            budget.charge(len, 0)?;
+            budget.charge(args.pos().len(), 0)?;
+        }
         let mut star_args = Vec::new();
+        let mut extra_pos = 0;
+        let mut capture_pos = |value| -> crate::Result<()> {
+            extra_pos += 1;
+            if self.indices.args.is_some() {
+                if let Some(budget) = budget {
+                    budget.push_vec(&mut star_args, value)?;
+                } else {
+                    star_args.push(value);
+                }
+            }
+            Ok(())
+        };
         let mut kwargs = LazyKwargs::default();
         let mut next_position = 0;
 
@@ -693,7 +716,7 @@ impl<'v> ParametersSpec<Value<'v>> {
                     slots[next_position] = Some(*v);
                     next_position += 1;
                 } else {
-                    star_args.push(*v);
+                    capture_pos(*v)?;
                 }
             }
         }
@@ -724,15 +747,32 @@ impl<'v> ParametersSpec<Value<'v>> {
 
         // Next up are the *args parameters
         if let Some(param_args) = args.args() {
-            for v in param_args
-                .iterate(heap)
-                .map_err(|_| FunctionError::ArgsArrayIsNotIterable)?
-            {
+            let iter = if budget.is_some() {
+                heap.bounded_iterator(param_args, "positional argument expansion")
+            } else {
+                param_args.iterate(heap)
+            };
+            let mut iter = match iter {
+                Ok(iter) => iter,
+                Err(_) => {
+                    if let Some(budget) = budget {
+                        budget.check()?;
+                    }
+                    return Err(FunctionError::ArgsArrayIsNotIterable.into());
+                }
+            };
+            loop {
+                if let Some(budget) = budget {
+                    budget.charge(1, 0)?;
+                }
+                let Some(v) = iter.next() else {
+                    break;
+                };
                 if next_position < (self.indices.num_positional as usize) {
                     slots[next_position] = Some(v);
                     next_position += 1;
                 } else {
-                    star_args.push(v);
+                    capture_pos(v)?;
                 }
             }
         }
@@ -822,10 +862,10 @@ impl<'v> ParametersSpec<Value<'v>> {
         // Note that we deliberately give warnings about missing parameters _before_ giving warnings
         // about unexpected extra parameters, so if a user misspells an argument they get a better error.
         if let Some(args_pos) = self.indices.args {
-            slots[args_pos as usize] = Some(heap.alloc_tuple(&star_args));
-        } else if unlikely(!star_args.is_empty()) {
+            slots[args_pos as usize] = Some(heap.alloc_budgeted_tuple(&star_args)?);
+        } else if unlikely(extra_pos != 0) {
             return Err(FunctionError::ExtraPositionalArg {
-                count: star_args.len(),
+                count: extra_pos,
                 function: self.signature(),
             }
             .into());

@@ -75,6 +75,76 @@ impl<'v, 'a> Arguments<'v, 'a> {
         })
     }
 
+    pub(super) fn bounded_optional<const REQUIRED: usize, const OPTIONAL: usize>(
+        &self,
+        heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<([Value<'v>; REQUIRED], [Option<Value<'v>>; OPTIONAL])> {
+        let mut positions = self.bounded_positions(heap, budget)?;
+        let mut required = [Value::new_none(); REQUIRED];
+        let mut optional = [None; OPTIONAL];
+        let mut got = 0;
+        loop {
+            budget.charge(1, 0)?;
+            let Some(value) = positions.next() else {
+                break;
+            };
+            if got < REQUIRED {
+                required[got] = value;
+            } else if let Some(slot) = optional.get_mut(got - REQUIRED) {
+                *slot = Some(value);
+            }
+            got += 1;
+        }
+        if got < REQUIRED || got > REQUIRED + OPTIONAL {
+            return Err(FunctionError::WrongNumberOfArgs {
+                min: REQUIRED,
+                max: REQUIRED + OPTIONAL,
+                got,
+            }
+            .into());
+        }
+        Ok((required, optional))
+    }
+
+    pub(crate) fn bounded_no_named_args(&self, budget: &ExecutionBudget) -> crate::Result<()> {
+        budget.check()?;
+        let explicit = self.0.names.names();
+        let kwargs = self.unpack_kwargs()?;
+        if explicit.is_empty() && kwargs.as_ref().is_none_or(|kwargs| kwargs.is_empty()) {
+            return Ok(());
+        }
+
+        // A malformed ** argument takes precedence over unexpected names. Keep the
+        // dictionary borrowed across both passes so validated names cannot change.
+        if let Some(kwargs) = &kwargs {
+            for key in kwargs.keys() {
+                budget.charge(1, 0)?;
+                Self::unpack_kwargs_key(key)?;
+            }
+        }
+        let keys = explicit.iter().map(|(name, _)| name.as_str()).chain(
+            kwargs
+                .iter()
+                .flat_map(|kwargs| kwargs.keys().map(|key| key.unpack_str().unwrap())),
+        );
+
+        // Write the diagnostic once so displaying it never joins owned key copies.
+        let mut message = BoundedText::new(budget, usize::MAX);
+        message.push_str("Found `")?;
+        for (index, name) in keys.enumerate() {
+            budget.charge(1, 0)?;
+            if index != 0 {
+                message.push_str("` `")?;
+            }
+            message.push_str(name)?;
+        }
+        message.push_str("` extra named parameter(s) for call to function")?;
+        Err(crate::Error::new_kind(crate::ErrorKind::Function(
+            anyhow::Error::msg(message.finish()?),
+        )))
+    }
+
     pub(crate) fn bounded_format_names(
         &self,
         budget: &ExecutionBudget,
