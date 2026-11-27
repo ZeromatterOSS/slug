@@ -2,9 +2,14 @@
 # Opt-in native diagnostic. Never invokes Slug CLI/Bazel or acquires inputs.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
-for probe_tool in unshare prlimit strace perl timeout; do
+for probe_tool in perl timeout; do
     command -v "$probe_tool" >/dev/null
 done
+if [[ $# != 2 || "$1" != "--portable-limits" ]]; then
+    for probe_tool in unshare prlimit strace; do
+        command -v "$probe_tool" >/dev/null
+    done
+fi
 probe_harness=
 probe_portable=0 probe_limits_only=0 probe_deadline=12
 probe_portable_cpu=15 probe_shell_timeout=15 probe_python_timeout=17
