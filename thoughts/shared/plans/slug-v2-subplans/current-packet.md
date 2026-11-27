@@ -19,14 +19,15 @@ Cleanup returned to exactly 168 retained bytes, zero FDs and zero backing.
 The earlier unclassified refusal at attempt 859 still has no attributed cause
 or demonstrated removal. Full Rust and completed-command latency/RSS remain open.
 
-The [authentic Rust frontier][frontier] recorded 11.72 of 13.80 workspace seconds
-inside six Archive dispatches: 4.03 verified capture, 4.31 rooted extraction,
-and 3.35 snapshot/record. At 831 computes, 55 roots and 114 records, the sixth
-Archive passed extraction and refused during snapshot/record at
-SourceWorkDeadline. Cleanup was exact. Next test a causal hypothesis within
-the reached extraction or snapshot owners while preserving full rooted reads,
-decoded bytes, checks and history. The [attribution contract][attribution]
-keeps the complete report at 512 KiB. Keep the
+Packed capture forwards full aligned RootIo blocks to the existing encoder and
+assembles fragments under the same scratch admission. Matched runs of the
+relocatable six-archive gate preserved bytes, peak credit and last-reader
+retirement with effectively flat elapsed time and instructions. The [authentic
+Rust frontier][frontier] completed six Archives in 11.55 seconds, including 4.30
+rooted extraction. It reached 832 computes, 55 roots and 115 records, then
+refused File 6 at SourceWorkDeadline with exact cleanup. Next isolate decoder
+cost from TAR and rooted IO before choosing an extraction change.
+The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
 [bounded typed Registration classifier][registration] available if that
 category recurs. Private message parsing, blind repeats, presumed API repair,
 diagnostic-only integration, caller pruning, Need cacheability, new route,

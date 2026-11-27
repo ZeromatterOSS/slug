@@ -1,4 +1,6 @@
 //! Covered snapshots build packed immutable bodies directly from actual FD chunks.
+use slug_bzlmod_v2::REPOSITORY_WORKSPACE_BODY_CHUNK_BYTES as BLOCK_BYTES;
+
 use super::*;
 
 fn build_error(error: RepositoryWorkspaceBodyBuildError<PhysicalRootError>) -> PhysicalRootError {
@@ -35,6 +37,30 @@ fn append(
         .map_err(build_error)?;
     check(scope, active)
 }
+
+fn assemble_blocks<E>(
+    partial: &mut Vec<u8>,
+    mut chunk: &[u8],
+    mut append: impl FnMut(&[u8]) -> Result<(), E>,
+) -> Result<(), E> {
+    while !chunk.is_empty() {
+        if partial.is_empty() && chunk.len() >= BLOCK_BYTES {
+            let (block, rest) = chunk.split_at(BLOCK_BYTES);
+            append(block)?;
+            chunk = rest;
+            continue;
+        }
+        let count = chunk.len().min(BLOCK_BYTES - partial.len());
+        let (fragment, rest) = chunk.split_at(count);
+        partial.extend_from_slice(fragment);
+        chunk = rest;
+        if partial.len() == BLOCK_BYTES {
+            append(partial)?;
+            partial.clear();
+        }
+    }
+    Ok(())
+}
 pub(super) fn capture(
     io: &RootIo<'_>,
     path: &Path,
@@ -58,17 +84,15 @@ pub(super) fn capture(
         _scratch: scratch,
     };
     // RootIo retains its own FD scratch across this callback. Keep the
-    // assembler off the fixed Source-worker stack, under the existing 2MiB
-    // construction allowance; no full logical file is materialized.
+    // fragment buffer off the fixed Source-worker stack, under the existing
+    // 2MiB construction allowance. Initialize only bytes that need assembly.
     let mut buffer = Vec::new();
     buffer
-        .try_reserve_exact(64 * 1024)
+        .try_reserve_exact(BLOCK_BYTES)
         .map_err(|_| PhysicalRootError::Resource)?;
-    if buffer.capacity() > 64 * 1024 {
+    if buffer.capacity() > BLOCK_BYTES {
         return Err(PhysicalRootError::Resource);
     }
-    buffer.resize(64 * 1024, 0);
-    let mut filled = 0usize;
     let mut offset = 0usize;
     let mut callback_error = None;
     let captured = io.read_file_contents(path, &|| active() && scope.check().is_ok(), |chunk| {
@@ -78,18 +102,9 @@ pub(super) fn capture(
                 .checked_add(chunk.len())
                 .filter(|end| *end <= length)
                 .ok_or(PhysicalRootError::Snapshot)?;
-            let mut remaining = chunk;
-            while !remaining.is_empty() {
-                let count = remaining.len().min(buffer.len() - filled);
-                buffer[filled..filled + count].copy_from_slice(&remaining[..count]);
-                filled += count;
-                remaining = &remaining[count..];
-                if filled == buffer.len() {
-                    append(&mut construction, &buffer, scope, active)?;
-                    filled = 0;
-                }
-            }
-            Ok::<_, PhysicalRootError>(())
+            assemble_blocks(&mut buffer, chunk, |block| {
+                append(&mut construction, block, scope, active)
+            })
         })();
         if let Err(error) = result {
             callback_error = Some(error);
@@ -107,8 +122,8 @@ pub(super) fn capture(
         if offset != length || !seal::unchanged(framed, &captured) {
             return Err(PhysicalRootError::Snapshot);
         }
-        if filled != 0 {
-            append(&mut construction, &buffer[..filled], scope, active)?;
+        if !buffer.is_empty() {
+            append(&mut construction, &buffer, scope, active)?;
         }
         Ok(())
     })();
@@ -137,4 +152,43 @@ pub(super) fn capture(
     let pending = construction.pending.take().unwrap();
     let lease = candidates.finish(pending, body, active)?;
     Ok(lease.body().clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packed_block_assembly_forwards_aligned_input_and_assembles_fragments() {
+        let payload = (0..4 * BLOCK_BYTES + 37)
+            .map(|index| (index % 251) as u8)
+            .collect::<Vec<_>>();
+        let mut buffer = Vec::with_capacity(BLOCK_BYTES);
+        let mut seen = 0;
+        let mut forwarded = 0;
+        let mut position = 0;
+        for size in [
+            BLOCK_BYTES,
+            BLOCK_BYTES - 3,
+            BLOCK_BYTES,
+            3,
+            BLOCK_BYTES,
+            37,
+        ] {
+            let chunk = &payload[position..position + size];
+            assemble_blocks(&mut buffer, chunk, |block| {
+                assert_eq!(block, &payload[seen..seen + BLOCK_BYTES]);
+                if std::ptr::eq(block.as_ptr(), payload[seen..].as_ptr()) {
+                    forwarded += block.len();
+                }
+                seen += block.len();
+                Ok::<_, ()>(())
+            })
+            .unwrap();
+            position += size;
+        }
+        assert_eq!(seen, 4 * BLOCK_BYTES);
+        assert_eq!(buffer, payload[seen..]);
+        assert_eq!(forwarded, 2 * BLOCK_BYTES);
+    }
 }
