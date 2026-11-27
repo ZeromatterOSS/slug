@@ -7,6 +7,10 @@ registry-metadata.tar
   registry-metadata.json records each object's demand order, source URL, size,
   and SHA-256. The metadata has no executable payload content.
 
+apple_support 1.24.2
+  Source: https://github.com/bazelbuild/apple_support/releases/tag/1.24.2
+  License: Apache License 2.0, copied as licenses/apple_support-LICENSE
+
 bazel_features 1.42.1
   Source: https://github.com/bazel-contrib/bazel_features/releases/tag/v1.42.1
   License: Apache License 2.0, copied as licenses/bazel_features-LICENSE

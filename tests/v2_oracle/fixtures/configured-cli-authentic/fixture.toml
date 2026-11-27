@@ -20,7 +20,7 @@ verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove 
 
 [authentic]
 inventory_version = 1
-total_source_bytes = 32440662
+total_source_bytes = 32559262
 historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
 candidate_commit = "27e9e9c0c"
 candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
@@ -351,3 +351,34 @@ member = "MODULE.bazel"
 patch = "registry/modules/rules_swift/3.1.2/patches/module_dot_bazel_version.patch"
 expected = "modules/rules_swift/3.1.2/MODULE.bazel"
 preimage_sha256 = "5e412fafa1373df80c72bc9de891dd0281b174d693cedad5987c85d59aab572a"
+
+[[objects]]
+source = "mirror/github.com/bazelbuild/apple_support/releases/download/1.24.2/apple_support.1.24.2.tar.gz"
+destination = "mirror/github.com/bazelbuild/apple_support/releases/download/1.24.2/apple_support.1.24.2.tar.gz"
+sha256 = "8625cc7b7b2952e38101e17b4a9e7c043b3a79f55d26e4772819891998725e16"
+size = 106895
+source_url = "https://github.com/bazelbuild/apple_support/releases/download/1.24.2/apple_support.1.24.2.tar.gz"
+kind = "archive"
+
+[[objects]]
+source = "registry/modules/apple_support/1.24.2/patches/module_dot_bazel_version.patch"
+destination = "registry/modules/apple_support/1.24.2/patches/module_dot_bazel_version.patch"
+sha256 = "037651b4a7e9463942177b2691e26b362294612e4c2c7abf7bde3133eae85a2e"
+size = 347
+source_url = "https://bcr.bazel.build/modules/apple_support/1.24.2/patches/module_dot_bazel_version.patch"
+kind = "patch"
+
+[[objects]]
+source = "licenses/apple_support-LICENSE"
+destination = "licenses/apple_support-LICENSE"
+sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+size = 11358
+source_url = "https://github.com/bazelbuild/apple_support/releases/download/1.24.2/apple_support.1.24.2.tar.gz#./LICENSE"
+kind = "license"
+
+[[patch_checks]]
+archive = "mirror/github.com/bazelbuild/apple_support/releases/download/1.24.2/apple_support.1.24.2.tar.gz"
+member = "MODULE.bazel"
+patch = "registry/modules/apple_support/1.24.2/patches/module_dot_bazel_version.patch"
+expected = "modules/apple_support/1.24.2/MODULE.bazel"
+preimage_sha256 = "0b8cadf1e8fa65a6d09114700663d36737ccbd4a886b039a2cd3d930cf0b8041"

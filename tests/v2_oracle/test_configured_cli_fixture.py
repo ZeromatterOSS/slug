@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import io
 import json
@@ -75,19 +76,19 @@ def test_portable_driver_receives_checked_deadline_limits(deadline: int) -> None
 
 def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> None:
     verified = verify_fixture()
-    assert len(verified.objects) == 35
+    assert len(verified.objects) == 38
     assert len(verified.registry_entries) == 177
-    assert verified.total_bytes == 32_440_662
+    assert verified.total_bytes == 32_559_262
     assert (
         verified.inventory_sha256
-        == "6895d4ffee1075659d9db5709bf4a1418b0cc772ac7d95cbeaf472c14c669538"
+        == "982151a70f6b9b77265259028d53a64aae17482a0cb85474a84077fd1978d657"
     )
 
     destination = tmp_path / "assembled"
     receipt = assemble(destination)
-    assert receipt["object_count"] == 35
+    assert receipt["object_count"] == 38
     assert receipt["registry_metadata_count"] == 177
-    assert receipt["source_bytes"] == 32_440_662
+    assert receipt["source_bytes"] == 32_559_262
     assert receipt["inventory_sha256"] == verified.inventory_sha256
     assert "local_path_override" not in (destination / "workspace/MODULE.bazel").read_text()
     assert (destination / "workspace/BUILD.bazel").read_text().endswith(
@@ -125,6 +126,18 @@ def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> Non
         destination
         / "registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch"
     ).is_file()
+    apple_support = destination / "registry/modules/apple_support/1.24.2"
+    source = json.loads((apple_support / "source.json").read_text())
+    for path, integrity in (
+        (destination / "mirror" / source["url"].removeprefix("https://"), source["integrity"]),
+        (
+            apple_support / "patches/module_dot_bazel_version.patch",
+            source["patches"]["module_dot_bazel_version.patch"],
+        ),
+    ):
+        with path.open("rb") as stream:
+            encoded = base64.b64encode(hashlib.file_digest(stream, "sha256").digest())
+            assert integrity == "sha256-" + encoded.decode("ascii")
     assert json.loads((destination / "inventory.json").read_text()) == receipt
     for item in verified.objects:
         if item.kind == "archive":

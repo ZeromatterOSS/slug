@@ -1,2 +1,4 @@
 * text=auto eol=lf
 app/slug_bzlmod_v2/builtin/bazel_tools/tools/python/BUILD whitespace=-blank-at-eof
+# Preserve the original context lines in pinned Bazel registry patches.
+tests/v2_oracle/fixtures/**/registry/modules/**/patches/*.patch -text whitespace=-blank-at-eol
