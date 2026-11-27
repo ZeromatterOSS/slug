@@ -40,6 +40,7 @@ use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RunfilesSymlink;
 use slug_build_api_v2::RunfilesSymlinkDepset;
+use slug_loading_v2::alloc_budgeted_starlark_label;
 use slug_loading_v2::provider::StarlarkDepset;
 use slug_loading_v2::provider::StarlarkDepsetSuccessorGen;
 use slug_loading_v2::provider::StarlarkOutputGroupInfo;
@@ -58,6 +59,7 @@ use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
+use starlark::eval::ExecutionBudget;
 use starlark::starlark_module;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
@@ -469,6 +471,25 @@ impl AnalysisConfiguredTargetValue {
             .get("files")
             .copied()
     }
+
+    fn bounded_files<'v>(&self, budget: &ExecutionBudget) -> starlark::Result<Option<Value<'v>>> {
+        for (identity, value) in &self.providers {
+            budget.charge(1, 0)?;
+            if !identity.is_builtin("DefaultInfo") {
+                continue;
+            }
+            if let Some(default) = BuiltinProviderView::from_value(value.to_value()) {
+                for (name, value) in &default.fields {
+                    budget.charge(1, 0)?;
+                    if name.as_str() == "files" {
+                        return Ok(Some(value.to_value()));
+                    }
+                }
+            }
+            break;
+        }
+        Ok(None)
+    }
 }
 
 impl fmt::Display for AnalysisConfiguredTargetValue {
@@ -520,6 +541,22 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
                 self.retained.identity().label().clone(),
             )),
             _ => None,
+        }
+    }
+
+    fn get_attr_bounded(
+        &self,
+        name: &str,
+        heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> starlark::Result<Option<Value<'v>>> {
+        match name {
+            "files" => self.bounded_files(budget),
+            "label" => Ok(Some(alloc_budgeted_starlark_label(
+                heap,
+                self.retained.identity().label(),
+            )?)),
+            _ => Ok(None),
         }
     }
 
@@ -1343,6 +1380,7 @@ mod cc_variables;
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::sync::Arc;
 
     use slug_build_api_v2::DefaultInfo;
     use slug_build_api_v2::DepsetOrder;
@@ -1351,8 +1389,17 @@ mod tests {
     use slug_build_api_v2::PlatformInfo;
     use slug_build_api_v2::ProviderId;
     use slug_build_api_v2::RunEnvironmentInfo;
+    use slug_identity_v2::ApparentLabel;
+    use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalLabel;
+    use slug_identity_v2::CanonicalRepoName;
+    use slug_identity_v2::RepositoryMapping;
+    use slug_identity_v2::RepositoryMappingId;
     use slug_loading_v2::provider::alloc_starlark_provider_callable;
+    use slug_loading_v2::provider::starlark_label_ref;
     use slug_loading_v2::provider::starlark_provider_identity;
+    use starlark::environment::Module;
+    use starlark::eval::ExecutionLimit;
     use starlark::values::list::ListRef;
 
     use super::*;
@@ -1373,6 +1420,103 @@ mod tests {
 
     fn field<'a>(view: &'a BuiltinProviderView, name: &str) -> &'a FrozenValue {
         view.fields.get(name).unwrap()
+    }
+
+    #[test]
+    fn bounded_target_files_reuses_the_existing_frozen_handle() {
+        let label = CanonicalLabel::parse("@@//pkg:target").unwrap();
+        let default =
+            DefaultInfo::from_executable(AnalysisArtifact::Source(label.clone()), None).unwrap();
+        let heap = FrozenHeap::new();
+        let mut materializer = AnalysisValueMaterializer::new(&heap);
+        let budget = Arc::new(ExecutionBudget::new(1000, 0, 16).with_bounded_attributes());
+        let module = Module::new_with_execution_budget(budget.clone());
+        for providers in [
+            ProviderCollection::new(vec![ProviderValue::DefaultInfo(default)]).unwrap(),
+            ProviderCollection::from_values(Vec::new(), false).unwrap(),
+        ] {
+            let target =
+                ConfiguredTargetValue::new(AnalysisTargetIdentity::null(label.clone()), providers);
+            let target = materializer.target(&target).unwrap().to_value();
+            let expected = AnalysisConfiguredTargetValue::from_value(target)
+                .unwrap()
+                .files();
+            let actual = target.get_attr("files", module.heap()).unwrap();
+            match expected {
+                Some(handle) => assert!(actual.unwrap().ptr_eq(handle.to_value())),
+                None => assert!(actual.is_none()),
+            }
+            assert!(target.get_attr("unknown", module.heap()).unwrap().is_none());
+        }
+        assert_eq!(budget.check(), Ok(()));
+        assert_eq!(module.heap().allocated_summary().total_allocated_bytes(), 0);
+    }
+
+    #[test]
+    fn bounded_target_label_admits_all_owned_components_and_the_aligned_object() {
+        let mut mapping =
+            RepositoryMapping::new(RepositoryMappingId::new("mapping".repeat(80)).unwrap());
+        mapping.insert(
+            ApparentRepoName::new("visible").unwrap(),
+            CanonicalRepoName::new(format!("dep+{}", "r".repeat(260))).unwrap(),
+        );
+        let mapped = ApparentLabel::parse(&format!(
+            "@visible//{}:{}",
+            "package".repeat(60),
+            "résumé".repeat(60)
+        ))
+        .unwrap()
+        .resolve(&mapping);
+        assert_eq!(mapped.mapping_id(), Some(mapping.id()));
+
+        for label in [CanonicalLabel::parse("@@//:root").unwrap(), mapped] {
+            let target = ConfiguredTargetValue::new(
+                AnalysisTargetIdentity::null(label.clone()),
+                ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())])
+                    .unwrap(),
+            );
+            let heap = FrozenHeap::new();
+            let target = AnalysisValueMaterializer::new(&heap)
+                .target(&target)
+                .unwrap();
+            let ordinary = Module::new();
+            let ordinary_label = target
+                .to_value()
+                .get_attr("label", ordinary.heap())
+                .unwrap()
+                .unwrap();
+            assert_eq!(starlark_label_ref(ordinary_label), Some(&label));
+            // The type profile includes both the aligned arena object and
+            // uniquely owned allocations made by the ordinary label clone.
+            let bytes = ordinary
+                .heap()
+                .allocated_summary()
+                .summary()
+                .get("Label")
+                .unwrap()
+                .1;
+            for allowance in [bytes - 1, bytes] {
+                let budget =
+                    Arc::new(ExecutionBudget::new(1000, allowance, 16).with_bounded_attributes());
+                let module = Module::new_with_execution_budget(budget.clone());
+                let result = target.to_value().get_attr("label", module.heap());
+                if allowance == bytes {
+                    let actual = result.unwrap().unwrap();
+                    assert_eq!(starlark_label_ref(actual), Some(&label));
+                    assert_eq!(
+                        module.heap().allocated_summary().summary().get("Label"),
+                        Some(&(1, bytes))
+                    );
+                    assert_eq!(budget.charge(0, 1), Err(ExecutionLimit::AllocationBytes));
+                } else {
+                    let error = result.unwrap_err();
+                    assert!(matches!(error.kind(), starlark::ErrorKind::Other(cause)
+                        if cause.downcast_ref::<ExecutionLimit>() == Some(&ExecutionLimit::AllocationBytes)));
+                    assert_eq!(budget.check(), Err(ExecutionLimit::AllocationBytes));
+                    assert_eq!(module.heap().allocated_summary().total_allocated_bytes(), 0);
+                }
+            }
+        }
     }
 
     #[test]

@@ -44,6 +44,8 @@ use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
+use starlark::eval::ExecutionBudget;
+use starlark::eval::ExecutionLimit;
 use starlark::starlark_module;
 use starlark::values::AllocValue;
 use starlark::values::Demand;
@@ -1119,6 +1121,41 @@ where
                 Some(values.values[index].to_value())
             }
         }
+    }
+
+    fn get_attr_bounded(
+        &self,
+        attribute: &str,
+        _heap: Heap<'v>,
+        budget: &ExecutionBudget,
+    ) -> starlark::Result<Option<Value<'v>>> {
+        let matches = |name: &str| -> Result<bool, ExecutionLimit> {
+            if name.len() != attribute.len() {
+                return Ok(false);
+            }
+            budget.charge_text_work(name.len())?;
+            Ok(name == attribute)
+        };
+        match &self.fields {
+            LoadingProviderFieldsGen::Schemaful { schema, values } => {
+                // Walk retained values so unset declarations do not require a map probe.
+                for (index, value) in values.iter() {
+                    budget.charge(1, 0)?;
+                    if matches(schema[*index as usize].as_str())? {
+                        return Ok(Some(value.to_value()));
+                    }
+                }
+            }
+            LoadingProviderFieldsGen::Schemaless(fields) => {
+                for (name, value) in fields.names.iter().zip(&fields.values) {
+                    budget.charge(1, 0)?;
+                    if matches(name.as_str())? {
+                        return Ok(Some(value.to_value()));
+                    }
+                }
+            }
+        }
+        Ok(None)
     }
 
     fn dir_attr(&self) -> Vec<String> {

@@ -19,6 +19,8 @@ use std::marker::PhantomData;
 use std::mem;
 
 use crate::cast;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::private::Private;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
@@ -109,6 +111,32 @@ impl FrozenHeap {
 }
 
 impl<'v> Heap<'v> {
+    /// Allocate a simple value after admitting its arena object and owned text copies.
+    /// `cloned_text_lengths` gives the requested byte length of each string cloned
+    /// by `build`. The constructor runs only after admission succeeds.
+    pub fn alloc_budgeted_simple_with_cloned_text<
+        T: StarlarkValue<'v> + HeapSendable<'v> + Send + Sync + 'static,
+    >(
+        self,
+        cloned_text_lengths: impl IntoIterator<Item = usize>,
+        build: impl FnOnce() -> T,
+    ) -> Result<Value<'v>, ExecutionLimit> {
+        if let Some(budget) = self.execution_budget() {
+            let mut bytes = AValueSimple::<T>::alloc_size_for_extra_len(0).bytes() as usize;
+            let mut work = 1 + ExecutionBudget::text_work(bytes);
+            for length in cloned_text_lengths {
+                bytes = bytes
+                    .checked_add(length)
+                    .ok_or_else(|| budget.refuse(ExecutionLimit::AllocationBytes))?;
+                work = work
+                    .checked_add(1 + ExecutionBudget::text_work(length))
+                    .ok_or_else(|| budget.refuse(ExecutionLimit::Work))?;
+            }
+            budget.charge(work, bytes)?;
+        }
+        Ok(self.alloc_simple(build()))
+    }
+
     /// Allocate a simple [`StarlarkValue`] on this heap.
     ///
     /// Simple value is any starlark value which:
@@ -121,5 +149,60 @@ impl<'v> Heap<'v> {
         x: T,
     ) -> Value<'v> {
         self.alloc_raw(simple(x)).to_value()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+    use std::sync::Arc;
+
+    use allocative::Allocative;
+    use starlark_derive::starlark_value;
+
+    use super::*;
+    use crate as starlark;
+    use crate::environment::Module;
+    use crate::values::NoSerialize;
+    use crate::values::ProvidesStaticType;
+
+    #[derive(
+        Debug,
+        Allocative,
+        ProvidesStaticType,
+        NoSerialize,
+        derive_more::Display
+    )]
+    #[display("{}", _0)]
+    struct OwnedText(String);
+
+    #[starlark_value(type = "owned_text")]
+    impl<'v> StarlarkValue<'v> for OwnedText {}
+
+    #[test]
+    fn budgeted_simple_text_admits_all_allocation_and_work_before_construction() {
+        let text = "x".repeat(257);
+        let arena_bytes = AValueSimple::<OwnedText>::alloc_size_for_extra_len(0).bytes() as usize;
+        let bytes = arena_bytes + text.len();
+        let work =
+            2 + ExecutionBudget::text_work(arena_bytes) + ExecutionBudget::text_work(text.len());
+        for (work, bytes, expected) in [
+            (work, bytes, Ok(())),
+            (work, bytes - 1, Err(ExecutionLimit::AllocationBytes)),
+            (work - 1, bytes, Err(ExecutionLimit::Work)),
+        ] {
+            let budget = Arc::new(ExecutionBudget::new(work, bytes, 8));
+            let module = Module::new_with_execution_budget(budget.clone());
+            let built = Cell::new(false);
+            let result = module
+                .heap()
+                .alloc_budgeted_simple_with_cloned_text([text.len()], || {
+                    built.set(true);
+                    OwnedText(text.clone())
+                });
+            assert_eq!(budget.check(), expected);
+            assert_eq!(built.get(), expected.is_ok());
+            assert_eq!(result.map(|_| ()), expected);
+        }
     }
 }

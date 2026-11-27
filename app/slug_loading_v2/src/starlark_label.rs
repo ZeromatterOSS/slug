@@ -22,6 +22,7 @@ use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
+use starlark::eval::ExecutionLimit;
 use starlark::starlark_module;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
@@ -70,6 +71,24 @@ impl fmt::Display for StarlarkLabel {
 }
 
 starlark::starlark_simple_value!(StarlarkLabel);
+
+/// Project an owned Starlark label after admitting every cloned string and its heap object.
+pub fn alloc_budgeted_starlark_label<'v>(
+    heap: Heap<'v>,
+    label: &CanonicalLabel,
+) -> Result<Value<'v>, ExecutionLimit> {
+    let package = label.package();
+    let cloned_lengths = [
+        package.repo().as_str().len(),
+        package.package().as_str().len(),
+        label.target().as_str().len(),
+    ]
+    .into_iter()
+    .chain(label.mapping_id().map(|mapping| mapping.as_str().len()));
+    heap.alloc_budgeted_simple_with_cloned_text(cloned_lengths, || {
+        StarlarkLabel::new(label.clone())
+    })
+}
 
 #[starlark_value(type = "Label")]
 impl<'v> StarlarkValue<'v> for StarlarkLabel {
