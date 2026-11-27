@@ -1,5 +1,6 @@
 //! Request-owned credits for native operations that admit work and allocation.
 
+use std::cmp::Ordering;
 use std::sync::Mutex;
 
 /// First refusal of an opt-in execution budget.
@@ -18,6 +19,12 @@ pub enum ExecutionLimit {
     /// Rendering would exceed the admitted value nesting depth.
     #[error("Starlark text depth limit exceeded")]
     TextDepth,
+    /// Structural identity would exceed the admitted value nesting depth.
+    #[error("Starlark structural identity depth limit exceeded")]
+    StructuralDepth,
+    /// Structural identity encountered an active value cycle.
+    #[error("Starlark structural identity encountered a value cycle")]
+    StructuralCycle,
     /// A fallible allocation refused an admitted request.
     #[error("Starlark text allocation failed")]
     AllocationFailed,
@@ -60,7 +67,7 @@ pub struct ExecutionBudget {
 
 impl ExecutionBudget {
     /// Set the total work, cumulative controlled allocation bytes, and maximum
-    /// value nesting accepted by text rendering.
+    /// value nesting accepted by text rendering and structural identity.
     pub fn new(work: usize, allocation_bytes: usize, text_depth: usize) -> Self {
         Self {
             state: Mutex::new(Ok(Credits {
@@ -139,7 +146,47 @@ impl ExecutionBudget {
         Ok(())
     }
 
-    /// Return the configured text nesting limit.
+    /// Heap-sort in place, charging each comparison and swap before it occurs.
+    /// The comparison can charge any additional work required by its operands.
+    pub fn sort_unstable_by<T>(
+        &self,
+        values: &mut [T],
+        mut compare: impl FnMut(&T, &T) -> Result<Ordering, ExecutionLimit>,
+    ) -> Result<(), ExecutionLimit> {
+        self.check()?;
+        let mut sift_down = |values: &mut [T], mut parent: usize| -> Result<(), ExecutionLimit> {
+            while parent < values.len() / 2 {
+                let left = 2 * parent + 1;
+                let right = left + 1;
+                let mut child = left;
+                if right < values.len() {
+                    self.charge(1, 0)?;
+                    if compare(&values[right], &values[left])?.is_gt() {
+                        child = right;
+                    }
+                }
+                self.charge(1, 0)?;
+                if !compare(&values[parent], &values[child])?.is_lt() {
+                    break;
+                }
+                self.charge(1, 0)?;
+                values.swap(parent, child);
+                parent = child;
+            }
+            Ok(())
+        };
+        for parent in (0..values.len() / 2).rev() {
+            sift_down(values, parent)?;
+        }
+        for end in (1..values.len()).rev() {
+            self.charge(1, 0)?;
+            values.swap(0, end);
+            sift_down(&mut values[..end], 0)?;
+        }
+        Ok(())
+    }
+
+    /// Return the configured value nesting limit shared with text rendering.
     pub fn text_depth(&self) -> usize {
         self.text_depth
     }

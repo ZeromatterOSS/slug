@@ -35,12 +35,16 @@
 //! ```
 
 pub(crate) mod alloc;
+mod bounded_identity;
 pub(crate) mod refs;
 pub(crate) mod structs;
 pub(crate) mod unordered_hasher;
 pub(crate) mod value;
 
 pub use crate::values::types::structs::alloc::AllocStruct;
+pub use crate::values::types::structs::bounded_identity::StructuralIdentity;
+pub use crate::values::types::structs::bounded_identity::StructuralIdentityNative;
+pub use crate::values::types::structs::bounded_identity::StructuralIdentityOp;
 pub use crate::values::types::structs::refs::FrozenStructRef;
 pub use crate::values::types::structs::refs::StructRef;
 pub use crate::values::types::structs::value::StarlarkStructuralValue;

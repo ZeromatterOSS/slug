@@ -162,17 +162,14 @@ skips that row while preserving exit 0. Successful rows use Starlark `str`.
 Publish through the existing accepted terminal outside the DICE graph.
 
 Public admission requires a closed evaluator with no loader and finite source,
-heap, work and output admission. Use the shared interpreter's untyped module
-mode to defer operations on script values to runtime and preserve original
-bytecode after freeze. The source parser admits bytes, grammar tokens, and
-integer digits before recursive grammar work. Value freeze still needs its
-own admission. Runtime admission shares sticky request credits across heaps
-and terminal text. String rendering, interpolation, stable sort, and ordered
-depset traversal precharge their scratch and result allocation. Depset
-provider leaves still require metered structural hash and equality. Bound
-native call packing, diagnostics, and the remaining collection operations
-before activation. Resource outcomes are Slug-native. Pinned Bazel's
-`StarlarkOutputFormatterCallback` and `configured_query_test.sh` own the setup
+heap, work and output admission. Untyped modules defer script operations to
+runtime and preserve original bytecode after freeze. The parser bounds bytes,
+grammar tokens, and integer digits. Shared sticky runtime credits cover text,
+interpolation, stable sort, and ordered depset traversal, including structural
+provider identity. Bound value freeze, native call packing, attribute
+projections, diagnostics, and remaining collection operations before
+activation. Resource outcomes are Slug-native. Bazel 9.2's
+`StarlarkOutputFormatterCallback` and `configured_query_test.sh` define setup
 and partial-output semantics.
 
 First prove setup failure, partial output, formatter edit and recovery on real
