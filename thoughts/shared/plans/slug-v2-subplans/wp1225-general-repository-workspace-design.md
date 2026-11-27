@@ -3282,12 +3282,14 @@ before ambient IO and is not used by these action/runfiles consumers.
 Proof must discriminate None-to-Some invalidation, full natural conflicts,
 forged Host/anchor/digest/scope metadata and source/reader last-drop custody,
 plus actual original-to-Analysis-to-NativeLink transport for Workspace, Local,
-selected BCR and Builtin captures. Workspace capture still covers the complete
-tree and may refuse subsequent publication trees containing unadmitted links;
-no output/.git/target filter or test policy may conceal that boundary. A first
-admitted Workspace publication and fresh A/B for the other producers establish
-this bounded join; repeated Workspace publication, automatic capture, public
-activation, authentic Rust and matched-command memory remain separate gates.
+selected BCR and Builtin captures. First Workspace publication and fresh A/B
+for the other producers passed. A second Workspace publication left A's outputs
+in place and refused `invalid rooted literal link` before its transport start.
+Use the shared contained-link projection in [Stage 7](07-reapi-native-execution.md).
+Repeat cold/warm/B/restored-A with unfiltered whole-tree capture, a fresh Source
+instance each command, prior output reads in the readonly child and an A reader
+held through B and runtime drop. Require last-reader bank refund and refusal
+of an ordinary unadmitted absolute link. Repeat publication remains open.
 
 Ordinary selected BCR archive acquisition keeps its existing producer and bytes.
 Its successful realizer establishes a resource-free GenerationRoot path policy

@@ -34,6 +34,10 @@ The native Archive launcher verified 512 MiB/call and 1 GiB cumulative decode
 at exact and +1, physical page rounding and link inode charging. Six Archive
 tests passed. Maximum complete-tree envelope remains open.
 
+Repeated Workspace publication refused an absolute prior runfiles link before
+the second NativeLink transport start. The [selected design][design] routes
+contained output links through shared publication staging.
+
 Exact prior accepted body sharing cleared the retained refusal at 493.
 Measured 8 MiB sealed backing cleared Source bootstrap at 574. Accepted backing
 was 1,536 MiB, down 448 MiB. Rollback prunes dead claims after owner retirement

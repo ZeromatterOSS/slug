@@ -402,6 +402,16 @@ or extra power-loss guarantee is claimed. Host sources retain observed requested
 The complete batch is staged/sealed and preflighted before installing backing then trees
 under final native source validation; established partial-publication errors remain explicit.
 
+For repeated Workspace capture, select one local publication projection for
+typed runfiles and artifact aliases. When a verified target lies within the
+Workspace, derive a contained relative literal from the final link parent.
+Validate and seal that literal through confined output staging. Its `readlink`
+spelling is Slug-native. The manifest owner emits absolute paths, and REAPI
+derives identity from the logical layout and input digests. External Host
+targets use absolute spelling and fall outside Workspace capture. Source
+capture applies its normal relative-link verifier. Publication uses existing
+source/digest and exact producer authority.
+
 WP750 evidence covers exact pairing, overlay/conflict handling, missing/corrupt backing,
 mode preservation, confined cleanup, typed mixed-result provenance, warning restoration,
 public binary A/warm-A/B/restored-A plus runtime shutdown, MANIFEST-only selection, and an
