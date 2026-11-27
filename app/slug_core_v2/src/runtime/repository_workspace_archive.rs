@@ -11,7 +11,6 @@ use std::os::unix::fs::MetadataExt;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod_v2::GeneratedRepositoryArchiveEffect;
-use slug_bzlmod_v2::RepositoryWorkspaceNode;
 use slug_bzlmod_v2::RepositoryWorkspaceOperation;
 use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceResult;
@@ -50,16 +49,11 @@ impl<'working> ArchiveWriteReceipt<'working> {
         origin: ArchiveWriteOrigin,
         working: &'working resources::ResourceCredit,
     ) -> Option<Self> {
-        let prior = origin.predecessor().entries();
-        if prior.len() > snapshot::ARCHIVE_ENTRY_LIMIT
-            || !prior.iter().any(|entry| {
-                matches!(entry.node(), RepositoryWorkspaceNode::File(body)
-                    if !body.is_empty() && body.raw_arc().is_none())
-            })
-        {
+        let entries = origin.entry_count();
+        if entries > snapshot::ARCHIVE_ENTRY_LIMIT {
             return None;
         }
-        let words = prior.len().div_ceil(u64::BITS as usize);
+        let words = entries.div_ceil(u64::BITS as usize);
         let bytes = words
             .checked_mul(std::mem::size_of::<Cell<u64>>())?
             .checked_add(std::mem::size_of::<Self>() + 64)?;
@@ -79,43 +73,23 @@ impl<'working> ArchiveWriteReceipt<'working> {
         })
     }
 
-    pub(super) fn matches(
-        &self,
-        builder: &RepositoryPhysicalRootBuilder,
-        predecessor: &RepositoryWorkspaceState,
-        scope: &Arc<SourceServiceScope>,
-    ) -> bool {
-        self.origin.matches(builder, predecessor, scope)
-    }
-
-    fn prior_index(&self, path: &str) -> Option<usize> {
-        self.origin
-            .predecessor()
-            .entries()
-            .binary_search_by(|entry| entry.path().cmp(path))
-            .ok()
-    }
-
-    fn opened_bit(&self, index: usize) -> (&Cell<u64>, u64) {
-        let bits = u64::BITS as usize;
-        (&self.opened[index / bits], 1 << (index % bits))
-    }
-
     fn record_open(&self, path: &str) {
-        if let Some(index) = self.prior_index(path) {
-            let (word, bit) = self.opened_bit(index);
-            word.set(word.get() | bit);
+        if let Some(index) = self.origin.prior_index(path) {
+            let bits = u64::BITS as usize;
+            let word = &self.opened[index / bits];
+            word.set(word.get() | (1 << (index % bits)));
         }
     }
 
-    pub(super) fn prior_body(&self, path: &str) -> Option<(&RepositoryWorkspaceBody, bool)> {
-        let index = self.prior_index(path)?;
-        let RepositoryWorkspaceNode::File(body) = self.origin.predecessor().entries()[index].node()
-        else {
-            return None;
-        };
-        let (word, bit) = self.opened_bit(index);
-        Some((body, word.get() & bit == 0))
+    pub(super) fn origin(&self) -> &ArchiveWriteOrigin {
+        &self.origin
+    }
+
+    pub(super) fn untouched(&self, index: usize) -> bool {
+        let bits = u64::BITS as usize;
+        self.opened
+            .get(index / bits)
+            .is_some_and(|word| word.get() & (1 << (index % bits)) == 0)
     }
 }
 
@@ -302,7 +276,7 @@ impl<'request> VerifiedWorkspaceArchiveCapture<'request> {
             return Err(PhysicalRootError::RootIdentity);
         }
         let receipt = if let Some(origin) = write_origin {
-            if origin.index() != self.request.index()
+            if !origin.is_for_request(self.request)
                 || !origin.matches(builder, self.request.predecessor(), scope)
             {
                 return Err(PhysicalRootError::Reservation);

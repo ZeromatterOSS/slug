@@ -6,72 +6,40 @@ Status: INACTIVE_IMPLEMENTATION_IN_PROGRESS. General production remains Disabled
 
 ## Current result and next step
 
-The original reached 999 computes, 57 roots and 153 records, with the pinned
-`tinyjson` Archive in the epoch. All 63 shared compute samples matched the
-backing-refused control. It admitted immutable `rules_rust+` and decoded all
-224,337,920 bytes of the pinned archive. The Source work deadline expired before
-adoption. Cleanup returned to 168 bytes, zero FDs and zero backing. The report
-used 128,679 bytes with its prefix. Full Rust and completed-command latency/RSS
+The original adopted immutable `rules_rust+` after all 224,337,920 archive
+bytes, then completed File and Delete and materialized `tinyjson`. It reached
+1,020 computes, 57 roots and 155 records before the Source work deadline in
+later path work. All 43 shared compute samples matched the typed-deadline
+control. Cleanup returned to 168 bytes, zero FDs and zero backing. The report
+used 129,759 bytes with its prefix. Full Rust and completed-command latency/RSS
 remain open.
 
-Two timed runs matched all 63 shared compute samples. The seven earlier
-Archive acquisitions varied from 3.061 to 3.795 seconds while extraction stayed
-at 4.167–4.183 seconds. The slower runs reached the same Source and stopped
-during population before its first manifest. The latest retained the typed
-`WorkDeadline` after 174,620,672 decoded bytes. Its report used 129,056 bytes.
+The [writer receipt][archive-writes] now covers trusted Archive-mode filesystem
+operations. Completed filesystem snapshots went from 520 prior comparisons
+over 2,459,550,860 bytes to 86 over 47,716 bytes while completing two more
+snapshots. Both native receipts verified full rereads and touched writes. The
+fresh default CLI, 81 focused tests, five native guards and the six-archive
+check passed.
 
-Measured read-only Archive finalization closed 56 roots at 16 MiB, one at
-64 MiB and one at 1,024 MiB. Peak native backing was 6,301 MiB versus 8,066 MiB
-in the control. The earlier 2,048 MiB bootstrap refusal had 7,937 MiB live,
-fully reconciled by the backing inventory. The bank and mutable quotas stay fixed.
+Measured sealed quotas brought native backing below the 8 GiB bank. The
+previous immutable Source refusal was a 2,048 MiB bootstrap with 7,937 MiB
+live. The successful Source issued a 256 MiB sealed quota, and peak native
+backing was again 6,301 MiB. Across the three earlier identical compute
+prefixes, Archive acquisition ranged from 3.061 to 3.795 seconds. Preserve
+the [bounded phase and typed scope cause][attribution] for exact attribution.
 
-The [Archive writer receipt][archive-writes] preserves rooted reads through EOF
-while removing 380 prior-body comparisons over 2,362,966,940 bytes in the
-original. The native same-length overwrite fixture proved old and new body
-selection and full reads. The six-archive matched CPU/instruction ratios were
-0.926/0.897. Seventy-four focused tests and five native guards passed.
-
-Configuration construction writes nested fields into one buffer. Eight
-complete baseline and candidate encodings and projections match across
-486,703 bytes. Matched target, overlay and Exec construction used CPU 0.262
-and instructions 0.234 of baseline. Two hundred focused tests, five native
-guards and the 7.90-second six-archive gate passed.
-
-Platform candidate preparation reads all four registration sources with their
-existing precedence and merges execution-platform labels. It reached 93,107
-validated toolchain input rows. Of 645 module-toolchain Need returns, 630
-rebuilt a prefix totaling 20,656 rows. Loading uses one ordered set and
-captures spelling for emitted ambiguities. Its matched accumulator CPU ratio
-was 0.580. Complete route, package and subtree reuse belongs to DICE children.
-
-The 920-compute CPU profile attributes 25.77% of cycles to liblzma and 11.62% to
-packed decoding. Fresh rooted comparisons account for 76.03% of decoder cycles.
-The exact literal/back-reference verifier trial on 3.74 GB used CPU 1.049 and
-instructions 1.293 of baseline. The trial was retired.
-Word-at-a-time Unix path comparison preserves standard order for admitted raw
-aliases. Matched Workspace union CPU/instruction ratios were 0.414/0.285.
-The preceding original adopted `local_config_cc` at 935 computes (`c7f70e6a8`).
-
-Prior accepted owner results include pidfd retirement (ABBA wall 0.836),
-sorted union insertion (CPU 0.772, instructions 0.837), and the
-[pinned single-threaded XZ revision][xz-design] with the
-[six-archive and offline-repin receipt][xz-receipt]. The [archive
-frontier][frontier] attributed 4.09 of 4.23 rooted extraction seconds to
-liblzma. Bzlmod dev/test `-O3` passed CPU/wall at 0.936/0.935 (`f33c1690a`).
-XZ and LZ4 `-O3` and the stored observation-map hash fell short of their gates.
-The previous detailed checkpoint is in `ff79543a2`.
-
-Measure and remove redundant prior packed-body comparisons in trusted
-Archive-mode filesystem snapshots. This reduces work before the immutable
-`rules_rust+` Source adoption gate. Keep the bank, mutable quotas, deadline,
-launcher/PID1, rooted comparison, codec and history checks. Compare equal work
-for timing. The earlier refusal at compute 859 remains unattributed.
-The [attribution contract][attribution] keeps the report at 512 KiB. Keep the
-[bounded typed Registration classifier][registration] available if that
-category recurs. Private message parsing, blind repeats, presumed API repair,
+Follow the later path frontier using its actual operation class and owner.
+Keep native quotas, clocks, launcher/PID1, rooted reads, codec and history
+checks. Compare equal work for timing. The earlier compute-859 refusal remains
+unattributed. Private message parsing, blind repeats, presumed API repair,
 diagnostic-only integration, caller pruning, Need cacheability, new route,
 syntax or global path caches, and concurrent Archive batching remain outside
 scope.
+
+Prior tuning receipts remain in `124b41411` under this path. The
+[pinned XZ revision][xz-design] has the [six-archive gate][xz-receipt] and
+[archive attribution][frontier]. Keep the [typed Registration classifier][registration]
+available if that category recurs.
 
 ## Outcome and compatibility
 

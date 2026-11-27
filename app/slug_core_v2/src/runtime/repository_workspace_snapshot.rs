@@ -8,6 +8,7 @@ use std::path::Path;
 use compact_str::CompactString;
 use slug_bzlmod_v2::RepositoryWorkspaceEntry;
 use slug_bzlmod_v2::RepositoryWorkspaceNode;
+use slug_bzlmod_v2::RepositoryWorkspaceOperation;
 use slug_bzlmod_v2::RepositoryWorkspaceRequest;
 use slug_bzlmod_v2::RepositoryWorkspaceResult;
 use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
@@ -15,12 +16,79 @@ use slug_bzlmod_v2::RepositoryWorkspaceTranscript;
 use super::body_coverage::NativeBodyAdmission;
 use super::body_coverage::NativeBodyCandidates;
 use super::body_coverage::NativeBodyLedger;
+use super::progress::command::ArchiveWriteOrigin;
 use super::*;
 
 #[path = "repository_workspace_snapshot/body_recovery.rs"]
 mod body_recovery;
 #[path = "repository_workspace_snapshot/packed.rs"]
 mod packed;
+
+/// Borrowed through complete capture from one successful trusted operation.
+/// A positive continuity claim still requires an actual framed read to EOF.
+pub(super) struct SnapshotWriteProof<'a> {
+    origin: &'a ArchiveWriteOrigin,
+    footprint: WriteFootprint<'a>,
+}
+
+enum WriteFootprint<'a> {
+    ReadOnly,
+    Leaf(&'a str),
+    Subtree(&'a str),
+    Opened(&'a archive::ArchiveWriteReceipt<'a>),
+}
+
+impl<'a> SnapshotWriteProof<'a> {
+    pub(super) fn archive(receipt: &'a archive::ArchiveWriteReceipt<'a>) -> Self {
+        Self {
+            origin: receipt.origin(),
+            footprint: WriteFootprint::Opened(receipt),
+        }
+    }
+
+    pub(super) fn filesystem(
+        origin: &'a ArchiveWriteOrigin,
+        request: &'a RepositoryWorkspaceRequest,
+        result: &RepositoryWorkspaceResult,
+    ) -> Option<Self> {
+        use RepositoryWorkspaceOperation as Operation;
+        use RepositoryWorkspaceResult as Effect;
+        if !origin.is_for_request(request) {
+            return None;
+        }
+        let footprint = match (request.operation(), result) {
+            (
+                Operation::File { path, .. }
+                | Operation::Template { path, .. }
+                | Operation::Symlink { path, .. },
+                Effect::Unit,
+            ) => WriteFootprint::Leaf(path.as_str()),
+            (Operation::Delete(path), Effect::Delete(true)) => {
+                WriteFootprint::Subtree(path.as_str())
+            }
+            (Operation::Read(_), Effect::Read(_))
+            | (Operation::Exists(_), Effect::Exists(_))
+            | (Operation::Delete(_), Effect::Delete(false)) => WriteFootprint::ReadOnly,
+            _ => return None,
+        };
+        Some(Self { origin, footprint })
+    }
+
+    fn untouched(&self, index: usize, path: &str) -> bool {
+        match self.footprint {
+            WriteFootprint::ReadOnly => true,
+            WriteFootprint::Leaf(touched) => path != touched,
+            WriteFootprint::Subtree(touched) => {
+                !touched.is_empty()
+                    && path != touched
+                    && !path
+                        .strip_prefix(touched)
+                        .is_some_and(|suffix| suffix.starts_with('/'))
+            }
+            WriteFootprint::Opened(receipt) => receipt.untouched(index),
+        }
+    }
+}
 
 /// Entries/bodies precede their credit on destruction. No uncredited owned
 /// entries accessor exists; protocol completion prepays its successor first.
@@ -264,7 +332,7 @@ pub(super) fn capture_with_candidates<'prior>(
     candidates: &mut NativeBodyCandidates,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
-    archive_writes: Option<&archive::ArchiveWriteReceipt<'_>>,
+    write_proof: Option<&SnapshotWriteProof<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     candidates
         .ledger()
@@ -276,7 +344,7 @@ pub(super) fn capture_with_candidates<'prior>(
         Some(candidates),
         scope,
         active,
-        archive_writes,
+        write_proof,
     )
 }
 fn capture_builder<'prior>(
@@ -286,13 +354,13 @@ fn capture_builder<'prior>(
     candidates: Option<&mut NativeBodyCandidates>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
-    archive_writes: Option<&archive::ArchiveWriteReceipt<'_>>,
+    write_proof: Option<&SnapshotWriteProof<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != builder.reservation.as_ref() {
         return Err(PhysicalRootError::Reservation);
     }
-    if archive_writes.is_some_and(|writes| !writes.matches(builder, prior, scope)) {
+    if write_proof.is_some_and(|proof| !proof.origin.matches(builder, prior, scope)) {
         return Err(PhysicalRootError::Reservation);
     }
     if prior.mode() == RepositoryWorkspaceMode::Process
@@ -320,7 +388,7 @@ fn capture_builder<'prior>(
         Limits::for_mode(builder.mode),
         Some(&sources),
         candidates,
-        archive_writes,
+        write_proof,
     )?;
     if backing_identity(&builder.file, builder.mode)? != builder.identity {
         return Err(PhysicalRootError::RootIdentity);
@@ -369,7 +437,7 @@ fn capture_at_with_sources<'prior>(
     limits: Limits,
     sources: Option<&SourceLinkSet>,
     mut candidates: Option<&mut NativeBodyCandidates>,
-    archive_writes: Option<&archive::ArchiveWriteReceipt<'_>>,
+    write_proof: Option<&SnapshotWriteProof<'_>>,
 ) -> Result<CapturedWorkspaceSnapshot<'prior>, PhysicalRootError> {
     check(scope, active)?;
     if prior.reservation().as_ref() != reservation {
@@ -501,7 +569,7 @@ fn capture_at_with_sources<'prior>(
                     prior,
                     &mut capture.credit,
                     candidates.as_deref_mut(),
-                    archive_writes,
+                    write_proof,
                     scope,
                     active,
                 )?;
@@ -655,7 +723,7 @@ fn capture_body_covered(
     prior: &RepositoryWorkspaceState,
     credit: &mut resources::ResourceCredit,
     mut candidates: Option<&mut NativeBodyCandidates>,
-    archive_writes: Option<&archive::ArchiveWriteReceipt<'_>>,
+    write_proof: Option<&SnapshotWriteProof<'_>>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<RepositoryWorkspaceBody, PhysicalRootError> {
@@ -669,14 +737,14 @@ fn capture_body_covered(
     }
     let running = || active() && scope.check().is_ok();
     let text = path.to_str().ok_or(PhysicalRootError::Snapshot)?;
-    let previous = match archive_writes {
-        Some(writes) => writes.prior_body(text),
-        None => match prior.entry(text).map(RepositoryWorkspaceEntry::node) {
-            Some(RepositoryWorkspaceNode::File(body)) => Some((body, false)),
-            _ => None,
-        },
+    let previous = match write_proof {
+        Some(proof) => proof
+            .origin
+            .prior_index(text)
+            .map(|index| (prior.entries()[index].node(), proof.untouched(index, text))),
+        None => prior.entry(text).map(|entry| (entry.node(), false)),
     };
-    if let Some((old, untouched)) = previous
+    if let Some((RepositoryWorkspaceNode::File(old), untouched)) = previous
         && old.len() == length
     {
         let same = if untouched && old.raw_arc().is_none() {

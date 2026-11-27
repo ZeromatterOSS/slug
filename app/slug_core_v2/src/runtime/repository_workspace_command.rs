@@ -2,6 +2,7 @@
 //! projected old epoch nor an individual root can mint process admission. Taking
 //! the whole command prevents concurrent roots spending the same history budget.
 use slug_bzlmod_v2::RepositoryWorkspaceEpoch;
+use slug_bzlmod_v2::RepositoryWorkspaceNode;
 use slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits;
 use slug_workspace_v2::NormalizedAbsolutePath;
 
@@ -113,7 +114,7 @@ struct NativeRootSlot {
     body_ledger: Arc<NativeBodyLedger>,
 }
 
-/// The checked predecessor of one write on an exclusively owned Archive root.
+/// The checked predecessor of one operation on an exclusively owned Archive root.
 /// Only the consuming command can issue this before any payload uses the seed.
 pub(in crate::runtime::repository_physical_root) struct ArchiveWriteOrigin {
     root: RootIdentity,
@@ -123,10 +124,18 @@ pub(in crate::runtime::repository_physical_root) struct ArchiveWriteOrigin {
 }
 
 impl ArchiveWriteOrigin {
-    pub(in crate::runtime::repository_physical_root) fn predecessor(
+    pub(in crate::runtime::repository_physical_root) fn entry_count(&self) -> usize {
+        self.predecessor.entries().len()
+    }
+
+    pub(in crate::runtime::repository_physical_root) fn prior_index(
         &self,
-    ) -> &RepositoryWorkspaceState {
-        &self.predecessor
+        path: &str,
+    ) -> Option<usize> {
+        self.predecessor
+            .entries()
+            .binary_search_by(|entry| entry.path().cmp(path))
+            .ok()
     }
 
     pub(in crate::runtime::repository_physical_root) fn matches(
@@ -142,8 +151,11 @@ impl ArchiveWriteOrigin {
             && std::ptr::eq(predecessor, self.predecessor.as_ref())
     }
 
-    pub(in crate::runtime::repository_physical_root) fn index(&self) -> usize {
-        self.index
+    pub(in crate::runtime::repository_physical_root) fn is_for_request(
+        &self,
+        request: &RepositoryWorkspaceRequest,
+    ) -> bool {
+        self.index == request.index() && Arc::ptr_eq(&self.predecessor, request.predecessor())
     }
 }
 
@@ -706,34 +718,38 @@ impl RepositoryWorkspaceCommand {
             .merge(sources.dependencies().owners(), &self.resources)?;
         let mut progress = self.roots[slot].progress.take().unwrap();
         progress.admit_link_sources(sources)?;
+        let initial = &self.roots[slot];
+        let builder = progress.builder();
+        let prior = progress.transcript().current();
+        let origin = if let Some(mount) = &initial.initial
+            && initial.lease.is_none()
+            && builder.mode == RepositoryWorkspaceMode::Archive
+            && request.index() == progress.transcript().records().len()
+            && Arc::ptr_eq(request.predecessor(), prior)
+            && prior.entries().iter().any(|entry| {
+                matches!(entry.node(), RepositoryWorkspaceNode::File(body)
+                    if !body.is_empty() && body.raw_arc().is_none())
+            })
+            && mount.check_binding(builder, scope, active).is_ok()
+        {
+            Some(ArchiveWriteOrigin {
+                root: builder.identity,
+                backing: builder.backing.clone(),
+                predecessor: prior.clone(),
+                index: request.index(),
+            })
+        } else {
+            None
+        };
         let progress = if matches!(
             request.operation(),
             RepositoryWorkspaceOperation::Archive(_)
         ) {
-            let slot = &self.roots[slot];
-            let builder = progress.builder();
-            let prior = progress.transcript().current();
-            let origin = if let Some(initial) = &slot.initial
-                && slot.lease.is_none()
-                && builder.mode == RepositoryWorkspaceMode::Archive
-                && request.index() == progress.transcript().records().len()
-                && Arc::ptr_eq(request.predecessor(), prior)
-                && initial.check_binding(builder, scope, active).is_ok()
-            {
-                Some(ArchiveWriteOrigin {
-                    root: builder.identity,
-                    backing: builder.backing.clone(),
-                    predecessor: prior.clone(),
-                    index: request.index(),
-                })
-            } else {
-                None
-            };
             progress.apply_archive_with_candidates(
                 request, bodies, runtime, distdirs, scope, active, origin,
             )?
         } else {
-            progress.apply_with_candidates(request, bodies, scope, active)?
+            progress.apply_with_candidates(request, bodies, scope, active, origin)?
         };
         if let Some(lease) = self.roots[slot].lease.take() {
             self.roots[slot].lease = Some(

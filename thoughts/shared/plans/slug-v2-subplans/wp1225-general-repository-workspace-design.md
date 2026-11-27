@@ -1435,6 +1435,11 @@ the idle replay allowance and retires before record completion. Untouched prior
 packed files still stream through EOF with the full FD and name checks. The
 receipt supplies byte continuity for same-path reuse. Opened paths, captures
 without proof, Process snapshots and the final seal retain full comparison.
+The same checked origin covers successful trusted filesystem operations. File,
+Template and Symlink exclude their exact destination. A successful Delete
+excludes its component-bounded subtree. Read, Exists and a missing Delete
+affect no body. The footprint borrows the request through capture. Routed reads,
+the full framed reread, history protection and final sealing keep their checks.
 
 RED leaves the old hashed caller in place. New real-helper Raw/Packed equal and
 first-byte mismatch cases must finish bool/full reads/frames/old-body lifetime/

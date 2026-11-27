@@ -292,6 +292,251 @@ fn native_archive_rereads_untouched_packed_body_without_comparing_it() {
 }
 
 #[test]
+#[ignore = "requires trusted Rust physical Archive factory and rooted filesystem operations"]
+fn native_archive_filesystem_rereads_survivors_and_compares_only_written_packed_bodies() {
+    use slug_bzlmod_v2::REPOSITORY_WORKSPACE_BODY_CHUNK_BYTES as BLOCK;
+    use slug_bzlmod_v2::RepositoryWorkspaceBodyBuilder;
+    use slug_bzlmod_v2::RepositoryWorkspaceState;
+
+    use crate::runtime::repository_root_io::read_work_for_test;
+    use crate::runtime::repository_workspace_comparison_work_for_test;
+
+    let fixture = tempfile::Builder::new()
+        .prefix("slug-wp425-rolling-")
+        .tempdir()
+        .unwrap();
+    let display = fixture.path().join("root");
+    std::fs::create_dir(&display).unwrap();
+    let selected = reservation(&display, 1905);
+    let bank = bank();
+    let baseline = bank.snapshot().retained_bytes;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let before = vec![b'a'; 2 * BLOCK + 13];
+    let after = vec![b'b'; before.len()];
+    let kept = vec![b'c'; 2 * BLOCK + 37];
+    let removed = vec![b'd'; 2 * BLOCK + 43];
+    let (_source, initial) = archive_input_with_entries(fixture.path(), "", |tar| {
+        append_archive_file(tar, "outside", before.len(), before.as_slice());
+        append_archive_file(tar, "sub-near/kept", kept.len(), kept.as_slice());
+        append_archive_file(tar, "sub/child", removed.len(), removed.as_slice());
+    });
+    let packed_file = |state: &RepositoryWorkspaceState, path: &str, expected: &[u8]| {
+        let RepositoryWorkspaceNode::File(body) = state.entry(path).unwrap().node() else {
+            panic!("expected regular file at {path}");
+        };
+        assert!(body.len() > 2 * BLOCK && body.native_storage_bytes() < body.len());
+        assert!(body.raw_arc().is_none() && body.equals_slice(expected));
+        body.downgrade()
+    };
+    let scope = command_scope(&selected);
+    let (command, fd) = start(selected.clone(), bank.clone(), scope.clone());
+    let mut command = apply(command, &selected, initial, &runtime, &scope);
+    let native = command.roots[0].progress.as_ref().unwrap();
+    let identity = native.builder().identity;
+    let initial = native.transcript().current();
+    let old_outside = packed_file(initial, "outside", &before);
+    let old_kept = packed_file(initial, "sub-near/kept", &kept);
+    let old_removed = packed_file(initial, "sub/child", &removed);
+
+    // Keep the File request packed so transcript canonicalization retains a
+    // packed body for the following equal Template replacement to compare.
+    let mut changed_body = RepositoryWorkspaceBodyBuilder::new(after.len()).unwrap();
+    for chunk in after.chunks(BLOCK) {
+        changed_body
+            .append(chunk, &mut |_| Ok::<(), ()>(()))
+            .unwrap();
+    }
+    let template_body =
+        slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(after.as_slice()));
+    let link_target = NormalizedAbsolutePath::new(display.join("outside")).unwrap();
+    let whole = after.len() + kept.len() + removed.len();
+    let survivors = after.len() + kept.len();
+    let operations = [
+        (
+            "File",
+            RepositoryWorkspaceOperation::File {
+                path: "outside".into(),
+                body: changed_body.finish().unwrap(),
+                mode: 0o640,
+            },
+            whole + after.len(),
+            0,
+            after.len(),
+        ),
+        (
+            "Template",
+            RepositoryWorkspaceOperation::Template {
+                path: "outside".into(),
+                body: template_body.clone(),
+                mode: 0o755,
+                source: HostRepositoryLabelPathValue::new(
+                    NormalizedAbsolutePath::new("/tracked/template").unwrap(),
+                    PathObservationNamespace::Host,
+                )
+                .unwrap(),
+                source_body: template_body,
+                substitutions: SmallMap::new(),
+            },
+            whole,
+            0,
+            after.len(),
+        ),
+        (
+            "Symlink",
+            RepositoryWorkspaceOperation::Symlink {
+                path: "sub/link".into(),
+                target: link_target.clone(),
+                source: None,
+            },
+            whole,
+            0,
+            0,
+        ),
+        (
+            "Read through link",
+            RepositoryWorkspaceOperation::Read("sub/link".into()),
+            whole,
+            after.len(),
+            0,
+        ),
+        (
+            "Exists through link",
+            RepositoryWorkspaceOperation::Exists("sub/link".into()),
+            whole,
+            0,
+            0,
+        ),
+        (
+            "Delete subtree",
+            RepositoryWorkspaceOperation::Delete("sub".into()),
+            survivors,
+            0,
+            0,
+        ),
+        (
+            "Delete missing subtree",
+            RepositoryWorkspaceOperation::Delete("sub".into()),
+            survivors,
+            0,
+            0,
+        ),
+    ];
+    let mut work = Vec::with_capacity(operations.len());
+    for (name, operation, contents, digest, compared) in operations {
+        let reads = read_work_for_test::begin();
+        let comparisons = repository_workspace_comparison_work_for_test::begin();
+        command = apply(command, &selected, operation, &runtime, &scope);
+        work.push((
+            name,
+            reads.snapshot(),
+            comparisons.snapshot(),
+            contents,
+            digest,
+            compared,
+        ));
+    }
+
+    let transcript = &command.epoch().transcripts().unwrap()[0];
+    let [_, file, template, symlink, read, exists, delete, missing] = transcript.records() else {
+        panic!("expected every native operation in the transcript");
+    };
+    let changed = packed_file(file.next(), "outside", &after);
+    assert!(
+        !changed
+            .upgrade()
+            .unwrap()
+            .ptr_eq(&old_outside.upgrade().unwrap())
+    );
+    assert_eq!(file.next().entry("outside").unwrap().mode(), 0o640);
+    assert_eq!(template.next().entry("outside").unwrap().mode(), 0o755);
+    for record in [file, template, symlink] {
+        assert_eq!(record.result(), &RepositoryWorkspaceResult::Unit);
+    }
+    assert!(matches!(symlink.next().entry("sub/link").unwrap().node(),
+        RepositoryWorkspaceNode::Link(target) if Some(target.as_str()) == link_target.as_path().to_str()));
+    assert!(
+        matches!(read.result(), RepositoryWorkspaceResult::Read(body)
+        if body.equals_slice(&after) && body.ptr_eq(&changed.upgrade().unwrap()))
+    );
+    assert_eq!(exists.result(), &RepositoryWorkspaceResult::Exists(true));
+    assert_eq!(delete.result(), &RepositoryWorkspaceResult::Delete(true));
+    assert_eq!(missing.result(), &RepositoryWorkspaceResult::Delete(false));
+    for record in [file, template, symlink, read, exists, delete, missing] {
+        let state = record.next();
+        assert!(
+            packed_file(state, "sub-near/kept", &kept)
+                .upgrade()
+                .unwrap()
+                .ptr_eq(&old_kept.upgrade().unwrap())
+        );
+        assert!(
+            packed_file(state, "outside", &after)
+                .upgrade()
+                .unwrap()
+                .ptr_eq(&changed.upgrade().unwrap())
+        );
+    }
+    for record in [delete, missing] {
+        assert!(record.next().entry("sub").is_none());
+        assert!(record.next().entry("sub/child").is_none());
+        assert!(record.next().entry("sub/link").is_none());
+    }
+
+    let request = final_request(&command, &selected);
+    let (command, sealed) = command
+        .seal_for_materialization(request, &scope, &|| true)
+        .unwrap();
+    command.check_epoch_body_coverage(&scope, &|| true).unwrap();
+    let (request, root, history) = sealed.into_parts();
+    assert_eq!(root.identity, identity);
+    assert_eq!(
+        root.state()
+            .entries()
+            .iter()
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>(),
+        ["", "outside", "sub-near", "sub-near/kept"]
+    );
+    let weak_root = Arc::downgrade(&root);
+    let mut reader = root.open_member("outside", &scope, &|| true).unwrap();
+    drop((command, request, root));
+    assert!(old_outside.upgrade().is_some() && old_removed.upgrade().is_some());
+    drop(history);
+    assert!(old_outside.upgrade().is_none() && old_removed.upgrade().is_none());
+    assert!(weak_root.upgrade().is_some() && old_kept.upgrade().is_some());
+    let mut actual = Vec::new();
+    reader.read_to_end(&mut actual).unwrap();
+    assert_eq!(actual, after);
+    drop(reader);
+    assert!(weak_root.upgrade().is_none());
+    assert!(changed.upgrade().is_none() && old_kept.upgrade().is_none());
+    release(&bank, baseline, fd);
+
+    // The unchanged implementation can finish and seal every operation. The
+    // scoped work assertions discriminate the rooted snapshot change.
+    for (name, reads, comparisons, contents, digest, compared) in work {
+        assert_eq!(
+            reads,
+            read_work_for_test::Snapshot {
+                contents_payload: contents as u64,
+                digest_payload: digest as u64,
+                digest_sha: digest as u64,
+                ..Default::default()
+            },
+            "{name}: full rooted payload reads"
+        );
+        assert_eq!(
+            comparisons.comparison_bytes, compared as u64,
+            "{name}: rooted snapshot comparisons"
+        );
+    }
+}
+
+#[test]
 #[ignore = "requires trusted Rust physical Archive factory and actual 48MiB archive capture"]
 fn native_deleted_archive_body_retires_with_history_while_final_reader_survives() {
     let fixture = tempfile::Builder::new()

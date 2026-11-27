@@ -34,6 +34,11 @@ impl IncomingOperation {
     }
 }
 
+enum CompletedWrites<'working> {
+    Archive(archive::ArchiveWriteReceipt<'working>),
+    Filesystem(command::ArchiveWriteOrigin),
+}
+
 pub(super) struct RepositoryWorkspaceProgress {
     builder: RepositoryPhysicalRootBuilder,
     transcript: CreditedWorkspaceTranscript,
@@ -226,7 +231,13 @@ impl RepositoryWorkspaceProgress {
         }
         #[cfg(all(test, feature = "native-probe-observer"))]
         let snapshot_span = span(Stage::ArchiveSnapshot);
-        let progress = self.complete_snapshot(incoming, result, scope, active, writes)?;
+        let progress = self.complete_snapshot(
+            incoming,
+            result,
+            scope,
+            active,
+            writes.map(CompletedWrites::Archive),
+        )?;
         #[cfg(all(test, feature = "native-probe-observer"))]
         if let Some(span) = snapshot_span {
             span.finish();
@@ -240,7 +251,7 @@ impl RepositoryWorkspaceProgress {
         result: RepositoryWorkspaceResult,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
-        archive_writes: Option<archive::ArchiveWriteReceipt<'_>>,
+        writes: Option<CompletedWrites<'_>>,
     ) -> Result<Self, PhysicalRootError> {
         // Result (which can own a newly captured body) precedes incoming
         // candidates, including capture refusal before completion is entered.
@@ -260,6 +271,17 @@ impl RepositoryWorkspaceProgress {
         use crate::runtime::probe_observer::snapshot_work::span;
         #[cfg(all(test, feature = "native-probe-observer"))]
         let capture = span(Phase::Capture, 0);
+        let write_proof = match &writes {
+            Some(CompletedWrites::Archive(receipt)) => {
+                Some(snapshot::SnapshotWriteProof::archive(receipt))
+            }
+            Some(CompletedWrites::Filesystem(origin)) => snapshot::SnapshotWriteProof::filesystem(
+                origin,
+                &input.incoming.request,
+                &input.result,
+            ),
+            None => None,
+        };
         let snapshot = snapshot::capture_with_candidates(
             &self.builder,
             self.transcript().current(),
@@ -267,9 +289,9 @@ impl RepositoryWorkspaceProgress {
             &mut input.incoming.candidates,
             scope,
             active,
-            archive_writes.as_ref(),
+            write_proof.as_ref(),
         )?;
-        drop(archive_writes);
+        drop(writes);
         #[cfg(all(test, feature = "native-probe-observer"))]
         drop(capture);
         #[cfg(all(test, feature = "native-probe-observer"))]
@@ -356,7 +378,7 @@ impl RepositoryWorkspaceProgress {
         self.check_scope(scope)?;
         check(scope, active)?;
         let candidates = self.body_ledger().candidates()?;
-        self.apply_with_candidates(request, candidates, scope, active)
+        self.apply_with_candidates(request, candidates, scope, active, None)
     }
     pub(super) fn apply_with_candidates(
         mut self,
@@ -364,6 +386,7 @@ impl RepositoryWorkspaceProgress {
         candidates: NativeBodyCandidates,
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
+        write_origin: Option<command::ArchiveWriteOrigin>,
     ) -> Result<Self, PhysicalRootError> {
         let mut incoming = IncomingOperation {
             request,
@@ -514,7 +537,13 @@ impl RepositoryWorkspaceProgress {
         }
         #[cfg(all(test, feature = "native-probe-observer"))]
         let snapshot = span(Stage::FilesystemSnapshot);
-        let completed = self.complete_snapshot(incoming, result, scope, active, None);
+        let completed = self.complete_snapshot(
+            incoming,
+            result,
+            scope,
+            active,
+            write_origin.map(CompletedWrites::Filesystem),
+        );
         #[cfg(all(test, feature = "native-probe-observer"))]
         if let Some(snapshot) = snapshot
             && completed.is_ok()
