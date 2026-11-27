@@ -32,6 +32,8 @@ def _selected_tools(args: argparse.Namespace) -> list[ToolConfig]:
     if args.tool in ("auto", "both", "bazel") and bazel is not None:
         tools.append(ToolConfig("bazel", bazel))
     if args.tool in ("auto", "both", "slug") and slug is not None:
+        if args.slug_daemon_route == "installed":
+            slug = slug.resolve()
         tools.append(ToolConfig("slug", slug))
     if args.tool == "bazel" and bazel is None:
         raise SystemExit("--tool bazel requires --bazel or BAZEL_BIN")
@@ -57,8 +59,12 @@ def cmd_list(args: argparse.Namespace) -> int:
 def cmd_run(args: argparse.Namespace) -> int:
     fixture = find_fixture(Path(args.fixtures_root), args.fixture)
     run_root = Path(args.run_root) if args.run_root else default_run_root()
-    options = RunOptions(run_root=run_root, timeout_seconds=args.timeout)
+    options = RunOptions(
+        run_root=run_root, timeout_seconds=args.timeout, slug_daemon_route=args.slug_daemon_route
+    )
     tools = _selected_tools(args)
+    if args.slug_daemon_route == "installed" and all(tool.name != "slug" for tool in tools):
+        raise SystemExit("--slug-daemon-route installed requires a Slug tool")
     expected = load_expected(fixture.expected_oracle)
     failures: list[str] = []
     summaries: list[dict[str, object]] = []
@@ -108,6 +114,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--bazel", help="path to upstream Bazel 9 binary")
     run_parser.add_argument("--slug", help="path to Slug V2 binary; defaults to SLUG_V2_BIN")
     run_parser.add_argument("--tool", choices=("auto", "bazel", "slug", "both"), default="auto")
+    run_parser.add_argument(
+        "--slug-daemon-route", choices=("generic", "installed"), default="generic",
+        help="Slug daemon protocol to verify and retire; use installed with an installed Slug executable",
+    )
     run_parser.add_argument("--update-expected", action="store_true")
     run_parser.add_argument("--run-root", help="artifact root; defaults to target/v2o")
     run_parser.add_argument("--timeout", type=int, default=120)

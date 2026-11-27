@@ -26,10 +26,14 @@ from tools.v2_oracle_lib.fixture import Fixture, discover_fixtures
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Build Slug once and run selected V2 oracle fixtures serially."
+        description="Run selected V2 oracle fixtures serially."
     )
     parser.add_argument("--fixture", action="append", required=True, metavar="NAME")
     parser.add_argument("--timeout", type=int, default=120, metavar="SECONDS")
+    parser.add_argument(
+        "--installed-slug", type=Path, metavar="PATH",
+        help="installed Slug executable to verify",
+    )
     return parser
 
 
@@ -76,22 +80,35 @@ def _slug_binary() -> Path:
     return _target_dir() / "debug" / "slug"
 
 
-def _unique_run_root() -> Path:
+def _built_slug_is_installed() -> bool:
+    return sys.platform == "linux" and os.uname().machine == "x86_64" and sys.maxsize > 2**32
+
+
+def _unique_run_root(*, installed: bool) -> Path:
+    if installed:
+        return Path(tempfile.mkdtemp(prefix="v2p.")).resolve()
     root = REPO_ROOT / "target" / "v2p"
     root.mkdir(parents=True, exist_ok=True)
     return Path(tempfile.mkdtemp(prefix="p", dir=root))
 
 
-def _daemon_socket_path(run_root: Path, fixture: Fixture) -> Path:
-    return run_root / "ob" / fixture.name / "slug" / "slugd.sock"
+def _slug_output_base(run_root: Path, fixture: Fixture) -> Path:
+    return run_root / "ob" / fixture.name / "slug"
 
 
-def _validate_daemon_socket_paths(selected: list[Fixture], run_root: Path) -> list[str]:
+def _validate_daemon_socket_paths(
+    selected: list[Fixture], run_root: Path, *, installed: bool
+) -> list[str]:
     failures: list[str] = []
     for fixture in selected:
         if not fixture.daemon:
             continue
-        socket_path = _daemon_socket_path(run_root, fixture)
+        output_base = _slug_output_base(run_root, fixture)
+        socket_path = (
+            output_base / ".slugd-installed" / "stage" / "s"
+            if installed
+            else output_base / "slugd.sock"
+        )
         if len(os.fsencode(socket_path)) > UNIX_SOCKET_PATH_MAX:
             failures.append(
                 f"{fixture.name}: daemon socket path exceeds {UNIX_SOCKET_PATH_MAX} bytes: {socket_path}"
@@ -129,13 +146,22 @@ def _build_slug() -> bool:
     return completed.returncode == 0
 
 
-def _daemon_markers(run_root: Path) -> list[Path]:
-    return sorted(
-        path for name in ("slugd.sock", "slugd.pid") for path in run_root.rglob(name)
-    )
+def _daemon_markers(run_root: Path, fixture: Fixture, *, installed: bool) -> list[Path]:
+    base = _slug_output_base(run_root, fixture)
+    generic = ("slugd.sock", "slugd.pid")
+    markers = [
+        base / ".slugd-installed" / generation for generation in ("live", "stage")
+    ]
+    if installed:
+        markers.extend(base / name for name in generic)
+    else:
+        markers.extend(path for name in generic for path in run_root.rglob(name))
+    return sorted(path for path in markers if os.path.lexists(path))
 
 
-def _run_fixture(fixture: Fixture, slug: Path, run_root: Path, timeout: int) -> int | None:
+def _run_fixture(
+    fixture: Fixture, slug: Path, run_root: Path, timeout: int, *, installed: bool
+) -> int | None:
     try:
         return subprocess.run(
             [
@@ -148,6 +174,7 @@ def _run_fixture(fixture: Fixture, slug: Path, run_root: Path, timeout: int) -> 
                 "slug",
                 "--slug",
                 str(slug),
+                *(["--slug-daemon-route=installed"] if installed else []),
                 "--run-root",
                 str(run_root),
                 "--timeout",
@@ -172,30 +199,36 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         with _packet_lock():
-            run_root = _unique_run_root()
+            supplied_slug = args.installed_slug
+            installed = supplied_slug is not None or _built_slug_is_installed()
+            run_root = _unique_run_root(installed=installed)
             print(f"artifacts: {run_root}")
-            daemon_path_failures = _validate_daemon_socket_paths(selected, run_root)
+            daemon_path_failures = _validate_daemon_socket_paths(
+                selected, run_root, installed=installed
+            )
             if daemon_path_failures:
                 for failure in daemon_path_failures:
                     print(failure, file=sys.stderr)
                 print(f"result: failed ({len(daemon_path_failures)} failure(s))")
                 return 1
-            if not _build_slug():
+            if supplied_slug is None and not _build_slug():
                 print("Slug build failed", file=sys.stderr)
                 return 1
-            slug = _slug_binary()
+            slug = supplied_slug.resolve() if supplied_slug is not None else _slug_binary()
             if not slug.is_file() or not os.access(slug, os.X_OK):
                 print(f"Slug binary is missing or not executable: {slug}", file=sys.stderr)
                 return 1
 
             failures: list[str] = []
             for fixture in selected:
-                exit_code = _run_fixture(fixture, slug, run_root, args.timeout)
+                exit_code = _run_fixture(
+                    fixture, slug, run_root, args.timeout, installed=installed
+                )
                 if exit_code is None:
                     failures.append(f"{fixture.name}: oracle could not start")
                 elif exit_code != 0:
                     failures.append(f"{fixture.name}: oracle failed")
-                markers = _daemon_markers(run_root)
+                markers = _daemon_markers(run_root, fixture, installed=installed)
                 if markers:
                     failures.extend(f"{fixture.name}: leftover daemon marker: {marker}" for marker in markers)
 

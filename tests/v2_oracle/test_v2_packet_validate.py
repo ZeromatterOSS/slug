@@ -32,6 +32,11 @@ class PacketValidateTest(unittest.TestCase):
         self.constants.start()
         self.addCleanup(self.constants.stop)
         self.addCleanup(self.tmp.cleanup)
+        self.platform_route = mock.patch.object(
+            packet_validate, "_built_slug_is_installed", return_value=False
+        )
+        self.built_route = self.platform_route.start()
+        self.addCleanup(self.platform_route.stop)
 
     def fixture(self, name: str, *, generated: bool = True, daemon: bool = False) -> None:
         fixture_root = self.fixtures / name
@@ -181,6 +186,79 @@ class PacketValidateTest(unittest.TestCase):
 
         with mock.patch.object(packet_validate.subprocess, "run", side_effect=run):
             self.assertEqual(1, packet_validate.main(["--fixture", "one"]))
+
+    def test_packet_routes_its_default_installed_build(self) -> None:
+        self.fixture("retained", daemon=True)
+        slug = self.binary()
+        self.built_route.return_value = True
+        with mock.patch.object(packet_validate.subprocess, "run") as run:
+            run.return_value = self.completed()
+            self.assertEqual(0, packet_validate.main(["--fixture", "retained"]))
+        self.assertEqual(2, run.call_count)
+        build, oracle = [call.args[0] for call in run.call_args_list]
+        self.assertIn("build", build)
+        self.assertIn(str(slug), oracle)
+        self.assertIn("--slug-daemon-route=installed", oracle)
+
+    def test_installed_packet_forwards_route_and_preserves_expected_lock(self) -> None:
+        self.fixture("one-shot")
+        self.fixture("retained", daemon=True)
+        slug = self.binary()
+
+        def run(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[object]:
+            self.assertEqual(sys.executable, argv[0])
+            self.assertIn("--slug-daemon-route=installed", argv)
+            self.assertEqual(str(slug), argv[argv.index("--slug") + 1])
+            root = Path(argv[argv.index("--run-root") + 1])
+            self.assertEqual(0o700, root.stat().st_mode & 0o777)
+            control = root / "ob" / argv[-1] / "slug" / ".slugd-installed"
+            if argv[-1] == "retained":
+                control.mkdir(parents=True)
+                (control / "lock").touch()
+            return self.completed()
+
+        with mock.patch.object(tempfile, "tempdir", str(self.root)):
+            with mock.patch.object(packet_validate.subprocess, "run", side_effect=run) as calls:
+                result = packet_validate.main(
+                    ["--installed-slug", str(slug), "--fixture", "one-shot", "--fixture", "retained"]
+                )
+        self.assertEqual(0, result)
+        self.assertEqual(2, calls.call_count)
+
+    def test_installed_packet_preflights_longer_stage_socket(self) -> None:
+        slug = self.binary()
+        root = Path("/tmp/short-run-root")
+        name = "x" * (107 - len(os.fsencode(root / "ob" / "slug" / "slugd.sock")) - 1)
+        self.fixture(name, daemon=True)
+        with mock.patch.object(packet_validate, "_unique_run_root", return_value=root):
+            with mock.patch.object(packet_validate.subprocess, "run") as run:
+                result = packet_validate.main(["--installed-slug", str(slug), "--fixture", name])
+        self.assertEqual(1, result)
+        run.assert_not_called()
+
+    def test_installed_packet_reports_markers_without_removing_them(self) -> None:
+        self.fixture("retained", daemon=True)
+        slug = self.binary()
+        root = self.root / "run"
+        base = root / "ob" / "retained" / "slug"
+        markers = [
+            base / ".slugd-installed" / "stage",
+            base / ".slugd-installed" / "live",
+            base / "slugd.sock",
+            base / "slugd.pid",
+        ]
+
+        def run(_argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[object]:
+            for marker in markers:
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.symlink_to("missing")
+            return self.completed()
+
+        with mock.patch.object(packet_validate, "_unique_run_root", return_value=root):
+            with mock.patch.object(packet_validate.subprocess, "run", side_effect=run):
+                result = packet_validate.main(["--installed-slug", str(slug), "--fixture", "retained"])
+        self.assertEqual(1, result)
+        self.assertTrue(all(marker.is_symlink() for marker in markers))
 
 
 if __name__ == "__main__":
