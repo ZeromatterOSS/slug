@@ -6,6 +6,7 @@ use std::io::Read as _;
 use serde_json::Value;
 use serde_json::json;
 use sha2::Digest;
+use slug_analysis_v2::ConfiguredAction;
 use slug_bzlmod_v2::RepositoryEnvironmentEntry;
 use slug_bzlmod_v2::RepositoryWorkspaceOperation;
 use slug_bzlmod_v2::RepositoryWorkspaceRequest;
@@ -17,6 +18,8 @@ use slug_workspace_v2::PathObservationOperation;
 
 use super::*;
 
+#[path = "rust_toolchain_tests/edition_comparison.rs"]
+mod edition_comparison;
 #[cfg(feature = "native-probe-observer")]
 #[path = "rust_toolchain_tests/phase_profile.rs"]
 mod phase_profile;
@@ -626,7 +629,16 @@ fn reduced_profile_report() -> Value {
     json!({"enabled":false,"purpose":"typed_terminal_capture"})
 }
 
-fn rust_probe_projection(evaluation: &CqueryCommandEvaluation) -> Option<Value> {
+fn rust_probe_actions(analysis: &ConfiguredNodeResult) -> impl Iterator<Item = &ConfiguredAction> {
+    // A fourth selected action is sufficient to disprove the three-row oracle.
+    analysis
+        .actions()
+        .iter()
+        .filter(|action| matches!(action.mnemonic(), "Rustc" | "SymlinkTree" | "RunfilesTree"))
+        .take(4)
+}
+
+fn rust_probe_projection(evaluation: &CqueryCommandEvaluation, edition: &str) -> Option<Value> {
     let mut analyses = evaluation.analyses();
     let analysis = analyses.next()?;
     if analyses.next().is_some() {
@@ -635,33 +647,20 @@ fn rust_probe_projection(evaluation: &CqueryCommandEvaluation) -> Option<Value> 
 
     let probe = CanonicalLabel::parse("@@//pkg:probe").unwrap();
     let host = CanonicalLabel::parse("@@platforms//host:host").unwrap();
-    // A fourth selected action is sufficient to disprove the three-row oracle.
-    // Project static names only so the terminal report never carries action text.
-    let selected = analysis
-        .actions()
-        .iter()
-        .filter_map(|action| {
-            let mnemonic = match action.mnemonic() {
-                "Rustc" => "Rustc",
-                "SymlinkTree" => "SymlinkTree",
-                "RunfilesTree" => "RunfilesTree",
-                _ => return None,
-            };
-            Some((mnemonic, action))
-        })
-        .take(4)
-        .collect::<Vec<_>>();
-    let rustc = selected.iter().find(|(mnemonic, _)| *mnemonic == "Rustc");
-    let argv = rustc.and_then(|(_, action)| action.spawn_spec()?.render_argv().ok());
+    let selected = rust_probe_actions(analysis).collect::<Vec<_>>();
+    let rustc = selected.iter().find(|action| action.mnemonic() == "Rustc");
+    let argv = rustc.and_then(|action| action.spawn_spec()?.render_argv().ok());
     Some(json!({
         "target": analysis.key().label().bazel_natural_cmp(&probe).is_eq(),
-        "actions": selected.iter().map(|(mnemonic, _)| mnemonic).collect::<Vec<_>>(),
-        "owners": selected.iter().all(|(_, action)| {
+        "actions": selected.iter().map(|action| action.mnemonic()).collect::<Vec<_>>(),
+        "owners": selected.iter().all(|action| {
             Some(action.context().owner()) == analysis.configured_target_key()
         }),
-        "rustc_host_platform": rustc.and_then(|(_, action)| action.context().execution_platform())
-            .is_some_and(|platform| platform.label().bazel_natural_cmp(&host).is_eq()),
-        "rustc_edition_2024": argv.as_ref().is_some_and(|argv| argv.iter().any(|arg| arg == "--edition=2024")),
+        "host_platforms": selected.iter().all(|action| action.context().execution_platform()
+            .is_some_and(|platform| platform.label().bazel_natural_cmp(&host).is_eq())),
+        "rustc_edition": argv.as_ref().is_some_and(|argv| {
+            argv.iter().filter_map(|arg| arg.strip_prefix("--edition=")).eq([edition])
+        }),
         "rustc_process_wrapper": argv.as_ref().and_then(|argv| argv.first()).is_some_and(|arg| {
             arg.ends_with("external/rules_rust+/util/process_wrapper/process_wrapper")
         }),
@@ -672,6 +671,18 @@ fn rust_probe_projection(evaluation: &CqueryCommandEvaluation) -> Option<Value> 
             ))
         })),
     }))
+}
+
+fn expected_rust_probe_projection() -> Value {
+    json!({
+        "target": true,
+        "actions": ["Rustc", "SymlinkTree", "RunfilesTree"],
+        "owners": true,
+        "host_platforms": true,
+        "rustc_edition": true,
+        "rustc_process_wrapper": true,
+        "rustc_generated_tool": true,
+    })
 }
 
 #[derive(Clone)]
@@ -917,6 +928,65 @@ fn verify_inputs(config: &Value, workspace: &Path) {
         );
     }
 }
+
+fn rust_cquery_request(
+    runtime: &WorkspaceRuntime,
+    config: &Value,
+) -> (CqueryCommandRoot, NativeDemandRequestInputBundle) {
+    let host = runtime.process_host.default_configuration_inputs().unwrap();
+    let root = CqueryCommandRoot {
+        expression: QueryExpression::parse("//pkg:probe").unwrap(),
+        workspace: NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap(),
+        base_configuration: ConfigurationKey::from_slug(
+            SlugConfiguration::default_target(&host).unwrap(),
+        ),
+        configuration_overlay: CommandConfigurationOverlay::from(vec![
+            CommandConfigurationOccurrence::starlark(
+                "@rules_rust//rust/toolchain/channel",
+                Some("nightly"),
+                false,
+            ),
+        ]),
+        roots: Arc::from([CqueryRootTarget {
+            requested: Arc::from("//pkg:probe"),
+            canonical: CanonicalLabel::parse("@@//pkg:probe").unwrap(),
+        }]),
+        literal_roots: Arc::from([(Arc::from("//pkg:probe"), 0)]),
+        include_implicit: true,
+        include_tool: true,
+    };
+    let distdirs = config["distdirs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    let inputs = NativeDemandRequestInputBundle {
+        archive_distdirs: crate::runtime::ArchiveDistdirPolicy::from_request(
+            &runtime.workspace,
+            &distdirs,
+        )
+        .unwrap(),
+        runtime_sources: None,
+        guest_namespace: None,
+        command_policy: BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+            .unwrap(),
+        lockfile_mode: LockfileMode::Off,
+        registry_urls: RegistryUrls::from_request(
+            &runtime.workspace,
+            &[config["registry_uri"].as_str().unwrap().to_owned()],
+        )
+        .unwrap(),
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot::from_canonical([
+            RepositoryEnvironmentEntry::new("CC", "/usr/bin/gcc"),
+            RepositoryEnvironmentEntry::new("PATH", "/usr/bin:/bin"),
+        ])
+        .unwrap(),
+    };
+    (root, inputs)
+}
+
 #[test]
 #[ignore = "one genuine original Rust cquery diagnostic; source-only staged input JSON and finite native supervisor required"]
 fn native_original_rust_toolchain_cquery_frontier() {
@@ -950,56 +1020,10 @@ fn native_original_rust_toolchain_cquery_frontier() {
         .enable_general_repository_workspaces_for_test(resources.clone(), limits())
         .unwrap();
     let trace = Arc::new(Mutex::new(Trace::default()));
-    let host = runtime.process_host.default_configuration_inputs().unwrap();
+    let (inner, inputs) = rust_cquery_request(&runtime, &config);
     let root = ObservedCquery {
-        inner: CqueryCommandRoot {
-            expression: QueryExpression::parse("//pkg:probe").unwrap(),
-            workspace: NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap(),
-            base_configuration: ConfigurationKey::from_slug(
-                SlugConfiguration::default_target(&host).unwrap(),
-            ),
-            configuration_overlay: CommandConfigurationOverlay::from(vec![
-                CommandConfigurationOccurrence::starlark(
-                    "@rules_rust//rust/toolchain/channel",
-                    Some("nightly"),
-                    false,
-                ),
-            ]),
-            roots: Arc::from([CqueryRootTarget {
-                requested: Arc::from("//pkg:probe"),
-                canonical: CanonicalLabel::parse("@@//pkg:probe").unwrap(),
-            }]),
-            literal_roots: Arc::from([(Arc::from("//pkg:probe"), 0)]),
-            include_implicit: true,
-            include_tool: true,
-        },
+        inner,
         trace: trace.clone(),
-    };
-    let distdirs = config["distdirs"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|v| v.as_str().unwrap().to_owned())
-        .collect::<Vec<_>>();
-    let inputs = NativeDemandRequestInputBundle {
-        archive_distdirs: crate::runtime::ArchiveDistdirPolicy::from_request(workspace, &distdirs)
-            .unwrap(),
-        runtime_sources: None,
-        guest_namespace: None,
-        command_policy: BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-        environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
-            .unwrap(),
-        lockfile_mode: LockfileMode::Off,
-        registry_urls: RegistryUrls::from_request(
-            workspace,
-            &[config["registry_uri"].as_str().unwrap().to_owned()],
-        )
-        .unwrap(),
-        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot::from_canonical([
-            RepositoryEnvironmentEntry::new("CC", "/usr/bin/gcc"),
-            RepositoryEnvironmentEntry::new("PATH", "/usr/bin:/bin"),
-        ])
-        .unwrap(),
     };
     let outcome = runtime.drive_command(inputs, root);
     let status = match &outcome {
@@ -1009,7 +1033,7 @@ fn native_original_rust_toolchain_cquery_frontier() {
                 json!({"status":"accepted_terminal_error","kind":terminal_error(error),"terminal_leaf":terminal_leaf(error),"reason":reason(error),"attempts":driven.attempts})
             }
             Ok(evaluation) => {
-                json!({"status":"accepted_success","analyses":evaluation.analyses().count(),"attempts":driven.attempts,"probe":rust_probe_projection(evaluation)})
+                json!({"status":"accepted_success","analyses":evaluation.analyses().count(),"attempts":driven.attempts,"probe":rust_probe_projection(evaluation, "2024")})
             }
         },
     };
@@ -1061,18 +1085,7 @@ fn native_original_rust_toolchain_cquery_frontier() {
     println!("WP425_RUST_FRONTIER {encoded}");
     println!("WP425_RUST_CLEANUP {cleanup}");
     if report["result"]["status"] == "accepted_success" {
-        assert_eq!(
-            report["result"]["probe"],
-            json!({
-                "target": true,
-                "actions": ["Rustc", "SymlinkTree", "RunfilesTree"],
-                "owners": true,
-                "rustc_host_platform": true,
-                "rustc_edition_2024": true,
-                "rustc_process_wrapper": true,
-                "rustc_generated_tool": true,
-            }),
-        );
+        assert_eq!(report["result"]["probe"], expected_rust_probe_projection());
     }
 }
 

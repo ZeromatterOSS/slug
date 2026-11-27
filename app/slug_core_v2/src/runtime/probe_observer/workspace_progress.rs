@@ -139,6 +139,7 @@ pub(super) struct Totals {
     snapshots: [[snapshot_work::Work; 2]; 2],
     backing_refusals: u64,
     last_backing_refusal: Option<[u64; 3]>,
+    last_retained_refusal: Option<[usize; 3]>,
     backing_inventory: Option<BackingInventory>,
     closed_archive_quotas: [Option<[u64; 4]>; 10],
 }
@@ -147,6 +148,15 @@ impl Totals {
     pub(super) fn record_backing_refusal(&mut self, live: u64, requested: u64, limit: u64) {
         self.backing_refusals = self.backing_refusals.saturating_add(1);
         self.last_backing_refusal = Some([live, requested, limit]);
+    }
+
+    pub(super) fn record_retained_refusal(
+        &mut self,
+        sampled_live: usize,
+        requested: usize,
+        limit: usize,
+    ) {
+        self.last_retained_refusal = Some([sampled_live, requested, limit]);
     }
 
     pub(super) fn record_backing_inventory(&mut self, inventory: BackingInventory) {
@@ -209,6 +219,9 @@ impl Totals {
             "backing_admission_refusals": self.backing_refusals,
             "last_backing_admission_refusal": self.last_backing_refusal.map(|[live, requested, limit]| {
                 json!({"live_bytes": live, "requested_bytes": requested, "limit_bytes": limit})
+            }),
+            "last_retained_admission_refusal": self.last_retained_refusal.map(|[sampled_live, requested, limit]| {
+                json!({"sampled_live_bytes": sampled_live, "requested_bytes": requested, "limit_bytes": limit})
             }),
             "last_source_bootstrap_backing_inventory": self.backing_inventory.as_ref().map(BackingInventory::report),
             "closed_archive_quotas": {
@@ -474,6 +487,7 @@ fn workspace_progress_report_is_bounded_at_maximum_counts() {
         }; 2]; 2],
         backing_refusals: u64::MAX,
         last_backing_refusal: Some([u64::MAX; 3]),
+        last_retained_refusal: Some([usize::MAX; 3]),
         backing_inventory: Some(BackingInventory {
             root_counts: [u64::MAX; 6],
             root_debit_bytes: u64::MAX,

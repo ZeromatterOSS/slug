@@ -22,6 +22,13 @@ while both runfiles keys stayed stable. The inactive Slug edition-2024 result
 matched the target, ordered action names, owners, Rustc host platform and
 selected tool arguments. Its bounded projection adds no raw action text.
 
+The retained-runtime edition regression passed the initial CrateInfo and
+action checks. Warm attempt 493 stopped with a native retained-bank
+allocation refusal. The bank denied 67,109,504 bytes with 533,250,939 sampled
+live under the 512 MiB limit. Abort recovered FDs and backing and retained
+17,880 extra bytes until runtime drop, which returned all credits to baseline.
+The changed and restored edition cases are pending.
+
 Matched Source manifests reuse validated entry paths and modes and count closed
 state capacities directly. The 7,935-entry native fixture used 0.886 of control
 instructions and 0.952 of CPU, with identical inode and block facts. Bzlmod 94,
@@ -47,8 +54,9 @@ backing was again 6,301 MiB. Across the three earlier identical compute
 prefixes, Archive acquisition ranged from 3.061 to 3.795 seconds. Preserve
 the [bounded phase and typed scope cause][attribution] for exact attribution.
 
-Continue the full action comparison with the pinned edition mutation and
-restoration, then the public-command and activation gates. Keep native quotas,
+Resolve warm retained-bank admission under the fixed policy while preserving
+atomic publication and existing readers. Complete the pinned edition comparison,
+public-command and activation gates. Keep native quotas,
 clocks, launcher/PID1, rooted reads, codec and history checks. Compare equal
 work for timing.
 Private message parsing, blind repeats, presumed API repair,

@@ -397,6 +397,19 @@ impl Observer {
     }
 
     #[cfg(test)]
+    pub(crate) fn record_retained_refusal(
+        &self,
+        sampled_live: usize,
+        requested: usize,
+        limit: usize,
+    ) {
+        self.workspace_progress
+            .lock()
+            .expect("workspace progress sampler poisoned")
+            .record_retained_refusal(sampled_live, requested, limit);
+    }
+
+    #[cfg(test)]
     pub(crate) fn record_backing_inventory(&self, inventory: workspace_progress::BackingInventory) {
         self.workspace_progress
             .lock()

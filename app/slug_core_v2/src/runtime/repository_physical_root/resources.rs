@@ -123,10 +123,19 @@ impl RepositoryRootResources {
         fds: usize,
         backing: u64,
     ) -> Result<ResourceCredit, PhysicalRootError> {
-        let bytes = self
-            .bytes
-            .try_reserve(bytes)
-            .map_err(|_| PhysicalRootError::Resource)?;
+        let bytes = self.bytes.try_reserve(bytes).map_err(|_error| {
+            #[cfg(all(test, feature = "native-probe-observer"))]
+            if _error == slug_workspace_v2::ImageDescriptorBudgetError::ResourceLimit {
+                if let Some(observer) = crate::runtime::probe_observer::capture() {
+                    observer.record_retained_refusal(
+                        self.bytes.used_bytes(),
+                        bytes,
+                        self.limits.retained_bytes,
+                    );
+                }
+            }
+            PhysicalRootError::Resource
+        })?;
         {
             let mut usage = self.usage.lock().map_err(|_| PhysicalRootError::Resource)?;
             let next_fds = usage
