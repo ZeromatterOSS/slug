@@ -267,14 +267,18 @@ fn configured_target_hash_preserves_complete_artifact_identity() {
                 .slug_configuration()
                 .unwrap()
                 .canonical_bytes();
-            assert_eq!(configuration.complete_identity_bytes().as_ref(), canonical);
+            let complete = configuration.complete_identity_bytes();
+            assert_eq!(complete.as_ref(), canonical);
+            assert!(std::ptr::eq(complete.as_ref(), canonical));
             let owner =
                 slug_build_api_v2::AnalysisConfiguredTargetKey::new(label.clone(), canonical);
             let owner = match target.toolchain_execution_platform() {
                 Some(platform) => owner.with_toolchain_execution_platform(platform.clone()),
                 None => owner,
             };
-            assert_eq!(target.artifact_owner(), owner);
+            let artifact = target.artifact_owner();
+            assert_eq!(artifact, owner);
+            assert!(std::ptr::eq(artifact.configuration(), canonical));
         }
     }
 }

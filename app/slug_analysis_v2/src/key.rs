@@ -218,7 +218,14 @@ impl ConfigurationKey {
     /// the display/checksum projection used by command and query rendering.
     #[rustfmt::skip]
     pub fn complete_identity_bytes(&self) -> Arc<[u8]> {
-        let ConfigurationIdentity::Legacy { kind, checksum, starlark_options } = &self.identity else { return Arc::from(self.slug_configuration().unwrap().canonical_bytes()); };
+        let (kind, checksum, starlark_options) = match &self.identity {
+            ConfigurationIdentity::Slug(configuration) => return configuration.shared_canonical_bytes(),
+            ConfigurationIdentity::Legacy {
+                kind,
+                checksum,
+                starlark_options,
+            } => (kind, checksum, starlark_options),
+        };
         fn bytes(out: &mut Vec<u8>, value: &[u8]) { out.extend_from_slice(&(value.len() as u64).to_be_bytes()); out.extend_from_slice(value); }
         let mut out = b"slug-legacy-config\0\x01".to_vec();
         out.push(match kind { ConfigurationKind::Target => 0, ConfigurationKind::Exec => 1, ConfigurationKind::HostLike => 2 });

@@ -1274,6 +1274,11 @@ impl SlugConfiguration {
         &self.0.canonical_bytes
     }
 
+    /// Share the retained bytes returned by [`Self::canonical_bytes`].
+    pub fn shared_canonical_bytes(&self) -> Arc<[u8]> {
+        Arc::clone(&self.0.canonical_bytes)
+    }
+
     pub fn option_count(&self) -> usize {
         self.0.options.len()
     }
