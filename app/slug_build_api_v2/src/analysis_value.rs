@@ -1108,7 +1108,7 @@ impl AnalysisDepset {
         self.0.metadata().element_type
     }
 
-    pub fn successors(&self) -> impl Iterator<Item = AnalysisDepsetSuccessor<'_>> {
+    pub fn successors(&self) -> impl ExactSizeIterator<Item = AnalysisDepsetSuccessor<'_>> {
         self.0.successors().map(|successor| match successor {
             DepsetSuccessor::Direct(value) => AnalysisDepsetSuccessor::Direct(value),
             DepsetSuccessor::Transitive(child) => {

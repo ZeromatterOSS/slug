@@ -4,10 +4,12 @@ use std::sync::atomic::AtomicUsize;
 
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisDepsetOccurrence;
+use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::RunfilesSymlink;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::provider::StarlarkDepset;
+use slug_loading_v2::provider::alloc_budgeted_starlark_depset;
 use slug_loading_v2::provider::alloc_budgeted_starlark_depset_parts;
 use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use starlark::values::Value;
@@ -32,15 +34,20 @@ fn assert_diamond<'v>(
     shared: Value<'v>,
     element_type: &str,
     expected_depth: usize,
+    expected_retained: Option<&AnalysisDepset>,
     leaf_text: impl Fn(Value<'v>) -> &'v str,
 ) {
     use StarlarkDepsetSuccessorGen::Direct;
     use StarlarkDepsetSuccessorGen::Transitive;
 
-    let (order, typ, _, retained, depth, row) = StarlarkDepset::parts_from_value(root).unwrap();
+    let (order, typ, occurrence, retained, depth, row) =
+        StarlarkDepset::parts_from_value(root).unwrap();
     assert_eq!(order, DepsetOrder::Preorder);
     assert_eq!(typ.as_deref(), Some(element_type));
-    assert!(retained.is_none());
+    assert_eq!(retained.as_ref(), expected_retained);
+    if let Some(expected) = expected_retained {
+        assert!(occurrence.shares_with(&expected.occurrence()));
+    }
     assert_eq!(depth, expected_depth);
     let [Direct(root_leaf), Transitive(left), Transitive(right)] = row.as_slice() else {
         panic!("unexpected root successors");
@@ -74,6 +81,7 @@ fn native_depset_projection_preserves_ordered_diamonds_and_empty_owners() {
         shared.to_value(),
         "string",
         files.depth(),
+        None,
         |value| value.unpack_str().unwrap(),
     );
     let independent = Depset::from_direct(
@@ -97,6 +105,7 @@ fn native_depset_projection_preserves_ordered_diamonds_and_empty_owners() {
         shared.to_value(),
         "SymlinkEntry",
         symlinks.depth(),
+        None,
         |value| {
             let entry = value.downcast_ref::<StarlarkRunfilesSymlink>().unwrap();
             assert_eq!(entry.retained.artifact, artifact);
@@ -217,6 +226,7 @@ fn bounded_native_projection_keeps_owned_aliases_and_admits_rows_before_callback
         shared.to_value(),
         "string",
         root.depth(),
+        None,
         |value| value.unpack_str().unwrap(),
     );
     let cached = memo
@@ -240,7 +250,7 @@ fn bounded_native_projection_keeps_owned_aliases_and_admits_rows_before_callback
     assert_eq!(short_lookup.check(), Err(ExecutionLimit::Work));
 
     let next = Depset::from_direct(root.order(), vec!["new row".to_owned()]).unwrap();
-    let short_row = ExecutionBudget::new(1000, size_of::<Frame<String>>(), 16);
+    let short_row = ExecutionBudget::new(1000, size_of::<Frame<Depset<String>>>(), 16);
     assert!(matches!(
         try_project(
             &next,
@@ -264,4 +274,198 @@ fn bounded_native_projection_keeps_owned_aliases_and_admits_rows_before_callback
         );
     }
     assert_eq!(budget.check(), Ok(()));
+}
+
+#[test]
+fn bounded_retained_projection_preserves_occurrences_and_ordered_diamond() {
+    let heap = FrozenHeap::new();
+    let budget = ExecutionBudget::new(100_000, 1 << 20, 16);
+    let order = DepsetOrder::Preorder;
+    let shared = AnalysisDepset::new(
+        order,
+        vec![
+            AnalysisValue::string("shared"),
+            AnalysisValue::string("second"),
+        ],
+        Vec::new(),
+    )
+    .unwrap();
+    let branch = |name| {
+        AnalysisDepset::new(
+            order,
+            vec![AnalysisValue::string(name)],
+            vec![shared.dupe()],
+        )
+        .unwrap()
+    };
+    let root = AnalysisDepset::new(
+        order,
+        vec![AnalysisValue::string("root")],
+        vec![branch("left"), branch("right")],
+    )
+    .unwrap();
+    let mut memo = RetainedMemo::new();
+    let mut visits = Vec::new();
+    let mut project = |root: &AnalysisDepset, memo: &mut RetainedMemo| {
+        try_project_retained(
+            memo,
+            root,
+            Some(&budget),
+            |memo| memo,
+            |_, leaf| {
+                let text = leaf.as_str().unwrap();
+                visits.push(text.to_owned());
+                Ok(heap.alloc_budgeted_str(&budget, text)?.to_frozen_value())
+            },
+            |_, node, row| alloc_budgeted_starlark_depset(&heap, &budget, node.dupe(), row),
+        )
+        .unwrap()
+    };
+    let value = project(&root, &mut memo);
+    assert_eq!(memo.len(), 4);
+    let separate_store = AnalysisDepset::new_with_occurrence(
+        shared.occurrence(),
+        order,
+        shared.to_list(),
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(!shared.shares_store_with(&separate_store));
+    let alias = project(&separate_store, &mut memo);
+    assert_diamond(
+        value.to_value(),
+        alias.to_value(),
+        "string",
+        root.depth(),
+        Some(&root),
+        |value| value.unpack_str().unwrap(),
+    );
+    let independent = AnalysisDepset::new(order, shared.to_list(), Vec::new()).unwrap();
+    let independent_value = project(&independent, &mut memo);
+    assert!(!alias.to_value().ptr_eq(independent_value.to_value()));
+    let (_, _, occurrence, kept, _, _) =
+        StarlarkDepset::parts_from_value(independent_value.to_value()).unwrap();
+    assert!(occurrence.shares_with(&independent.occurrence()));
+    assert!(kept.unwrap().shares_occurrence_with(&independent));
+
+    let mut empties = Vec::new();
+    for order in [
+        DepsetOrder::Default,
+        DepsetOrder::Postorder,
+        DepsetOrder::Preorder,
+        DepsetOrder::Topological,
+    ] {
+        let source = AnalysisDepset::empty(order);
+        let empty = project(&source, &mut memo).to_value();
+        let again = project(&AnalysisDepset::empty(order), &mut memo).to_value();
+        assert!(empty.ptr_eq(again));
+        assert!(empties.iter().all(|&earlier| !empty.ptr_eq(earlier)));
+        let (actual_order, typ, occurrence, kept, depth, row) =
+            StarlarkDepset::parts_from_value(empty).unwrap();
+        assert_eq!(actual_order, order);
+        assert_eq!(typ, None);
+        assert_eq!(depth, 0);
+        assert!(row.is_empty());
+        assert!(occurrence.shares_with(&source.occurrence()));
+        assert!(kept.unwrap().shares_occurrence_with(&source));
+        empties.push(empty);
+    }
+    assert_eq!(memo.len(), 9);
+    assert_eq!(
+        visits,
+        [
+            "shared", "second", "right", "left", "root", "shared", "second"
+        ]
+    );
+}
+
+#[derive(Debug)]
+enum ProjectionError {
+    Limit(ExecutionLimit),
+    Shape,
+}
+
+impl From<ExecutionLimit> for ProjectionError {
+    fn from(limit: ExecutionLimit) -> Self {
+        Self::Limit(limit)
+    }
+}
+
+#[test]
+fn bounded_retained_projection_shares_reentrant_memo_and_keeps_typed_failures() {
+    let heap = FrozenHeap::new();
+    let budget = ExecutionBudget::new(100_000, 1 << 20, 16);
+    let order = DepsetOrder::Default;
+    let node = |leaf| AnalysisDepset::new(order, vec![leaf], Vec::new()).unwrap();
+    let child = node(AnalysisValue::string("child"));
+    let root = node(AnalysisValue::depset(child.dupe()));
+    let mut memo = RetainedMemo::new();
+    let alloc = |_: &RetainedMemo, source: &AnalysisDepset, row| {
+        alloc_budgeted_starlark_depset(&heap, &budget, source.dupe(), row)
+    };
+    let result = try_project_retained(
+        &mut memo,
+        &root,
+        Some(&budget),
+        |memo| memo,
+        |memo, leaf| {
+            let AnalysisValueKind::Depset(nested) = leaf.kind() else {
+                panic!("expected nested retained depset")
+            };
+            try_project_retained(
+                memo,
+                nested,
+                Some(&budget),
+                |memo| memo,
+                |_, leaf| {
+                    Ok(heap
+                        .alloc_budgeted_str(&budget, leaf.as_str().unwrap())?
+                        .to_frozen_value())
+                },
+                alloc,
+            )
+        },
+        alloc,
+    )
+    .unwrap();
+    let (_, _, _, _, _, row) = StarlarkDepset::parts_from_value(result.to_value()).unwrap();
+    let [StarlarkDepsetSuccessorGen::Direct(nested)] = row.as_slice() else {
+        panic!("expected a direct nested depset")
+    };
+    assert!(nested.ptr_eq(memo.get(&child).unwrap().1.to_value()));
+
+    let failed = node(AnalysisValue::string("unsupported leaf"));
+    let shape = try_project_retained(
+        &mut memo,
+        &failed,
+        Some(&budget),
+        |memo| memo,
+        |_, _| Err(ProjectionError::Shape),
+        |_, _, _| panic!("allocated a node after shape refusal"),
+    );
+    assert!(matches!(shape, Err(ProjectionError::Shape)));
+    assert_eq!(budget.check(), Ok(()));
+    let short = ExecutionBudget::new(0, 0, 16);
+    let limit: Result<_, ProjectionError> = try_project_retained(
+        &mut memo,
+        &failed,
+        Some(&short),
+        |memo| memo,
+        |_, _| panic!("invoked a leaf after budget refusal"),
+        |_, _, _| panic!("allocated a node after budget refusal"),
+    );
+    assert!(matches!(
+        limit,
+        Err(ProjectionError::Limit(ExecutionLimit::Work))
+    ));
+    assert_eq!(short.check(), Err(ExecutionLimit::Work));
+    assert_eq!(memo.len(), 2);
+    assert!(memo.get(&failed).is_none());
+    assert!(
+        memo.get(&root)
+            .unwrap()
+            .1
+            .to_value()
+            .ptr_eq(result.to_value())
+    );
 }

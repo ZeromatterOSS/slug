@@ -24,6 +24,7 @@ use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisDepsetGraphInput;
 use slug_build_api_v2::AnalysisDepsetGraphNode;
 use slug_build_api_v2::AnalysisDepsetGraphRow;
+#[cfg(test)]
 use slug_build_api_v2::AnalysisDepsetSuccessor;
 use slug_build_api_v2::AnalysisNumber;
 use slug_build_api_v2::AnalysisTargetIdentity;
@@ -576,7 +577,7 @@ pub(crate) struct AnalysisValueMaterializer<'a> {
     // materializer, and temporary native allocations cannot cause pointer ABA.
     containers: HashMap<slug_build_api_v2::analysis_value::AnalysisContainerIdentity, FrozenValue>,
     cc_variables: SmallMap<slug_build_api_v2::cc_variables::CcVariablesOccurrence, FrozenValue>,
-    depsets: HashMap<AnalysisDepset, FrozenValue>,
+    depsets: native_depset::RetainedMemo,
     file_depsets: native_depset::Memo<String>,
     symlink_depsets: native_depset::Memo<RunfilesSymlink>,
 }
@@ -587,7 +588,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
             heap,
             containers: HashMap::new(),
             cc_variables: SmallMap::new(),
-            depsets: HashMap::default(),
+            depsets: SmallMap::new(),
             file_depsets: SmallMap::new(),
             symlink_depsets: SmallMap::new(),
         }
@@ -785,39 +786,17 @@ impl<'a> AnalysisValueMaterializer<'a> {
     }
 
     fn depset(&mut self, value: &AnalysisDepset) -> Result<FrozenValue, String> {
-        let mut stack = vec![(value.clone(), false)];
-        while let Some((current, exiting)) = stack.pop() {
-            if self.depsets.contains_key(&current) {
-                continue;
-            }
-            if !exiting {
-                stack.push((current.clone(), true));
-                for successor in current.successors() {
-                    if let AnalysisDepsetSuccessor::Transitive(child) = successor
-                        && !self.depsets.contains_key(&child)
-                    {
-                        stack.push((child, false));
-                    }
-                }
-                continue;
-            }
-            let successors = current
-                .successors()
-                .map(|successor| match successor {
-                    AnalysisDepsetSuccessor::Direct(value) => {
-                        self.value(value).map(StarlarkDepsetSuccessorGen::Direct)
-                    }
-                    AnalysisDepsetSuccessor::Transitive(child) => {
-                        Ok(StarlarkDepsetSuccessorGen::Transitive(
-                            *self.depsets.get(&child).expect("child materialized first"),
-                        ))
-                    }
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let result = alloc_starlark_depset(self.heap, current.clone(), successors);
-            self.depsets.insert(current, result);
-        }
-        Ok(*self.depsets.get(value).expect("root materialized"))
+        native_depset::try_project_retained(
+            self,
+            value,
+            None,
+            |state| &mut state.depsets,
+            |state, value| state.value(value).map_err(anyhow::Error::msg),
+            |state, node, successors| {
+                Ok(alloc_starlark_depset(state.heap, node.dupe(), successors))
+            },
+        )
+        .map_err(|error: anyhow::Error| error.to_string())
     }
 
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {

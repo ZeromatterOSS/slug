@@ -1,6 +1,10 @@
+use std::hash::Hash;
+
 use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::AnalysisDepset;
+use slug_build_api_v2::AnalysisDepsetSuccessor;
+use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetSuccessor;
 use slug_loading_v2::provider::StarlarkDepsetSuccessorGen;
@@ -18,10 +22,71 @@ type Successors = Vec<StarlarkDepsetSuccessorGen<FrozenValue>>;
 // Keep the source owner alive for every raw node key. Structurally equal
 // independent nodes have distinct native Starlark occurrences.
 pub(super) type Memo<T> = SmallMap<NodeKey, (Depset<T>, FrozenValue)>;
+// Retained depsets use AnalysisDepset's occurrence equality and hash,
+// including the canonical empty occurrence supplied for each order.
+pub(super) type RetainedMemo = SmallMap<AnalysisDepset, (AnalysisDepset, FrozenValue)>;
 
-struct Frame<T> {
-    node: Depset<T>,
-    key: Hashed<NodeKey>,
+trait ProjectionSource: Dupe {
+    type Key: Dupe + Eq + Hash;
+    type Leaf;
+
+    const RETAINED: bool;
+
+    fn memo_key(&self) -> Self::Key;
+
+    fn ordered_row(&self) -> impl ExactSizeIterator<Item = DepsetSuccessor<&Self::Leaf, Self>>;
+
+    fn traversal_successor(&self, index: usize) -> Option<DepsetSuccessor<&Self::Leaf, Self>> {
+        let mut row = self.ordered_row();
+        let index = if Self::RETAINED {
+            // The original retained DFS pushed children in row order onto a
+            // LIFO stack. Preserve that callback order and emit rows forwards.
+            row.len().checked_sub(index)?.checked_sub(1)?
+        } else {
+            index
+        };
+        row.nth(index)
+    }
+}
+
+impl<T> ProjectionSource for Depset<T> {
+    type Key = NodeKey;
+    type Leaf = T;
+
+    const RETAINED: bool = false;
+
+    fn memo_key(&self) -> Self::Key {
+        self.node_key()
+    }
+
+    fn ordered_row(&self) -> impl ExactSizeIterator<Item = DepsetSuccessor<&T, Self>> {
+        self.successors()
+    }
+}
+
+impl ProjectionSource for AnalysisDepset {
+    type Key = AnalysisDepset;
+    type Leaf = AnalysisValue;
+
+    const RETAINED: bool = true;
+
+    fn memo_key(&self) -> Self::Key {
+        self.dupe()
+    }
+
+    fn ordered_row(&self) -> impl ExactSizeIterator<Item = DepsetSuccessor<&AnalysisValue, Self>> {
+        self.successors().map(|successor| match successor {
+            AnalysisDepsetSuccessor::Direct(leaf) => DepsetSuccessor::Direct(leaf),
+            AnalysisDepsetSuccessor::Transitive(child) => DepsetSuccessor::Transitive(child),
+        })
+    }
+}
+
+type ProjectionMemo<N> = SmallMap<<N as ProjectionSource>::Key, (N, FrozenValue)>;
+
+struct Frame<N: ProjectionSource> {
+    node: N,
+    key: Hashed<N::Key>,
     next: usize,
 }
 
@@ -33,9 +98,9 @@ fn latch(budget: Option<&ExecutionBudget>, limit: ExecutionLimit) -> ExecutionLi
     budget.map_or(limit, |budget| budget.refuse(limit))
 }
 
-fn push_frame<T>(
-    stack: &mut Vec<Frame<T>>,
-    frame: Frame<T>,
+fn push_frame<N: ProjectionSource>(
+    stack: &mut Vec<Frame<N>>,
+    frame: Frame<N>,
     budget: Option<&ExecutionBudget>,
 ) -> Result<(), ExecutionLimit> {
     if let Some(budget) = budget {
@@ -55,9 +120,9 @@ fn memo_error(budget: &ExecutionBudget, error: BoundedMapError<ExecutionLimit>) 
     }
 }
 
-fn lookup<T>(
-    memo: &Memo<T>,
-    key: &Hashed<NodeKey>,
+fn lookup<N: ProjectionSource>(
+    memo: &ProjectionMemo<N>,
+    key: &Hashed<N::Key>,
     budget: Option<&ExecutionBudget>,
 ) -> Result<Option<FrozenValue>, ExecutionLimit> {
     let found = if let Some(budget) = budget {
@@ -73,10 +138,10 @@ fn lookup<T>(
     Ok(found.map(|(_, value)| *value))
 }
 
-fn remember<T>(
-    memo: &mut Memo<T>,
-    key: Hashed<NodeKey>,
-    node: Depset<T>,
+fn remember<N: ProjectionSource>(
+    memo: &mut ProjectionMemo<N>,
+    key: Hashed<N::Key>,
+    node: N,
     value: FrozenValue,
     budget: Option<&ExecutionBudget>,
 ) -> Result<(), ExecutionLimit> {
@@ -134,9 +199,42 @@ pub(super) fn try_project<T>(
     mut leaf: impl FnMut(&T) -> Result<FrozenValue, ExecutionLimit>,
     mut materialize: impl FnMut(&Depset<T>, Successors) -> Result<FrozenValue, ExecutionLimit>,
 ) -> Result<FrozenValue, ExecutionLimit> {
+    try_project_node(
+        memo,
+        root,
+        budget,
+        |memo| memo,
+        |_, value| leaf(value).map_err(|limit| latch(budget, limit)),
+        |_, node, row| materialize(node, row).map_err(|limit| latch(budget, limit)),
+    )
+}
+
+/// Project retained nodes through the caller's materializer. The leaf callback
+/// may reenter projection through the same append-only memo. Budget failures
+/// from walker operations convert to the caller's typed error alongside native
+/// shape errors. Callbacks use the same budget and latch any resource refusals.
+pub(super) fn try_project_retained<S, E: From<ExecutionLimit>>(
+    state: &mut S,
+    root: &AnalysisDepset,
+    budget: Option<&ExecutionBudget>,
+    memo: impl Fn(&mut S) -> &mut RetainedMemo,
+    leaf: impl FnMut(&mut S, &AnalysisValue) -> Result<FrozenValue, E>,
+    materialize: impl FnMut(&S, &AnalysisDepset, Successors) -> Result<FrozenValue, E>,
+) -> Result<FrozenValue, E> {
+    try_project_node(state, root, budget, memo, leaf, materialize)
+}
+
+fn try_project_node<N: ProjectionSource, S, E: From<ExecutionLimit>>(
+    state: &mut S,
+    root: &N,
+    budget: Option<&ExecutionBudget>,
+    memo: impl Fn(&mut S) -> &mut ProjectionMemo<N>,
+    mut leaf: impl FnMut(&mut S, &N::Leaf) -> Result<FrozenValue, E>,
+    mut materialize: impl FnMut(&S, &N, Successors) -> Result<FrozenValue, E>,
+) -> Result<FrozenValue, E> {
     step(budget)?;
-    let root_key = Hashed::new(root.node_key());
-    if let Some(found) = lookup(memo, &root_key, budget)? {
+    let root_key = Hashed::new(root.memo_key());
+    if let Some(found) = lookup(memo(state), &root_key, budget)? {
         return Ok(found);
     }
 
@@ -155,11 +253,11 @@ pub(super) fn try_project<T>(
     loop {
         step(budget)?;
         let current = stack.last_mut().expect("active depset frame");
-        if let Some(successor) = current.node.successors().nth(current.next) {
+        if let Some(successor) = current.node.traversal_successor(current.next) {
             current.next += 1;
             if let DepsetSuccessor::Transitive(child) = successor {
-                let key = Hashed::new(child.node_key());
-                if lookup(memo, &key, budget)?.is_none() {
+                let key = Hashed::new(child.memo_key());
+                if lookup(memo(state), &key, budget)?.is_none() {
                     push_frame(
                         &mut stack,
                         Frame {
@@ -175,7 +273,17 @@ pub(super) fn try_project<T>(
         }
 
         let Frame { node, key, .. } = stack.pop().expect("active depset frame");
-        let mut input = node.successors();
+        if N::RETAINED
+            && let Some(value) = lookup(memo(state), &key, budget)?
+        {
+            // A child with the same retained occurrence completed this key.
+            if stack.is_empty() {
+                return Ok(value);
+            }
+            continue;
+        }
+        let memo_len = if N::RETAINED { memo(state).len() } else { 0 };
+        let mut input = node.ordered_row();
         let count = input.len();
         let mut successors = if let Some(budget) = budget {
             let mut successors = Vec::new();
@@ -187,19 +295,31 @@ pub(super) fn try_project<T>(
         for _ in 0..count {
             step(budget)?;
             successors.push(match input.next().expect("fixed successor count") {
-                DepsetSuccessor::Direct(value) => StarlarkDepsetSuccessorGen::Direct(
-                    leaf(value).map_err(|limit| latch(budget, limit))?,
-                ),
+                DepsetSuccessor::Direct(value) => {
+                    StarlarkDepsetSuccessorGen::Direct(leaf(state, value)?)
+                }
                 DepsetSuccessor::Transitive(child) => {
-                    let key = Hashed::new(child.node_key());
+                    let key = Hashed::new(child.memo_key());
                     StarlarkDepsetSuccessorGen::Transitive(
-                        lookup(memo, &key, budget)?.expect("child materialized first"),
+                        lookup(memo(state), &key, budget)?.expect("child materialized first"),
                     )
                 }
             });
         }
-        let value = materialize(&node, successors).map_err(|limit| latch(budget, limit))?;
-        remember(memo, key, node, value, budget)?;
+        drop(input);
+        // Leaf materialization can project nested retained values. Reuse the
+        // already-published occurrence if that path completed this same key.
+        if N::RETAINED
+            && memo(state).len() != memo_len
+            && let Some(value) = lookup(memo(state), &key, budget)?
+        {
+            if stack.is_empty() {
+                return Ok(value);
+            }
+            continue;
+        }
+        let value = materialize(state, &node, successors)?;
+        remember(memo(state), key, node, value, budget)?;
         if stack.is_empty() {
             return Ok(value);
         }
