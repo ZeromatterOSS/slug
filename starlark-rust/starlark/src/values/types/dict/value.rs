@@ -572,9 +572,10 @@ impl<'v> DictLike<'v> for FrozenHashableDictData {
     }
 }
 
+static DICT_METHODS: MethodsStatic = MethodsStatic::new();
+
 pub(crate) fn dict_methods() -> Option<&'static Methods> {
-    static RES: MethodsStatic = MethodsStatic::new();
-    RES.methods(crate::values::types::dict::methods::dict_methods)
+    DICT_METHODS.methods(crate::values::types::dict::methods::dict_methods)
 }
 
 #[starlark_value(type = Dict::TYPE)]
@@ -586,6 +587,10 @@ where
 
     fn get_methods() -> Option<&'static Methods> {
         dict_methods()
+    }
+
+    fn get_methods_bounded() -> Option<&'static Methods> {
+        DICT_METHODS.get()
     }
 
     fn collect_repr(&self, r: &mut String) {

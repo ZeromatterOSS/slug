@@ -24,9 +24,12 @@ use starlark_derive::starlark_module;
 
 use crate as starlark;
 use crate::environment::MethodsBuilder;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::values::Heap;
 use crate::values::Value;
 use crate::values::ValueOfUnchecked;
+use crate::values::dict::Dict;
 use crate::values::dict::DictMut;
 use crate::values::dict::DictRef;
 use crate::values::list::AllocList;
@@ -34,6 +37,21 @@ use crate::values::list::ListRef;
 use crate::values::list::UnpackList;
 use crate::values::none::NoneType;
 use crate::values::typing::StarlarkIter;
+
+fn items_bounded<'v>(
+    this: &Dict<'v>,
+    heap: Heap<'v>,
+    budget: &ExecutionBudget,
+) -> Result<Value<'v>, ExecutionLimit> {
+    budget.charge(this.len(), 0)?;
+    heap.try_alloc_budgeted_list(
+        this.iter()
+            .map(|(key, value)| heap.alloc_budgeted_tuple(&[key, value])),
+    )
+}
+
+#[cfg(test)]
+mod bounded_items_tests;
 
 #[starlark_module]
 pub(crate) fn dict_methods(registry: &mut MethodsBuilder) {
@@ -105,11 +123,15 @@ pub(crate) fn dict_methods(registry: &mut MethodsBuilder) {
     /// x.items() == [("one", 1), ("two", 2)]
     /// # "#);
     /// ```
+    #[starlark(bounded_method)]
     fn items<'v>(
         this: DictRef<'v>,
         heap: Heap<'v>,
-    ) -> anyhow::Result<ValueOfUnchecked<'v, UnpackList<(Value<'v>, Value<'v>)>>> {
-        Ok(heap.alloc_typed_unchecked(AllocList(this.iter())).cast())
+    ) -> starlark::Result<ValueOfUnchecked<'v, UnpackList<(Value<'v>, Value<'v>)>>> {
+        match heap.bounded_operation_budget() {
+            Some(budget) => Ok(ValueOfUnchecked::new(items_bounded(&this, heap, budget)?)),
+            None => Ok(heap.alloc_typed_unchecked(AllocList(this.iter())).cast()),
+        }
     }
 
     /// [dict.keys](

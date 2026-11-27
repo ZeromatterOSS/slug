@@ -83,11 +83,12 @@ impl ExecutionBudget {
         }
     }
 
-    /// Prepare the fixed core string method table and require bounded dispatch
+    /// Prepare the fixed core string and dict method tables and require bounded dispatch
     /// on the checked operation paths of every heap sharing this request.
     /// Embedders prepare additional supported receiver tables before execution.
     pub fn with_bounded_operations(mut self) -> Self {
         let _ = crate::values::types::string::str_type::str_methods();
+        let _ = crate::values::types::dict::value::dict_methods();
         self.bounded_operations = true;
         self
     }

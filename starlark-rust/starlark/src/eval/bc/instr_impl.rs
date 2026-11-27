@@ -84,9 +84,11 @@ use crate::values::dict::Dict;
 use crate::values::function::NativeFunc;
 use crate::values::int::pointer_i32::PointerI32;
 use crate::values::layout::value_not_special::FrozenValueNotSpecial;
+use crate::values::list::ListRef;
 use crate::values::string::dot_format::format_one;
 use crate::values::string::dot_format::format_one_bounded;
 use crate::values::string::interpolation::percent_s_one;
+use crate::values::tuple::TupleRef;
 use crate::values::types::known_methods::KnownMethod;
 use crate::values::types::list::value::ListData;
 use crate::values::typing::type_compiled::compiled::TypeCompiled;
@@ -294,6 +296,31 @@ impl InstrNoFlowImpl for InstrUnpackImpl {
         (source, target): &(BcSlotIn, FrozenRef<'static, [BcSlotOut]>),
     ) -> crate::Result<()> {
         let v = frame.get_bc_slot(*source);
+        if let Some(budget) = eval.heap().bounded_operation_budget() {
+            budget.charge(1, 0)?;
+            let items = ListRef::from_value(v)
+                .map(ListRef::content)
+                .or_else(|| TupleRef::from_value(v).map(TupleRef::content))
+                .ok_or_else(|| {
+                    budget.refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "sequence unpacking",
+                        value_type: v.get_type(),
+                    })
+                })?;
+            if items.len() != target.len() {
+                return Err(crate::Error::new_other(
+                    AssignError::IncorrectNumberOfValueToUnpack(
+                        target.len() as i32,
+                        items.len() as i32,
+                    ),
+                ));
+            }
+            budget.charge(items.len(), 0)?;
+            for (&slot, &item) in target.iter().zip(items) {
+                frame.set_bc_slot(slot, item);
+            }
+            return Ok(());
+        }
         let nvl = v.length()?;
         if nvl != target.len() as i32 {
             return Err(crate::Error::new_other(

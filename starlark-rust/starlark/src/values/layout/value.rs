@@ -683,6 +683,16 @@ impl<'v> Value<'v> {
 
     /// `x % other`.
     pub fn percent(self, other: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        if let Some(budget) = heap.bounded_operation_budget() {
+            budget.charge(1, 0)?;
+            let format = self.unpack_starlark_str().ok_or_else(|| {
+                budget.refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "percent operator",
+                    value_type: self.get_type(),
+                })
+            })?;
+            return StarlarkValue::percent(format, other, heap);
+        }
         self.get_ref().percent(other, heap)
     }
 
@@ -896,6 +906,25 @@ impl<'v> Value<'v> {
     /// Add two [`Value`]s together. Will first try using [`add`](StarlarkValue::add),
     /// before falling back to [`radd`](StarlarkValue::radd).
     pub fn add(self, other: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        if let Some(budget) = heap.bounded_operation_budget() {
+            budget.charge(1, 0)?;
+            let (Some(left), Some(right)) = (self.unpack_str(), other.unpack_str()) else {
+                let unsupported = if self.is_str() { other } else { self };
+                return Err(budget
+                    .refuse(ExecutionLimit::UnsupportedOperation {
+                        operation: "addition",
+                        value_type: unsupported.get_type(),
+                    })
+                    .into());
+            };
+            if left.is_empty() {
+                return Ok(other);
+            }
+            if right.is_empty() {
+                return Ok(self);
+            }
+            return Ok(heap.alloc_budgeted_str_parts(&[left, right])?.to_value());
+        }
         // Fast special case for ints.
         if let Some(ls) = self.unpack_inline_int() {
             if let Some(rs) = other.unpack_inline_int() {
@@ -1691,6 +1720,9 @@ where
     FrozenValue: Send + Sync,
 {
 }
+
+#[cfg(test)]
+mod bounded_string_operator_tests;
 
 #[cfg(test)]
 #[path = "callable_admission_tests.rs"]

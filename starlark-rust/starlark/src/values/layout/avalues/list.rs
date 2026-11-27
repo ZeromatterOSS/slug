@@ -188,8 +188,17 @@ impl<'v> Heap<'v> {
         self,
         elems: impl ExactSizeIterator<Item = Value<'v>>,
     ) -> Result<Value<'v>, ExecutionLimit> {
+        self.try_alloc_budgeted_list(elems.map(Ok))
+    }
+
+    /// The fallible variant also admits the list before drawing any elements.
+    /// Elements admitted before a refusal remain owned by the heap.
+    pub(crate) fn try_alloc_budgeted_list(
+        self,
+        elems: impl ExactSizeIterator<Item = Result<Value<'v>, ExecutionLimit>>,
+    ) -> Result<Value<'v>, ExecutionLimit> {
         let Some(budget) = self.execution_budget() else {
-            return Ok(self.alloc_list_iter(elems));
+            return self.try_alloc_list_iter(elems);
         };
         let count = elems.len();
         let list_bytes = AValueList::alloc_size_for_extra_len(0).bytes() as usize;
@@ -199,7 +208,7 @@ impl<'v> Heap<'v> {
         budget.charge(1 + count, bytes)?;
         let array = self.alloc_array(count);
         for value in elems {
-            array.push(value);
+            array.push(value?);
         }
         Ok(self.alloc_raw(list_avalue(array)).to_value())
     }
