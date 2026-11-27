@@ -43,6 +43,7 @@ use crate::HostCanonicalRepositoryLoadRouteError;
 use crate::HostCanonicalRepositoryLoadRouteKey;
 use crate::HostCanonicalRepositoryLoadRouteObservationError;
 use crate::HostCanonicalRepositoryLoadRouteObservationKey;
+use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -123,6 +124,18 @@ impl fmt::Display for HostRootRepositoryLoadRouteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             HostRootRepositoryLoadRouteErrorKind::Root(error) => error.fmt(f),
+            HostRootRepositoryLoadRouteErrorKind::LoadRoute(error)
+                if matches!(
+                    &error.kind,
+                    HostCanonicalRepositoryLoadRouteErrorKind::Effect(_)
+                ) =>
+            {
+                write!(
+                    f,
+                    "root repository load route '@{}': {error}",
+                    self.apparent_repo.as_str()
+                )
+            }
             kind => write!(
                 f,
                 "root repository load route '@{}': {kind:?}",

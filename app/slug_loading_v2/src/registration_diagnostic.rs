@@ -6,6 +6,7 @@ use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError as Plan;
 use slug_bzlmod_v2::HostRepositoryLabelPathError as LabelPath;
 use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 
 use crate::ModuleRegistrationExpansionError;
 use crate::ModuleRegistrationExpansionErrorKind as Registration;
@@ -190,6 +191,18 @@ impl fmt::Display for Diagnostic<'_> {
         debug_assert!(result.is_ok() || out.stopped);
         f.write_str(out.text())
     }
+}
+
+pub(crate) fn write_canonical_repository_effect(
+    f: &mut fmt::Formatter<'_>,
+    canonical_repo: &CanonicalRepoName,
+    error: &Effect,
+) -> fmt::Result {
+    let mut out = Buffer::new();
+    let result = write!(out, "canonical repository load route '{canonical_repo}': ")
+        .and_then(|()| walk_with_mode(&mut out, Node::Effect(error), true));
+    debug_assert!(result.is_ok() || out.stopped);
+    f.write_str(out.text())
 }
 
 enum Node<'a> {

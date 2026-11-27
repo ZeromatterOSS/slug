@@ -35,6 +35,7 @@ use crate::HostSelectedRepositoryFileEffectKey;
 use crate::HostSelectedRepositoryFileEffectObservationError;
 use crate::HostSelectedRepositoryFileEffectObservationKey;
 use crate::dependency_cycle::compute_guarded;
+use crate::registration_diagnostic::write_canonical_repository_effect;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -80,28 +81,29 @@ impl HostCanonicalRepositoryLoadRouteError {
 
 impl fmt::Display for HostCanonicalRepositoryLoadRouteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let HostCanonicalRepositoryLoadRouteErrorKind::Effect(
-            HostSelectedRepositoryFileEffectError::Invocation {
-                ordinal, message, ..
-            },
-        ) = &self.kind
-        {
-            write!(
+        let HostCanonicalRepositoryLoadRouteErrorKind::Effect(effect) = &self.kind else {
+            return write!(
                 f,
-                "canonical repository load route '{}': Effect(Invocation ordinal={ordinal}): ",
-                self.canonical_repo
-            )?;
-            if let Some((end, _)) = message.char_indices().nth(512) {
-                f.write_str(&message[..end])?;
-                return f.write_str("…");
-            }
-            return f.write_str(message.as_str());
-        }
+                "canonical repository load route '{}': {:?}",
+                self.canonical_repo, self.kind
+            );
+        };
+        let HostSelectedRepositoryFileEffectError::Invocation {
+            ordinal, message, ..
+        } = effect
+        else {
+            return write_canonical_repository_effect(f, &self.canonical_repo, effect);
+        };
         write!(
             f,
-            "canonical repository load route '{}': {:?}",
-            self.canonical_repo, self.kind
-        )
+            "canonical repository load route '{}': Effect(Invocation ordinal={ordinal}): ",
+            self.canonical_repo
+        )?;
+        if let Some((end, _)) = message.char_indices().nth(512) {
+            f.write_str(&message[..end])?;
+            return f.write_str("…");
+        }
+        f.write_str(message.as_str())
     }
 }
 

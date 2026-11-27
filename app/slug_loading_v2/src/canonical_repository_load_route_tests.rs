@@ -184,12 +184,13 @@ compatibility=module_extension(implementation=impl)
     }
 
     #[tokio::test]
-    async fn canonical_invocation_display_bounds_unicode_and_retains_typed_owner() {
+    async fn canonical_effect_display_is_bounded_and_retains_typed_owner() {
         use crate::HostCanonicalRepositoryRouteKey;
         use crate::HostSelectedRepositoryFileEffectError;
         use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteError;
         use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind;
         use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateKey;
+        use crate::root_repository_load_route::tests::diagnostic_load;
 
         let dice = crate::canonical_repository_route_tests::tests::generated_graph_dice();
         let mut tx = transaction(
@@ -278,6 +279,49 @@ compatibility=module_extension(implementation=impl)
             assert_eq!(message.as_str(), cause);
             assert_eq!(held.repository(ordinal).unwrap().spec_parts().0, &canonical);
         }
+        let host_input = |message: &str| HostCanonicalRepositoryLoadRouteError {
+            canonical_repo: canonical.clone(),
+            kind: HostCanonicalRepositoryLoadRouteErrorKind::Effect(
+                HostSelectedRepositoryFileEffectError::HostInput {
+                    certificate: certificate.clone(),
+                    ordinal,
+                    message: message.into(),
+                },
+            ),
+        };
+        let cause = "repository_ctx.path host exists does not support a dangling symlink";
+        let host_input_prefix =
+            format!("canonical repository load route '{canonical}': Effect: HostInput {ordinal}: ");
+        let error = host_input(cause);
+        assert_eq!(error.to_string(), format!("{host_input_prefix}{cause}"));
+        let HostCanonicalRepositoryLoadRouteErrorKind::Effect(
+            HostSelectedRepositoryFileEffectError::HostInput {
+                certificate: held,
+                ordinal: held_ordinal,
+                message,
+            },
+        ) = &error.kind
+        else {
+            panic!("expected typed host input error")
+        };
+        assert!(Arc::ptr_eq(held, &certificate));
+        assert_eq!(*held_ordinal, ordinal);
+        assert_eq!(message.as_str(), cause);
+
+        let long = host_input(&format!(
+            "first line\n{}unrendered suffix",
+            "é🦀".repeat(3072)
+        ));
+        let text = long.to_string();
+        assert!(text.starts_with(&format!("{host_input_prefix}first line\\n")));
+        assert!(text.ends_with("[diagnostic incomplete: output limit]"));
+        assert!(text.len() <= 3072);
+        assert!(!text.contains("unrendered suffix"));
+        assert_eq!(
+            diagnostic_load(long).to_string(),
+            format!("root repository load route '@repo': {text}")
+        );
+
         let ordinary = HostCanonicalRepositoryLoadRouteError {
             canonical_repo: canonical.clone(),
             kind: HostCanonicalRepositoryLoadRouteErrorKind::RouteCompute(Arc::from("unchanged")),
@@ -286,6 +330,9 @@ compatibility=module_extension(implementation=impl)
             ordinary.to_string(),
             format!("canonical repository load route '{canonical}': RouteCompute(\"unchanged\")")
         );
+        let ordinary_apparent =
+            format!("root repository load route '@repo': LoadRoute({ordinary:?})");
+        assert_eq!(diagnostic_load(ordinary).to_string(), ordinary_apparent);
     }
 
     #[derive(Default)]
@@ -1157,7 +1204,8 @@ compatibility=module_extension(implementation=impl)
             [(
                 request.clone(),
                 RepositoryMaterializationSuccess::Immutable {
-                    path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
+                    path_policy:
+                        slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                     source_identity: Arc::from("root-request-bzl-source"),
                     generation_root: PathBuf::from("/registry-parent"),
                     observation_instance: instance,
@@ -1734,7 +1782,8 @@ compatibility=module_extension(implementation=impl)
                 (
                     request.clone(),
                     RepositoryMaterializationSuccess::Immutable {
-                        path_policy: slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
+                        path_policy:
+                            slug_bzlmod_v2::RepositoryMaterializationPathPolicy::LegacyUnbounded,
                         source_identity: Arc::from("builtin-public-load-rules-cc"),
                         generation_root: PathBuf::from("/registry-rules-cc"),
                         observation_instance: instance,
