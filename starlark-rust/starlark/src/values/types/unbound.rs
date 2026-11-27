@@ -96,7 +96,7 @@ impl UnboundValue {
     pub(crate) fn bind<'v>(&self, this: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
         match self {
             UnboundValue::Method(m) => {
-                if let Some(budget) = heap.bounded_attribute_budget() {
+                if let Some(budget) = heap.bounded_operation_budget() {
                     if !m.function.is_bounded() {
                         return Err(budget
                             .refuse(ExecutionLimit::UnsupportedOperation {

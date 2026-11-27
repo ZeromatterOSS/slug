@@ -42,7 +42,7 @@ use crate::values::value_of_unchecked::ValueOfUnchecked;
 mod sorted_budget;
 
 fn attribute_name<'v>(value: Value<'v>, heap: Heap<'v>) -> crate::Result<&'v str> {
-    let Some(budget) = heap.bounded_attribute_budget() else {
+    let Some(budget) = heap.bounded_operation_budget() else {
         return <&str>::unpack_named_param(value, "attr");
     };
     budget.charge(1, 0)?;
@@ -165,7 +165,7 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
         #[starlark(require = pos)] x: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Vec<String>> {
-        if let Some(budget) = heap.bounded_attribute_budget() {
+        if let Some(budget) = heap.bounded_operation_budget() {
             return Err(budget
                 .refuse(crate::eval::ExecutionLimit::UnsupportedOperation {
                     operation: "attribute enumeration",

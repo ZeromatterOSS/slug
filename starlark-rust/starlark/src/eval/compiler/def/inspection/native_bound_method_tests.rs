@@ -244,7 +244,7 @@ fn native_member_admission_controls_frozen_bound_invocation_before_unpack() {
     );
     assert_eq!(ordinary_budget.check(), Ok(()));
 
-    let budget = Arc::new(ExecutionBudget::new(1000, 4096, 8).with_bounded_attributes());
+    let budget = Arc::new(ExecutionBudget::new(1000, 4096, 8).with_bounded_operations());
     let module = Module::new_with_execution_budget(budget.clone());
     let mut evaluator = Evaluator::new(&module);
     assert_eq!(
@@ -268,7 +268,7 @@ fn native_attribute_invocation_refuses_before_getter() {
     let UnboundValue::Attr(attribute) = methods.get_hashed(Hashed::new("property")).unwrap() else {
         panic!("expected a native attribute");
     };
-    let budget = Arc::new(ExecutionBudget::new(1000, 4096, 8).with_bounded_attributes());
+    let budget = Arc::new(ExecutionBudget::new(1000, 4096, 8).with_bounded_operations());
     let module = Module::new_with_execution_budget(budget.clone());
     let error = attribute
         .invoke(Value::testing_new_int(0), module.heap())

@@ -90,6 +90,7 @@ use crate::values::ValueIdentity;
 use crate::values::ValueTextMode;
 use crate::values::bool::value::VALUE_FALSE_TRUE;
 use crate::values::demand::request_value_impl;
+use crate::values::dict::DictRef;
 use crate::values::dict::FrozenDictRef;
 use crate::values::dict::value::VALUE_EMPTY_FROZEN_DICT;
 use crate::values::enumeration::EnumType;
@@ -97,6 +98,7 @@ use crate::values::enumeration::FrozenEnumValue;
 use crate::values::function::FUNCTION_TYPE;
 use crate::values::function::FrozenBoundMethod;
 use crate::values::function::NativeFunction;
+use crate::values::index::read_sequence_index_bounded;
 use crate::values::int::pointer_i32::PointerI32;
 use crate::values::iter::StarlarkIterator;
 use crate::values::layout::avalue::AValue;
@@ -113,6 +115,7 @@ use crate::values::layout::value_lifetimeless::ValueLifetimeless;
 use crate::values::layout::vtable::AValueDyn;
 use crate::values::layout::vtable::AValueDynFull;
 use crate::values::layout::vtable::AValueVTable;
+use crate::values::list::ListRef;
 use crate::values::list::value::VALUE_EMPTY_FROZEN_LIST;
 use crate::values::none::none_type::VALUE_NONE;
 use crate::values::range::Range;
@@ -124,6 +127,7 @@ use crate::values::stack_guard;
 use crate::values::starlark_type_id::StarlarkTypeId;
 use crate::values::string::str_type::StarlarkStr;
 use crate::values::structs::value::FrozenStruct;
+use crate::values::tuple::TupleRef;
 use crate::values::tuple::value::VALUE_EMPTY_TUPLE;
 use crate::values::type_repr::StarlarkTypeRepr;
 use crate::values::types::int::inline_int::InlineInt;
@@ -573,6 +577,24 @@ impl<'v> Value<'v> {
 
     /// `x[index]`.
     pub fn at(self, index: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        if let Some(budget) = heap.bounded_operation_budget() {
+            budget.charge(1, 0)?;
+            if let Some(list) = ListRef::from_value(self) {
+                return read_sequence_index_bounded(list.content(), index, budget);
+            }
+            if let Some(tuple) = TupleRef::from_value(self) {
+                return read_sequence_index_bounded(tuple.content(), index, budget);
+            }
+            if let Some(dict) = DictRef::from_value(self) {
+                return dict.at_bounded(index, budget);
+            }
+            return Err(budget
+                .refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "indexing",
+                    value_type: self.get_type(),
+                })
+                .into());
+        }
         self.get_ref().at(index, heap)
     }
 
@@ -970,7 +992,7 @@ impl<'v> Value<'v> {
 
     /// Return the attribute with the given name.
     pub fn get_attr(self, attribute: &str, heap: Heap<'v>) -> crate::Result<Option<Value<'v>>> {
-        if let Some(budget) = heap.bounded_attribute_budget() {
+        if let Some(budget) = heap.bounded_operation_budget() {
             return self
                 .get_member_bounded(attribute, heap, budget)?
                 .map(|member| member.bind(self, heap))
@@ -1042,7 +1064,7 @@ impl<'v> Value<'v> {
 
     pub(crate) fn attribute_not_supported(self, attribute: &str, heap: Heap<'v>) -> crate::Error {
         let typ = self.get_type();
-        if let Some(budget) = heap.bounded_attribute_budget() {
+        if let Some(budget) = heap.bounded_operation_budget() {
             ValueError::bounded_message(
                 budget,
                 format_args!("Operation `.{attribute}` not supported on type `{typ}`"),
@@ -1064,7 +1086,7 @@ impl<'v> Value<'v> {
     }
 
     pub(crate) fn try_has_attr(self, attribute: &str, heap: Heap<'v>) -> crate::Result<bool> {
-        if let Some(budget) = heap.bounded_attribute_budget() {
+        if let Some(budget) = heap.bounded_operation_budget() {
             let vtable = &self.vtable().starlark_value;
             if vtable.HAS_has_attr && !vtable.HAS_get_attr_bounded {
                 return Err(budget

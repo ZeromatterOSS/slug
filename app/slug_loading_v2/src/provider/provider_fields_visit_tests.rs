@@ -28,7 +28,7 @@ fn user_provider<'v>(
 
 #[test]
 fn bounded_user_provider_lookup_preserves_live_field_identity_and_absence() {
-    let budget = Arc::new(ExecutionBudget::new(100_000, 1 << 20, 16).with_bounded_attributes());
+    let budget = Arc::new(ExecutionBudget::new(100_000, 1 << 20, 16).with_bounded_operations());
     let module = Module::new_with_execution_budget(budget.clone());
     let heap = module.heap();
     let payload = heap.alloc("a retained field payload");
@@ -93,7 +93,7 @@ fn bounded_user_provider_lookup_charges_retained_rows_and_equal_length_names() {
         ] {
             for available in [work, work - 1] {
                 let budget =
-                    Arc::new(ExecutionBudget::new(available, 0, 16).with_bounded_attributes());
+                    Arc::new(ExecutionBudget::new(available, 0, 16).with_bounded_operations());
                 let module = Module::new_with_execution_budget(budget.clone());
                 let provider = provider.owned_value(module.frozen_heap());
                 let result = provider.get_attr(name, module.heap());

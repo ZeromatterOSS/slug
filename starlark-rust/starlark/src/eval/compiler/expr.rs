@@ -1158,7 +1158,7 @@ pub(crate) fn get_attr_hashed_raw<'v>(
     attribute: &Symbol,
     heap: Heap<'v>,
 ) -> crate::Result<MemberOrValue<'v>> {
-    if let Some(budget) = heap.bounded_attribute_budget() {
+    if let Some(budget) = heap.bounded_operation_budget() {
         return get_attr_bounded_member(x, attribute.as_str(), heap, budget);
     }
     let aref = x.get_ref();
@@ -1178,7 +1178,7 @@ pub(crate) fn get_attr_hashed_bind<'v>(
     attribute: &Symbol,
     heap: Heap<'v>,
 ) -> crate::Result<Value<'v>> {
-    if let Some(budget) = heap.bounded_attribute_budget() {
+    if let Some(budget) = heap.bounded_operation_budget() {
         return get_attr_bounded_member(x, attribute.as_str(), heap, budget)?.bind(x, heap);
     }
     let aref = x.get_ref();

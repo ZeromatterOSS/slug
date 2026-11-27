@@ -214,7 +214,7 @@ fn eval<'v>(module: &'v Module, source: &str) -> crate::Result<Value<'v>> {
 }
 
 fn strict_budget() -> Arc<ExecutionBudget> {
-    Arc::new(ExecutionBudget::new(50_000, 1 << 20, 16).with_bounded_attributes())
+    Arc::new(ExecutionBudget::new(50_000, 1 << 20, 16).with_bounded_operations())
 }
 
 fn assert_refusal(

@@ -44,12 +44,15 @@ use crate::collections::SmallMap;
 use crate::collections::StarlarkHasher;
 use crate::environment::Methods;
 use crate::environment::MethodsStatic;
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::hint::unlikely;
 use crate::typing::Ty;
 use crate::util::refcell::unleak_borrow;
 use crate::values::AllocFrozenValue;
 use crate::values::AllocStaticSimple;
 use crate::values::AllocValue;
+use crate::values::BoundedText;
 use crate::values::Freeze;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
@@ -62,6 +65,7 @@ use crate::values::StringValue;
 use crate::values::Trace;
 use crate::values::Value;
 use crate::values::ValueLike;
+use crate::values::ValueTextMode;
 use crate::values::comparison::equals_small_map;
 use crate::values::dict::DictRef;
 use crate::values::error::ControlError;
@@ -249,6 +253,58 @@ impl<'v> Dict<'v> {
     /// and otherwise [`Some`] if the key exists in the dictionary and [`None`] otherwise.
     pub fn get(&self, key: Value<'v>) -> crate::Result<Option<Value<'v>>> {
         Ok(self.get_hashed(key.get_hashed()?))
+    }
+
+    /// Read an admitted string key. Use the stored full hashes to skip other
+    /// rows without calling their hash or equality hooks.
+    pub(crate) fn get_bounded(
+        &self,
+        key: Value<'v>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Option<Value<'v>>> {
+        budget.charge(1, 0)?;
+        let Some(key) = key.unpack_starlark_str() else {
+            return Err(budget
+                .refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "indexing",
+                    value_type: key.get_type(),
+                })
+                .into());
+        };
+        budget.charge_text_work(key.len())?;
+        let hash = key.get_hash();
+
+        budget.charge(self.len(), 0)?;
+        for (candidate, value) in self.iter_hashed() {
+            if candidate.hash() != hash {
+                continue;
+            }
+            let Some(candidate) = candidate.key().unpack_starlark_str() else {
+                continue;
+            };
+            if candidate.len() == key.len() {
+                budget.charge_text_work(key.len())?;
+                if candidate.as_str() == key.as_str() {
+                    return Ok(Some(value));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn at_bounded(
+        &self,
+        key: Value<'v>,
+        budget: &ExecutionBudget,
+    ) -> crate::Result<Value<'v>> {
+        if let Some(value) = self.get_bounded(key, budget)? {
+            return Ok(value);
+        }
+        let mut repr = BoundedText::new(budget, usize::MAX);
+        repr.write_value(key, ValueTextMode::Repr)?;
+        Err(crate::Error::new_other(ValueError::KeyNotFound(
+            repr.finish()?,
+        )))
     }
 
     /// Lookup the value by the given prehashed key.

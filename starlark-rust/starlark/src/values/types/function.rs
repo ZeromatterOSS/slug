@@ -271,7 +271,7 @@ impl NativeMeth {
         this: Value<'v>,
         args: &Arguments<'v, '_>,
     ) -> crate::Result<Value<'v>> {
-        if let Some(budget) = eval.heap().bounded_attribute_budget() {
+        if let Some(budget) = eval.heap().bounded_operation_budget() {
             budget.check()?;
             if !self.is_bounded() {
                 return Err(budget
@@ -339,7 +339,7 @@ starlark_simple_value!(NativeAttribute);
 impl NativeAttribute {
     #[inline]
     pub(crate) fn invoke<'v>(&self, this: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
-        if let Some(budget) = heap.bounded_attribute_budget() {
+        if let Some(budget) = heap.bounded_operation_budget() {
             return Err(budget
                 .refuse(ExecutionLimit::UnsupportedOperation {
                     operation: "attribute access",

@@ -151,9 +151,9 @@ impl<'v> Heap<'v> {
         self.0.execution_budget.as_deref()
     }
 
-    pub(crate) fn bounded_attribute_budget(self) -> Option<&'v ExecutionBudget> {
+    pub(crate) fn bounded_operation_budget(self) -> Option<&'v ExecutionBudget> {
         self.execution_budget()
-            .filter(|budget| budget.bounds_attributes())
+            .filter(|budget| budget.bounds_operations())
     }
 
     /// Create a heap and use it within the closure

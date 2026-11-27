@@ -15,9 +15,16 @@
  * limitations under the License.
  */
 
+use crate::eval::ExecutionBudget;
+use crate::eval::ExecutionLimit;
 use crate::values::UnpackValue;
 use crate::values::Value;
 use crate::values::ValueError;
+use crate::values::type_repr::StarlarkTypeRepr;
+use crate::values::types::int::int_or_big::StarlarkIntRef;
+
+#[cfg(test)]
+mod bounded_tests;
 
 // Helper for convert_slice_indices
 fn convert_index_aux(
@@ -52,7 +59,10 @@ fn convert_index_aux(
 /// and len. Raise the correct errors if the value is not numeric or the
 /// index is out of bound.
 pub(crate) fn convert_index(v: Value, len: i32) -> crate::Result<i32> {
-    let x = i32::unpack_value_err(v)?;
+    normalize_index(i32::unpack_value_err(v)?, len)
+}
+
+fn normalize_index(x: i32, len: i32) -> crate::Result<i32> {
     let i = if x < 0 {
         len.checked_add(x).ok_or(ValueError::IntegerOverflow)?
     } else {
@@ -63,6 +73,32 @@ pub(crate) fn convert_index(v: Value, len: i32) -> crate::Result<i32> {
     } else {
         Ok(i)
     }
+}
+
+/// Read a list or tuple element, admitting work before inspecting its index.
+pub(crate) fn read_sequence_index_bounded<'v>(
+    sequence: &[Value<'v>],
+    index: Value<'v>,
+    budget: &ExecutionBudget,
+) -> crate::Result<Value<'v>> {
+    budget.charge(1, 0)?;
+    let Some(index) = index.unpack_i32() else {
+        if StarlarkIntRef::unpack(index).is_some() {
+            // The ordinary out-of-i32 diagnostic performs unrestricted BigInt formatting.
+            return Err(budget.refuse(ExecutionLimit::UnsupportedText("int")).into());
+        }
+        let actual = index.bounded_type_description(budget)?;
+        return Err(ValueError::bounded_message(
+            budget,
+            format_args!(
+                "Expected `{}`, but got `{actual}`",
+                i32::starlark_type_repr()
+            ),
+        ));
+    };
+    let len = i32::try_from(sequence.len())
+        .map_err(|_| budget.refuse(ExecutionLimit::AllocationBytes))?;
+    Ok(sequence[normalize_index(index, len)? as usize])
 }
 
 /// Parse indices for slicing.

@@ -29,7 +29,7 @@ fn eval<'v>(module: &'v Module, source: &str) -> crate::Result<Value<'v>> {
 }
 
 fn strict_budget(bytes: usize) -> Arc<ExecutionBudget> {
-    Arc::new(ExecutionBudget::new(50_000, bytes, 16).with_bounded_attributes())
+    Arc::new(ExecutionBudget::new(50_000, bytes, 16).with_bounded_operations())
 }
 
 fn freeze(source: &str) -> FrozenModule {

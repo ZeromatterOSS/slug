@@ -218,7 +218,7 @@ mod tests {
         eval_source(&producer, "frozen_to_list = data.to_list").unwrap();
         let frozen = producer.freeze().unwrap();
 
-        let budget = Arc::new(ExecutionBudget::new(50_000, 1 << 20, 16).with_bounded_attributes());
+        let budget = Arc::new(ExecutionBudget::new(50_000, 1 << 20, 16).with_bounded_operations());
         let module = Module::new_with_execution_budget(budget.clone());
         module.import_public_symbols(&frozen);
         for source in [

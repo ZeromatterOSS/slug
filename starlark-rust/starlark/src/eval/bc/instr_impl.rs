@@ -32,6 +32,7 @@ use crate::environment::slots::ModuleSlotId;
 use crate::eval::Arguments;
 use crate::eval::DefInfo;
 use crate::eval::Evaluator;
+use crate::eval::ExecutionLimit;
 use crate::eval::ParametersSpec;
 use crate::eval::bc::addr::BcAddrOffset;
 use crate::eval::bc::addr::BcAddrOffsetNeg;
@@ -438,6 +439,14 @@ impl InstrNoFlowImpl for InstrArrayIndex2Impl {
         (array, index0, index1, target): &(BcSlotIn, BcSlotIn, BcSlotIn, BcSlotOut),
     ) -> crate::Result<()> {
         let array = frame.get_bc_slot(*array);
+        if let Some(budget) = eval.heap().bounded_operation_budget() {
+            return Err(budget
+                .refuse(ExecutionLimit::UnsupportedOperation {
+                    operation: "indexing",
+                    value_type: array.get_type(),
+                })
+                .into());
+        }
         let index0 = frame.get_bc_slot(*index0);
         let index1 = frame.get_bc_slot(*index1);
         let value = array.get_ref().at2(index0, index1, eval.heap())?;
@@ -1648,7 +1657,7 @@ fn call_maybe_known_method_common<'v>(
     span: FrozenRef<'static, FrameSpan>,
     target: BcSlotOut,
 ) -> crate::Result<()> {
-    if eval.heap().bounded_attribute_budget().is_some() {
+    if eval.heap().bounded_operation_budget().is_some() {
         return call_method_common(eval, frame, this, symbol, arguments, span, target);
     }
     if let Some(methods) = this.vtable().methods() {

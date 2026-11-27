@@ -176,7 +176,7 @@ fn bounded_file_short_path_matches_ordinary_dot_getattr_and_host_access() {
     for artifact in artifacts() {
         let expected = artifact.short_path();
         let ordinary = Module::new();
-        let budget = Arc::new(ExecutionBudget::new(4096, 1 << 20, 16).with_bounded_attributes());
+        let budget = Arc::new(ExecutionBudget::new(4096, 1 << 20, 16).with_bounded_operations());
         let bounded = Module::new_with_execution_budget(budget.clone());
         for module in [&ordinary, &bounded] {
             let heap = module.heap();
@@ -215,7 +215,7 @@ fn bounded_file_refuses_known_unadmitted_attribute_through_every_read_route() {
         value_type: "File",
     };
     for source in [None, Some("file.path"), Some("getattr(file, 'path', None)")] {
-        let budget = Arc::new(ExecutionBudget::new(4096, 1 << 20, 16).with_bounded_attributes());
+        let budget = Arc::new(ExecutionBudget::new(4096, 1 << 20, 16).with_bounded_operations());
         let module = Module::new_with_execution_budget(budget.clone());
         let heap = module.heap();
         let file = heap.alloc_simple(AnalysisArtifactValue::new(artifact.clone()));

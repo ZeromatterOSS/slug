@@ -169,8 +169,9 @@ interpolation, stable sort, ordered depsets with structural provider identity,
 argument binding, evaluator frames, and bytecode dispatch with loop cleanup.
 Bounded reads cover File short paths, Target fields, and retained user
 provider fields. String `endswith` and `format` and depset `to_list` use
-admitted native methods. Bound provider dictionary construction, collection
-operations, freeze, and diagnostics before activation.
+admitted native methods. List, tuple, and string-key dictionary reads use
+bounded indexing. Bound dictionary construction, remaining operations,
+freeze, and diagnostics before activation.
 Resource outcomes are Slug-native.
 Bazel 9.2's `StarlarkOutputFormatterCallback` and `configured_query_test.sh`
 define setup and partial-output semantics.

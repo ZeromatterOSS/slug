@@ -1429,7 +1429,7 @@ mod tests {
             DefaultInfo::from_executable(AnalysisArtifact::Source(label.clone()), None).unwrap();
         let heap = FrozenHeap::new();
         let mut materializer = AnalysisValueMaterializer::new(&heap);
-        let budget = Arc::new(ExecutionBudget::new(1000, 0, 16).with_bounded_attributes());
+        let budget = Arc::new(ExecutionBudget::new(1000, 0, 16).with_bounded_operations());
         let module = Module::new_with_execution_budget(budget.clone());
         for providers in [
             ProviderCollection::new(vec![ProviderValue::DefaultInfo(default)]).unwrap(),
@@ -1497,7 +1497,7 @@ mod tests {
                 .1;
             for allowance in [bytes - 1, bytes] {
                 let budget =
-                    Arc::new(ExecutionBudget::new(1000, allowance, 16).with_bounded_attributes());
+                    Arc::new(ExecutionBudget::new(1000, allowance, 16).with_bounded_operations());
                 let module = Module::new_with_execution_budget(budget.clone());
                 let result = target.to_value().get_attr("label", module.heap());
                 if allowance == bytes {

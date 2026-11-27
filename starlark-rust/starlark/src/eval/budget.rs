@@ -63,7 +63,7 @@ struct Credits {
 pub struct ExecutionBudget {
     state: Mutex<Result<Credits, ExecutionLimit>>,
     text_depth: usize,
-    bounded_attributes: bool,
+    bounded_operations: bool,
 }
 
 impl ExecutionBudget {
@@ -76,21 +76,21 @@ impl ExecutionBudget {
                 allocation_bytes,
             })),
             text_depth,
-            bounded_attributes: false,
+            bounded_operations: false,
         }
     }
 
-    /// Prepare the fixed core string method table and require admitted field
-    /// and member access on every heap sharing this request. Embedders prepare
-    /// any additional supported receiver tables before execution.
-    pub fn with_bounded_attributes(mut self) -> Self {
+    /// Prepare the fixed core string method table and require bounded dispatch
+    /// on the checked operation paths of every heap sharing this request.
+    /// Embedders prepare additional supported receiver tables before execution.
+    pub fn with_bounded_operations(mut self) -> Self {
         let _ = crate::values::types::string::str_type::str_methods();
-        self.bounded_attributes = true;
+        self.bounded_operations = true;
         self
     }
 
-    pub(crate) fn bounds_attributes(&self) -> bool {
-        self.bounded_attributes
+    pub(crate) fn bounds_operations(&self) -> bool {
+        self.bounded_operations
     }
 
     /// Admit work and the full requested allocation before either occurs.
