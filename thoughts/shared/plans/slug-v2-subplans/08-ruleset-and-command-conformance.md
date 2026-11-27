@@ -144,6 +144,33 @@ Implement command slices in this order:
    target/runfiles and `test` with test results/exit semantics.
 5. BEP JSON for accepted build/test integrations.
 
+#### Public Rust cquery prerequisite
+
+The pinned Rust invocation reaches two parser refusals, `--starlark:file`
+and `--noshow_progress`. Admit those options with the existing literal query
+and ordered configuration inputs. The CLI captures a bounded UTF-8 regular
+file, resolving relative paths against the caller's working directory. The
+daemon receives the typed captured source under the existing frame bound and
+checks the same decoded source cap before analysis. Use a bounded regular FD
+read with EOF verification each command. The captured name serves diagnostics.
+
+Share one formatter across the ordinary CLI and daemon terminal owners. Reuse
+Analysis's retained configured targets and native Starlark provider, label,
+depset and artifact values. Compile the formatter once per command, then call
+it over the ordered accepted analyses. Match Bazel's exit 2 for `format(target)`
+setup errors and `str` of successful results. A per-target error reports and
+skips that row while preserving exit 0. Publish through the existing accepted
+terminal and keep the formatter out of the DICE graph.
+Use a closed evaluator with no loader and finite source, heap, work and output
+admission. Treat its limits and resource diagnostics as Slug-native. The
+pinned `StarlarkOutputFormatterCallback` and `configured_query_test.sh` own the
+setup and partial-output semantics.
+
+First prove setup failure, partial output, formatter edit and recovery on real
+custom providers through both command routes. Then run the unchanged Rust
+fixture on the reviewed activation candidate and compare with pinned Bazel.
+Public action comparison and Rust REAPI follow this cquery gate.
+
 Initial modules:
 
 - `app/slug_commands_v2/src/{build.rs,run.rs,test.rs,query.rs,cquery.rs,aquery.rs}`

@@ -75,13 +75,14 @@ backing was again 6,301 MiB. Across the three earlier identical compute
 prefixes, Archive acquisition ranged from 3.061 to 3.795 seconds. Preserve
 the [bounded phase and typed scope cause][attribution] for exact attribution.
 
-Continue the public command, action graph and activation gates. Keep atomic
+Continue with the [Stage 8 public cquery formatter][stage8], followed by
+public action comparison and Rust REAPI. Keep atomic
 publication, existing readers, native quotas, clocks, launcher/PID1, rooted
 reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
-diagnostic-only integration, caller pruning, Need cacheability, new route,
-syntax or global path caches, and concurrent Archive batching remain outside
-scope.
+diagnostic-only integration, caller pruning, Need cacheability, new repository
+routes, unselected syntax, global path caches and concurrent Archive batching
+remain outside scope.
 
 Prior tuning receipts remain in `124b41411` under this path. The
 [pinned XZ revision][xz-design] has the [six-archive gate][xz-receipt] and
@@ -210,6 +211,7 @@ Full chronology is pinned to Git commit
 [design]: wp1225-general-repository-workspace-design.md
 [api]: wp1225-repository-api-source-contract.md
 [stage5]: 05-bzlmod-and-repository-graph.md
+[stage8]: 08-ruleset-and-command-conformance.md#public-rust-cquery-prerequisite
 [stage9]: 09-v1-extraction-ledger.md
 [dice]: ../../../../docs/developers/dice.md
 [readiness]: bootstrap-readiness.md
