@@ -55,6 +55,33 @@ fn collision_probe_refusal_precedes_inserting_the_fresh_slot() {
 }
 
 #[test]
+fn sparse_reserved_insert_uses_the_occupied_control_group_bound() {
+    let mut index = Index::with_capacity(65);
+    let mut remaining = 1usize;
+    let mut charge = |work, bytes| {
+        assert_eq!(bytes, 0);
+        remaining = remaining.checked_sub(work).ok_or("work")?;
+        Ok(())
+    };
+    assert_eq!(
+        index.insert_reserved_bounded(7, 12, &mut charge),
+        Err(BoundedMapError::Operation("work"))
+    );
+    assert_eq!(index.len(), 0);
+
+    let mut remaining = 2usize;
+    index
+        .insert_reserved_bounded(7, 12, &mut |work, bytes| -> Result<(), &'static str> {
+            assert_eq!(bytes, 0);
+            remaining = remaining.checked_sub(work).ok_or("work")?;
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(remaining, 0);
+    assert_eq!(index.find(7, |value| *value == 12), Some(&12));
+}
+
+#[test]
 fn empty_reserved_clone_keeps_hidden_index_storage_certificate() {
     let empty = SmallSet::<usize>::new();
     assert_eq!(empty.retained_storage_bytes_upper_bound(), Some(0));

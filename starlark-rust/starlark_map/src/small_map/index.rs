@@ -171,13 +171,9 @@ impl Index {
         charge: &mut impl FnMut(usize, usize) -> Result<(), E>,
     ) -> Result<(), BoundedMapError<E>> {
         assert!(self.has_spare_capacity());
-        // A previously used table can contain tombstones. Admit a full
-        // probe even if few rows remain, plus the small-table fixup load.
-        let work = self
-            .max_bucket_count()
-            .and_then(|buckets| buckets.checked_add(2))
-            .ok_or(BoundedMapError::SizeOverflow)?;
-        charge(work, 0).map_err(BoundedMapError::Operation)?;
+        // The same control-group bound includes insert's small-table fixup.
+        // With no tombstones the certificate counts occupied groups.
+        self.charge_lookup_probe(charge)?;
         // Effective capacity exceeds occupancy, so even insertion into an
         // empty bucket has the required growth credit and cannot rehash.
         self.table
