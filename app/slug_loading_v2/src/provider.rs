@@ -8,13 +8,16 @@
  * above-listed licenses.
  */
 
+use std::alloc::Layout;
 use std::cell::OnceCell;
 use std::cell::RefCell;
 use std::fmt;
 use std::hash::Hash;
+use std::mem::size_of;
 #[cfg(test)]
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 
 use crate::bzl_module::semantic_evaluation::budget::Budget;
 use crate::source_table::CertifiedSourceTable;
@@ -27,6 +30,7 @@ use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisDepsetOccurrence;
+use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueType;
 use slug_build_api_v2::DepsetBuild;
 use slug_build_api_v2::DepsetBuildError;
@@ -35,6 +39,7 @@ use slug_build_api_v2::DepsetSuccessor;
 use slug_build_api_v2::DepsetView;
 use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::build_depset;
 use slug_build_api_v2::traverse_depset;
 use slug_identity_v2::CanonicalLabel;
@@ -53,6 +58,7 @@ use starlark::values::Freeze;
 use starlark::values::FreezeError;
 use starlark::values::FreezeResult;
 use starlark::values::Freezer;
+use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
@@ -80,6 +86,7 @@ use crate::bzl_module::BzlModuleSourceProvenance;
 use crate::bzl_module::manifest_starlark_sources;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::starlark_label::StarlarkLabel;
+pub use crate::starlark_label::alloc_budgeted_frozen_starlark_label;
 
 mod depset_budget;
 mod depset_freeze;
@@ -1060,6 +1067,98 @@ pub fn alloc_starlark_user_provider(
         }),
     })
 }
+
+/// Rebuild a native user provider from its borrowed canonical field order.
+/// The caller admits each projected value and attaches any foreign frozen
+/// owners. An occurrence with an original must use that original instead.
+pub fn alloc_budgeted_starlark_user_provider<E: From<ExecutionLimit>>(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    occurrence: &ProviderOccurrence,
+    mut materialize: impl FnMut(&AnalysisValue) -> Result<FrozenValue, E>,
+) -> Result<FrozenValue, E> {
+    budget.charge(1, 0)?;
+    let Some(id) = occurrence
+        .identity()
+        .user_id()
+        .filter(|_| occurrence.original_origin().is_none())
+    else {
+        return Err(budget
+            .refuse(ExecutionLimit::UnsupportedOperation {
+                operation: "provider materialization",
+                value_type: occurrence.value_type().as_str(),
+            })
+            .into());
+    };
+
+    let fields = occurrence.fields();
+    let count = fields.len();
+    let overflow = || budget.refuse(ExecutionLimit::AllocationBytes);
+    let names_layout = Layout::array::<CompactString>(count).map_err(|_| overflow())?;
+    // The existing Arc slice backing uses two atomic counters before its data.
+    let names_arc_bytes = Layout::new::<[AtomicUsize; 2]>()
+        .extend(names_layout)
+        .map_err(|_| overflow())?
+        .0
+        .pad_to_align()
+        .size();
+    let work = count
+        .checked_mul(2)
+        .ok_or_else(|| budget.refuse(ExecutionLimit::Work))?;
+    // One pass over the source and one move from the name vector into its Arc.
+    budget.charge(work, names_arc_bytes)?;
+    let mut names = Vec::new();
+    let mut values = Vec::new();
+    budget.reserve_vec(&mut names, count)?;
+    budget.reserve_vec(&mut values, count)?;
+    for (name, value) in fields.iter() {
+        // Copy the spelling from its borrowed slice. CompactString::clone
+        // would allocate based on the retained string's spare capacity.
+        let name = name.as_str();
+        let bytes = field_name_copy_bytes(name.len()).ok_or_else(overflow)?;
+        budget.charge(0, bytes)?;
+        budget.charge_text_work(name.len())?;
+        names.push(
+            CompactString::try_new(name)
+                .map_err(|_| budget.refuse(ExecutionLimit::AllocationFailed))?,
+        );
+        values.push(materialize(value)?);
+    }
+
+    Ok(
+        heap.alloc_budgeted_simple(budget, || LoadingStarlarkUserProviderGen {
+            id: id.dupe(),
+            fields: LoadingProviderFieldsGen::Schemaless(SchemalessLoadingFieldsGen {
+                names: names.into(),
+                values,
+                has_schema: occurrence.has_schema(),
+            }),
+        })?,
+    )
+}
+
+fn field_name_copy_bytes(len: usize) -> Option<usize> {
+    // CompactString 0.8.2 keeps short strings inline. A fresh long string
+    // uses at least one word more than that size and can store capacity in
+    // a heap header on 32-bit targets.
+    let inline = size_of::<CompactString>();
+    if len <= inline {
+        return Some(0);
+    }
+    let capacity = len.max(inline + size_of::<usize>());
+    let max_encoded_capacity = (usize::MAX >> 8) - 1;
+    if capacity <= max_encoded_capacity {
+        Some(capacity)
+    } else if usize::BITS == 32 {
+        Layout::new::<usize>()
+            .extend(Layout::array::<u8>(capacity).ok()?)
+            .ok()
+            .map(|(layout, _)| layout.pad_to_align().size())
+    } else {
+        None
+    }
+}
+
 impl<V> fmt::Display for LoadingStarlarkUserProviderGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}(...)", self.id.exported_name())
@@ -1567,6 +1666,50 @@ pub fn alloc_starlark_depset_parts(
     heap.alloc(StarlarkDepsetGen {
         order,
         element_type,
+        occurrence,
+        retained,
+        depth,
+        successors,
+    })
+}
+
+/// Consume the caller-admitted successor vector and admit the frozen wrapper.
+pub fn alloc_budgeted_starlark_depset(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    retained: AnalysisDepset,
+    successors: Vec<StarlarkDepsetSuccessorGen<FrozenValue>>,
+) -> Result<FrozenValue, ExecutionLimit> {
+    let element_type = retained.element_type();
+    let depth = retained.depth();
+    alloc_budgeted_starlark_depset_parts(
+        heap,
+        budget,
+        retained.order(),
+        (element_type != AnalysisValueType::Empty).then(|| element_type.as_str()),
+        retained.occurrence(),
+        Some(retained),
+        depth,
+        successors,
+    )
+}
+
+/// Consume already-admitted, ordered successors. The only new allocation is
+/// the frozen wrapper. The element-type spelling has static backing.
+#[allow(clippy::too_many_arguments)]
+pub fn alloc_budgeted_starlark_depset_parts(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    order: DepsetOrder,
+    element_type: Option<&'static str>,
+    occurrence: AnalysisDepsetOccurrence,
+    retained: Option<AnalysisDepset>,
+    depth: usize,
+    successors: Vec<StarlarkDepsetSuccessorGen<FrozenValue>>,
+) -> Result<FrozenValue, ExecutionLimit> {
+    heap.alloc_budgeted_simple(budget, || StarlarkDepsetGen {
+        order,
+        element_type: element_type.map(CompactString::const_new),
         occurrence,
         retained,
         depth,
@@ -2483,6 +2626,9 @@ mod provider_fields_visit_tests;
 
 #[cfg(test)]
 mod analysis_builtin_certificate_tests;
+
+#[cfg(test)]
+mod bounded_frozen_view_tests;
 
 /// Complete fixed native provider-token class state, obtained by typed inspection.
 /// This is a certificate for retaining the original, never replacement execution.

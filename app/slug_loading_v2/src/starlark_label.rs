@@ -22,8 +22,11 @@ use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
+use starlark::eval::ExecutionBudget;
 use starlark::eval::ExecutionLimit;
 use starlark::starlark_module;
+use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
@@ -77,17 +80,36 @@ pub fn alloc_budgeted_starlark_label<'v>(
     heap: Heap<'v>,
     label: &CanonicalLabel,
 ) -> Result<Value<'v>, ExecutionLimit> {
-    let package = label.package();
-    let cloned_lengths = [
-        package.repo().as_str().len(),
-        package.package().as_str().len(),
-        label.target().as_str().len(),
-    ]
-    .into_iter()
-    .chain(label.mapping_id().map(|mapping| mapping.as_str().len()));
-    heap.alloc_budgeted_simple_with_cloned_text(cloned_lengths, || {
+    let (lengths, count) = label_clone_lengths(label);
+    heap.alloc_budgeted_simple_with_cloned_text(lengths[..count].iter().copied(), || {
         StarlarkLabel::new(label.clone())
     })
+}
+
+/// Project the same native Label into a frozen heap using the request budget.
+pub fn alloc_budgeted_frozen_starlark_label(
+    heap: &FrozenHeap,
+    budget: &ExecutionBudget,
+    label: &CanonicalLabel,
+) -> Result<FrozenValue, ExecutionLimit> {
+    let (lengths, count) = label_clone_lengths(label);
+    heap.alloc_budgeted_simple_with_cloned_text(budget, &lengths[..count], || {
+        StarlarkLabel::new(label.clone())
+    })
+}
+
+fn label_clone_lengths(label: &CanonicalLabel) -> ([usize; 4], usize) {
+    let package = label.package();
+    let mapping = label.mapping_id();
+    (
+        [
+            package.repo().as_str().len(),
+            package.package().as_str().len(),
+            label.target().as_str().len(),
+            mapping.map_or(0, |mapping| mapping.as_str().len()),
+        ],
+        3 + usize::from(mapping.is_some()),
+    )
 }
 
 #[starlark_value(type = "Label")]
