@@ -712,6 +712,8 @@ probe = subrule(
 )
 def _rule(ctx): fail("rule implementation ran")
 subject = rule(implementation = _rule, subrules = [probe])
+def _unprovided(ctx): return [DefaultInfo()]
+unprovided = rule(implementation = _unprovided)
 "#,
     );
     write(
@@ -720,15 +722,16 @@ subject = rule(implementation = _rule, subrules = [probe])
     );
     write(
         &workspace.join("profiles/BUILD.bazel"),
-        "exports_files(['profile'])\n",
+        "load('//pkg:defs.bzl', 'unprovided')\nunprovided(name='profile', visibility=['//visibility:public'])\nexports_files(['source'])\n",
     );
-    write(&workspace.join("profiles/profile"), "profile\n");
-    let changed: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
-        NativeCommandOption::FdoProfile,
-        Some("//profiles:profile"),
-        false,
-    )]
-    .into();
+    write(&workspace.join("profiles/source"), "profile\n");
+    let profile = |label: &str| {
+        CommandConfigurationOverlay::from(vec![CommandConfigurationOccurrence::native(
+            NativeCommandOption::FdoProfile,
+            Some(label),
+            false,
+        )])
+    };
     let request = |configuration_overlay| {
         DaemonRequest::Cquery(CqueryRequest {
             expression: "//pkg:subject".to_owned(),
@@ -746,10 +749,11 @@ subject = rule(implementation = _rule, subrules = [probe])
     };
     let mut daemon = Daemon::new(&workspace).unwrap();
     let initial = run(&mut daemon, CommandConfigurationOverlay::default());
-    let selected = run(&mut daemon, changed);
+    let selected = run(&mut daemon, profile("//profiles:profile"));
     let restored = run(&mut daemon, CommandConfigurationOverlay::default());
+    let rejected_file = run(&mut daemon, profile("//profiles:source"));
 
-    for result in [&initial, &selected, &restored] {
+    for result in [&initial, &selected, &restored, &rejected_file] {
         assert_ne!(result.exit_code, 0, "{result:?}");
         assert_eq!(result.invalidated_files, 0, "{result:?}");
         assert!(result.stdout.is_empty(), "{result:?}");
@@ -765,6 +769,13 @@ subject = rule(implementation = _rule, subrules = [probe])
     );
     assert!(!stderr_text(&selected.stderr).contains("implementation ran"));
     assert_eq!(restored.stderr, initial.stderr);
+    assert!(
+        stderr_text(&rejected_file.stderr).contains(
+            "configured dependency `://pkg:defs.bzl%probe%_profile` source file @@//profiles:source does not match its admitted file types"
+        ),
+        "{rejected_file:?}"
+    );
+    assert!(!stderr_text(&rejected_file.stderr).contains("implementation ran"));
 }
 
 #[test]
@@ -1924,14 +1935,14 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
     assert!(malformed.stdout.is_empty());
     assert!(stderr_text(&malformed.stderr).contains("invalid Slug regex"));
 
-    let unsupported = run(
+    let native_rule = run(
         &mut daemon,
-        "kind('rule', //pkg:files)",
+        "kind('^filegroup rule$', //pkg:files)",
         CqueryOutput::StarlarkLabel,
     );
-    assert_eq!(unsupported.exit_code, 2, "{unsupported:?}");
-    assert!(unsupported.stdout.is_empty());
-    assert!(stderr_text(&unsupported.stderr).contains("not a Starlark rule"));
+    assert_eq!(native_rule.exit_code, 0, "{native_rule:?}");
+    assert_eq!(native_rule.stdout, "@@//pkg:files\n");
+    assert!(native_rule.stderr.is_empty());
 
     write(&definitions, &definition("beta_rule"));
     let changed = run(
@@ -2199,11 +2210,10 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
         source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
-        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\ndef _reject_impl(ctx):\n    fail('ANALYSIS_PRECEDES_LOADING_FILES')\nreject = rule(implementation = _reject_impl)\n",
     );
     let build = workspace.join("pkg/BUILD.bazel");
-    let build_contents =
-        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\nfilegroup(name = \"files\")\n";
+    let build_contents = "load(\":defs.bzl\", \"probe\", \"reject\")\nprobe(name = \"probe\")\nreject(name = \"reject\")\nfilegroup(name = \"files\")\n";
     write(&build, build_contents);
     let mut daemon = Daemon::new(&workspace).unwrap();
     let run = |daemon: &mut Daemon, expression: &str, output| {
@@ -2265,15 +2275,26 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
     assert!(stderr_text(&missing.stderr).contains("//pkg:missing"));
     assert!(!stderr_text(&missing.stderr).contains(expected));
 
-    let analysis = run(
+    let native_rule = run(
         &mut daemon,
         "buildfiles(//pkg:files)",
         CqueryOutput::StarlarkLabel,
     );
+    assert_eq!(native_rule.exit_code, 1, "{native_rule:?}");
+    assert!(native_rule.stdout.is_empty());
+    assert!(stderr_text(&native_rule.stderr).contains(expected));
+    assert_eq!(native_rule.invalidated_files, 0);
+
+    let analysis = run(
+        &mut daemon,
+        "buildfiles(//pkg:reject)",
+        CqueryOutput::StarlarkLabel,
+    );
     assert_eq!(analysis.exit_code, 2, "{analysis:?}");
     assert!(analysis.stdout.is_empty());
-    assert!(stderr_text(&analysis.stderr).contains("not a Starlark rule"));
+    assert!(stderr_text(&analysis.stderr).contains("ANALYSIS_PRECEDES_LOADING_FILES"));
     assert!(!stderr_text(&analysis.stderr).contains(expected));
+    assert_eq!(analysis.invalidated_files, 0);
 
     fs::remove_file(&build).unwrap();
     let deleted = run(
@@ -2925,7 +2946,22 @@ fn retained_daemon_build_observes_direct_external_exported_sources() {
     remote_execute.executor = Some("grpc://must-not-run".to_owned());
     let remote_source = daemon.build(&[target("@dep//:target.txt")], &remote_execute, &[]);
     assert_eq!(remote_source.exit_code, 0, "{remote_source:?}");
-    let evidence: serde_json::Value = serde_json::from_slice(&remote_source.stderr).unwrap();
+    assert!(remote_source.stdout.is_empty(), "{remote_source:?}");
+    let mut lines = stderr_text(&remote_source.stderr).lines();
+    let evidence: serde_json::Value = serde_json::from_str(lines.next_back().unwrap()).unwrap();
+    let prints = lines
+        .map(|line| {
+            assert!(line.starts_with("DEBUG: "), "{remote_source:?}");
+            line.rsplit_once(": ").unwrap().1
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        matches!(
+            prints.as_slice(),
+            [] | ["ROOT_EVENT"] | ["DEP_BUILD_EVENT"] | ["ROOT_EVENT", "DEP_BUILD_EVENT"]
+        ),
+        "{remote_source:?}"
+    );
     assert_eq!(evidence["completed_boundary"], "reapi_native_execution");
     assert_eq!(evidence["reapi_actions"], 0);
     assert_eq!(evidence["materialized_outputs"], serde_json::json!([]));
