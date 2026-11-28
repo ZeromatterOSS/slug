@@ -61,6 +61,7 @@ use starlark_map::small_set::SmallSet;
 mod path_lookahead;
 #[cfg(any(test, feature = "native-probe-observer"))]
 pub(crate) mod prefix_probe;
+mod semantic_projection;
 #[cfg(feature = "native-probe-observer")]
 pub use path_lookahead::PathLookaheadProbeSnapshot;
 #[cfg(feature = "native-probe-observer")]

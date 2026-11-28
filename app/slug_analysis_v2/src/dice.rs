@@ -3224,13 +3224,13 @@ async fn compute_registration_expansion_input(
             } else {
                 ModuleRegistrationExpansionObservationKey::toolchains(workspace)
             };
-            match ctx.compute(&key).await {
+            match key.compute_semantic(ctx).await {
                 Ok(LoadingPreparationOutcome::Need(need)) => RegistrationExpansionInput::Need(need),
                 Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
                     observed_registration_error(error)
                 }
-                Ok(LoadingPreparationOutcome::Complete(Ok(observed))) => {
-                    RegistrationExpansionInput::Value(observed.result().dupe())
+                Ok(LoadingPreparationOutcome::Complete(Ok(value))) => {
+                    RegistrationExpansionInput::Value(value)
                 }
                 Err(error) => RegistrationExpansionInput::Semantic(AnalysisError::new(format!(
                     "{context}: {error}"
@@ -3268,13 +3268,13 @@ async fn compute_registration_expansion_input(
                     configuration.dupe(),
                 )
             };
-            match ctx.compute(&key).await {
+            match key.compute_semantic(ctx).await {
                 Ok(LoadingPreparationOutcome::Need(need)) => RegistrationExpansionInput::Need(need),
                 Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
                     observed_registration_error(error)
                 }
-                Ok(LoadingPreparationOutcome::Complete(Ok(observed))) => {
-                    RegistrationExpansionInput::Value(observed.result().dupe())
+                Ok(LoadingPreparationOutcome::Complete(Ok(value))) => {
+                    RegistrationExpansionInput::Value(value)
                 }
                 Err(error) => RegistrationExpansionInput::Semantic(AnalysisError::new(format!(
                     "{context}: {error}"

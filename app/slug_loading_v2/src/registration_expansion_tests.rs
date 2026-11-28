@@ -96,6 +96,9 @@ mod path_prerequisite_tests;
 #[path = "registration_expansion_tests/command_hash_tests.rs"]
 mod command_hash_tests;
 
+#[path = "registration_expansion_tests/semantic_projection_tests.rs"]
+mod semantic_projection_tests;
+
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
 }
