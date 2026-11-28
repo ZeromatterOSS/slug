@@ -36,9 +36,12 @@ command route against same-host Bazel 9.2, with one retained daemon. The
 comparison checks ordered action fields and argv through the native
 configuration domains. Bazel ActionKey projection is deferred for these
 families. Build forwards ordered distdirs. The frozen FileWrite output passed
-using the actual builtin registry prerequisites. The first Rust Build reached
-REAPI command lowering and refused conditional parameter files. Prove the
-configured spill rule in that original Build and close the full sweep.
+with the selected builtin prerequisites. Protected cut `ad344eef7` passed
+configured conditional spill lowering and reached NativeLink capabilities.
+The first execution precheck exhausted the existing decoded-byte quota before
+CAS staging. The certificate held 189 rooted content observations. Attribute
+those bytes by sealed owner and operation, then qualify a bounded source
+certification change and rerun the original Build.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
