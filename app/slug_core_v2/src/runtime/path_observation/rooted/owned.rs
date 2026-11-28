@@ -2,6 +2,20 @@
 //! grants no exemption: only the sealed carrier in the batch owner selects it.
 use super::*;
 
+/// Private construction requires a complete verified file payload read. The
+/// rooted owner separately proves the backing that can retain the witness.
+#[derive(Clone, Copy)]
+pub(in crate::runtime) struct ArchiveDigestReceipt {
+    digest: FileContentDigest,
+    frame: libc::stat,
+}
+
+impl ArchiveDigestReceipt {
+    pub(in crate::runtime) fn digest(&self) -> FileContentDigest {
+        self.digest
+    }
+}
+
 fn framed(error: io::Error) -> RootedObservationError {
     if is_missing_error(&error)
         || matches!(
@@ -19,7 +33,7 @@ fn framed(error: io::Error) -> RootedObservationError {
     }
 }
 
-pub(super) fn verify(
+pub(super) fn verify_with_frame(
     root: &RootIo<'_>,
     path: &Path,
     body: &slug_bzlmod_v2::RepositoryWorkspaceBody,
@@ -27,7 +41,7 @@ pub(super) fn verify(
     operation: PathObservationOperation,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
-) -> Result<PathObservationResult, RootedObservationError> {
+) -> Result<(PathObservationResult, Option<ArchiveDigestReceipt>), RootedObservationError> {
     check(scope, active)?;
     if operation == PathObservationOperation::FileBytes
         && body.len() > crate::runtime::dice::source_service::HOST_FILE_OBJECT_BYTES
@@ -72,7 +86,8 @@ pub(super) fn verify(
     let mut offset = 0usize;
     let mut callback_error = None;
     let captured = body.with_range_comparison(|compare| {
-        root.read_file(path, &|| active() && scope.check().is_ok(), |chunk| {
+        let running = || active() && scope.check().is_ok();
+        let capture = |chunk: &[u8]| {
             let verified = (|| {
                 check(scope, active)?;
                 // Every returned body keeps this independent monotonic history
@@ -99,14 +114,23 @@ pub(super) fn verify(
                 return Err(io::Error::other("owned file verification refused"));
             }
             Ok(())
-        })
+        };
+        match operation {
+            PathObservationOperation::FileBytes => root
+                .read_file_contents(path, &running, capture)
+                .map(|metadata| (metadata, None)),
+            PathObservationOperation::FileDigest => root
+                .read_file(path, &running, capture)
+                .map(|capture| (capture.metadata, Some(capture.digest))),
+            _ => unreachable!("batch owner selects only content operations"),
+        }
     });
     if let Some(error) = callback_error {
         return Err(error);
     }
     check(scope, active)?;
-    let captured = captured.map_err(framed)?;
-    if offset != body.len() || !unchanged(&before, &captured.metadata) {
+    let (metadata, digest) = captured.map_err(framed)?;
+    if offset != body.len() || !unchanged(&before, &metadata) {
         return Err(RootedObservationError::Unstable);
     }
     let result = match operation {
@@ -119,16 +143,58 @@ pub(super) fn verify(
                     unsafe { materialized.bytes.take().unwrap().assume_init() }
                 }
             };
-            PathObservationResult::FileBytes(PathOperationResult::Present(bytes))
+            (
+                PathObservationResult::FileBytes(PathOperationResult::Present(bytes)),
+                None,
+            )
         }
         PathObservationOperation::FileDigest => {
-            PathObservationResult::FileDigest(PathOperationResult::Present(
-                FileContentDigest::new(captured.digest, body.len() as u64)
-                    .ok_or(RootedObservationError::Bound)?,
-            ))
+            let digest = FileContentDigest::new(
+                digest.expect("digest capture yields SHA-256"),
+                body.len() as u64,
+            )
+            .ok_or(RootedObservationError::Bound)?;
+            let receipt = ArchiveDigestReceipt {
+                digest,
+                frame: metadata,
+            };
+            (
+                PathObservationResult::FileDigest(PathOperationResult::Present(digest)),
+                Some(receipt),
+            )
         }
         _ => unreachable!("batch owner selects only content operations"),
     };
     check(scope, active)?;
     Ok(result)
+}
+
+#[cfg(test)]
+pub(super) fn verify(
+    root: &RootIo<'_>,
+    path: &Path,
+    body: &slug_bzlmod_v2::RepositoryWorkspaceBody,
+    mode: u16,
+    operation: PathObservationOperation,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<PathObservationResult, RootedObservationError> {
+    verify_with_frame(root, path, body, mode, operation, scope, active).map(|(result, _)| result)
+}
+
+pub(super) fn verify_prior_digest(
+    root: &RootIo<'_>,
+    path: &Path,
+    receipt: ArchiveDigestReceipt,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<PathObservationResult, RootedObservationError> {
+    check(scope, active)?;
+    let verified =
+        root.verify_regular_frame(path, &receipt.frame, &|| active() && scope.check().is_ok());
+    check(scope, active)?;
+    verified.map_err(framed)?;
+    Ok(PathObservationResult::FileDigest(
+        PathOperationResult::Present(receipt.digest),
+    ))
 }

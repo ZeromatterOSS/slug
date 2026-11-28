@@ -21,10 +21,12 @@ use super::*;
 use crate::runtime::dice::source_service::SourceBufferReservation;
 use crate::runtime::dice::source_service::SourceCounter;
 use crate::runtime::dice::source_service::read_open_regular_file_after_attempt;
+use crate::runtime::repository_physical_root::PendingArchiveDigestReceipts;
 use crate::runtime::repository_physical_root::SealedGeneralObservation;
 use crate::runtime::repository_root_io::RootIo;
 
 mod owned;
+pub(in crate::runtime) use owned::ArchiveDigestReceipt;
 
 const MAX_DEMANDS: usize = 131_072;
 const MAX_PATH_STORAGE: usize = 4 * 1024 * 1024;
@@ -176,7 +178,7 @@ pub(in crate::runtime) fn observe_rooted(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<PathObservationEpoch, RootedObservationError> {
-    observe_batch(root, anchor, demands, scope, active, None)
+    observe_batch(root, anchor, demands, scope, active, None, None)
 }
 
 /// A separate closed entrypoint: generic RootIo callers cannot supply modeled
@@ -185,7 +187,20 @@ pub(in crate::runtime) fn observe_rooted(
 pub(in crate::runtime) fn observe_sealed_general(
     owner: &SealedGeneralObservation<'_>,
     demands: &[PathObservationDemand],
+    tracking: Option<(
+        &mut PendingArchiveDigestReceipts<'_>,
+        Option<&PathObservationEpoch>,
+    )>,
 ) -> Result<PathObservationEpoch, RootedObservationError> {
+    if tracking
+        .as_ref()
+        .is_some_and(|(pending, _)| !owner.owns_digest_receipts(pending))
+    {
+        return Err(RootedObservationError::RootIo(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "foreign archive digest receipt owner",
+        )));
+    }
     observe_batch(
         owner.io(),
         owner.anchor(),
@@ -193,6 +208,7 @@ pub(in crate::runtime) fn observe_sealed_general(
         owner.scope(),
         owner.active(),
         Some(owner),
+        tracking,
     )
 }
 
@@ -203,6 +219,10 @@ fn observe_batch(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
     owner: Option<&SealedGeneralObservation<'_>>,
+    mut tracking: Option<(
+        &mut PendingArchiveDigestReceipts<'_>,
+        Option<&PathObservationEpoch>,
+    )>,
 ) -> Result<PathObservationEpoch, RootedObservationError> {
     check(scope, active)?;
     let paths = validate_rooted_demands(anchor, demands)?;
@@ -264,8 +284,32 @@ fn observe_batch(
         let canonical = content
             .then(|| owner.and_then(|owner| owner.file(path)))
             .flatten();
-        let result = if let Some((body, mode)) = canonical {
-            owned::verify(root, path, body, mode, demand.operation(), scope, active)?
+        let result = if let Some((entry, body, mode)) = canonical {
+            let digests = tracking
+                .as_mut()
+                .filter(|_| demand.operation() == PathObservationOperation::FileDigest);
+            let matching = digests
+                .as_ref()
+                .and_then(|(pending, certificate)| pending.matching(entry, demand, *certificate));
+            if let Some(receipt) = matching {
+                // A selected receipt still authenticates a freshly rooted
+                // named open; a failed frame never becomes a successful hit.
+                owned::verify_prior_digest(root, path, receipt, scope, active)?
+            } else {
+                let (result, receipt) = owned::verify_with_frame(
+                    root,
+                    path,
+                    body,
+                    mode,
+                    demand.operation(),
+                    scope,
+                    active,
+                )?;
+                if let (Some((pending, _)), Some(receipt)) = (digests, receipt) {
+                    pending.record(entry, receipt);
+                }
+                result
+            }
         } else {
             if content {
                 scope.charge(SourceCounter::SourceAttempts, 1)?;

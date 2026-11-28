@@ -36,9 +36,16 @@ command route against same-host Bazel 9.2, with one retained daemon. The
 comparison checks ordered action fields and argv through the native
 configuration domains. Bazel ActionKey projection is deferred for these
 families. Build forwards ordered distdirs. The frozen FileWrite output passed
-using the actual builtin registry prerequisites. The first Rust Build reached
-REAPI command lowering and refused conditional parameter files. Prove the
-configured spill rule in that original Build and close the full sweep.
+with the selected builtin prerequisites. Protected cut `ad344eef7` passed
+configured conditional spill lowering and reached NativeLink capabilities.
+The first execution precheck exhausted the 2 GiB decoded-byte quota before CAS
+staging. It started at 1,867,997,193 bytes and selected 794,211,606 bytes across
+56 direct Archive digests. The kernel read-only seal passed original-FD
+`EROFS`, live-writer `EBUSY`, retirement and Source/Process controls. Certified
+Archive repeats reuse prior actual digests after fresh descriptor, name and
+scope checks. Ordinary reads and mismatched digests still hash the payload.
+Native tests also reject foreign receipt owners and keep mutable-source
+publication checks. Rerun the original Build under the existing limits.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,

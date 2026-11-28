@@ -93,6 +93,7 @@ pub(super) fn seal(
         frozen_archive_quota: builder.frozen_archive_quota,
         source_dependencies,
         _body_coverage: bodies,
+        archive_digests: Default::default(),
         credit: builder.credit,
     }))
 }

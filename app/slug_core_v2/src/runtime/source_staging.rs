@@ -110,6 +110,33 @@ fn error(value: impl fmt::Display) -> Arc<str> {
     Arc::from(value.to_string())
 }
 
+pub(super) async fn observe_declared_sources(
+    workspace: &NormalizedAbsolutePath,
+    artifacts: &SmallSet<AnalysisArtifact>,
+    observations: &mut PathObservationEpoch,
+    ctx: &mut DiceComputations<'_>,
+) -> Result<PreparationOutcome<Vec<Arc<ObservedSourceArtifactInput>>>, Arc<str>> {
+    let mut sources = Vec::with_capacity(artifacts.len());
+    for artifact in artifacts {
+        let key = SourceArtifactInputObservationKey::new(workspace.dupe(), artifact)
+            .map_err(|value| error(format!("{value:?}")))?;
+        let source = match ctx.compute(&key).await.map_err(error)? {
+            PreparationOutcome::Need(need) => return Ok(PreparationOutcome::Need(need)),
+            PreparationOutcome::Complete(result) => result.map_err(error)?,
+        };
+        source
+            .result()
+            .as_ref()
+            .map_err(|value| error(format!("{value:?}")))?;
+        observations
+            .try_union_assign(source.observations())
+            .map_err(ObservedPathFrontierError::from)
+            .map_err(error)?;
+        sources.push(source);
+    }
+    Ok(PreparationOutcome::Complete(sources))
+}
+
 fn declared_sources(spawn: &SpawnSpec) -> Result<SmallSet<AnalysisArtifact>, Arc<str>> {
     visit_files_to_run(spawn, |provider| {
         if provider.support.is_some() {
@@ -235,24 +262,17 @@ impl SourceStagingKey {
         let spawn = source_spawn(action)?;
         // Validate the entire declared set before any content observation.
         let artifacts = declared_sources(spawn)?;
-        let mut sources = Vec::with_capacity(artifacts.len());
-        for artifact in &artifacts {
-            let key = SourceArtifactInputObservationKey::new(self.build.workspace.dupe(), artifact)
-                .map_err(|value| error(format!("{value:?}")))?;
-            match ctx.compute(&key).await.map_err(error)? {
-                PreparationOutcome::Need(need) => return Ok(PreparationOutcome::Need(need)),
-                PreparationOutcome::Complete(result) => {
-                    let source = result.map_err(error)?;
-                    source
-                        .result()
-                        .as_ref()
-                        .map_err(|value| error(format!("{value:?}")))?;
-                    observations = union_build_observations(&observations, source.observations())
-                        .map_err(error)?;
-                    sources.push(source);
-                }
-            }
-        }
+        let sources = match observe_declared_sources(
+            &self.build.workspace,
+            &artifacts,
+            &mut observations,
+            ctx,
+        )
+        .await?
+        {
+            PreparationOutcome::Need(need) => return Ok(PreparationOutcome::Need(need)),
+            PreparationOutcome::Complete(sources) => sources,
+        };
         let certificate = SourceCertificate::from_epoch(observations.dupe()).map_err(error)?;
         Ok(PreparationOutcome::Complete(Arc::new(
             PreparedSourceActionInputs {

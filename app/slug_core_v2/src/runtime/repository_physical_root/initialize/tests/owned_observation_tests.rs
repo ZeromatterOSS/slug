@@ -3,10 +3,21 @@ use slug_bzlmod_v2::RepositoryWorkspaceNode;
 
 use super::*;
 use crate::runtime::dice::source_service::SourceCounter;
+use crate::runtime::repository_root_io::read_work_for_test;
 
 #[test]
 #[ignore = "actual compiled CLI claimed General root; finite native supervisor and SLUG_V2_BIN required"]
 fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_after_root_drop() {
+    verify_native_owned_observation(false);
+}
+
+#[test]
+#[ignore = "actual compiled CLI archive finalization and rooted certification"]
+fn native_only_frozen_archive_certification_reuses_the_actual_digest() {
+    verify_native_owned_observation(true);
+}
+
+fn verify_native_owned_observation(finalize_archive: bool) {
     const BODY: &[u8] = b"owned observation\0\xff";
     let temporary = tempfile::tempdir().unwrap();
     let workspace = NormalizedAbsolutePath::new(temporary.path()).unwrap();
@@ -39,8 +50,18 @@ fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_aft
         RepositoryWorkspaceStableKey::new(workspace.clone(), owner, repository, 0).unwrap(),
     );
     let actor = RepositoryMaterializer::new_scoped(workspace, scope.clone()).unwrap();
-    let (token, generation) =
-        generation(&actor, &key, &resources, &readers, &scope, &runtime, BODY);
+    let (token, generation) = generation_with_adoption_spec(
+        &actor,
+        &key,
+        &resources,
+        &readers,
+        &scope,
+        &runtime,
+        BODY,
+        false,
+        finalize_archive,
+    )
+    .unwrap();
     let lease = generation
         .roots
         .lease_for(&generation.source)
@@ -97,9 +118,12 @@ fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_aft
         admission.peak_native_fds
     );
     let before = scope.snapshot();
+    let work = read_work_for_test::begin();
     let first = actor
         .observe_native(token, [bytes.clone(), hash.clone()])
         .unwrap();
+    assert_eq!(work.snapshot().digest_sha, BODY.len() as u64);
+    drop(work);
     let after_first = scope.snapshot();
     let PathObservationResult::FileBytes(PathOperationResult::Present(body)) =
         first.get(&bytes).unwrap().as_ref()
@@ -112,10 +136,64 @@ fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_aft
     assert!(
         matches!(first.get(&hash).unwrap().as_ref(),PathObservationResult::FileDigest(PathOperationResult::Present(value)) if *value==digest(BODY))
     );
-    let repeated = actor.observe_native(token, [bytes.clone(), hash]).unwrap();
+    let ordinary = actor
+        .observe_native(token, [bytes.clone(), hash.clone()])
+        .unwrap();
+    let after_ordinary = scope.snapshot();
+    assert_eq!(ordinary, first);
+
+    let work = read_work_for_test::begin();
+    let repeated = actor
+        .observe_native_certificate(
+            token,
+            vec![bytes.clone(), hash.clone()],
+            &first,
+            &mut |_| {},
+            &mut |_, _, _| {},
+        )
+        .unwrap();
+    let digest_bytes = if finalize_archive {
+        0
+    } else {
+        BODY.len() as u64
+    };
+    assert_eq!(work.snapshot().digest_payload, digest_bytes);
+    assert_eq!(work.snapshot().digest_sha, digest_bytes);
+    assert_eq!(work.snapshot().contents_payload, BODY.len() as u64);
+    let after_certified = scope.snapshot();
+    assert_eq!(
+        after_certified.decoded_bytes - after_ordinary.decoded_bytes,
+        BODY.len() as u64 + digest_bytes
+    );
+    assert_eq!(repeated, first);
+    drop(work);
+
+    let wrong = PathObservationEpoch::new([(
+        hash.clone(),
+        PathObservationResult::FileDigest(PathOperationResult::Present(digest(b"wrong"))),
+    )])
+    .unwrap();
+    let work = read_work_for_test::begin();
+    let fallback = actor
+        .observe_native_certificate(
+            token,
+            vec![hash.clone()],
+            &wrong,
+            &mut |_| {},
+            &mut |_, _, _| {},
+        )
+        .unwrap();
+    assert_eq!(fallback.get(&hash), first.get(&hash));
+    assert_eq!(work.snapshot().digest_sha, BODY.len() as u64);
+    drop(work);
     let after_repeat = scope.snapshot();
+    assert_eq!(
+        after_repeat.decoded_bytes - after_certified.decoded_bytes,
+        BODY.len() as u64
+    );
     let same_repeat = repeated.observations().values().any(|value| matches!(value.as_ref(),PathObservationResult::FileBytes(PathOperationResult::Present(body)) if Arc::ptr_eq(body,canonical.raw_arc().unwrap())));
     drop(first);
+    drop(ordinary);
     drop(repeated);
     let weak_body = Arc::downgrade(&kept);
     actor
@@ -186,7 +264,7 @@ fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_aft
         2 * BODY.len() as u64
     );
     assert_eq!(
-        after_repeat.decoded_bytes - after_first.decoded_bytes,
+        after_ordinary.decoded_bytes - after_first.decoded_bytes,
         2 * BODY.len() as u64
     );
     assert_eq!(

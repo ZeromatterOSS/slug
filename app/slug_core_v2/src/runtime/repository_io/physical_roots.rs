@@ -5,6 +5,8 @@ use crate::runtime::SourceArtifactInput;
 use crate::runtime::native_source_access::NativeReaderCredit;
 use crate::runtime::native_source_access::NativeReaderResources;
 #[cfg(target_os = "linux")]
+use crate::runtime::repository_physical_root::PendingArchiveDigestReceipts;
+#[cfg(target_os = "linux")]
 use crate::runtime::repository_physical_root::RepositoryPhysicalRoot;
 
 /// Data-only legacy lifetime. Dependencies name already-existing owners, so
@@ -790,18 +792,23 @@ impl PhysicalObservationBatch {
         actor: &RepositoryMaterializer,
         token: RepositorySessionToken,
         legacy: PathObservationEpoch,
-    ) -> Result<PathObservationEpoch, RepositorySessionError> {
-        self.observe_impl(actor, token, legacy, || {})
+        certificate: Option<&PathObservationEpoch>,
+    ) -> Result<(PathObservationEpoch, Vec<PendingArchiveDigestReceipts<'_>>), RepositorySessionError>
+    {
+        self.observe_impl(actor, token, legacy, certificate, || {})
     }
     fn observe_impl(
         &self,
         actor: &RepositoryMaterializer,
         token: RepositorySessionToken,
         legacy: PathObservationEpoch,
+        certificate: Option<&PathObservationEpoch>,
         after_io: impl FnOnce(),
-    ) -> Result<PathObservationEpoch, RepositorySessionError> {
+    ) -> Result<(PathObservationEpoch, Vec<PendingArchiveDigestReceipts<'_>>), RepositorySessionError>
+    {
         let mut epochs = Vec::with_capacity(self.physical.len() + 1);
         epochs.push(legacy);
+        let mut pending = Vec::with_capacity(self.physical.len());
         for (row, demands) in &self.physical {
             let RetainedRootOwner::Physical(root) = &row.root else {
                 unreachable!()
@@ -811,18 +818,24 @@ impl PhysicalObservationBatch {
                     "physical observation requires original scope".into(),
                 )
             })?;
-            epochs.push(
-                root.observe(demands, scope, &|| actor.session_is_active(token))
-                    .map_err(|error| {
-                        #[cfg(any(test, feature = "repository-workspace-test-support"))]
-                        report_physical_observation_refusal(&error);
-                        #[cfg(not(any(test, feature = "repository-workspace-test-support")))]
-                        let _ = error;
-                        RepositorySessionError::NativeWorkspace(
-                            "physical root observation refused".into(),
-                        )
-                    })?,
-            );
+            let (epoch, receipts) = root
+                .observe_with_archive_digests(
+                    demands,
+                    scope,
+                    &|| actor.session_is_active(token),
+                    certificate,
+                )
+                .map_err(|error| {
+                    #[cfg(any(test, feature = "repository-workspace-test-support"))]
+                    report_physical_observation_refusal(&error);
+                    #[cfg(not(any(test, feature = "repository-workspace-test-support")))]
+                    let _ = error;
+                    RepositorySessionError::NativeWorkspace(
+                        "physical root observation refused".into(),
+                    )
+                })?;
+            epochs.push(epoch);
+            pending.push(receipts);
         }
         if let Some(scope) = &self.scope {
             actor.check_command_scope(token, scope)?;
@@ -843,13 +856,22 @@ impl PhysicalObservationBatch {
             .lock()
             .expect("repository materializer mutex poisoned");
         let active = matching_active(&state, token)?;
+        self.recheck(&state, active)?;
+        Ok((merged, pending))
+    }
+
+    pub(super) fn recheck(
+        &self,
+        state: &RepositoryMaterializerState,
+        active: &ActiveRepositorySession,
+    ) -> Result<(), RepositorySessionError> {
         if !super::command_scope::scope_is_current(active, self.scope.as_ref()) {
             return Err(RepositorySessionError::NativeWorkspace(
                 "physical command scope changed".into(),
             ));
         }
         for (row, _) in &self.physical {
-            if !association_current(&state, active, row)
+            if !association_current(state, active, row)
                 || !active.entries.iter().any(|entry| {
                     Arc::ptr_eq(&entry.request, &row.request)
                         && row_matches_result(row, &entry.result)
@@ -860,7 +882,16 @@ impl PhysicalObservationBatch {
                 ));
             }
         }
-        Ok(merged)
+        Ok(())
+    }
+
+    pub(super) fn publish_archive_digests(&self, pending: Vec<PendingArchiveDigestReceipts<'_>>) {
+        for ((row, _), receipts) in self.physical.iter().zip(pending) {
+            let RetainedRootOwner::Physical(root) = &row.root else {
+                unreachable!();
+            };
+            root.publish_archive_digests(receipts);
+        }
     }
 }
 #[cfg(all(
@@ -923,7 +954,9 @@ impl RepositoryMaterializer {
         let (demands, _credit) = self.collect_native_demands(token, demands)?;
         let mut batch = self.split_physical_demands(token, demands)?;
         let legacy = self.observe_native(token, std::mem::take(&mut batch.legacy))?;
-        batch.observe_impl(self, token, legacy, after_io)
+        batch
+            .observe_impl(self, token, legacy, None, after_io)
+            .map(|(epoch, _)| epoch)
     }
     #[cfg(test)]
     pub(in crate::runtime) fn replace_source_identity_for_test(
@@ -1023,7 +1056,12 @@ impl RepositoryMaterializer {
                 .len()
                 .checked_mul(4 * std::mem::size_of::<PathObservationDemand>() + 256)
                 .and_then(|n| {
-                    n.checked_add(count * (std::mem::size_of::<RetainedRepositoryRoot>() * 4 + 128))
+                    n.checked_add(
+                        count
+                            * (std::mem::size_of::<RetainedRepositoryRoot>() * 4
+                                + std::mem::size_of::<PendingArchiveDigestReceipts<'_>>()
+                                + 128),
+                    )
                 })
                 .ok_or_else(|| {
                     RepositorySessionError::NativeWorkspace(

@@ -237,6 +237,7 @@ fn run_checked(plan: &RunPlan) -> Result<()> {
         let (before, after) = readonly_quota::compact_attached(
             attached.as_ref().ok_or_else(|| invalid(6))?,
             Path::new(plan.display.to_str().map_err(|_| invalid(6))?),
+            plan.mode == RunMode::FinalizeArchive,
             &resources,
             &scope,
             &|| true,

@@ -3,13 +3,13 @@
 use slug_build_api_v2::AnalysisArtifact;
 
 use super::source_staging::checked_build_frontier;
+use super::source_staging::observe_declared_sources;
 use super::*;
 use crate::runtime::ActionPrerequisitePlan;
 use crate::runtime::ObservedSourceArtifactInput;
 use crate::runtime::PlannedAction;
 use crate::runtime::RequestedActionPrerequisitePlan;
 use crate::runtime::SourceArtifactInput;
-use crate::runtime::SourceArtifactInputObservationKey;
 
 #[path = "action_chain_staging/runfiles.rs"]
 mod runfiles;
@@ -193,24 +193,17 @@ impl ActionChainStagingKey {
             }
         }
         drop(plan);
-        let mut sources = Vec::with_capacity(artifacts.len());
-        for artifact in &artifacts {
-            let key = SourceArtifactInputObservationKey::new(self.build.workspace.dupe(), artifact)
-                .map_err(|value| error(format!("{value:?}")))?;
-            match ctx.compute(&key).await.map_err(error)? {
-                PreparationOutcome::Need(need) => return Ok(PreparationOutcome::Need(need)),
-                PreparationOutcome::Complete(result) => {
-                    let source = result.map_err(error)?;
-                    source
-                        .result()
-                        .as_ref()
-                        .map_err(|value| error(format!("{value:?}")))?;
-                    observations = union_build_observations(&observations, source.observations())
-                        .map_err(error)?;
-                    sources.push(source);
-                }
-            }
-        }
+        let sources = match observe_declared_sources(
+            &self.build.workspace,
+            &artifacts,
+            &mut observations,
+            ctx,
+        )
+        .await?
+        {
+            PreparationOutcome::Need(need) => return Ok(PreparationOutcome::Need(need)),
+            PreparationOutcome::Complete(sources) => sources,
+        };
         let certificate = SourceCertificate::from_epoch(observations.dupe()).map_err(error)?;
         let prepared = PreparedActionChainInputs {
             workspace: self.build.workspace.dupe(),

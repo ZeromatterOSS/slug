@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use slug_bzlmod_v2::RepositoryWorkspaceBody;
 use slug_bzlmod_v2::RepositoryWorkspaceBodyAllocation;
@@ -32,6 +33,9 @@ use super::repository_root_io::RootIoLimits;
 
 #[path = "repository_workspace_archive.rs"]
 mod archive;
+mod archive_digests;
+use archive_digests::ArchiveDigestReceipts;
+pub(in crate::runtime) use archive_digests::PendingArchiveDigestReceipts;
 #[path = "repository_mount_lease.rs"]
 mod mount_lease;
 use mount_lease::readonly_quota::FrozenArchiveQuota;
@@ -253,6 +257,7 @@ pub(in crate::runtime) struct RepositoryPhysicalRoot {
     // Only final-state allocations; complete historical bodies have a separate
     // native request guard. State payloads retire before these shared leases.
     _body_coverage: Option<NativeBodySet>,
+    archive_digests: Mutex<ArchiveDigestReceipts>,
     credit: resources::ResourceCredit,
 }
 
@@ -433,13 +438,59 @@ impl RepositoryPhysicalRoot {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<PathObservationEpoch, PhysicalRootError> {
+        self.observe_inner(demands, scope, active, None)
+    }
+
+    pub(in crate::runtime) fn observe_with_archive_digests<'root>(
+        &'root self,
+        demands: &[PathObservationDemand],
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+        certificate: Option<&PathObservationEpoch>,
+    ) -> Result<(PathObservationEpoch, PendingArchiveDigestReceipts<'root>), PhysicalRootError>
+    {
+        let mut pending = PendingArchiveDigestReceipts::new(self);
+        let observations =
+            self.observe_inner(demands, scope, active, Some((&mut pending, certificate)))?;
+        Ok((observations, pending))
+    }
+
+    pub(in crate::runtime) fn publish_archive_digests(
+        &self,
+        pending: PendingArchiveDigestReceipts<'_>,
+    ) {
+        pending.publish(self);
+    }
+
+    fn observe_inner(
+        &self,
+        demands: &[PathObservationDemand],
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+        tracking: Option<(
+            &mut PendingArchiveDigestReceipts<'_>,
+            Option<&PathObservationEpoch>,
+        )>,
+    ) -> Result<PathObservationEpoch, PhysicalRootError> {
         self.check_origin(scope, active)?;
         let _credit = self.resources.reserve(IO_SCRATCH, 3, 0)?;
         self.validate_backing()?;
+        // The frozen backing is authenticated above. A read-only detached
+        // view alone cannot qualify: inspect the original parent FD.
+        let tracking = tracking.filter(|_| {
+            self.mode == RepositoryWorkspaceMode::Archive
+                && self.frozen_archive_quota.is_some()
+                && mount_lease::readonly::check_readonly(&self.file).is_ok()
+        });
+        let tracked = tracking.is_some();
         let owner = SealedGeneralObservation::new(self, scope, active)?;
-        let result = super::path_observation::rooted::observe_sealed_general(&owner, demands)
-            .map_err(PhysicalRootError::Observation)?;
+        let result =
+            super::path_observation::rooted::observe_sealed_general(&owner, demands, tracking)
+                .map_err(PhysicalRootError::Observation)?;
         self.validate_backing()?;
+        if tracked {
+            mount_lease::readonly::check_readonly(&self.file).map_err(PhysicalRootError::mount)?;
+        }
         self.check_origin(scope, active)?;
         Ok(result)
     }

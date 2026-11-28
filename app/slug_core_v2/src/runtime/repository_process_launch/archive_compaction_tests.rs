@@ -2,6 +2,7 @@
 //! state is fabricated to obtain the smaller physical read-only quota.
 use std::os::fd::AsRawFd;
 use std::os::fd::BorrowedFd;
+use std::os::fd::FromRawFd;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
@@ -35,6 +36,20 @@ fn facts(fd: i32) -> Facts {
         allocated: (value.f_blocks - value.f_bfree) as u64 * 4096,
         used_inodes: (value.f_files - value.f_ffree) as u64,
     }
+}
+
+fn open_archive_writer(fd: i32) -> io::Result<File> {
+    let writer = unsafe {
+        libc::openat(
+            fd,
+            c"data".as_ptr(),
+            libc::O_WRONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if writer < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(unsafe { File::from_raw_fd(writer) })
 }
 fn initialized(
     id: u64,
@@ -223,6 +238,12 @@ fn native_small_archive_finalization_contracts_same_original_root_only_after_rea
     assert_eq!((before.bytes, before.inodes), (ARCHIVE_BYTES, 262144));
     let request = final_request(&command, &selected);
     let control = bank.reserve(4096, 0, 0).unwrap();
+    {
+        let _writer_credit = bank.reserve(0, 1, 0).unwrap();
+        // The ordinary parent caller can write through this original mount
+        // before finalization, while the helper will remount a distinct alias.
+        drop(open_archive_writer(fd).unwrap());
+    }
     let verified = Arc::new(AtomicBool::new(false));
     let admission = command
         .admit_view_finalization_for_test(request, &scope, &|| true)
@@ -240,6 +261,13 @@ fn native_small_archive_finalization_contracts_same_original_root_only_after_rea
     assert!(verified.load(Ordering::Acquire));
     assert_eq!(sealed.root().file.as_raw_fd(), fd);
     assert_eq!(sealed.root().identity, identity);
+    {
+        let _writer_credit = bank.reserve(0, 1, 0).unwrap();
+        assert_eq!(
+            open_archive_writer(fd).unwrap_err().raw_os_error(),
+            Some(libc::EROFS)
+        );
+    }
     assert_eq!(
         sealed.root().frozen_archive_quota(),
         Some(FrozenArchiveQuota::TINY)
@@ -275,6 +303,45 @@ fn native_small_archive_finalization_contracts_same_original_root_only_after_rea
     drop(reader);
     drop(verified);
     drop(control);
+    release(&bank, baseline);
+}
+
+#[test]
+#[ignore = "actual compiled CLI Archive freeze refuses an outstanding original-mount writer"]
+fn native_archive_global_freeze_refuses_a_live_original_writer() {
+    let (_temporary, selected, bank, baseline, scope, runtime, command, fd, _) = initialized(2405);
+    let command = apply(
+        command,
+        &selected,
+        RepositoryWorkspaceOperation::File {
+            path: "data".into(),
+            body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(&b"active"[..])),
+            mode: 0o644,
+        },
+        &runtime,
+        &scope,
+    );
+    let request = final_request(&command, &selected);
+    let admission = command
+        .admit_view_finalization_for_test(request, &scope, &|| true)
+        .unwrap();
+    let backing = admission.builder().backing.clone();
+    let writer_credit = bank.reserve(0, 1, 0).unwrap();
+    let writer = open_archive_writer(fd).unwrap();
+    let launch = FinalizeLaunch::new(admission, &|| true).unwrap();
+    let retirement = launch.retirement_observer().unwrap();
+    let result = runtime.block_on(process_owner::run(launch, platform(), &|| true));
+    assert!(matches!(
+        result,
+        Err(PhysicalRootError::Io(error))
+            if error.to_string() == format!("repository helper stage 6 errno {}", libc::EBUSY)
+    ));
+    assert!(retirement.wait_until(Instant::now() + Duration::from_secs(1)));
+    assert_eq!(bank.snapshot().backing_bytes, ARCHIVE_BYTES);
+    drop(writer);
+    drop(writer_credit);
+    drop(backing);
+    drop(retirement);
     release(&bank, baseline);
 }
 

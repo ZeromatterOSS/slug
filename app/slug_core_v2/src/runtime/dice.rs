@@ -1436,25 +1436,22 @@ impl NativeCommandCompletionContext<'_, '_> {
                 certificate,
                 &self.command.path_observations,
                 |demands| {
+                    let materializer = &self.command.runtime.repository_materializer;
                     #[cfg(all(test, target_os = "linux"))]
-                    {
-                        let materializer = &self.command.runtime.repository_materializer;
-                        let context = super::source_attempt_context::SourceAttemptContext::certificate_precheck(
-                            materializer.workspace(), Some(self.selected_repository_results),
-                        );
-                        materializer.observe_native_with_charge_census(
-                            self.command.repository_session, demands, &mut |demand| context.report(demand),
+                    let context = super::source_attempt_context::SourceAttemptContext::certificate_precheck(
+                        materializer.workspace(), Some(self.selected_repository_results),
+                    );
+                    materializer
+                        .observe_native_certificate(
+                            self.command.repository_session,
+                            demands,
+                            certificate.observations(),
+                            #[cfg(all(test, target_os = "linux"))]
+                            &mut |demand| context.report(demand),
+                            #[cfg(all(test, target_os = "linux"))]
                             &mut |scope, demand, record| context.report_charge(scope, demand, record),
-                        ).map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
-                    }
-                    #[cfg(not(all(test, target_os = "linux")))]
-                    {
-                    self.command
-                        .runtime
-                        .repository_materializer
-                        .observe_native(self.command.repository_session, demands)
+                        )
                         .map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
-                    }
                 },
             )
             .await
@@ -7098,25 +7095,24 @@ impl WorkspaceRuntime {
                                     &full_epoch,
                                     |demands| {
                                         #[cfg(all(test, target_os = "linux"))]
-                                        {
-                                            let context = super::source_attempt_context::SourceAttemptContext::certificate_finalize(
-                                                self.repository_materializer.workspace(), Some(&prepared.snapshot.repository_results),
-                                            );
-                                            self.repository_materializer.observe_native_with_charge_census(
-                                                repository_session, demands, &mut |demand| context.report(demand),
-                            &mut |scope, demand, record| context.report_charge(scope, demand, record),
-                                            ).map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
-                                        }
-                                        #[cfg(not(all(test, target_os = "linux")))]
-                                        {
+                                        let context = super::source_attempt_context::SourceAttemptContext::certificate_finalize(
+                                            self.repository_materializer.workspace(), Some(&prepared.snapshot.repository_results),
+                                        );
                                         self.repository_materializer
-                                            .observe_native(repository_session, demands)
+                                            .observe_native_certificate(
+                                                repository_session,
+                                                demands,
+                                                source_certificate.observations(),
+                                                #[cfg(all(test, target_os = "linux"))]
+                                                &mut |demand| context.report(demand),
+                                                #[cfg(all(test, target_os = "linux"))]
+                                                &mut |scope, demand, record| context.report_charge(scope, demand, record),
+                                            )
                                             .map_err(|error| {
                                                 RequestRevisionError::Observation(format!(
                                                     "{error:?}"
                                                 ))
                                             })
-                                        }
                                     },
                                     || attempt_root.publish(&mut terminal),
                                 )

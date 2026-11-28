@@ -6,6 +6,7 @@ use super::quota::QuotaFacts;
 use super::quota::facts_for_quota;
 use super::readonly::ReadOnlyMountClone;
 use super::readonly::check_readonly;
+use super::readonly::check_writable;
 use super::*;
 
 const TINY_BYTES: u64 = 8 * 1024 * 1024;
@@ -94,6 +95,7 @@ impl FrozenArchiveQuota {
 pub(super) fn compact_attached(
     root: &AttachedSetupRoot,
     display: &Path,
+    freeze_superblock: bool,
     resources: &Arc<RepositoryRootResources>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
@@ -103,10 +105,16 @@ pub(super) fn compact_attached(
     let before_id = identity(&root.file)?;
     path_identity(display, before_id)?;
     let _owner = current_owner(resources)?;
+    if freeze_superblock {
+        check_writable(&root.file)?;
+    }
     let before = facts_for_quota(&root.file, quota(RepositoryWorkspaceMode::Archive))?;
     let class = FrozenArchiveQuota::select(before);
     let (bytes, inodes) = class.quota();
-    if (bytes, inodes) != (before.bytes, before.inodes) {
+    if let Some(flags) = remount_flags(
+        (bytes, inodes) != (before.bytes, before.inodes),
+        freeze_superblock,
+    ) {
         let path = std::ffi::CString::new(display.as_os_str().as_bytes())
             .map_err(|_| MountLeaseError::AttachedRoot)?;
         let options = std::ffi::CString::new(format!("size={bytes},nr_inodes={inodes}"))
@@ -116,7 +124,7 @@ pub(super) fn compact_attached(
                 std::ptr::null(),
                 path.as_ptr(),
                 c"tmpfs".as_ptr(),
-                libc::MS_REMOUNT | libc::MS_NOSUID | libc::MS_NODEV,
+                flags,
                 options.as_ptr().cast(),
             )
         } != 0
@@ -132,8 +140,62 @@ pub(super) fn compact_attached(
         return Err(MountLeaseError::AttachedRoot);
     }
     path_identity(display, before_id)?;
+    if freeze_superblock {
+        check_readonly(&root.file)?;
+    }
     check(scope, active)?;
     Ok((before, after))
+}
+
+fn remount_flags(quota_changed: bool, freeze_superblock: bool) -> Option<libc::c_ulong> {
+    let flags = libc::MS_REMOUNT | libc::MS_NOSUID | libc::MS_NODEV;
+    if freeze_superblock {
+        // A non-bind remount changes the superblock as well as this mount.
+        Some(flags | libc::MS_RDONLY)
+    } else {
+        quota_changed.then_some(flags)
+    }
+}
+
+/// The parent's original mount was writable before launching the finalizer.
+/// The helper can remount only its distinct attached alias of this backing.
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+pub(super) struct WritableArchiveParent {
+    original: RootIdentity,
+    helper: RootIdentity,
+}
+
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+impl WritableArchiveParent {
+    pub(super) fn before_launch(
+        builder: &RepositoryPhysicalRootBuilder,
+        incoming: &AttachedMountClone,
+    ) -> Result<Self, PhysicalRootError> {
+        let proof = Self {
+            original: builder.identity,
+            helper: incoming.detached,
+        };
+        if builder.mode != RepositoryWorkspaceMode::Archive
+            || !same_backing(proof.original, proof.helper)
+            || proof.original.mount == proof.helper.mount
+        {
+            return Err(PhysicalRootError::Backing);
+        }
+        proof.check_before_transfer(builder)?;
+        Ok(proof)
+    }
+
+    pub(super) fn check_before_transfer(
+        &self,
+        builder: &RepositoryPhysicalRootBuilder,
+    ) -> Result<(), PhysicalRootError> {
+        if builder.identity != self.original
+            || identity(&builder.file).map_err(PhysicalRootError::mount)? != self.original
+        {
+            return Err(PhysicalRootError::Backing);
+        }
+        check_writable(&builder.file).map_err(PhysicalRootError::mount)
+    }
 }
 
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
@@ -154,6 +216,7 @@ pub(in crate::runtime::repository_physical_root) struct PendingReadOnlyCompactio
 impl PendingReadOnlyCompaction {
     pub(super) fn receive(
         builder: &RepositoryPhysicalRootBuilder,
+        parent: &WritableArchiveParent,
         successor: &AttachedMountClone,
         attached: &File,
         words: [u64; 8],
@@ -188,12 +251,19 @@ impl PendingReadOnlyCompaction {
             || before.used_inodes != after.used_inodes
             || facts_for_quota(&builder.file, class.quota())? != after
             || facts_for_quota(attached, class.quota())? != after
+            || parent.original != builder.identity
+            || parent.helper != successor.attached
+            || parent.original.mount == successor.detached.mount
             || backing_identity_for_quota(&builder.file, class.quota())? != builder.identity
             || backing_identity_for_quota(attached, class.quota())? != successor.attached
             || !same_backing(builder.identity, successor.attached)
         {
             return Err(PhysicalRootError::Backing);
         }
+        // This FD's distinct mount was writable before the helper remounted
+        // its own alias. Its transition proves the backing is now read-only.
+        check_readonly(&builder.file).map_err(PhysicalRootError::mount)?;
+        check_readonly(attached).map_err(PhysicalRootError::mount)?;
         let credit = builder.resources.reserve(
             add(
                 std::mem::size_of::<Self>(),
@@ -240,6 +310,7 @@ impl PendingReadOnlyCompaction {
         {
             return Err(PhysicalRootError::Backing);
         }
+        check_readonly(&builder.file).map_err(PhysicalRootError::mount)?;
         builder.frozen_archive_quota = Some(self.class);
         Ok(())
     }
@@ -275,6 +346,7 @@ impl PendingReadOnlyCompaction {
         {
             return Err(PhysicalRootError::Backing);
         }
+        check_readonly(&root.file).map_err(PhysicalRootError::mount)?;
         check_readonly(&mount.clone.token).map_err(PhysicalRootError::mount)?;
         if namespace_identity(&mount.clone.owner).map_err(PhysicalRootError::mount)?
             != self.namespace
@@ -317,6 +389,16 @@ impl VerifiedReadOnlyCompaction<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn general_archive_freezes_even_when_quota_is_unchanged() {
+        let flags = libc::MS_REMOUNT | libc::MS_NOSUID | libc::MS_NODEV;
+        assert_eq!(remount_flags(false, true), Some(flags | libc::MS_RDONLY));
+        assert_eq!(remount_flags(true, true), Some(flags | libc::MS_RDONLY));
+        assert_eq!(remount_flags(false, false), None);
+        assert_eq!(remount_flags(true, false), Some(flags));
+    }
+
     #[test]
     fn immutable_compaction_uses_actual_allocated_bytes_and_charged_inode_units() {
         let facts = |allocated, used_inodes| QuotaFacts {
