@@ -4,6 +4,7 @@ use slug_bzlmod_v2::RepositoryWorkspaceNode;
 use super::*;
 use crate::runtime::dice::source_service::SourceCounter;
 use crate::runtime::repository_root_io::read_work_for_test;
+use crate::runtime::repository_workspace_comparison_work_for_test as comparison_work;
 
 #[test]
 #[ignore = "actual compiled CLI claimed General root; finite native supervisor and SLUG_V2_BIN required"]
@@ -15,6 +16,161 @@ fn native_owned_file_observation_reuses_canonical_body_and_preserves_history_aft
 #[ignore = "actual compiled CLI archive finalization and rooted certification"]
 fn native_only_frozen_archive_certification_reuses_the_actual_digest() {
     verify_native_owned_observation(true);
+}
+
+#[test]
+#[ignore = "actual compiled CLI Archive finalization and selected native source reader"]
+fn native_selected_direct_archive_reader_reuses_packed_frame_and_probes_real_eof() {
+    const BLOCK: usize = slug_bzlmod_v2::REPOSITORY_WORKSPACE_BODY_CHUNK_BYTES;
+    let mut expected = vec![b'a'; 2 * BLOCK + 37];
+    expected[BLOCK..2 * BLOCK].fill(b'b');
+    expected[2 * BLOCK..].fill(b'c');
+    let wanted = digest(&expected);
+    let wrong = FileContentDigest::new([0; 32], wanted.size_bytes()).unwrap();
+
+    for finalized in [true, false] {
+        let temporary = tempfile::tempdir().unwrap();
+        let workspace = NormalizedAbsolutePath::new(temporary.path()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(26);
+        let scope = SourceServiceScope::new_for_test(
+            workspace.clone(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            SourceServiceLimits::default(),
+        )
+        .unwrap();
+        let resources = RepositoryRootResources::new(
+            RepositoryRootResourceLimits::new(512 * 1024 * 1024, 512, 2 * ARCHIVE_BYTES).unwrap(),
+        )
+        .unwrap();
+        let before = resources.snapshot();
+        let readers = new_reader_resources().unwrap();
+        let reader_baseline = readers.snapshot();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let key = Arc::new(
+            RepositoryWorkspaceStableKey::new(
+                workspace.clone(),
+                crate::runtime::dice::physical_root_owner_for_test(),
+                CanonicalRepoName::new("archive_direct_reader").unwrap(),
+                0,
+            )
+            .unwrap(),
+        );
+        let actor = RepositoryMaterializer::new_scoped(workspace, scope.clone()).unwrap();
+        let (token, generation) = generation_with_adoption_spec(
+            &actor,
+            &key,
+            &resources,
+            &readers,
+            &scope,
+            &runtime,
+            FixtureBody::Packed(&expected),
+            false,
+            finalized,
+        )
+        .unwrap();
+        let lease = generation
+            .roots
+            .lease_for(&generation.source)
+            .unwrap()
+            .unwrap();
+        let root = lease.physical().unwrap();
+        let (index, body, _) = root.canonical_file("input").unwrap();
+        assert!(body.raw_arc().is_none());
+        assert_eq!(generation.source.digest(), wanted);
+        assert_eq!(
+            root.archive_digest_receipt(index)
+                .map(|receipt| receipt.digest()),
+            finalized.then_some(wanted)
+        );
+        let open_selected = || {
+            NativeSourceReader::open_selected_for_test(
+                &generation.source,
+                &generation.roots,
+                Some(scope.clone()),
+                readers.clone(),
+            )
+            .unwrap()
+        };
+        assert_reader_work(
+            open_selected(),
+            &expected,
+            if finalized { 0 } else { wanted.size_bytes() },
+        );
+        assert_reader_work(
+            root.open_member("input", &scope, &|| true).unwrap(),
+            &expected,
+            wanted.size_bytes(),
+        );
+        assert_reader_work(
+            root.open_selected_direct_member("input", wrong, &scope, &|| true)
+                .unwrap(),
+            &expected,
+            wanted.size_bytes(),
+        );
+        let foreign = source(
+            &generation,
+            generation.source.namespace(),
+            generation.source.anchor().cloned(),
+            wrong,
+        );
+        assert!(
+            NativeSourceReader::open_selected_for_test(
+                &foreign,
+                &generation.roots,
+                Some(scope.clone()),
+                readers.clone(),
+            )
+            .is_err()
+        );
+
+        let mut selected = open_selected();
+        actor
+            .accept(token, std::slice::from_ref(&generation.request), vec![])
+            .unwrap();
+        scope.cancel();
+        {
+            let reads = read_work_for_test::begin();
+            let comparisons = comparison_work::begin();
+            let error = selected.read(&mut [0; 1]).unwrap_err();
+            assert!(error.to_string().contains("Cancelled"));
+            assert_eq!(reads.reader_payload_bytes(), 0);
+            assert_eq!(reads.reader_eof_probes(), 0);
+            assert_eq!(comparisons.snapshot().comparison_calls, 0);
+        }
+        drop(selected);
+        drop(lease);
+        drop(generation);
+        drop(actor);
+        let after = resources.snapshot();
+        assert_eq!(after.retained_bytes, before.retained_bytes);
+        assert_eq!(after.backing_bytes, 0);
+        assert_eq!(after.native_fds, 0);
+        assert_eq!(
+            readers.snapshot().retained_bytes,
+            reader_baseline.retained_bytes
+        );
+        assert_eq!(readers.snapshot().native_fds, 0);
+    }
+}
+
+fn assert_reader_work(mut reader: impl Read, expected: &[u8], compared_bytes: u64) {
+    let reads = read_work_for_test::begin();
+    let comparisons = comparison_work::begin();
+    let mut bytes = vec![0; expected.len()];
+    reader.read_exact(&mut bytes).unwrap();
+    assert_eq!(bytes, expected);
+    assert_eq!(reader.read(&mut [0; 1]).unwrap(), 0);
+    assert_eq!(reads.reader_payload_bytes(), expected.len() as u64);
+    assert_eq!(reads.reader_eof_probes(), 1);
+    assert_eq!(comparisons.snapshot().comparison_bytes, compared_bytes);
+    assert_eq!(
+        comparisons.snapshot().comparison_calls == 0,
+        compared_bytes == 0
+    );
 }
 
 fn verify_native_owned_observation(finalize_archive: bool) {
@@ -57,7 +213,7 @@ fn verify_native_owned_observation(finalize_archive: bool) {
         &readers,
         &scope,
         &runtime,
-        BODY,
+        FixtureBody::Raw(BODY),
         false,
         finalize_archive,
     )

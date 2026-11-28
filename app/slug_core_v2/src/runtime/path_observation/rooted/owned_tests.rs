@@ -141,6 +141,7 @@ fn prior_digest_frame_checks_actual_rooted_name_without_reading_payload() {
     .unwrap();
     let receipt = receipt.unwrap();
     assert_eq!(receipt.digest(), fixture.digest());
+    assert!(receipt.matches_file(fixture.digest(), &root.lstat(path).unwrap()));
     assert_eq!(
         owned::verify_prior_digest(&root, path, receipt, &resources, &|| true).unwrap(),
         observed
@@ -160,6 +161,7 @@ fn prior_digest_frame_checks_actual_rooted_name_without_reading_payload() {
     let replacement = fixture.directory.path().join("replacement");
     fs::write(&replacement, fixture.body.as_ref()).unwrap();
     fs::rename(replacement, fixture.path()).unwrap();
+    assert!(!receipt.matches_file(fixture.digest(), &root.lstat(path).unwrap()));
     assert!(matches!(
         owned::verify_prior_digest(&root, path, receipt, &resources, &|| true),
         Err(RootedObservationError::Unstable)

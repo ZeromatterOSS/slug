@@ -134,7 +134,7 @@ pub(super) fn open(
                     .and_then(|p| p.to_str())
                     .ok_or_else(|| refusal("physical source escapes selected anchor"))?;
                 Input::Physical(
-                    root.open_member(relative, scope, &|| true)
+                    root.open_selected_direct_member(relative, source.digest(), scope, &|| true)
                         .map_err(refusal)?,
                 )
             }

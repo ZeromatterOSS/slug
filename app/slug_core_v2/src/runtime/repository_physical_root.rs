@@ -500,14 +500,20 @@ impl RepositoryPhysicalRoot {
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
     ) -> Result<RepositoryRootReader, PhysicalRootError> {
-        reader::open(self, relative, scope, active)
+        reader::open(self, relative, scope, active, None)
     }
     fn validate_backing(&self) -> Result<(), PhysicalRootError> {
-        if backing_identity_for_quota(&self.file, self.native_quota())? != self.identity {
+        self.validated_backing_flags().map(|_| ())
+    }
+    fn validated_backing_flags(&self) -> Result<u64, PhysicalRootError> {
+        let (identity, flags) =
+            backing_identity_and_flags_for_quota(&self.file, self.native_quota())?;
+        if identity != self.identity {
             return Err(PhysicalRootError::RootIdentity);
         }
         self.backing
-            .matches_data(&self.resources, self.mode, self.frozen_archive_quota)
+            .matches_data(&self.resources, self.mode, self.frozen_archive_quota)?;
+        Ok(flags)
     }
 }
 
@@ -552,6 +558,13 @@ fn backing_identity_for_quota(
     file: &File,
     expected: (u64, u64),
 ) -> Result<RootIdentity, PhysicalRootError> {
+    backing_identity_and_flags_for_quota(file, expected).map(|(identity, _)| identity)
+}
+
+fn backing_identity_and_flags_for_quota(
+    file: &File,
+    expected: (u64, u64),
+) -> Result<(RootIdentity, u64), PhysicalRootError> {
     let fd = file.as_raw_fd();
     let stat = nix::sys::stat::fstat(file).map_err(io::Error::from)?;
     if stat.st_mode & libc::S_IFMT != libc::S_IFDIR || stat.st_ino != 1 {
@@ -618,11 +631,14 @@ fn backing_identity_for_quota(
     {
         return Err(PhysicalRootError::Backing);
     }
-    Ok(RootIdentity {
-        device: stat.st_dev as u64,
-        inode: stat.st_ino as u64,
-        mount: extended.stx_mnt_id,
-    })
+    Ok((
+        RootIdentity {
+            device: stat.st_dev as u64,
+            inode: stat.st_ino as u64,
+            mount: extended.stx_mnt_id,
+        },
+        vfs.f_flag as u64,
+    ))
 }
 
 #[cfg(test)]

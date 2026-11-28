@@ -60,6 +60,27 @@ struct Generation {
     source: SourceArtifactInput,
     materialized: RepositoryMaterialization,
 }
+
+enum FixtureBody<'a> {
+    Raw(&'a [u8]),
+    Packed(&'a [u8]),
+}
+
+impl<'a> FixtureBody<'a> {
+    fn into_request(self) -> (&'a [u8], RepositoryWorkspaceBody) {
+        match self {
+            Self::Raw(bytes) => (bytes, RepositoryWorkspaceBody::from_arc(Arc::from(bytes))),
+            Self::Packed(bytes) => {
+                let mut builder = RepositoryWorkspaceBodyBuilder::new(bytes.len()).unwrap();
+                for chunk in bytes.chunks(slug_bzlmod_v2::REPOSITORY_WORKSPACE_BODY_CHUNK_BYTES) {
+                    builder.append(chunk, &mut |_| Ok::<(), ()>(())).unwrap();
+                }
+                (bytes, builder.finish().unwrap())
+            }
+        }
+    }
+}
+
 fn digest(bytes: &[u8]) -> FileContentDigest {
     FileContentDigest::new(Sha256::digest(bytes).into(), bytes.len() as u64).unwrap()
 }
@@ -97,7 +118,7 @@ fn generation(
         readers,
         scope,
         runtime,
-        body,
+        FixtureBody::Raw(body),
         false,
         false,
     )
@@ -110,7 +131,7 @@ fn generation_with_adoption_spec(
     readers: &Arc<crate::runtime::native_source_access::NativeReaderResources>,
     scope: &Arc<SourceServiceScope>,
     runtime: &tokio::runtime::Runtime,
-    body: &[u8],
+    body: FixtureBody<'_>,
     foreign_spec: bool,
     finalize_archive: bool,
 ) -> Option<(
@@ -155,12 +176,13 @@ fn generation_with_adoption_spec(
             &|| true,
         ))
         .unwrap();
+    let (body, request_body) = body.into_request();
     let write = command
         .request(
             ticket.reservation(),
             RepositoryWorkspaceOperation::File {
                 path: "input".into(),
-                body: slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(Arc::from(body)),
+                body: request_body,
                 mode: 0o644,
             },
             scope,
@@ -974,7 +996,7 @@ fn native_seal_rejects_foreign_spec_after_actual_history_and_releases_root() {
             &readers,
             &scope,
             &runtime,
-            b"actual sealed bytes",
+            FixtureBody::Raw(b"actual sealed bytes"),
             true,
             false,
         )
