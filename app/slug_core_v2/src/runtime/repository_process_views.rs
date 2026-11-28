@@ -55,7 +55,9 @@ fn mount_flags(file: &File) -> Result<u64, MountLeaseError> {
     Ok(unsafe { value.assume_init() }.f_flag as u64)
 }
 
-fn validate_flags(flags: u64) -> Result<(), MountLeaseError> {
+pub(in crate::runtime::repository_physical_root) fn validate_flags(
+    flags: u64,
+) -> Result<(), MountLeaseError> {
     let required = libc::ST_RDONLY as u64 | libc::ST_NOSUID as u64 | libc::ST_NODEV as u64;
     if flags & required != required || flags & libc::ST_NOEXEC as u64 != 0 {
         return Err(MountLeaseError::AttachedRoot);

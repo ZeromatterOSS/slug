@@ -14,6 +14,14 @@ impl ArchiveDigestReceipt {
     pub(in crate::runtime) fn digest(&self) -> FileContentDigest {
         self.digest
     }
+
+    pub(in crate::runtime) fn matches_file(
+        &self,
+        digest: FileContentDigest,
+        frame: &libc::stat,
+    ) -> bool {
+        self.digest == digest && unchanged(&self.frame, frame)
+    }
 }
 
 fn framed(error: io::Error) -> RootedObservationError {

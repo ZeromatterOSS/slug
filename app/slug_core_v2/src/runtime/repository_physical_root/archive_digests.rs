@@ -80,7 +80,11 @@ impl RepositoryPhysicalRoot {
     /// The complete prior byte comparison also verifies the canonical body.
     pub(super) fn observed_archive_digest(&self, path: &str) -> Option<FileContentDigest> {
         let (entry, _, _) = self.canonical_file(path)?;
-        Some(self.archive_digests.lock().ok()?.get(entry)?.digest())
+        Some(self.archive_digest_receipt(entry)?.digest())
+    }
+
+    pub(super) fn archive_digest_receipt(&self, entry: usize) -> Option<ArchiveDigestReceipt> {
+        self.archive_digests.lock().ok()?.get(entry)
     }
 }
 
@@ -114,7 +118,7 @@ impl<'root> PendingArchiveDigestReceipts<'root> {
         else {
             return None;
         };
-        let receipt = self.root.archive_digests.lock().ok()?.get(entry)?;
+        let receipt = self.root.archive_digest_receipt(entry)?;
         (receipt.digest() == *expected).then_some(receipt)
     }
 

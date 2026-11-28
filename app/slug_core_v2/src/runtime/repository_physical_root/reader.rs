@@ -25,6 +25,7 @@ pub(in crate::runtime) struct RepositoryRootReader {
     scope: Arc<SourceServiceScope>,
     entry: usize,
     framed: libc::stat,
+    verified_archive_frame: bool,
     offset: u64,
     _credit: resources::ResourceCredit,
 }
@@ -48,6 +49,7 @@ pub(super) fn open(
     relative: &str,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
+    selected_digest: Option<FileContentDigest>,
 ) -> Result<RepositoryRootReader, PhysicalRootError> {
     root.check_origin(scope, active)?;
     let index = root
@@ -67,7 +69,7 @@ pub(super) fn open(
         3,
         0,
     )?;
-    root.validate_backing()?;
+    let before_flags = root.validated_backing_flags()?;
     let io = RootIo::new(&root.file, io_limits(root.mode, &root.reservation))?;
     let before = io.lstat(Path::new(relative))?;
     if before.st_mode & libc::S_IFMT != libc::S_IFREG
@@ -85,7 +87,18 @@ pub(super) fn open(
     {
         return Err(PhysicalRootError::Snapshot);
     }
-    root.validate_backing()?;
+    let after_flags = root.validated_backing_flags()?;
+    let verified_archive_frame = selected_digest.is_some_and(|digest| {
+        root.mode == RepositoryWorkspaceMode::Archive
+            && root.frozen_archive_quota.is_some()
+            && root.state.source_bindings().is_empty()
+            && body.raw_arc().is_none()
+            && mount_lease::readonly::validate_flags(before_flags).is_ok()
+            && mount_lease::readonly::validate_flags(after_flags).is_ok()
+            && root
+                .archive_digest_receipt(index)
+                .is_some_and(|receipt| receipt.matches_file(digest, &before))
+    });
     root.check_origin(scope, active)?;
     Ok(RepositoryRootReader {
         file: Some(file),
@@ -94,6 +107,7 @@ pub(super) fn open(
         scope: scope.clone(),
         entry: index,
         framed: before,
+        verified_archive_frame,
         offset: 0,
         _credit: credit,
     })
@@ -102,7 +116,10 @@ pub(super) fn open(
 impl RepositoryRootReader {
     fn validate(&self) -> Result<(), PhysicalRootError> {
         self.scope.check()?;
-        self.root.validate_backing()?;
+        let flags = self.root.validated_backing_flags()?;
+        if self.verified_archive_frame {
+            mount_lease::readonly::validate_flags(flags).map_err(PhysicalRootError::mount)?;
+        }
         if let Some(route) = &self.route {
             route.frames.validate(&routed::RouteRoots::new(
                 &self.root.file,
@@ -183,13 +200,14 @@ impl Read for RepositoryRootReader {
         let available = (body.len() as u64).saturating_sub(self.offset);
         if available == 0 {
             let mut probe = [0u8; 1];
-            if self
+            let count = self
                 .file
                 .as_ref()
                 .unwrap()
-                .read_at(&mut probe, self.offset)?
-                != 0
-            {
+                .read_at(&mut probe, self.offset)?;
+            #[cfg(test)]
+            crate::runtime::repository_root_io::read_work_for_test::record_reader_eof_probe();
+            if count != 0 {
                 return Err(read_error(PhysicalRootError::Snapshot));
             }
             self.validate().map_err(read_error)?;
@@ -204,10 +222,19 @@ impl Read for RepositoryRootReader {
             .as_ref()
             .unwrap()
             .read_at(&mut out[..requested], self.offset)?;
+        #[cfg(test)]
+        crate::runtime::repository_root_io::read_work_for_test::record_reader_payload(count);
         let start =
             usize::try_from(self.offset).map_err(|_| read_error(PhysicalRootError::Snapshot))?;
-        if count == 0 || !body.range_eq(start, &out[..count]) {
+        if count == 0 {
             return Err(read_error(PhysicalRootError::Snapshot));
+        }
+        if !self.verified_archive_frame {
+            #[cfg(test)]
+            crate::runtime::repository_workspace_comparison_work_for_test::record_call(count);
+            if !body.range_eq(start, &out[..count]) {
+                return Err(read_error(PhysicalRootError::Snapshot));
+            }
         }
         self.validate().map_err(read_error)?;
         self.offset = self
@@ -219,6 +246,18 @@ impl Read for RepositoryRootReader {
 }
 
 impl RepositoryPhysicalRoot {
+    /// For a direct member of an already authenticated native source lease.
+    /// Only a matching committed Archive frame can remove body comparison.
+    pub(in crate::runtime) fn open_selected_direct_member(
+        self: &Arc<Self>,
+        relative: &str,
+        digest: FileContentDigest,
+        scope: &Arc<SourceServiceScope>,
+        active: &dyn Fn() -> bool,
+    ) -> Result<RepositoryRootReader, PhysicalRootError> {
+        open(self, relative, scope, active, Some(digest))
+    }
+
     /// Allocation identity is a fast path, never a foreign-state substitute.
     /// No SourceScope/IO check is added to existing metadata-only callers.
     pub(in crate::runtime) fn matches_state(
@@ -406,7 +445,7 @@ impl RepositoryPhysicalRoot {
                 .ok()
                 .and_then(|path| path.to_str())
                 .ok_or(PhysicalRootError::Snapshot)?;
-            open(self, relative, scope, &|| true)?
+            open(self, relative, scope, &|| true, None)?
         } else {
             let credit = self.resources.reserve(
                 std::mem::size_of::<RepositoryRootReader>() + std::mem::size_of::<RoutedRead>(),
@@ -432,6 +471,7 @@ impl RepositoryPhysicalRoot {
                 scope: scope.clone(),
                 entry: 0,
                 framed: unsafe { std::mem::zeroed() },
+                verified_archive_frame: false,
                 offset: 0,
                 _credit: credit,
             };

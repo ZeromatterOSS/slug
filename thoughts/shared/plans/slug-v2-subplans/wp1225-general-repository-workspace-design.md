@@ -1136,6 +1136,10 @@ charged read. A sealed Source snapshot can also reuse a selected FileDigest
 or FileBytes result after matching its raw SHA and size to the post-reap
 manifest and checking a freshly rooted descriptor and name against the credited
 file frame. An absent or mismatched certificate uses the charged read.
+An Archive receipt can replace redundant packed body decoding for a selected
+direct native reader. Require the exact digest and rooted file frame on
+committed read-only backing. Reads still check the scope, backing and name
+and stream the actual file through EOF. REAPI uploads still verify SHA-256.
 The [active packet](current-packet.md) tracks the real Build gate.
 
 Implementation scope is Core's physical-root observation seam plus a small

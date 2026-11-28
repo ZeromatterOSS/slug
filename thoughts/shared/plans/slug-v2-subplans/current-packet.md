@@ -51,22 +51,23 @@ content requests per check. The Source snapshot seal passed original-FD
 `EROFS`, live-writer `EBUSY`, pre-seal drift, retirement and Process controls.
 Sealed Source certificate repeats passed at exactly 64 acquisitions without
 reading payloads. A missing certificate still refused acquisition 65.
-Protected cut `1e87600ed` reached 67 CAS entries cold and 114 retained.
+Protected cut `4b0d3bc6c` reached 67 CAS entries cold and 114 retained.
 The retained worker compiled the tinyjson prerequisite from empty AC, with
 verified action, output bytes and worker timing. Both hit the 27-second
-work deadline before probe publication. A bounded trace counted 117 local
-metadata steps and four Rustc steps. The first 109 source rechecks consumed
+work deadline before probe publication. A bounded trace on `1e87600ed` counted
+117 local metadata steps and four Rustc steps. The first 109 rechecks consumed
 0.242 s. The first Rustc uploaded 606 MB in 1.385 s and expired in verified
 CAS readback, after 24.981 s of command preparation.
 REAPI now records provisional metadata in staging and checks the full source
 frontier before each remote-bound step. Nine checks passed, including stale
-source refusal, final retry and generated CAS eviction/corruption. Installed
-cut `4b0d3bc6c` again verified the retained tinyjson worker and reached the
-deadline on both routes. One runtime's cold/warm profile matched all four
+source refusal, final retry and generated CAS eviction/corruption.
+One runtime's cold/warm profile matched all four
 CrateInfo rows. Cold/warm RootCompute took 9.979/8.062 s and Archive dispatch
 8.725/8.183 s. The warm command discarded 15,096 completed module-toolchain
-prefix rows across 458 Needs. Check reuse of completed rows within the current
-scope and preserve the ordered source and event closure.
+prefix rows across 458 Needs. Check the cost of completed package-local work
+while preserving the ordered source and event closure.
+Selected direct Archive readers reused verified packed-file frames through
+actual bytes and EOF in fifteen focused checks. Measure coverage in Rust Build.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
