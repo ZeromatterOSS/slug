@@ -8,6 +8,7 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::ExpandedSpawnCommandLine;
+use slug_core_v2::runtime::ActionChainStage;
 use slug_core_v2::runtime::ActionChainTransport;
 use slug_core_v2::runtime::CompletedActionFailure;
 use slug_core_v2::runtime::NativeActionChainInputs;
@@ -495,6 +496,22 @@ impl ActionChainTransport for ActionChainReapiTransport {
             })
             .await
             .map_err(|e| protocol(e.to_string()))?
+    }
+
+    async fn stage_for_execution(
+        &self,
+        session: &mut Self::Session,
+        index: usize,
+    ) -> Result<ActionChainStage<Self::Staged>, Self::Error> {
+        let staged = self.stage(session, index).await?;
+        if matches!(&staged.payload, StagedPayload::Local(_)) {
+            // Stage has already verified any CAS-backed alias input. Commit
+            // the local result through the existing ordinal/custody fence.
+            self.execute(session, index, staged).await?;
+            Ok(ActionChainStage::CompletedLocally)
+        } else {
+            Ok(ActionChainStage::RequiresExecute(staged))
+        }
     }
 
     async fn execute(

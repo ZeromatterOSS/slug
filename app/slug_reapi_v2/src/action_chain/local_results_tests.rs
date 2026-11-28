@@ -171,15 +171,32 @@ stage = rule(implementation = _impl, executable = True, attrs = {"input": attr.l
                 .unwrap();
             let foreign = transport.stage(&mut other, 0).await.unwrap();
             assert!(transport.execute(&mut session, 0, foreign).await.is_err());
-            let staged = transport.stage(&mut session, 0).await.unwrap();
-            transport.execute(&mut session, 0, staged).await.unwrap();
+            assert!(matches!(
+                transport
+                    .stage_for_execution(&mut session, 0)
+                    .await
+                    .unwrap(),
+                ActionChainStage::CompletedLocally
+            ));
+            assert!(
+                transport
+                    .stage_for_execution(&mut session, 0)
+                    .await
+                    .is_err()
+            );
             assert!(transport.stage(&mut session, 0).await.is_err());
+            let staged = transport.stage(&mut other, 0).await.unwrap();
+            transport.execute(&mut other, 0, staged).await.unwrap();
+            let direct = transport.finish(other).await.unwrap();
             let result = transport.finish(session).await.unwrap();
             assert_eq!(result.results().len(), 1);
             assert!(result.selected().is_none());
             let selected = &result.results()[0];
             assert!(selected.remote().is_none());
             let local = selected.local_file().unwrap();
+            let direct = direct.results()[0].local_file().unwrap();
+            assert_eq!(local.output(), direct.output());
+            assert_eq!(local.bytes(), direct.bytes());
             assert_eq!(local.digest(), &ReapiDigest::of_bytes(local.bytes()));
             assert_eq!(
                 local.output().path(),

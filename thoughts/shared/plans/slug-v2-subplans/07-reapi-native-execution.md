@@ -305,6 +305,11 @@ requested results have no singular selected action. Portable tests exercise actu
 preflight/binding/result projection; unchanged chain wire/CAS evidence is reused, not a
 new multi-root backend smoke claim.
 
+REAPI can complete artifact aliases and runfiles metadata provisionally in staging.
+Generated aliases still verify CAS in that phase. Every remote-bound step, including
+Action Cache lookup, requires the full pre-execution certificate. Final source
+certification gates publication for every chain, including a wholly local chain.
+
 Requested preparation also retains source-certified failed build evaluations. Its
 read-only evaluation() view returns the original typed error; plan() reports failure
 without attempting execution. Completed typed errors retain their readable DICE

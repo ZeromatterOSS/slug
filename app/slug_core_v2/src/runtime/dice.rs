@@ -3480,6 +3480,7 @@ pub use action_chain_staging::PreparedRunfilesAction;
 mod action_chain_execution;
 pub use action_chain_execution::ActionChainOutputTransport;
 pub use action_chain_execution::ActionChainResult;
+pub use action_chain_execution::ActionChainStage;
 pub use action_chain_execution::ActionChainTransport;
 pub use action_chain_execution::CompletedActionFailure;
 pub use action_chain_execution::RequestedActionResult;

@@ -170,6 +170,8 @@ enum Behavior {
     StageSource,
     StageModule,
     RetrySource,
+    LocalBeforeRemoteSource,
+    AllLocalRetrySource,
     StageError,
     ExecuteError,
     CompletedFailure,
@@ -274,13 +276,17 @@ impl ActionChainTransport for Fake {
         let attempt = self.starts.fetch_add(1, Ordering::SeqCst);
         if matches!(
             self.behavior,
-            Behavior::RetrySource | Behavior::OutputSource
+            Behavior::RetrySource | Behavior::OutputSource | Behavior::AllLocalRetrySource
         ) && attempt > 0
         {
             assert_eq!(self.session_drops.load(Ordering::SeqCst), attempt);
             assert_eq!(self.output_drops.load(Ordering::SeqCst), attempt);
         }
-        if matches!(self.behavior, Behavior::OutputSource) && attempt > 0 {
+        if matches!(
+            self.behavior,
+            Behavior::OutputSource | Behavior::AllLocalRetrySource
+        ) && attempt > 0
+        {
             let plan = inputs.plan().unwrap();
             let action = plan.actions().last().unwrap().action();
             let root = crate::runtime::configured_output_root(
@@ -339,6 +345,25 @@ impl ActionChainTransport for Fake {
             _ => {}
         }
         Ok(index)
+    }
+    async fn stage_for_execution(
+        &self,
+        session: &mut Session,
+        index: usize,
+    ) -> Result<ActionChainStage<Self::Staged>, Self::Error> {
+        let staged = self.stage(session, index).await?;
+        let mutate = match self.behavior {
+            Behavior::LocalBeforeRemoteSource if index == 0 => true,
+            Behavior::AllLocalRetrySource => {
+                session.attempt == 0 && index + 1 == session.inputs.plan().unwrap().actions().len()
+            }
+            _ => return Ok(ActionChainStage::RequiresExecute(staged)),
+        };
+        if mutate {
+            fs::write(self.root.join("input"), b"bbb")?;
+        }
+        session.executed.push(index);
+        Ok(ActionChainStage::CompletedLocally)
     }
     async fn execute(
         &self,
@@ -463,6 +488,31 @@ fn output_download_source_change_retries_before_publication() {
     assert_eq!(published.root(), path.parent().unwrap());
     assert_eq!(published.outputs().len(), 1);
     assert_eq!(transport.starts.load(Ordering::SeqCst), 2);
+    assert_eq!(transport.output_stages.load(Ordering::SeqCst), 2);
+    assert_eq!(transport.session_drops.load(Ordering::SeqCst), 2);
+    assert_eq!(transport.output_drops.load(Ordering::SeqCst), 1);
+    workspace.assert_stage_cleanup();
+    drop(accepted);
+    assert_eq!(transport.output_drops.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn last_local_completion_retries_before_publishing_any_output() {
+    let workspace = Workspace::new();
+    let path = workspace.output_path();
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, b"old").unwrap();
+    let transport = Fake::new(workspace.root.path(), Behavior::AllLocalRetrySource);
+    let accepted = workspace.publish(&transport).unwrap();
+    assert_eq!(fs::read(&path).unwrap(), b"bbb");
+    let terminal = accepted.terminal_for_test();
+    assert_eq!(terminal.output().bytes, b"bbb");
+    assert_eq!(terminal.output().executed, [0, 1, 2, 3, 4]);
+    assert_eq!(terminal.published_outputs().unwrap().outputs().len(), 1);
+    assert_eq!(transport.starts.load(Ordering::SeqCst), 2);
+    assert_eq!(transport.stages.load(Ordering::SeqCst), 10);
+    assert_eq!(transport.executions.load(Ordering::SeqCst), 0);
     assert_eq!(transport.output_stages.load(Ordering::SeqCst), 2);
     assert_eq!(transport.session_drops.load(Ordering::SeqCst), 2);
     assert_eq!(transport.output_drops.load(Ordering::SeqCst), 1);
@@ -610,6 +660,25 @@ fn downstream_staging_checks_producer_sources_and_entire_build_frontier() {
         fs::write(workspace.root.path().join("MODULE.bazel"), &module).unwrap();
     }
     drop(workspace.run(4, &normal).unwrap());
+}
+
+#[test]
+fn local_completion_cannot_bypass_the_next_remote_execution_frontier() {
+    let workspace = Workspace::new();
+    let before = workspace.snapshot();
+    let transport = Fake::new(workspace.root.path(), Behavior::LocalBeforeRemoteSource);
+    let error = workspace.run(4, &transport).unwrap_err();
+    assert!(
+        error.to_string().contains("changed before execution"),
+        "{error}"
+    );
+    assert_eq!(transport.starts.load(Ordering::SeqCst), 1);
+    assert_eq!(transport.stages.load(Ordering::SeqCst), 2);
+    assert_eq!(transport.executions.load(Ordering::SeqCst), 0);
+    assert_eq!(transport.output_stages.load(Ordering::SeqCst), 0);
+    assert_eq!(transport.session_drops.load(Ordering::SeqCst), 1);
+    assert_eq!(transport.output_drops.load(Ordering::SeqCst), 0);
+    workspace.assert_restored(&before);
 }
 
 #[test]

@@ -109,6 +109,7 @@ pub use cquery_starlark::publish_cquery_starlark_file;
 pub use cquery_starlark::validate_cquery_starlark_source;
 pub use dice::ActionChainOutputTransport;
 pub use dice::ActionChainResult;
+pub use dice::ActionChainStage;
 pub use dice::ActionChainTransport;
 pub use dice::BuildCommandError;
 pub use dice::BuildCommandEvaluation;

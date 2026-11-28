@@ -50,13 +50,22 @@ SourceAttempts64 on the second. Two Source snapshots contributed 14 repeat
 content requests per check. The Source snapshot seal passed original-FD
 `EROFS`, live-writer `EBUSY`, pre-seal drift, retirement and Process controls.
 Sealed Source certificate repeats passed at exactly 64 acquisitions without
-reading payloads. A missing certificate still refused acquisition 65. Cold
-native admission ran close to the 27-second deadline. Measure both routes
-under the existing limits.
+reading payloads. A missing certificate still refused acquisition 65.
+Protected cut `1e87600ed` reached 67 CAS entries cold and 114 retained.
+The retained worker compiled the tinyjson prerequisite from empty AC, with
+verified action, output bytes and worker timing. Both hit the 27-second
+work deadline before probe publication. A bounded trace counted 117 local
+metadata steps and four Rustc steps. The first 109 source rechecks consumed
+0.242 s. The first Rustc uploaded 606 MB in 1.385 s and expired in verified
+CAS readback, after 24.981 s of command preparation.
+REAPI now records provisional metadata in staging and checks the full source
+frontier before each remote-bound step. Nine checks passed, including stale
+source refusal, final retry and generated CAS eviction/corruption. Qualify
+the new installed cut under the same clock.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
-diagnostic-only integration, caller pruning, Need cacheability, new repository
+diagnostic-only integration, source-demand pruning, Need cacheability, new repository
 routes, unselected syntax, global path caches and concurrent Archive batching
 remain outside scope.
 
@@ -144,15 +153,13 @@ final review precedes activation.
 The bounded six-archive gate and authored General glob cquery are accepted.
 The authentic inactive Rust driver, scoped HTTPS freshness, repeated Workspace
 publication, Archive envelope and public Rust action comparison passed.
-Production activation, Rust REAPI, full Slug closure and completed-command
-latency/RSS (RSS at most 1.25× Bazel)
-remain open under the [bootstrap readiness matrix][readiness]. One cold pinned
-CrateInfo row and three retained rows matched in the latest paired resource run.
-Sampled RSS was 0.872×, 1.234×, 1.024× and 0.943× Bazel. An earlier edition change
-reached 1.884× raw RSS. Descendant sampling caught a matching spike at the
-bubblewrap exec, and a trace confirmed `CLONE_VM | CLONE_VFORK`. Preserve raw samples
-and count verified shared address spaces once. Reassess new ownership,
-compatibility or resource prerequisites under the orchestration skill.
+Production activation, Rust REAPI and full Slug closure remain open under the
+[bootstrap readiness matrix][readiness]. Cut `1e87600ed` matched five paired
+CrateInfo rows. Conservative RSS was 0.753×–1.118× Bazel, within 1.25×.
+Raw edition-change/restoration RSS reached 1.765×/1.798×. Keep the raw values
+and count verified shared address spaces once. Warm cquery still took 22.558 s
+against 0.051 s for Bazel. Whole Build latency and RSS remain open. Reassess
+new ownership, compatibility or resource prerequisites under the orchestration skill.
 
 ## Evidence and history
 
