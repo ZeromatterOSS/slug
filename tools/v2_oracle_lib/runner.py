@@ -14,9 +14,10 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from .fixture import Fixture, FixtureCommand, Mutation
 from .manifest import collect_manifest_roots
@@ -44,6 +45,7 @@ class ToolConfig:
 class RunOptions:
     run_root: Path
     timeout_seconds: int = 120
+    slug_daemon_route: Literal["generic", "installed"] = "generic"
 
 
 @dataclass(frozen=True)
@@ -1013,12 +1015,27 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
             f"is unavailable; {tool.name} is unsupported"
         )
 
+    installed = tool.name == "slug" and options.slug_daemon_route == "installed"
+    if installed:
+        if sys.platform != "linux" or os.uname().machine != "x86_64":
+            raise RuntimeError("installed Slug fixtures require a Linux x86_64 host")
+        for command in fixture.commands:
+            if any(
+                arg == "--output_base" or arg.startswith("--output_base=")
+                for arg in (*fixture.startup_argv, *command.startup_argv, *command.argv)
+            ):
+                raise ValueError("installed fixtures must use the harness-owned output base")
+    run_root = options.run_root.resolve() if installed else options.run_root
     run_id = time.strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}-{tool.name}"
-    run_dir = options.run_root / "runs" / fixture.name / run_id
+    run_dir = run_root / "runs" / fixture.name / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     workspace = _copy_workspace(fixture, run_dir)
-    output_base = options.run_root / "ob" / fixture.name / tool.name
-    output_base.mkdir(parents=True, exist_ok=True)
+    output_base = run_root / "ob" / fixture.name / tool.name
+    managed_base = installed and fixture.daemon
+    if managed_base:
+        output_base.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        output_base.mkdir(parents=True, exist_ok=True)
     diagnostic_replacements = path_replacements(
         workspace=workspace, run_dir=run_dir, output_base=output_base
     )
@@ -1030,25 +1047,36 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
     registry_endpoint: str | None = None
     epochs = ServerEpochs()
     primary_error: BaseException | None = None
-    if fixture.reapi.remote_executor and tool.name == "slug":
-        binary = discover_nativelink_binary()
-        if binary is None:
-            raise FileNotFoundError(
-                "fixture requires NativeLink but no binary was found; set "
-                "SLUG_V2_NATIVELINK_BIN or build ../nativelink/target/release/nativelink"
-            )
-        nativelink_service = start_nativelink(
-            binary,
-            run_dir / "nativelink",
-            fixture.reapi.worker_platform_properties,
-        )
+    services = ExitStack()
 
     try:
+        if fixture.reapi.remote_executor and tool.name == "slug":
+            binary = discover_nativelink_binary()
+            if binary is None:
+                raise FileNotFoundError(
+                    "fixture requires NativeLink but no binary was found; set "
+                    "SLUG_V2_NATIVELINK_BIN or build ../nativelink/target/release/nativelink"
+                )
+            nativelink_service = start_nativelink(
+                binary,
+                run_dir / "nativelink",
+                fixture.reapi.worker_platform_properties,
+            )
+            services.callback(stop_nativelink, nativelink_service)
         if fixture.http_registry:
             registry_service, registry_endpoint, registry_log = _start_fixture_http_registry(
                 fixture, workspace
             )
+            services.callback(_stop_process, registry_service)
             replacements.update(path_replacements(http_registry=registry_endpoint))
+        installed_daemon = None
+        if managed_base:
+            from tools.v2_oracle.installed_daemon_witness import InstalledDaemon
+
+            installed_daemon = services.enter_context(
+                InstalledDaemon(output_base, tool.executable)
+            )
+        installed_daemon_pid: int | None = None
         records: list[dict[str, Any]] = []
         coordination: list[dict[str, Any]] = []
         commands = fixture.commands
@@ -1098,6 +1126,19 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
                 check=False,
             )
             duration_ms = int((time.monotonic() - start) * 1000)
+            # Commands such as version can complete before startup. A managed
+            # run must still prove its daemon identity by the last command.
+            if installed_daemon is not None and (
+                installed_daemon_pid is not None
+                or os.path.lexists(installed_daemon.endpoint)
+                or command_index == len(fixture.commands)
+            ):
+                try:
+                    installed_daemon_pid = installed_daemon.sample()
+                except (OSError, RuntimeError) as error:
+                    raise RuntimeError(
+                        f"{fixture.name}/{command.name}: installed daemon verification failed: {error}"
+                    ) from error
             server_epoch: int | None = None
             if fixture.observe_server_epochs:
                 identity = _read_bazel_server_identity(output_base)
@@ -1153,6 +1194,8 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
             if command.capture_server_epoch:
                 assert server_epoch is not None
                 record["server_epoch"] = server_epoch
+            if installed_daemon_pid is not None:
+                record["installed_daemon_pid"] = installed_daemon_pid
             if command.capture_startup_diagnostics:
                 assert startup_combined_forms is not None
                 assert startup_announcements is not None
@@ -1180,16 +1223,15 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
                         epochs.identities,
                         DAEMON_SHUTDOWN_TIMEOUT_SECONDS,
                     )
-                elif fixture.daemon and tool.name == "slug":
+                elif fixture.daemon and tool.name == "slug" and not installed:
                     _shutdown_slug_daemon(output_base)
-                if nativelink_service is not None:
-                    stop_nativelink(nativelink_service)
-                if registry_service is not None:
-                    _stop_process(registry_service)
             finally:
-                startup_bep_dir = run_dir / "startup-bep"
-                if startup_bep_dir.exists():
-                    shutil.rmtree(startup_bep_dir)
+                try:
+                    services.close()
+                finally:
+                    startup_bep_dir = run_dir / "startup-bep"
+                    if startup_bep_dir.exists():
+                        shutil.rmtree(startup_bep_dir)
         except BaseException as cleanup_error:
             if primary_error is not None:
                 raise primary_error from cleanup_error
@@ -1204,6 +1246,7 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
         "workspace": str(workspace),
         "output_base": str(output_base),
         "commands": records,
+        **({"slug_daemon_route": options.slug_daemon_route} if installed else {}),
         **({"concurrent_command_groups": coordination} if coordination else {}),
     }
     (run_dir / f"{tool.name}.json").write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")

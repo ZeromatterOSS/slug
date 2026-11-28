@@ -29,7 +29,7 @@ impl Drop for Directory {
         }
     }
 }
-fn stat(fd: BorrowedFd<'_>) -> io::Result<libc::stat> {
+pub(super) fn stat(fd: BorrowedFd<'_>) -> io::Result<libc::stat> {
     let mut value = MaybeUninit::zeroed();
     if unsafe { libc::fstat(fd.as_raw_fd(), value.as_mut_ptr()) } != 0 {
         return Err(io::Error::last_os_error());
@@ -44,6 +44,10 @@ fn same(a: &libc::stat, b: &libc::stat) -> bool {
         && a.st_mtime_nsec == b.st_mtime_nsec
         && a.st_ctime == b.st_ctime
         && a.st_ctime_nsec == b.st_ctime_nsec
+}
+
+pub(super) fn same_image(a: &libc::stat, b: &libc::stat) -> bool {
+    same(a, b) && a.st_uid == b.st_uid && a.st_gid == b.st_gid && a.st_size == b.st_size
 }
 impl HostMirror {
     pub(super) fn collect(
@@ -264,7 +268,11 @@ fn code(value: i32) -> io::Result<()> {
         Err(io::Error::from_raw_os_error(value))
     }
 }
-type CloseFrom = unsafe extern "C" fn(*mut libc::posix_spawn_file_actions_t, i32) -> i32;
+pub(super) type CloseFrom = unsafe extern "C" fn(*mut libc::posix_spawn_file_actions_t, i32) -> i32;
+pub(super) fn resolve_closefrom() -> io::Result<CloseFrom> {
+    closefrom_with(|name| unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) })
+}
+
 pub(super) fn closefrom_with(resolve: impl FnOnce(&CStr) -> *mut c_void) -> io::Result<CloseFrom> {
     let address = resolve(c"posix_spawn_file_actions_addclosefrom_np");
     if address.is_null() {
@@ -326,11 +334,21 @@ pub(super) fn launch(
     namespace: Option<BorrowedFd<'_>>,
     resources: &Arc<RepositoryRootResources>,
 ) -> Result<Spawned, PhysicalRootError> {
-    let closefrom =
-        closefrom_with(|name| unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) })?;
     let display = Path::new(OsStr::from_bytes(plan.display.as_bytes()));
-    let bwrap_image = pin_image(&platform.bwrap, display, !platform.test_images, false)?;
-    let helper_image = pin_image(&platform.helper, display, false, !platform.test_images)?;
+    #[cfg(any(test, feature = "repository-workspace-test-support"))]
+    let fixture;
+    let (bwrap_image, helper_image, closefrom) = match &platform.images {
+        ProcessImages::Installed(images) => images.launch_images(display)?,
+        #[cfg(any(test, feature = "repository-workspace-test-support"))]
+        ProcessImages::Fixture { bwrap, helper } => {
+            let closefrom = resolve_closefrom()?;
+            fixture = (
+                pin_image(bwrap, display, false, false)?,
+                pin_image(helper, display, false, false)?,
+            );
+            (fixture.0.as_fd(), fixture.1.as_fd(), closefrom)
+        }
+    };
     let argv = arguments(platform, plan, namespace.is_some())?;
     let pointers: Vec<*mut libc::c_char> = argv
         .iter()
@@ -372,8 +390,8 @@ pub(super) fn launch(
     for (i, pin) in mirror.pins.iter().enumerate() {
         add(pin.file.as_fd(), 6 + i as i32)?;
     }
-    add(bwrap_image.as_fd(), 6 + mirror.pins.len() as i32)?;
-    add(helper_image.as_fd(), 7 + mirror.pins.len() as i32)?;
+    add(bwrap_image, 6 + mirror.pins.len() as i32)?;
+    add(helper_image, 7 + mirror.pins.len() as i32)?;
     add(status_write.as_fd(), 8 + mirror.pins.len() as i32)?;
     let mut actions = Actions::new()?;
     code(unsafe {
@@ -429,6 +447,7 @@ pub(super) fn launch(
     })
 }
 
+#[cfg(any(test, feature = "repository-workspace-test-support"))]
 fn pin_image(path: &Path, display: &Path, root_owned: bool, current: bool) -> io::Result<File> {
     use std::os::unix::fs::MetadataExt;
     if !path.is_absolute() || path.starts_with(display) {
@@ -469,6 +488,11 @@ fn pin_image(path: &Path, display: &Path, root_owned: bool, current: bool) -> io
     {
         return Err(invalid("trusted image identity changed"));
     }
+    check_image_contents(&file)?;
+    Ok(file)
+}
+
+pub(super) fn check_image_contents(file: &File) -> io::Result<()> {
     require_no_file_capabilities(file.as_fd())?;
     use std::os::unix::fs::FileExt;
     let mut magic = [0u8; 4];
@@ -476,10 +500,10 @@ fn pin_image(path: &Path, display: &Path, root_owned: bool, current: bool) -> io
     if magic != *b"\x7fELF" {
         return Err(invalid("trusted setup image is not ELF"));
     }
-    Ok(file)
+    Ok(())
 }
 
-fn admitted_image_mode(mode: libc::mode_t, uid: libc::uid_t, root_owned: bool) -> bool {
+pub(super) fn admitted_image_mode(mode: libc::mode_t, uid: libc::uid_t, root_owned: bool) -> bool {
     mode & libc::S_IFMT == libc::S_IFREG
         && mode & 0o111 != 0
         && mode & (libc::S_ISUID | libc::S_ISGID | 0o022) == 0
@@ -516,7 +540,7 @@ fn arguments(
         args.push(CString::new(value).map_err(|_| invalid("invalid native setup argument"))?);
         Ok(())
     };
-    add(platform.bwrap.as_os_str().as_bytes())?;
+    add(platform.launcher_path().as_os_str().as_bytes())?;
     if namespace {
         add(b"--userns")?;
         add(b"5")?;

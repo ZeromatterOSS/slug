@@ -9,5 +9,5 @@
  */
 
 fn main() {
-    std::process::exit(slug_cli_v2::main());
+    std::process::exit(slug_cli_v2::installed_main());
 }

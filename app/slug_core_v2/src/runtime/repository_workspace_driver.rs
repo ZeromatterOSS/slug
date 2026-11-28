@@ -3,6 +3,18 @@
 use slug_bzlmod_v2::RepositoryMaterializationResult;
 
 use super::*;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+use crate::runtime::repository_physical_root::InstalledProcessPlatform;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+use crate::runtime::repository_physical_root::RepositoryWorkspaceLauncher;
 
 fn refusal(message: &'static str) -> NativeDemandSessionError {
     NativeDemandSessionError::Computation(anyhow::anyhow!(message))
@@ -23,13 +35,14 @@ impl WorkspaceRuntime {
         slug_bzlmod_v2::RepositoryWorkspaceExecutionPolicy::Disabled
     }
 
-    /// Trusted internal configuration. Public/default activation remains disabled.
+    /// Alternate native images are confined to controlled test runtimes.
     #[cfg(all(
+        any(test, feature = "repository-workspace-test-support"),
         target_os = "linux",
         target_arch = "x86_64",
         target_pointer_width = "64"
     ))]
-    pub(in crate::runtime) fn configure_general_repository_workspaces(
+    pub(in crate::runtime) fn enable_general_repository_workspaces_for_test(
         &mut self,
         resources: Arc<super::super::repository_physical_root::RepositoryRootResources>,
         limits: slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits,
@@ -50,25 +63,12 @@ impl WorkspaceRuntime {
         self.general_workspaces = Some(GeneralWorkspaceRuntime {
             resources,
             limits,
+            launcher: RepositoryWorkspaceLauncher::TestFixture,
             #[cfg(test)]
             probe: None,
         });
         Ok(())
     }
-    #[cfg(all(
-        test,
-        target_os = "linux",
-        target_arch = "x86_64",
-        target_pointer_width = "64"
-    ))]
-    pub(in crate::runtime) fn enable_general_repository_workspaces_for_test(
-        &mut self,
-        resources: Arc<super::super::repository_physical_root::RepositoryRootResources>,
-        limits: slug_bzlmod_v2::RepositoryWorkspaceRetentionLimits,
-    ) -> Result<(), NativeDemandSessionError> {
-        self.configure_general_repository_workspaces(resources, limits)
-    }
-
     pub(super) fn new_command_source_scope(
         &self,
     ) -> Result<(Option<Arc<source_service::SourceServiceScope>>, bool), NativeDemandSessionError>
@@ -371,6 +371,7 @@ mod native {
     use super::*;
     use crate::runtime::repository_io::reservations::ReservedRepositoryWorkspace;
     use crate::runtime::repository_physical_root::PhysicalRootError;
+    use crate::runtime::repository_physical_root::RepositoryRootResourceLimits;
     use crate::runtime::repository_physical_root::RepositoryRootResources;
     use crate::runtime::repository_physical_root::RepositoryWorkspaceCommand;
     use crate::runtime::repository_physical_root::ResourceCredit;
@@ -378,8 +379,28 @@ mod native {
     pub(in crate::runtime::dice) struct GeneralWorkspaceRuntime {
         pub(super) resources: Arc<RepositoryRootResources>,
         pub(super) limits: RepositoryWorkspaceRetentionLimits,
+        pub(super) launcher: RepositoryWorkspaceLauncher,
         #[cfg(test)]
         pub(super) probe: Option<GeneralWorkspaceProbe>,
+    }
+    impl GeneralWorkspaceRuntime {
+        pub(in crate::runtime::dice) fn installed() -> anyhow::Result<Self> {
+            let resources =
+                RepositoryRootResourceLimits::new(512 * 1024 * 1024, 512, 8 * 1024 * 1024 * 1024)
+                    .and_then(RepositoryRootResources::new)
+                    .map_err(physical)?;
+            let limits = repository_workspace_retention_limits()
+                .map_err(|error| anyhow::anyhow!("workspace policy: {error:?}"))?;
+            let launcher =
+                InstalledProcessPlatform::acquire(resources.clone()).map_err(physical)?;
+            Ok(Self {
+                resources,
+                limits,
+                launcher: RepositoryWorkspaceLauncher::Installed(launcher),
+                #[cfg(test)]
+                probe: None,
+            })
+        }
     }
     #[cfg(test)]
     pub(super) struct GeneralWorkspaceProbe {
@@ -445,12 +466,13 @@ mod native {
                 .repository_materializer
                 .begin_general_workspace(token, config.resources.clone(), config.limits, &scope)
                 .map_err(NativeDemandSessionError::Repository)?;
-            let command = RepositoryWorkspaceCommand::new(
+            let command = RepositoryWorkspaceCommand::new_with_launcher(
                 runtime.repository_materializer.workspace().clone(),
                 lease,
                 config.limits,
                 config.resources.clone(),
                 scope.clone(),
+                config.launcher.clone(),
                 &|| runtime.repository_materializer.session_is_active(token),
             )
             .map_err(physical)?;

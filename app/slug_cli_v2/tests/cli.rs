@@ -8,7 +8,6 @@
  * above-listed licenses.
  */
 
-use std::process::Command;
 use std::time::SystemTime;
 
 use slug_commands_v2::build::BuildRequest;
@@ -23,14 +22,12 @@ use fixture_support::FixtureWorkspace;
 #[path = "../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod source_staging_workspace;
 
-fn slug() -> Command {
-    let executable = std::path::PathBuf::from(env!("CARGO_BIN_EXE_slug"));
-    Command::new(if executable.is_absolute() {
-        executable
-    } else {
-        std::env::current_dir().unwrap().join(executable)
-    })
-}
+mod support;
+use support::INSTALLED_DAEMON;
+use support::daemon::daemon_fixture;
+use support::daemon::daemon_generation;
+use support::daemon::daemon_pid_path;
+use support::slug;
 
 fn scratch(name: &str) -> std::path::PathBuf {
     let nanos = SystemTime::now()
@@ -79,7 +76,28 @@ fn configured_cli_fixture(name: &str) -> std::path::PathBuf {
 }
 
 fn configured_cli_registry_arg(assembly: &std::path::Path) -> String {
-    format!("--registry=file://{}", assembly.join("registry").display())
+    format!(
+        "--registry={}",
+        fixture_support::configured_cli_registry_url(assembly)
+    )
+}
+
+fn local_cli_workspace(
+    name: &str,
+    module_name: &str,
+    additional_directives: &str,
+) -> (std::path::PathBuf, String) {
+    let workspace = scratch(name).canonicalize().unwrap();
+    source_staging_workspace::write(&workspace);
+    let module_path = workspace.join("MODULE.bazel");
+    let module = std::fs::read_to_string(&module_path).unwrap();
+    let (_, local_directives) = module.split_once('\n').unwrap();
+    write(
+        module_path,
+        &format!("module(name = \"{module_name}\")\n{local_directives}{additional_directives}"),
+    );
+    let registry = format!("--registry=file://{}/empty-registry", workspace.display());
+    (workspace, registry)
 }
 
 fn offline_cquery_workspace(name: &str, module: &str) -> (std::path::PathBuf, String) {
@@ -713,17 +731,6 @@ fn assert_query_oracle_case(
     }
 }
 
-struct DaemonCleanup(std::path::PathBuf);
-
-impl Drop for DaemonCleanup {
-    fn drop(&mut self) {
-        let socket = slug_server_v2::socket_path(&self.0);
-        if socket.exists() {
-            let _ = slug_server_v2::send_shutdown(&socket);
-        }
-    }
-}
-
 #[test]
 fn version_reports_v2_bazel_floor() {
     let output = slug().arg("version").output().unwrap();
@@ -903,8 +910,7 @@ fn typed_build_activation_publishes_cold_events_without_warm_daemon_replay() {
     assert!(stderr.contains("\"analyzed_target_count\":1"));
     assert!(stderr.contains("\"runtime_mode\":\"one-shot\""));
 
-    let output_base = scratch("typed-build-activation-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     for index in 0..2 {
         let daemon = slug()
@@ -952,8 +958,7 @@ fn requested_build_rejects_loading_only_native_filegroups() {
         workspace.join("pkg/BUILD.bazel"),
         "filegroup(name = \"probe\")\n",
     );
-    let output_base = scratch("typed-build-reapi-projector-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
 
     for args in [
@@ -1071,6 +1076,165 @@ fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
 }
 
 #[test]
+fn cquery_starlark_file_projects_providers_and_recovers_in_both_routes() {
+    let assembly = configured_cli_fixture("cquery-starlark-file-registry");
+    let registry = configured_cli_registry_arg(&assembly);
+    let root = scratch("cquery-starlark-file");
+    let workspace = root.join("workspace");
+    let caller = root.join("caller");
+    std::fs::create_dir(&caller).unwrap();
+    write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"fixture\")\n",
+    );
+    write(
+        workspace.join("pkg/defs.bzl"),
+        r#"ProbeInfo = provider(fields = ["message", "data"])
+
+def _impl(ctx):
+    data = depset(ctx.files.srcs)
+    return [DefaultInfo(files = data), ProbeInfo(message = ctx.attr.message, data = data)]
+
+probe = rule(implementation = _impl, attrs = {"message": attr.string(), "srcs": attr.label_list(allow_files = True)})
+"#,
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        r#"load(":defs.bzl", "probe")
+exports_files(["data.txt"])
+probe(name = "bin", message = "binary", srcs = ["data.txt"])
+probe(name = "lib", message = "library", srcs = ["data.txt"])
+"#,
+    );
+    write(workspace.join("pkg/data.txt"), "fixture\n");
+
+    let (_cleanup, output_base) = daemon_fixture();
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let expression = "set(//pkg:bin //pkg:lib)";
+    let run = |cwd: &std::path::Path, output_base_arg: Option<&str>, expression: &str| {
+        let mut command = slug();
+        command.current_dir(cwd);
+        if let Some(output_base_arg) = output_base_arg {
+            command.arg(output_base_arg);
+        }
+        command
+            .args([
+                "cquery",
+                expression,
+                "--output=starlark",
+                "--starlark:file=format.star",
+                "--noshow_progress",
+            ])
+            .arg(&registry)
+            .output()
+            .unwrap()
+    };
+
+    let provider_projection = r#"def render(target):
+    for key, info in providers(target).items():
+        if key.endswith("%ProbeInfo"):
+            data = sorted([file.short_path for file in info.data.to_list()])
+            return str(target.label) + ":" + info.message + ":" + str(data)
+    fail("ProbeInfo missing")
+"#;
+
+    let check_formatter = |cwd: &std::path::Path, output_base_arg| {
+        let formatter = cwd.join("format.star");
+        write(
+            &formatter,
+            &format!("{provider_projection}\ndef format(target):\n    return render(target)\n"),
+        );
+        let first = run(cwd, output_base_arg, expression);
+        assert!(first.status.success(), "{first:?}");
+        assert!(first.stderr.is_empty(), "{first:?}");
+        assert_eq!(
+            first.stdout,
+            b"@@//pkg:bin:binary:[\"pkg/data.txt\"]\n@@//pkg:lib:library:[\"pkg/data.txt\"]\n"
+        );
+
+        write(&formatter, "fail(\"formatter setup failure\")\n");
+        let setup = run(cwd, output_base_arg, "//pkg:lib");
+        assert_eq!(setup.status.code(), Some(1), "{setup:?}");
+        assert!(setup.stdout.is_empty(), "{setup:?}");
+        let stderr = std::str::from_utf8(&setup.stderr).unwrap();
+        assert!(stderr.contains("formatter setup failure"), "{stderr}");
+        let mixed = run(cwd, output_base_arg, "//pkg:missing");
+        assert_eq!(mixed.status.code(), Some(1), "{mixed:?}");
+        assert!(mixed.stdout.is_empty(), "{mixed:?}");
+        let stderr = std::str::from_utf8(&mixed.stderr).unwrap();
+        assert!(stderr.contains("no such target"), "{stderr}");
+        assert!(!stderr.contains("formatter setup failure"), "{stderr}");
+
+        write(
+            &formatter,
+            &format!(
+                "{provider_projection}\ndef format(target):\n    if str(target.label).endswith(\":bin\"):\n        fail(\"formatter row failure\")\n    return render(target)\n"
+            ),
+        );
+        let partial = run(cwd, output_base_arg, expression);
+        assert!(partial.status.success(), "{partial:?}");
+        assert_eq!(partial.stdout, b"@@//pkg:lib:library:[\"pkg/data.txt\"]\n");
+        let stderr = std::str::from_utf8(&partial.stderr).unwrap();
+        assert!(stderr.contains("formatter row failure"), "{stderr}");
+        assert!(
+            stderr.contains("ERROR: Starlark evaluation error for //pkg:bin:"),
+            "{stderr}"
+        );
+
+        write(
+            &formatter,
+            &format!(
+                "{provider_projection}\ndef format(target):\n    return \"edited:\" + render(target)\n"
+            ),
+        );
+        let recovered = run(cwd, output_base_arg, expression);
+        assert!(recovered.status.success(), "{recovered:?}");
+        assert!(recovered.stderr.is_empty(), "{recovered:?}");
+        assert_eq!(
+            recovered.stdout,
+            b"edited:@@//pkg:bin:binary:[\"pkg/data.txt\"]\nedited:@@//pkg:lib:library:[\"pkg/data.txt\"]\n"
+        );
+        std::fs::remove_file(formatter).unwrap();
+    };
+    check_formatter(&workspace, None);
+
+    let missing = run(&caller, Some(output_base_arg.as_str()), expression);
+    assert_eq!(missing.status.code(), Some(2), "{missing:?}");
+    assert!(missing.stdout.is_empty(), "{missing:?}");
+    assert!(!output_base.exists());
+
+    let launch = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "cquery", "//pkg:bin"])
+        .arg(&registry)
+        .output()
+        .unwrap();
+    assert!(launch.status.success(), "{launch:?}");
+    let generation = daemon_generation(&output_base).unwrap();
+    if INSTALLED_DAEMON {
+        write(caller.join("MODULE.bazel"), "module(name = \"foreign\")\n");
+        write(
+            caller.join("format.star"),
+            "fail(\"foreign formatter ran\")\n",
+        );
+        let foreign = run(&caller, Some(output_base_arg.as_str()), expression);
+        assert_eq!(foreign.status.code(), Some(2), "{foreign:?}");
+        assert!(foreign.stdout.is_empty(), "{foreign:?}");
+        let stderr = std::str::from_utf8(&foreign.stderr).unwrap();
+        assert!(
+            stderr.contains("managed daemon workspace mismatch"),
+            "{stderr}"
+        );
+        assert!(!stderr.contains("foreign formatter ran"), "{stderr}");
+        assert_eq!(daemon_generation(&output_base).unwrap(), generation);
+        check_formatter(&workspace, Some(output_base_arg.as_str()));
+    } else {
+        check_formatter(&caller, Some(output_base_arg.as_str()));
+    }
+    assert_eq!(daemon_generation(&output_base).unwrap(), generation);
+}
+
+#[test]
 fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
     let (workspace, registry) = offline_cquery_workspace(
         "cquery-set-expression-workspace",
@@ -1130,8 +1294,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
     assert!(empty_one_shot.stdout.is_empty());
     assert!(empty_one_shot.stderr.is_empty());
 
-    let output_base = scratch("cquery-set-expression-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base = format!("--output_base={}", output_base.display());
     let daemon = slug()
         .current_dir(&workspace)
@@ -1287,8 +1450,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     assert_eq!(shorthand.stdout, b"@@//pkg:pkg\n");
     assert!(shorthand.stderr.is_empty());
 
-    let output_base = scratch("cquery-deps-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base = format!("--output_base={}", output_base.display());
     for without_tools in [false, true] {
         let daemon = run(Some(&output_base), expression, without_tools);
@@ -1588,8 +1750,7 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     );
     assert!(one_shot.stderr.is_empty());
 
-    let output_base = scratch("cquery-graph-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base = format!("--output_base={}", output_base.display());
     let daemon = run(Some(&output_base), "deps(//:root)");
     assert!(daemon.status.success(), "{daemon:?}");
@@ -1743,8 +1904,7 @@ fn cquery_filter_matches_apparent_labels_in_one_shot_and_daemon() {
     assert!(empty_one_shot.stdout.is_empty());
     assert!(empty_one_shot.stderr.is_empty());
 
-    let output_base = scratch("cquery-filter-expression-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base = format!("--output_base={}", output_base.display());
     let anchored_daemon = run(Some(&output_base), anchored);
     assert!(anchored_daemon.status.success(), "{anchored_daemon:?}");
@@ -1809,8 +1969,7 @@ fn cquery_siblings_post_analysis_terminal_matches_one_shot_and_daemon() {
             .contains("\"message\":\"siblings() not supported for post analysis queries\"")
     );
 
-    let output_base = scratch("cquery-siblings-post-analysis-terminal-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base = format!("--output_base={}", output_base.display());
     let empty_daemon = run(Some(&output_base), empty, &starlark);
     assert!(empty_daemon.status.success(), "{empty_daemon:?}");
@@ -1882,8 +2041,7 @@ fn cquery_visible_vacuous_post_analysis_matches_one_shot_and_daemon() {
             .contains("\"message\":\"visible() is not supported on configured targets\"")
     );
 
-    let output_base = scratch("cquery-visible-vacuous-post-analysis-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base = format!("--output_base={}", output_base.display());
     let empty_daemon = run(Some(&output_base), empty, &starlark);
     assert!(empty_daemon.status.success(), "{empty_daemon:?}");
@@ -1947,8 +2105,7 @@ fn cquery_loading_files_post_analysis_terminals_match_one_shot_and_daemon() {
     let loadfiles_one_shot = run(None, loadfiles, &starlark);
     assert_terminal(&loadfiles_one_shot);
 
-    let output_base = scratch("cquery-loading-files-post-analysis-terminal-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base = format!("--output_base={}", output_base.display());
     let buildfiles_daemon = run(Some(&output_base), buildfiles, &[]);
     assert_terminal(&buildfiles_daemon);
@@ -1963,8 +2120,7 @@ fn cquery_starlark_label_daemon_recovers_after_missing() {
     let inputs = configured_cli_fixture("cquery-starlark-label-recovery-registry");
     let registry = configured_cli_registry_arg(&inputs);
     let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
-    let output_base = scratch("cquery-starlark-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     let invoke = |target: &str| {
         slug()
@@ -2040,8 +2196,7 @@ fn cquery_one_shot_and_retained_daemon_restore_label_projection() {
     assert!(one_shot.stderr.is_empty());
     let c0_one_shot = assert_slug_cquery_label(&one_shot.stdout, "//pkg:probe");
 
-    let output_base = scratch("cquery-label-configuration-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     let invoke = |extra: &[&str]| {
         slug()
@@ -2149,8 +2304,7 @@ fn typed_query_activation_publishes_cold_events_without_warm_daemon_replay() {
     assert_eq!(one_shot.stdout, b"//pkg:probe\n");
     assert_eq!(String::from_utf8(one_shot.stderr).unwrap(), event_stderr,);
 
-    let output_base = scratch("typed-query-activation-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     for index in 0..2 {
         let daemon = slug()
@@ -2239,15 +2393,14 @@ fn visible_fixture_matches_exact_twenty_five_rows_one_shot() {
 #[test]
 fn visible_fixture_matches_exact_twenty_five_rows_through_one_daemon() {
     let workspace = fixture_workspace("query-visible-visibility");
-    let output_base = scratch("visible-query-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     let cases = visible_oracle_cases();
     assert_eq!(cases.len(), 25);
     let mut daemon_pid = None;
     for named in &cases {
         assert_visible_oracle_case(&workspace, Some(&output_base_arg), named);
-        let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+        let pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
         if let Some(previous) = &daemon_pid {
             assert_eq!(&pid, previous, "{}", named.name);
         } else {
@@ -2259,15 +2412,14 @@ fn visible_fixture_matches_exact_twenty_five_rows_through_one_daemon() {
 #[test]
 fn tests_query_expansion_fixture_matches_all_twenty_one_function_rows_through_daemon() {
     let workspace = fixture_workspace("tests-query-expansion");
-    let output_base = scratch("tests-query-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     let cases = tests_function_oracle_cases();
     assert_eq!(cases.len(), 21);
     for case in cases {
         assert_query_oracle_case(&workspace, Some(&output_base_arg), case);
     }
-    assert!(slug_server_v2::pid_path(&output_base).is_file());
+    assert!(daemon_pid_path(&output_base).is_file());
 }
 
 #[test]
@@ -3284,10 +3436,8 @@ fn executables_rule_capability_fixture_matches_all_thirty_two_non_label_kind_baz
 
 #[test]
 fn output_base_executables_reuses_one_daemon_across_capability_transitions() {
-    let workspace = scratch("executables-capability-workspace");
-    let output_base = scratch("executables-capability-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
-    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let (workspace, registry) = local_cli_workspace("executables-capability-workspace", "demo", "");
+    let (_cleanup, output_base) = daemon_fixture();
     let defs = workspace.join("pkg/defs.bzl");
     let build = workspace.join("pkg/BUILD.bazel");
     let definition = |name: &str, arguments: &str| {
@@ -3303,6 +3453,7 @@ fn output_base_executables_reuses_one_daemon_across_capability_transitions() {
         slug()
             .current_dir(&workspace)
             .args([output_base_arg.as_str(), "query", expression])
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -3320,7 +3471,7 @@ fn output_base_executables_reuses_one_daemon_across_capability_transitions() {
     write(&defs, &definition("probe", ", executable = False"));
     write(&build, &build_file("probe", "item"));
     assert_query("executables(//pkg:item)", "");
-    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
 
     write(&defs, &definition("probe", ", executable = True"));
     assert_query("executables(//pkg:item)", "//pkg:item\n");
@@ -3363,7 +3514,7 @@ fn output_base_executables_reuses_one_daemon_across_capability_transitions() {
     write(&build, &build_file("renamed_exec", "item_test"));
     assert_query("executables(//pkg:item_test)", "//pkg:item_test\n");
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         pid
     );
 }
@@ -3994,8 +4145,7 @@ fn some_selection_fixture_covers_all_forty_two_bazel_rows_through_cli() {
 #[test]
 fn output_base_query_reuses_one_daemon_across_build_edits() {
     let workspace = scratch("query-workspace");
-    let output_base = scratch("query-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(
         workspace.join("pkg/BUILD.bazel"),
@@ -4014,7 +4164,7 @@ fn output_base_query_reuses_one_daemon_across_build_edits() {
         String::from_utf8(first.stdout).unwrap(),
         "//pkg:bin\n//pkg:one.txt\n"
     );
-    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
 
     write(
         workspace.join("pkg/BUILD.bazel"),
@@ -4032,7 +4182,7 @@ fn output_base_query_reuses_one_daemon_across_build_edits() {
         "//pkg:bin\n//pkg:two.txt\n"
     );
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         pid
     );
 }
@@ -4127,8 +4277,7 @@ fn direct_external_module_cycle_is_typed_for_query_and_build() {
 #[test]
 fn direct_external_exported_source_build_has_exact_one_shot_and_daemon_terminals() {
     let workspace = scratch("external-build-source");
-    let output_base = scratch("external-build-source-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(
         workspace.join("MODULE.bazel"),
         "module(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
@@ -4182,8 +4331,7 @@ fn direct_external_exported_source_build_has_exact_one_shot_and_daemon_terminals
 #[test]
 fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events() {
     let workspace = scratch("external-query-workspace");
-    let output_base = scratch("external-query-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(
         workspace.join("MODULE.bazel"),
         "print(\"MODULE_EVENT\")\nmodule(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
@@ -4295,7 +4443,7 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         first_stderr.contains("EXTERNAL_BUILD_EVENT"),
         "{first_stderr}"
     );
-    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
 
     let warm = slug()
         .current_dir(&workspace)
@@ -4306,7 +4454,7 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
     assert_eq!(String::from_utf8_lossy(&warm.stdout), "@dep//:target.txt\n");
     assert!(warm.stderr.is_empty(), "{warm:?}");
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         pid
     );
 
@@ -4457,7 +4605,7 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         "@dep//macro:macro_files\n"
     );
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         pid
     );
 
@@ -4573,7 +4721,7 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         "@dep//:remapped.txt\n"
     );
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         pid
     );
 }
@@ -4581,8 +4729,7 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
 #[test]
 fn bzlmod_environment_is_captured_per_one_shot_and_daemon_query_child() {
     let workspace = scratch("bzlmod-env-workspace");
-    let output_base = scratch("bzlmod-env-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(
         workspace.join("pkg/BUILD.bazel"),
@@ -4619,7 +4766,7 @@ fn bzlmod_environment_is_captured_per_one_shot_and_daemon_query_child() {
         .output()
         .unwrap();
     assert!(daemon_a.status.success(), "{daemon_a:?}");
-    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
     let daemon_b = slug()
         .current_dir(&workspace)
         .env("BZLMOD_ALLOW_YANKED_VERSIONS", "all")
@@ -4635,7 +4782,7 @@ fn bzlmod_environment_is_captured_per_one_shot_and_daemon_query_child() {
         .unwrap();
     assert!(daemon_a_again.status.success(), "{daemon_a_again:?}");
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         pid
     );
 }
@@ -4643,8 +4790,7 @@ fn bzlmod_environment_is_captured_per_one_shot_and_daemon_query_child() {
 #[test]
 fn equality_form_registry_reaches_one_shot_and_daemon_build_and_query() {
     let workspace = scratch("registry-command-transport");
-    let output_base = scratch("registry-command-transport-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(workspace.join("BUILD.bazel"), "");
     write(
@@ -4721,8 +4867,7 @@ fn equality_form_registry_reaches_one_shot_and_daemon_build_and_query() {
 #[test]
 fn bzlmod_environment_is_captured_per_one_shot_and_daemon_build_child() {
     let workspace = scratch("bzlmod-build-env-workspace");
-    let output_base = scratch("bzlmod-build-env-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(workspace.join("BUILD.bazel"), "");
     write(
@@ -4756,7 +4901,7 @@ fn bzlmod_environment_is_captured_per_one_shot_and_daemon_build_child() {
             .unwrap()
             .contains("analysis_not_implemented")
     );
-    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
     let daemon_a = slug()
         .current_dir(&workspace)
         .env_remove("BZLMOD_ALLOW_YANKED_VERSIONS")
@@ -4765,7 +4910,7 @@ fn bzlmod_environment_is_captured_per_one_shot_and_daemon_build_child() {
         .unwrap();
     assert_eq!(daemon_a.status.code(), Some(2), "{daemon_a:?}");
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         pid
     );
 }
@@ -4799,8 +4944,7 @@ fn non_unicode_client_environment_is_rejected_before_one_shot_evaluation() {
 #[test]
 fn only_package_loading_query_errors_receive_evaluation_context() {
     let workspace = scratch("query-error-context");
-    let output_base = scratch("query-error-context-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(workspace.join("BUILD.bazel"), "filegroup(name = \"one\")\n");
     let output_base_arg = format!("--output_base={}", output_base.display());
@@ -4856,8 +5000,7 @@ fn only_package_loading_query_errors_receive_evaluation_context() {
 #[test]
 fn rust_native_regex_query_diagnostics_fail_before_operand_evaluation_one_shot_and_daemon() {
     let workspace = scratch("regex-query-diagnostics");
-    let output_base = scratch("regex-query-diagnostics-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(workspace.join("BUILD.bazel"), "filegroup(name = \"one\")\n");
     let output_base_arg = format!("--output_base={}", output_base.display());
@@ -4899,8 +5042,7 @@ fn rust_native_regex_query_diagnostics_fail_before_operand_evaluation_one_shot_a
 #[test]
 fn output_base_labels_reuses_one_daemon_across_metadata_semantic_transitions() {
     let workspace = scratch("labels-metadata-workspace");
-    let output_base = scratch("labels-metadata-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     let defs = workspace.join("pkg/defs.bzl");
     let build = workspace.join("pkg/BUILD.bazel");
@@ -4934,7 +5076,7 @@ fn output_base_labels_reuses_one_daemon_across_metadata_semantic_transitions() {
     };
 
     assert_query("labels(dep, //pkg:rule)", "//pkg:one.txt\n");
-    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
     write(
         &build,
         "# semantic no-op\nconfig_setting( name = \"linux\", values = {\"cpu\": \"k8\"} )\nexports_files([\"one.txt\", \"two.txt\", \"three.txt\"])\nload(\":defs.bzl\", \"probe\")\nprobe( name = \"rule\", out = \"one.out\" )\n",
@@ -4962,7 +5104,7 @@ fn output_base_labels_reuses_one_daemon_across_metadata_semantic_transitions() {
     );
     assert_query("labels(out, //pkg:rule)", "//pkg:two.out\n");
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         pid
     );
 }
@@ -5102,8 +5244,7 @@ fn explicit_label_output_matches_bazel_and_text_is_rejected() {
         );
     }
 
-    let output_base = scratch("explicit-label-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     for (order, expected) in cases {
         let output = slug()
@@ -5143,6 +5284,8 @@ fn explicit_label_output_matches_bazel_and_text_is_rejected() {
 #[test]
 fn aquery_text_keeps_root_order_across_one_shot_and_retained_daemon_restoration() {
     let workspace = scratch("aquery-filewrite-text");
+    let registry =
+        configured_cli_registry_arg(&configured_cli_fixture("aquery-filewrite-registry"));
     write(
         workspace.join("MODULE.bazel"),
         r#"module(name = "aquery_filewrite_text")
@@ -5211,12 +5354,16 @@ root_rule(name = "root", deps = [":left", ":right"])
 "#,
     );
 
-    let output_base = scratch("aquery-filewrite-text-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     let run = |args: &[&str]| {
         let mut command = slug();
-        command.current_dir(&workspace).args(args).output().unwrap()
+        command
+            .current_dir(&workspace)
+            .args(args)
+            .arg(&registry)
+            .output()
+            .unwrap()
     };
     let accepted = |output: &std::process::Output| {
         assert!(output.status.success(), "{output:?}");
@@ -5248,7 +5395,7 @@ root_rule(name = "root", deps = [":left", ":right"])
     let daemon = run(&[output_base_arg.as_str(), "aquery", "//:root"]);
     let baseline = accepted(&daemon);
     assert_eq!(baseline, one_shot_text);
-    let baseline_pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let baseline_pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
     let tokens = |stdout: &str| {
         stdout
             .lines()
@@ -5293,7 +5440,7 @@ root_rule(name = "root", deps = [":left", ":right"])
     assert_eq!(deps_edited.matches("  Target: //:shared\n").count(), 1);
     assert_eq!(deps_edited.matches("action '").count(), 5);
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         baseline_pid
     );
 
@@ -5302,7 +5449,7 @@ root_rule(name = "root", deps = [":left", ":right"])
     assert_eq!(deps_restored, deps_daemon);
     assert_eq!(tokens(&deps_restored), deps_baseline_tokens);
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         baseline_pid
     );
 
@@ -5323,7 +5470,7 @@ root_rule(name = "root", deps = [":left", ":right"])
         vec![baseline_tokens[1].clone(), baseline_tokens[0].clone()]
     );
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         baseline_pid
     );
 
@@ -5332,18 +5479,15 @@ root_rule(name = "root", deps = [":left", ":right"])
     assert_eq!(restored, baseline);
     assert_eq!(tokens(&restored), baseline_tokens);
     assert_eq!(
-        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
         baseline_pid
     );
 }
 
 #[test]
 fn aquery_spawn_text_matches_one_shot_and_daemon() {
-    let workspace = scratch("aquery-spawn");
-    source_staging_workspace::write(&workspace);
-    let registry = format!("--registry=file://{}/empty-registry", workspace.display());
-    let output_base = scratch("aquery-spawn-daemon");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (workspace, registry) = local_cli_workspace("aquery-spawn", "aquery_spawn", "");
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     let run = |base: Option<&str>| {
         let output = slug()
@@ -5806,11 +5950,10 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
     fn stable_daemon_case(command: &str) {
         let workspace = workspace();
         let outputs = sentinel_outputs(&workspace);
-        let output_base = scratch("configured-action-conflicts-daemon");
-        let _cleanup = DaemonCleanup(output_base.clone());
+        let (_cleanup, output_base) = daemon_fixture();
         let base = format!("--output_base={}", output_base.display());
         let baseline = aquery(&workspace, Some(&base));
-        let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+        let pid = std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap();
         let probe = TransportProbe::new();
         mutate(&workspace);
         cquery_control(&workspace, Some(&base));
@@ -5818,14 +5961,14 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
             reject_command(&workspace, Some(&base), &probe, command);
             assert_outputs_unchanged(&outputs);
             assert_eq!(
-                std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+                std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
                 pid
             );
         }
         write(workspace.join("BUILD.bazel"), BUILD);
         assert_eq!(aquery(&workspace, Some(&base)), baseline);
         assert_eq!(
-            std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+            std::fs::read_to_string(daemon_pid_path(&output_base)).unwrap(),
             pid
         );
         assert_outputs_unchanged(&outputs);
@@ -5942,8 +6085,7 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
     );
     assert!(!run_stderr.contains("command_parse_error"), "{run_stderr}");
 
-    let output_base = scratch("command-module-overrides-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     let output_base_arg = format!("--output_base={}", output_base.display());
     let cases: &[(&str, &[&str])] = &[
         ("a-build", &["build", "//pkg:probe"]),
@@ -5956,7 +6098,7 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
         ("b-query", &["query", absolute_override.as_str(), query]),
         ("a-query-restored", &["query", query]),
     ];
-    let mut pid = None;
+    let mut generation = None;
     for (name, args) in cases {
         let output = slug()
             .current_dir(&workspace)
@@ -5987,11 +6129,11 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
                 "{name}: {stderr}"
             );
         }
-        let current_pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
-        if let Some(pid) = &pid {
-            assert_eq!(&current_pid, pid, "{name}");
+        let current_generation = daemon_generation(&output_base).unwrap();
+        if let Some(generation) = generation {
+            assert_eq!(current_generation, generation, "{name}");
         } else {
-            pid = Some(current_pid);
+            generation = Some(current_generation);
         }
     }
 
@@ -6007,8 +6149,7 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
 #[test]
 fn repository_environment_capture_and_transport_never_echo_values() {
     let workspace = scratch("repository-environment-redaction");
-    let output_base = scratch("repository-environment-redaction-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(
         workspace.join("pkg/BUILD.bazel"),
@@ -6071,8 +6212,7 @@ fn repository_environment_capture_and_transport_never_echo_values() {
 #[test]
 fn equality_form_registry_reaches_one_shot_and_daemon_run() {
     let workspace = scratch("run-registry-command-transport");
-    let output_base = scratch("run-registry-command-transport-output-base");
-    let _cleanup = DaemonCleanup(output_base.clone());
+    let (_cleanup, output_base) = daemon_fixture();
     write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(
         workspace.join("BUILD.bazel"),

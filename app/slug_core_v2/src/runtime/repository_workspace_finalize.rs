@@ -121,11 +121,10 @@ impl RepositoryWorkspaceCommand {
         ),
         PhysicalRootError,
     > {
+        let launcher = self.launcher().clone();
         let admission = self.admit_view_finalization(request, scope, active)?;
         let launch = FinalizeLaunch::new(admission, active)?;
-        let finalized =
-            process_owner::run(launch, super::super::super::initialize::platform()?, active)
-                .await?;
+        let finalized = process_owner::run(launch, launcher.platform()?, active).await?;
         #[cfg(all(test, feature = "native-probe-observer"))]
         if let Some(class) = finalized.1.root().frozen_archive_quota()
             && let Some(probe) = crate::runtime::probe_observer::capture()

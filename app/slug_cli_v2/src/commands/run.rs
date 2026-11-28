@@ -20,13 +20,18 @@ use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::run::RunRequest;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 use slug_server_v2::RUN_ENVIRONMENT_TO_CLEAR;
 use slug_server_v2::RunLaunchPlan;
 
+use super::RuntimeStartup;
+
 pub fn run(argv: Vec<String>) -> i32 {
+    run_with_startup(argv, RuntimeStartup::Generic)
+}
+
+pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i32 {
     let workspace = match std::env::current_dir() {
         Ok(workspace) => workspace,
         Err(error) => return run_error(&error.to_string(), "one-shot", 2),
@@ -71,22 +76,30 @@ pub fn run(argv: Vec<String>) -> i32 {
             );
         return run_daemon(
             &output_base,
+            &workspace,
             request,
             bzlmod,
             repository_environment,
             remote,
+            startup,
         );
     }
-    let accepted = match evaluate_workspace_build_command_with_repository_environment(
-        &workspace,
-        std::slice::from_ref(&request.target),
-        request.bzlmod_policy,
-        environment,
-        request.lockfile_mode,
-        &request.registry_urls,
-        repository_environment,
-        Default::default(),
-    ) {
+    let accepted = {
+        let runtime = match startup.new_runtime(&workspace) {
+            Ok(runtime) => runtime,
+            Err(error) => return run_error(&error, "one-shot", 2),
+        };
+        runtime.build_command_with_repository_environment(
+            std::slice::from_ref(&request.target),
+            request.bzlmod_policy,
+            environment,
+            request.lockfile_mode,
+            &request.registry_urls,
+            repository_environment,
+            Default::default(),
+        )
+    };
+    let accepted = match accepted {
         Ok(accepted) => accepted,
         Err(error) => return run_error(&error.to_string(), "one-shot", 2),
     };
@@ -129,21 +142,21 @@ pub fn run(argv: Vec<String>) -> i32 {
 
 fn run_daemon(
     output_base: &str,
+    workspace: &Path,
     request: RunRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
     remote: RemoteConfig,
+    startup: RuntimeStartup,
 ) -> i32 {
     let output_base = Path::new(output_base);
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return run_error(&error.to_string(), "daemon", 2);
     }
-    let socket = slug_server_v2::socket_path(output_base);
-    if std::os::unix::net::UnixStream::connect(&socket).is_err()
-        && let Err(error) = super::build::start_daemon(output_base)
-    {
-        return run_error(&error.to_string(), "daemon", 2);
-    }
+    let daemon = match startup.daemon_connection(output_base, workspace) {
+        Ok(daemon) => daemon,
+        Err(error) => return run_error(&error.to_string(), "daemon", 2),
+    };
     let daemon_request = slug_server_v2::BuildRequest {
         targets: vec![request.target.to_string()],
         configuration_overlay: Default::default(),
@@ -151,7 +164,7 @@ fn run_daemon(
         bzlmod,
         repository_environment,
     };
-    match slug_server_v2::send_run_request(&socket, &daemon_request) {
+    match daemon.send(slug_server_v2::DaemonRequest::Run(daemon_request)) {
         Ok(response) => finish_build(
             response.exit_code,
             response.stdout,

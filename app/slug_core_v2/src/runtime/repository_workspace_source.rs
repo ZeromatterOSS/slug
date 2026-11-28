@@ -94,9 +94,7 @@ impl RepositoryWorkspaceCommand {
                 probe.record_backing_inventory(self.backing_inventory_for_probe(&input));
             }
             let launch = launch?;
-            let builder =
-                process_owner::run(launch, super::super::super::initialize::platform()?, active)
-                    .await?;
+            let builder = process_owner::run(launch, self.launcher().platform()?, active).await?;
             #[cfg(all(test, feature = "native-probe-observer"))]
             if let Some(bootstrap) = bootstrap {
                 bootstrap.finish();
@@ -114,9 +112,7 @@ impl RepositoryWorkspaceCommand {
             #[cfg(all(test, feature = "native-probe-observer"))]
             let finalize = span(Stage::SourceFinalize);
             let launch = SourceFinalize::new(builder, state, state_credit, observer)?;
-            let finalized =
-                process_owner::run(launch, super::super::super::initialize::platform()?, active)
-                    .await?;
+            let finalized = process_owner::run(launch, self.launcher().platform()?, active).await?;
             #[cfg(all(test, feature = "native-probe-observer"))]
             if let Some(finalize) = finalize {
                 finalize.finish();

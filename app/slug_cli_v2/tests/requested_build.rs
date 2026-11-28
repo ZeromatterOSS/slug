@@ -5,7 +5,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Child;
-use std::process::Command;
 use std::process::Output;
 use std::process::Stdio;
 use std::sync::atomic::AtomicUsize;
@@ -15,6 +14,16 @@ use std::time::Instant;
 
 use serde_json::Value;
 use slug_reapi_v2::ReapiDigest;
+
+mod support;
+use support::INSTALLED_DAEMON;
+use support::daemon::DaemonCleanup;
+use support::daemon::DaemonGeneration;
+use support::daemon::daemon_fixture;
+use support::daemon::daemon_generation;
+use support::daemon::daemon_pid_path;
+use support::daemon::daemon_socket;
+use support::slug;
 
 #[path = "../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod fixture;
@@ -82,6 +91,8 @@ struct Workspace {
     root: PathBuf,
     output_base: PathBuf,
     daemon: Option<Child>,
+    daemon_cleanup: Option<DaemonCleanup>,
+    generation: Option<DaemonGeneration>,
 }
 impl Workspace {
     fn new() -> Self {
@@ -112,16 +123,23 @@ impl Workspace {
         .unwrap();
         fs::create_dir(root.join("tools")).unwrap();
         fs::write(root.join("tools/tool"), TOOL).unwrap();
+        let (daemon_cleanup, output_base) = daemon_fixture();
         Self {
-            output_base: root.join("daemon"),
             root,
+            output_base,
             daemon: None,
+            daemon_cleanup: Some(daemon_cleanup),
+            generation: None,
         }
     }
-    fn start_daemon(&mut self) {
+    fn prepare_daemon_route(&mut self, daemon: bool) {
+        // The installed route publishes its daemon on the first ordinary request.
+        if !daemon || INSTALLED_DAEMON {
+            return;
+        }
         fs::create_dir(&self.output_base).unwrap();
-        let socket = slug_server_v2::socket_path(&self.output_base);
-        let mut child = Command::new(env!("CARGO_BIN_EXE_slug"))
+        let socket = daemon_socket(&self.output_base);
+        let child = slug()
             .args(["--serve", "--socket"])
             .arg(&socket)
             .arg("--workspace")
@@ -131,11 +149,9 @@ impl Workspace {
             .stderr(Stdio::null())
             .spawn()
             .unwrap();
-        fs::write(
-            slug_server_v2::pid_path(&self.output_base),
-            child.id().to_string(),
-        )
-        .unwrap();
+        self.daemon = Some(child);
+        let child = self.daemon.as_mut().unwrap();
+        fs::write(daemon_pid_path(&self.output_base), child.id().to_string()).unwrap();
         let deadline = Instant::now() + Duration::from_secs(5);
         while std::os::unix::net::UnixStream::connect(&socket).is_err() {
             assert!(
@@ -143,16 +159,13 @@ impl Workspace {
                 "daemon exited during startup"
             );
             if Instant::now() >= deadline {
-                child.kill().unwrap();
-                child.wait().unwrap();
                 panic!("daemon readiness timeout");
             }
             std::thread::sleep(Duration::from_millis(10));
         }
-        self.daemon = Some(child);
     }
     fn run(&self, daemon: bool, args: &[&str]) -> Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_slug"));
+        let mut command = slug();
         command.current_dir(&self.root);
         if daemon {
             command.arg(format!("--output_base={}", self.output_base.display()));
@@ -177,6 +190,46 @@ impl Workspace {
             std::thread::sleep(Duration::from_millis(10));
         }
         child.wait_with_output().unwrap()
+    }
+    fn check_daemon_route(&mut self, daemon: bool) {
+        if !daemon {
+            assert!(!self.output_base.exists());
+            return;
+        }
+        let actual = daemon_generation(&self.output_base).unwrap();
+        if let Some(expected) = self.generation {
+            assert_eq!(actual, expected);
+        } else {
+            self.generation = Some(actual);
+        }
+        if let Some(child) = self.daemon.as_mut() {
+            assert_eq!(actual.pid, child.id());
+            assert!(child.try_wait().unwrap().is_none());
+        }
+    }
+    fn assert_refused_before_start(&self) {
+        for path in [&self.output_base, &self.root.join("bazel-out")] {
+            let metadata = path.symlink_metadata();
+            assert!(
+                matches!(metadata, Err(ref error) if error.kind() == std::io::ErrorKind::NotFound),
+                "unexpected state at {path:?}: {metadata:?}"
+            );
+        }
+    }
+    fn assert_only_empty_configuration_marker_dir(&self) {
+        let output = self.root.join("bazel-out");
+        let mut entries = output.read_dir().unwrap();
+        let markers = entries.next().unwrap().unwrap();
+        assert_eq!(markers.file_name(), ".slug-configurations", "{output:?}");
+        assert!(markers.file_type().unwrap().is_dir(), "{markers:?}");
+        assert!(
+            entries.next().is_none(),
+            "unexpected output under {output:?}"
+        );
+        assert!(
+            markers.path().read_dir().unwrap().next().is_none(),
+            "unexpected configuration marker under {output:?}"
+        );
     }
     fn bin(&self) -> PathBuf {
         let roots = fs::read_dir(self.root.join("bazel-out"))
@@ -205,7 +258,7 @@ impl Workspace {
 impl Drop for Workspace {
     fn drop(&mut self) {
         if let Some(mut child) = self.daemon.take() {
-            let _ = slug_server_v2::send_shutdown(&slug_server_v2::socket_path(&self.output_base));
+            let _ = slug_server_v2::send_shutdown(&daemon_socket(&self.output_base));
             let deadline = Instant::now() + Duration::from_secs(2);
             while child.try_wait().ok().flatten().is_none() && Instant::now() < deadline {
                 std::thread::sleep(Duration::from_millis(10));
@@ -215,6 +268,7 @@ impl Drop for Workspace {
             }
             let _ = child.wait();
         }
+        drop(self.daemon_cleanup.take());
         fn writable(path: &Path) {
             let Ok(metadata) = path.symlink_metadata() else {
                 return;
@@ -263,9 +317,7 @@ fn zero(json: &Value) {
 fn source_and_analyzed_empty_builds_skip_unreachable_executor() {
     for daemon in [false, true] {
         let mut workspace = Workspace::new();
-        if daemon {
-            workspace.start_daemon();
-        }
+        workspace.prepare_daemon_route(daemon);
         let (json, _) = terminal(
             &workspace.run(
                 daemon,
@@ -280,6 +332,7 @@ fn source_and_analyzed_empty_builds_skip_unreachable_executor() {
         );
         zero(&json);
         workspace.assert_no_action_outputs();
+        workspace.check_daemon_route(daemon);
     }
 }
 
@@ -308,7 +361,7 @@ fn build_policy_and_parser_errors_redact_headers_before_daemon_start() {
             );
             assert_eq!(json["error"], "build_runtime_error");
             assert!(!stderr.contains(secret));
-            assert!(!slug_server_v2::pid_path(&workspace.output_base).exists());
+            workspace.assert_refused_before_start();
         }
         for bare_flag in [
             "--remote_header",
@@ -323,7 +376,7 @@ fn build_policy_and_parser_errors_redact_headers_before_daemon_start() {
                 terminal(&workspace.run(daemon, &["build", "//:empty", bare_flag]), 2);
             assert_eq!(json["error"], "build_runtime_error", "{bare_flag}");
             assert!(!stderr.contains(secret));
-            assert!(!slug_server_v2::pid_path(&workspace.output_base).exists());
+            workspace.assert_refused_before_start();
         }
         let (_, stderr) = terminal(
             &workspace.run(
@@ -338,7 +391,7 @@ fn build_policy_and_parser_errors_redact_headers_before_daemon_start() {
             2,
         );
         assert!(!stderr.contains(secret));
-        assert!(!slug_server_v2::pid_path(&workspace.output_base).exists());
+        workspace.assert_refused_before_start();
         let (json, stderr) = terminal(
             &workspace.run(
                 daemon,
@@ -353,7 +406,7 @@ fn build_policy_and_parser_errors_redact_headers_before_daemon_start() {
         );
         assert_eq!(json["error"], "command_parse_error");
         assert!(!stderr.contains(secret));
-        assert!(!slug_server_v2::pid_path(&workspace.output_base).exists());
+        workspace.assert_refused_before_start();
     }
 }
 
@@ -388,9 +441,7 @@ fn analysis_only_build_redacts_headers_and_preserves_missing_target_and_run_cont
 fn typed_build_errors_repair_and_recur_without_remote_effects() {
     for daemon in [false, true] {
         let mut workspace = Workspace::new();
-        if daemon {
-            workspace.start_daemon();
-        }
+        workspace.prepare_daemon_route(daemon);
         for broken in [true, false, true] {
             fs::write(
                 workspace.root.join("defs.bzl"),
@@ -427,7 +478,10 @@ fn typed_build_errors_repair_and_recur_without_remote_effects() {
                 zero(&json);
                 assert!(!stderr.contains("WP746_ANALYSIS_PREFIX"));
             }
+            workspace.assert_only_empty_configuration_marker_dir();
+            workspace.check_daemon_route(daemon);
         }
+        let mut first_conflict: Option<String> = None;
         for broken in [true, false, true] {
             fs::write(
                 workspace.root.join("BUILD.bazel"),
@@ -458,18 +512,29 @@ fn typed_build_errors_repair_and_recur_without_remote_effects() {
                     .and_then(|path| path.strip_suffix("/bin/conflict.out"))
                     .unwrap_or_else(|| panic!("unexpected conflict path: {path}"));
                 assert_eq!(configuration.len(), 64, "{configuration}");
-                assert!(configuration.bytes().all(|byte| byte.is_ascii_hexdigit()));
+                assert!(
+                    configuration
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+                    "{configuration}"
+                );
                 assert_eq!(
                     owners,
                     format!(
                         "@@//:left [target:slugcfg-v2:{configuration}] versus @@//:right [target:slugcfg-v2:{configuration}]"
                     )
                 );
+                if let Some(previous) = &first_conflict {
+                    assert_eq!(message, previous.as_str());
+                } else {
+                    first_conflict = Some(message.to_owned());
+                }
             } else {
                 zero(&json);
             }
+            workspace.assert_only_empty_configuration_marker_dir();
+            workspace.check_daemon_route(daemon);
         }
-        workspace.assert_no_action_outputs();
     }
 }
 
@@ -478,10 +543,7 @@ fn wire(daemon: bool) {
     // Keep the observed package directory stable when publication creates its
     // private children; the backend and each adapter still start cold.
     fs::create_dir(workspace.root.join("bazel-out")).unwrap();
-    if daemon {
-        workspace.start_daemon();
-    }
-    let pid = workspace.daemon.as_ref().map(Child::id);
+    workspace.prepare_daemon_route(daemon);
     let endpoint = format!(
         "--remote_executor={}",
         std::env::var("SLUG_V2_NATIVELINK_ENDPOINT").unwrap()
@@ -575,21 +637,7 @@ fn wire(daemon: bool) {
         } else {
             assert_eq!(fs::read(bin.join("unrelated")).unwrap(), b"keep");
         }
-        if let Some(pid) = pid {
-            assert_eq!(
-                fs::read_to_string(slug_server_v2::pid_path(&workspace.output_base)).unwrap(),
-                pid.to_string()
-            );
-            assert!(
-                workspace
-                    .daemon
-                    .as_mut()
-                    .unwrap()
-                    .try_wait()
-                    .unwrap()
-                    .is_none()
-            );
-        }
+        workspace.check_daemon_route(daemon);
     }
     assert_eq!(digests[0], digests[1]);
     assert_eq!(digests[0], digests[3]);

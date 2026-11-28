@@ -12,16 +12,157 @@ pub mod aquery;
 pub mod build;
 pub mod cquery;
 pub mod help;
+#[cfg(all(
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+mod installed_daemon;
 pub mod query;
 mod repository_environment;
 pub mod run;
 pub mod test;
 pub mod version;
 
+use std::path::Path;
+use std::path::PathBuf;
+
 use slug_commands_v2::CommandKind;
 use slug_commands_v2::CommandParseError;
 use slug_commands_v2::CommandPlaceholderError;
 use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::ProcessHostOwner;
+use slug_core_v2::runtime::WorkspaceRuntime;
+use slug_server_v2::DaemonRequest;
+use slug_server_v2::DaemonResponse;
+
+enum DaemonConnection {
+    Generic(PathBuf),
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    Managed(slug_server_v2::ManagedDaemonConnection),
+}
+
+impl DaemonConnection {
+    fn send(self, request: DaemonRequest) -> anyhow::Result<DaemonResponse> {
+        match self {
+            Self::Generic(socket) => match request {
+                DaemonRequest::Build(request) => {
+                    slug_server_v2::send_build_request(&socket, &request)
+                }
+                DaemonRequest::Run(request) => slug_server_v2::send_run_request(&socket, &request),
+                DaemonRequest::Query(request) => {
+                    slug_server_v2::send_query_request(&socket, &request)
+                }
+                DaemonRequest::Aquery(request) => {
+                    slug_server_v2::send_aquery_request(&socket, &request)
+                }
+                DaemonRequest::Cquery(request) => {
+                    slug_server_v2::send_cquery_request(&socket, &request)
+                }
+            },
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            Self::Managed(connection) => connection.send(request),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum RuntimeStartup {
+    Generic,
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    Installed,
+}
+
+impl RuntimeStartup {
+    pub(crate) fn for_installed_binary() -> Self {
+        #[cfg(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        ))]
+        {
+            Self::Installed
+        }
+        #[cfg(not(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64"
+        )))]
+        {
+            Self::Generic
+        }
+    }
+
+    fn new_runtime(self, workspace: &Path) -> Result<WorkspaceRuntime, String> {
+        match self {
+            Self::Generic => WorkspaceRuntime::new(workspace, ProcessHostOwner::native())
+                .map_err(|error| error.to_string()),
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            Self::Installed => WorkspaceRuntime::new_with_installed_repository_launcher(workspace)
+                .map_err(|error| format!("{error:#}")),
+        }
+    }
+
+    fn daemon_connection(
+        self,
+        output_base: &Path,
+        _workspace: &Path,
+    ) -> anyhow::Result<DaemonConnection> {
+        // Keep an existing daemon's authority tied to its startup policy.
+        match self {
+            Self::Generic => {
+                let socket = slug_server_v2::socket_path(output_base);
+                if std::os::unix::net::UnixStream::connect(&socket).is_err() {
+                    build::start_daemon(output_base)?;
+                }
+                Ok(DaemonConnection::Generic(socket))
+            }
+            #[cfg(all(
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64"
+            ))]
+            Self::Installed => {
+                installed_daemon::connect(output_base, _workspace).map(DaemonConnection::Managed)
+            }
+        }
+    }
+}
+
+#[cfg(all(
+    test,
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64"
+))]
+#[test]
+fn daemon_endpoints_are_partitioned_by_startup_policy() {
+    let base = Path::new("/output");
+    assert_ne!(
+        installed_daemon::socket_path(base),
+        slug_server_v2::socket_path(base)
+    );
+    assert_ne!(
+        installed_daemon::pid_path(base),
+        slug_server_v2::pid_path(base)
+    );
+}
 
 /// Forward accepted event/terminal bytes without text conversion. A failed
 /// partial write is an output failure; callers must not launch a run payload.
@@ -37,9 +178,29 @@ where
     I: IntoIterator<Item = S>,
     S: Into<String>,
 {
+    dispatch_with_startup(args, RuntimeStartup::Generic)
+}
+
+pub(crate) fn dispatch_with_startup<I, S>(args: I, startup: RuntimeStartup) -> i32
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
     let mut args = args.into_iter().map(Into::into);
     let _program = args.next();
     let all_args: Vec<String> = args.collect();
+    #[cfg(all(
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64"
+    ))]
+    if matches!(startup, RuntimeStartup::Installed)
+        && all_args
+            .first()
+            .is_some_and(|arg| arg == installed_daemon::CHILD_ROLE)
+    {
+        return serve_status(installed_daemon::child(&all_args[1..]));
+    }
     // Collect startup flags (--output_base and its value) that appear before
     // the subcommand, then dispatch the remaining args.
     let mut startup_output_base: Option<String> = None;
@@ -88,12 +249,12 @@ where
             version::print_version();
             0
         }
-        "build" => build::run(rest),
-        "query" => query::run(rest),
-        "cquery" => cquery::run(rest),
-        "aquery" => aquery::run(rest),
+        "build" => build::run_with_startup(rest, startup),
+        "query" => query::run_with_startup(rest, startup),
+        "cquery" => cquery::run_with_startup(rest, startup),
+        "aquery" => aquery::run_with_startup(rest, startup),
         "test" => test::run(rest),
-        "run" => run::run(rest),
+        "run" => run::run_with_startup(rest, startup),
         other => {
             eprintln!(
                 "{{\"error\":\"unknown_command\",\"command\":\"{}\",\"known_commands\":[\"version\",\"help\",\"build\",\"query\",\"cquery\",\"aquery\",\"test\",\"run\"]}}",
@@ -164,7 +325,11 @@ fn serve_daemon(args: &[String]) -> i32 {
         );
         return 2;
     };
-    match slug_server_v2::serve(&socket, &workspace) {
+    serve_status(slug_server_v2::serve(socket, workspace))
+}
+
+fn serve_status(result: anyhow::Result<()>) -> i32 {
+    match result {
         Ok(()) => 0,
         Err(error) => {
             eprintln!(

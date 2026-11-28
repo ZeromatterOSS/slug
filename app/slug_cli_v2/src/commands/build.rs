@@ -12,15 +12,18 @@ use slug_commands_v2::CommandParseError;
 use slug_commands_v2::build::BuildRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::WorkspaceRuntime;
-use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
 use slug_reapi_v2::ActionChainReapiTransport;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
+use super::RuntimeStartup;
+
 pub fn run(argv: Vec<String>) -> i32 {
+    run_with_startup(argv, RuntimeStartup::Generic)
+}
+
+pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i32 {
     let workspace = match std::env::current_dir() {
         Ok(workspace) => workspace,
         Err(error) => {
@@ -100,30 +103,30 @@ pub fn run(argv: Vec<String>) -> i32 {
             );
         return run_daemon_build(
             &output_base,
+            &workspace,
             request,
             bzlmod,
             repository_environment,
             &remote,
+            startup,
         );
     }
 
     if let Some(transport) = transport {
-        let accepted = WorkspaceRuntime::new(&workspace, ProcessHostOwner::native())
-            .map_err(|error| error.to_string())
-            .and_then(|runtime| {
-                runtime
-                    .execute_and_publish_requested_actions_with_repository_environment(
-                        &request.targets,
-                        request.bzlmod_policy,
-                        environment_policy,
-                        request.lockfile_mode,
-                        &request.registry_urls,
-                        repository_environment,
-                        request.configuration_overlay,
-                        &transport,
-                    )
-                    .map_err(|error| error.to_string())
-            });
+        let accepted = startup.new_runtime(&workspace).and_then(|runtime| {
+            runtime
+                .execute_and_publish_requested_actions_with_repository_environment(
+                    &request.targets,
+                    request.bzlmod_policy,
+                    environment_policy,
+                    request.lockfile_mode,
+                    &request.registry_urls,
+                    repository_environment,
+                    request.configuration_overlay,
+                    &transport,
+                )
+                .map_err(|error| error.to_string())
+        });
         let accepted = match accepted {
             Ok(accepted) => accepted,
             Err(error) => {
@@ -155,21 +158,24 @@ pub fn run(argv: Vec<String>) -> i32 {
         return emit_output(code, stdout, stderr);
     }
 
-    let accepted = match evaluate_workspace_build_command_with_repository_environment(
-        &workspace,
-        &request.targets,
-        request.bzlmod_policy.clone(),
-        environment_policy,
-        request.lockfile_mode.clone(),
-        &request.registry_urls,
-        repository_environment,
-        request.configuration_overlay.clone(),
-    ) {
+    let accepted = match startup.new_runtime(&workspace).and_then(|runtime| {
+        runtime
+            .build_command_with_repository_environment(
+                &request.targets,
+                request.bzlmod_policy.clone(),
+                environment_policy,
+                request.lockfile_mode.clone(),
+                &request.registry_urls,
+                repository_environment,
+                request.configuration_overlay.clone(),
+            )
+            .map_err(|error| error.to_string())
+    }) {
         Ok(accepted) => accepted,
         Err(error) => {
             eprint!(
                 "{}",
-                build_error_json("build_runtime_error", &error.to_string(), "one-shot")
+                build_error_json("build_runtime_error", &error, "one-shot")
             );
             return 2;
         }
@@ -312,25 +318,25 @@ pub(super) fn extract_output_base(argv: &[String]) -> Option<String> {
 /// builds so `.bzl` edits are invalidated and replayed in the same process.
 fn run_daemon_build(
     output_base: &str,
+    workspace: &std::path::Path,
     request: BuildRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
     remote: &RemoteConfig,
+    startup: RuntimeStartup,
 ) -> i32 {
     let output_base_path = std::path::Path::new(output_base);
     let _ = std::fs::create_dir_all(output_base_path);
-    let socket = slug_server_v2::socket_path(output_base_path);
-
-    // Try to connect; if the daemon isn't running, start it.
-    if std::os::unix::net::UnixStream::connect(&socket).is_err() {
-        if let Err(error) = start_daemon(output_base_path) {
+    let daemon = match startup.daemon_connection(output_base_path, workspace) {
+        Ok(daemon) => daemon,
+        Err(error) => {
             eprintln!(
                 "{{\"error\":\"daemon_start_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\"}}",
                 json_escape(&error.to_string())
             );
             return 2;
         }
-    }
+    };
 
     let daemon_request = slug_server_v2::BuildRequest {
         targets: request.targets.iter().map(|t| t.to_string()).collect(),
@@ -340,7 +346,7 @@ fn run_daemon_build(
         repository_environment,
     };
 
-    match slug_server_v2::send_build_request(&socket, &daemon_request) {
+    match daemon.send(slug_server_v2::DaemonRequest::Build(daemon_request)) {
         Ok(response) => {
             if !response.stdout.is_empty() {
                 print!("{}", response.stdout);
@@ -439,7 +445,10 @@ fn wait_for_daemon_ready(
     ))
 }
 
-fn terminate_and_reap(child: &mut std::process::Child, primary: anyhow::Error) -> anyhow::Error {
+pub(super) fn terminate_and_reap(
+    child: &mut std::process::Child,
+    primary: anyhow::Error,
+) -> anyhow::Error {
     let kill_result = child.kill();
     daemon_cleanup_error(primary, kill_result, child.wait())
 }
