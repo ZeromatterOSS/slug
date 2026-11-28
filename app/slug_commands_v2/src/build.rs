@@ -20,6 +20,7 @@ use crate::common::CommandParseError;
 use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
 use crate::common::RepositoryEnvironmentOverride;
+use crate::common::archive_distdir_value;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
@@ -38,6 +39,7 @@ pub struct BuildRequest {
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
     pub repository_environment_overrides: Vec<RepositoryEnvironmentOverride>,
+    pub distdirs: Vec<String>,
 }
 
 impl BuildRequest {
@@ -64,7 +66,7 @@ impl BuildRequest {
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
         let repository_environment_overrides = repository_environment_overrides(&parsed.flags)?;
-        let configuration_overlay = build_flag_admission(&parsed.flags)?;
+        let (configuration_overlay, distdirs) = build_flag_admission(&parsed.flags)?;
         Ok(Self {
             targets: parse_target_patterns(CommandKind::Build, &parsed.positionals)?,
             flags: parsed.flags,
@@ -73,6 +75,7 @@ impl BuildRequest {
             lockfile_mode,
             registry_urls,
             repository_environment_overrides,
+            distdirs,
         })
     }
 
@@ -90,14 +93,16 @@ impl BuildRequest {
 /// daemon mode, so neither path can silently discard a configuration input.
 fn build_flag_admission(
     flags: &[ParsedFlag],
-) -> Result<CommandConfigurationOverlay, CommandParseError> {
+) -> Result<(CommandConfigurationOverlay, Vec<String>), CommandParseError> {
     let mut configuration = Vec::new();
+    let mut distdirs = Vec::new();
     for flag in flags {
         if let Some(occurrence) = command_configuration_occurrence(flag)? {
             configuration.push(occurrence);
             continue;
         }
         match flag.name.as_str() {
+            "distdir" => distdirs.push(archive_distdir_value(flag)?),
             "config" => {
                 return Err(unsupported_build_flag(flag));
             }
@@ -105,7 +110,46 @@ fn build_flag_admission(
             _ => return Err(unsupported_build_flag(flag)),
         }
     }
-    Ok(configuration.into())
+    Ok((configuration.into(), distdirs))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_distdirs_keep_raw_order_outside_configuration() {
+        let common = [
+            "//pkg:probe",
+            "--compilation_mode=opt",
+            "--lockfile_mode=off",
+        ];
+        let baseline = BuildRequest::parse(&common).unwrap();
+        let with_distdirs = BuildRequest::parse(&[
+            common[0],
+            "--distdir=relative",
+            common[1],
+            "--distdir=/absolute",
+            common[2],
+            "--distdir=relative",
+        ])
+        .unwrap();
+        assert!(baseline.distdirs.is_empty());
+        assert_eq!(
+            with_distdirs.distdirs,
+            ["relative", "/absolute", "relative"]
+        );
+        assert_eq!(
+            baseline.configuration_overlay,
+            with_distdirs.configuration_overlay
+        );
+        for invalid in ["--distdir", "--distdir="] {
+            assert!(matches!(
+                BuildRequest::parse(&["//pkg:probe", invalid]),
+                Err(CommandParseError::InvalidFlagValue { flag, .. }) if flag == invalid
+            ));
+        }
+    }
 }
 
 fn unsupported_build_flag(flag: &ParsedFlag) -> CommandParseError {

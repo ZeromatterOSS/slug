@@ -3627,6 +3627,8 @@ dependencies = [
  "futures 0.3.33",
  "nom 8.0.0",
  "regex",
+ "regex-automata",
+ "regex-syntax 0.8.11",
  "slug_bzlmod_v2",
  "slug_identity_v2",
  "slug_loading_v2",

@@ -969,7 +969,12 @@ fn requested_build_rejects_loading_only_native_filegroups() {
             "--remote_executor=grpc://127.0.0.1:1",
         ],
     ] {
-        let output = slug().current_dir(&workspace).args(args).output().unwrap();
+        let output = slug()
+            .current_dir(&workspace)
+            .args(args)
+            .args(cfg!(target_os = "linux").then_some("--distdir=./offline/archives"))
+            .output()
+            .unwrap();
         assert_eq!(output.status.code(), Some(2), "{output:?}");
         assert!(output.stdout.is_empty());
         let stderr = String::from_utf8(output.stderr).unwrap();
@@ -982,6 +987,42 @@ fn requested_build_rejects_loading_only_native_filegroups() {
         assert!(stderr.ends_with('\n'));
         assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
     }
+}
+
+#[test]
+fn invalid_build_distdir_stops_before_workspace_observation_or_daemon_startup() {
+    let workspace = scratch("invalid-build-distdir");
+    // No MODULE or BUILD file is needed for rejection.
+    let output_base = workspace.join("daemon");
+    let output_base_arg = format!("--output_base={}", output_base.display());
+
+    for startup_args in [&[][..], &[output_base_arg.as_str()][..]] {
+        let output = slug()
+            .current_dir(&workspace)
+            .args(startup_args)
+            .args([
+                "build",
+                "//pkg:probe",
+                "--distdir=",
+                "--remote_executor=grpc://127.0.0.1:1",
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{output:?}");
+        assert!(output.stdout.is_empty());
+        let stderr = std::str::from_utf8(&output.stderr).unwrap();
+        assert!(
+            stderr.contains("\"error\":\"command_parse_error\""),
+            "{stderr}"
+        );
+        assert!(
+            stderr.contains("--distdir requires a non-empty directory"),
+            "{stderr}"
+        );
+        assert!(!output_base.exists());
+        assert_eq!(std::fs::read_dir(&workspace).unwrap().count(), 0);
+    }
+    std::fs::remove_dir(&workspace).unwrap();
 }
 
 #[test]

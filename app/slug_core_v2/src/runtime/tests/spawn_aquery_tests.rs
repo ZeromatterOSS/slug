@@ -417,11 +417,12 @@ async fn spawn_aquery_preserves_filewrite_validation_before_render_priority() {
     use slug_build_api_v2::ActionOutput;
     use slug_build_api_v2::ActionOutputKind;
     use slug_build_api_v2::ActionSpec;
+    use slug_query_v2::QueryExpression;
+    use slug_query_v2::aquery_expression_spec;
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let mut transaction =
-        build_root_transaction(&dice, resolved_write_epoch(40, "setting_a", &[])).await;
+    let mut transaction = build_root_transaction(&dice, query_epoch(40, &[])).await;
     let outcome = transaction
-        .compute(&query_key("//:write", build_test_configuration("target")))
+        .compute(&query_key("//:subject", build_test_configuration("target")))
         .await
         .unwrap();
     let evaluation = complete_build_evaluation(&outcome);
@@ -450,7 +451,7 @@ async fn spawn_aquery_preserves_filewrite_validation_before_render_priority() {
                             content: String::new(),
                             is_executable: false,
                         },
-                        "FileWrite",
+                        "RegistrationOnlyWrite",
                         vec![ActionOutput::new(
                             original_action.outputs()[0].root().clone(),
                             "directory",
@@ -503,6 +504,21 @@ async fn spawn_aquery_preserves_filewrite_validation_before_render_priority() {
     );
     assert_eq!(
         crate::runtime::format_aquery_text_output_for_scope(&altered, AqueryScope::Deps),
-        expected.map_err(str::to_owned)
+        expected.clone().map_err(str::to_owned)
     );
+    let filtered = |pattern| {
+        let expression =
+            QueryExpression::parse(&format!("mnemonic(\"{pattern}\", //:write)")).unwrap();
+        let filter = aquery_expression_spec(&expression)
+            .unwrap()
+            .compile_mnemonic_filter()
+            .unwrap();
+        crate::runtime::format_aquery_text_output_for_scope_with_mnemonic_filter(
+            &altered,
+            AqueryScope::Literal,
+            filter.as_ref(),
+        )
+    };
+    assert_eq!(filtered("^FileWrite$"), expected.map_err(str::to_owned));
+    assert_eq!(filtered("^RegistrationOnlyWrite$").unwrap(), "");
 }

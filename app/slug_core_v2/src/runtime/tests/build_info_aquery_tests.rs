@@ -63,7 +63,7 @@ fn build_info_epoch() -> PathObservationEpoch {
     epoch.file("/workspace/MODULE.bazel", &module, 1);
     epoch.file("/workspace/wrapper.bzl", "def _impl(ctx):\n    out=ctx.actions.declare_file('wrapper')\n    ctx.actions.write(out,'wrapper')\n    return [DefaultInfo(files=depset([out]))]\nwrapper=rule(implementation=_impl,attrs={'dep':attr.label(cfg='exec')})\n", 1);
     epoch.package("", "load('@bazel_tools//tools/build_defs/build_info:bazel_cc_build_info.bzl','bazel_cc_build_info')\nload(':wrapper.bzl','wrapper')\nplatform(name='platform')\nbazel_cc_build_info(name='info')\nwrapper(name='wrapper',dep=':info')\n", 1);
-    epoch.build()
+    epoch.build_from_authored_module_inputs()
 }
 
 async fn build_info_transaction(dice: &Arc<Dice>) -> dice::DiceTransaction {
@@ -76,16 +76,6 @@ async fn build_info_transaction_with_epoch(
 ) -> dice::DiceTransaction {
     let transaction = build_root_transaction(dice, epoch).await;
     let mut updater = transaction.into_updater();
-    // The generic helper uses a Local bazel_tools override for small authored
-    // fixtures. This authenticated builtin requires the actual Builtin route.
-    inject_root_module_request_inputs(
-        &mut updater,
-        Path::new("/workspace"),
-        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-        LockfileMode::Update,
-    )
-    .unwrap();
     let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
     // Complete every declared Local module: the mapping requests four explicit
     // root dependencies first, then the other ten builtin dependency routes.

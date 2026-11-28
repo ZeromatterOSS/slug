@@ -1,5 +1,5 @@
 {
-  "checksum": "de8cd5a864c8f0573b8c290b8f13f9a5056886cb7e77deb3a3f75f7f9d52fe7b",
+  "checksum": "da6c70152d29b1dbcde3aa8a4abd4c88aaf4a4c6e2aeacb4e41c59dbcd37f15c",
   "crates": {
     "Inflector 0.11.4": {
       "name": "Inflector",
@@ -22469,6 +22469,14 @@
             {
               "id": "regex 1.13.1",
               "target": "regex"
+            },
+            {
+              "id": "regex-automata 0.4.16",
+              "target": "regex_automata"
+            },
+            {
+              "id": "regex-syntax 0.8.11",
+              "target": "regex_syntax"
             }
           ],
           "selects": {}
@@ -31756,6 +31764,8 @@
     "rand_xoshiro 0.7.0",
     "ref-cast 1.0.26",
     "regex 1.13.1",
+    "regex-automata 0.4.16",
+    "regex-syntax 0.8.11",
     "relative-path 1.9.3",
     "rustls 0.23.42",
     "rustls-native-certs 0.8.4",

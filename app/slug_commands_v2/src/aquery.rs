@@ -12,7 +12,9 @@ use std::path::Path;
 
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_identity_v2::TargetPattern;
+use slug_query_v2::AqueryMnemonicFilter;
 use slug_query_v2::AqueryScope;
 use slug_query_v2::QueryExpression;
 use slug_query_v2::aquery_expression_spec;
@@ -21,6 +23,7 @@ use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::ParsedFlag;
 use crate::common::RepositoryEnvironmentOverride;
+use crate::common::archive_distdir_value;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
@@ -28,13 +31,18 @@ use crate::common::bzlmod_registry_urls;
 use crate::common::parse_query_expression_for;
 use crate::common::repository_environment_overrides;
 use crate::common::split_args;
+use crate::common::starlark_configuration_occurrence;
+use crate::common::validate_bare_boolean_flag;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AqueryRequest {
     pub expression: String,
     pub target: TargetPattern,
     pub scope: AqueryScope,
+    pub mnemonic_filter: Option<AqueryMnemonicFilter>,
     pub output_base: Option<String>,
+    pub configuration_overlay: CommandConfigurationOverlay,
+    pub distdirs: Vec<String>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
@@ -86,10 +94,21 @@ impl AqueryRequest {
                 "aquery accepts only a main-repository literal target label",
             ));
         }
+        let mnemonic_filter = spec.compile_mnemonic_filter().map_err(|error| {
+            CommandParseError::InvalidQueryExpression {
+                message: error.to_string(),
+            }
+        })?;
 
         let mut output_seen = false;
         let mut output_base = None;
+        let mut configuration = Vec::new();
+        let mut distdirs = Vec::new();
         for flag in &parsed.flags {
+            if let Some(occurrence) = starlark_configuration_occurrence(flag)? {
+                configuration.push(occurrence);
+                continue;
+            }
             match flag.name.as_str() {
                 "output" => {
                     if output_seen {
@@ -104,6 +123,8 @@ impl AqueryRequest {
                     }
                 }
                 "output_base" => set_once(&mut output_base, flag, "--output_base")?,
+                "noshow_progress" => validate_bare_boolean_flag(flag)?,
+                "distdir" => distdirs.push(archive_distdir_value(flag)?),
                 "allow_yanked_versions"
                 | "ignore_dev_dependency"
                 | "noignore_dev_dependency"
@@ -125,7 +146,10 @@ impl AqueryRequest {
             expression,
             target,
             scope: spec.scope(),
+            mnemonic_filter,
             output_base,
+            configuration_overlay: configuration.into(),
+            distdirs,
             bzlmod_policy: match workspace {
                 Some(workspace) => bzlmod_command_policy_for_workspace(&parsed.flags, workspace)?,
                 None => bzlmod_command_policy(&parsed.flags)?,
@@ -160,5 +184,56 @@ fn unsupported(message: &str) -> CommandParseError {
     CommandParseError::InvalidFlagValue {
         flag: "aquery".to_owned(),
         message: message.to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use slug_configuration_v2::CommandConfigurationOccurrence;
+
+    use super::*;
+
+    #[test]
+    fn pinned_rust_aquery_flags_retain_setting_and_ordered_distdirs() {
+        let mut flags = vec![
+            "mnemonic(\"(Rustc|SymlinkTree|RunfilesTree)\", //pkg:probe)",
+            "--output=text",
+            "--@rules_rust//rust/toolchain/channel=nightly",
+            "--lockfile_mode=off",
+            "--distdir=relative",
+            "--distdir=/absolute",
+            "--distdir=relative",
+        ];
+        let expected = AqueryRequest::parse(&flags).unwrap();
+        flags.push("--noshow_progress");
+        let parsed = AqueryRequest::parse(&flags).unwrap();
+        assert_eq!(parsed, expected);
+        assert_eq!(parsed.scope, AqueryScope::Literal);
+        assert_eq!(parsed.distdirs, ["relative", "/absolute", "relative"]);
+        assert!(parsed.configuration_overlay.iter().eq([
+            &CommandConfigurationOccurrence::starlark(
+                "@rules_rust//rust/toolchain/channel",
+                Some("nightly"),
+                false,
+            ),
+        ]));
+        let filter = parsed.mnemonic_filter.unwrap();
+        assert!(filter.is_match("Rustc"));
+        assert!(!filter.is_match("RustcMetadata"));
+
+        for flag in [
+            "--noshow_progress=false",
+            "--distdir=",
+            "--distdir",
+            "--compilation_mode=opt",
+        ] {
+            assert!(
+                matches!(
+                    AqueryRequest::parse(&["//pkg:probe", flag]),
+                    Err(CommandParseError::InvalidFlagValue { .. })
+                ),
+                "{flag}"
+            );
+        }
     }
 }

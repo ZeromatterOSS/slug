@@ -146,6 +146,7 @@ fn run_daemon(
     }
     let daemon_request = slug_server_v2::BuildRequest {
         targets: vec![request.target.to_string()],
+        distdirs: Vec::new(),
         configuration_overlay: Default::default(),
         remote: (&remote).into(),
         bzlmod,

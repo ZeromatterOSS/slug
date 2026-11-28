@@ -273,7 +273,7 @@ fn cpp_epoch_with(
         root_build.unwrap_or_else(|| default_build.as_deref().unwrap()),
         revision,
     );
-    epoch.build()
+    epoch.build_from_authored_module_inputs()
 }
 
 async fn cpp_transaction(dice: &Arc<Dice>, revision: i64, marker: &str) -> dice::DiceTransaction {
@@ -314,14 +314,6 @@ async fn cpp_transaction_for_epoch(
     )
     .await;
     let mut updater = transaction.into_updater();
-    inject_root_module_request_inputs(
-        &mut updater,
-        Path::new("/workspace"),
-        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-        LockfileMode::Update,
-    )
-    .unwrap();
     let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
     slug_bzlmod_v2::inject_registry_request_inputs(
         &mut updater,

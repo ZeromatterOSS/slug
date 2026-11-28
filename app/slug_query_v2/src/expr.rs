@@ -18,7 +18,11 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use regex_automata::meta::Regex as MetaRegex;
 use starlark_map::small_set::SmallSet;
+
+use crate::query_regex::check_pattern_length;
+use crate::query_regex::compile_full_regex;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub struct SourceSpan {
@@ -53,10 +57,11 @@ pub enum AqueryScope {
     Deps,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct AqueryExpressionSpec {
     target: CompactString,
     scope: AqueryScope,
+    mnemonic: Option<Spanned<CompactString>>,
 }
 
 impl AqueryExpressionSpec {
@@ -67,7 +72,66 @@ impl AqueryExpressionSpec {
     pub const fn scope(&self) -> AqueryScope {
         self.scope
     }
+
+    /// The exact pattern spelling from the query word.
+    pub fn mnemonic_pattern(&self) -> Option<&str> {
+        self.mnemonic.as_ref().map(|pattern| pattern.value.as_str())
+    }
+
+    /// Compile the optional filter before evaluating the configured operand.
+    pub fn compile_mnemonic_filter(&self) -> Result<Option<AqueryMnemonicFilter>, QueryParseError> {
+        self.mnemonic
+            .as_ref()
+            .map(|pattern| {
+                let matcher = compile_full_regex(&pattern.value)
+                    .map_err(|message| QueryParseError::new(message, pattern.span))?;
+                Ok(AqueryMnemonicFilter {
+                    pattern: pattern.value.clone(),
+                    matcher: Arc::new(matcher),
+                })
+            })
+            .transpose()
+    }
 }
+
+impl PartialEq for AqueryExpressionSpec {
+    fn eq(&self, other: &Self) -> bool {
+        self.target == other.target
+            && self.scope == other.scope
+            && self.mnemonic_pattern() == other.mnemonic_pattern()
+    }
+}
+
+impl Eq for AqueryExpressionSpec {}
+
+/// A request-local whole-mnemonic regex with Slug's bounded Rust syntax.
+#[derive(Clone)]
+pub struct AqueryMnemonicFilter {
+    pattern: CompactString,
+    matcher: Arc<MetaRegex>,
+}
+
+impl AqueryMnemonicFilter {
+    pub fn is_match(&self, mnemonic: &str) -> bool {
+        self.matcher.is_match(mnemonic)
+    }
+}
+
+impl fmt::Debug for AqueryMnemonicFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("AqueryMnemonicFilter")
+            .field(&self.pattern)
+            .finish()
+    }
+}
+
+impl PartialEq for AqueryMnemonicFilter {
+    fn eq(&self, other: &Self) -> bool {
+        self.pattern == other.pattern
+    }
+}
+
+impl Eq for AqueryMnemonicFilter {}
 
 /// The one configured `deps()` form whose traversal semantics are admitted.
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -265,9 +329,38 @@ pub fn parse_query_expression(source: &str) -> Result<QueryExpression, QueryPars
     crate::parser::parse(source)
 }
 
-/// Returns the sole literal or unbounded top-level `deps()` form admitted by
-/// the FileWrite aquery command.
+/// Returns the admitted aquery operand and optional outer `mnemonic()` word.
 pub fn aquery_expression_spec(
+    expression: &QueryExpression,
+) -> Result<AqueryExpressionSpec, QueryParseError> {
+    if let QueryExpressionKind::Function { name, args } = &expression.kind
+        && name.value == "mnemonic"
+    {
+        let [word, operand] = args.as_ref() else {
+            return Err(QueryParseError::new(
+                "aquery mnemonic() requires exactly two arguments",
+                expression.span,
+            ));
+        };
+        let QueryExpressionKind::TargetLiteral(pattern) = &word.kind else {
+            return Err(QueryParseError::new(
+                "aquery mnemonic() requires a regex word as its first argument",
+                word.span,
+            ));
+        };
+        let mut spec = unfiltered_aquery_expression_spec(operand)?;
+        check_pattern_length(pattern)
+            .map_err(|message| QueryParseError::new(message, word.span))?;
+        spec.mnemonic = Some(Spanned {
+            span: word.span,
+            value: pattern.clone(),
+        });
+        return Ok(spec);
+    }
+    unfiltered_aquery_expression_spec(expression)
+}
+
+fn unfiltered_aquery_expression_spec(
     expression: &QueryExpression,
 ) -> Result<AqueryExpressionSpec, QueryParseError> {
     match &expression.kind {
@@ -275,6 +368,7 @@ pub fn aquery_expression_spec(
             Ok(AqueryExpressionSpec {
                 target: target.clone(),
                 scope: AqueryScope::Literal,
+                mnemonic: None,
             })
         }
         QueryExpressionKind::Function { name, args } if name.value == "deps" => {
@@ -299,6 +393,7 @@ pub fn aquery_expression_spec(
             Ok(AqueryExpressionSpec {
                 target: target.clone(),
                 scope: AqueryScope::Deps,
+                mnemonic: None,
             })
         }
         _ => Err(QueryParseError::new(

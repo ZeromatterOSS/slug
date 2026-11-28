@@ -94,6 +94,7 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
     let request = |entries: Vec<RepositoryEnvironmentWireEntry>| {
         DaemonRequest::Build(BuildRequest {
             targets: vec!["//:probe".to_owned()],
+            distdirs: Vec::new(),
             configuration_overlay: Default::default(),
             remote: Default::default(),
             bzlmod: Default::default(),
@@ -113,6 +114,7 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
     ];
     let build = BuildRequest {
         targets: vec!["//:probe".to_owned()],
+        distdirs: Vec::new(),
         configuration_overlay: Default::default(),
         remote: Default::default(),
         bzlmod: Default::default(),
@@ -141,6 +143,8 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
             "aquery",
             DaemonRequest::Aquery(AqueryRequest {
                 expression: "//:probe".to_owned(),
+                configuration_overlay: Default::default(),
+                distdirs: Vec::new(),
                 bzlmod: Default::default(),
                 repository_environment: RepositoryEnvironmentRequestInputs {
                     entries: entries.clone(),
@@ -388,6 +392,8 @@ fn aquery_wire_revalidates_the_raw_expression_scope() {
     let request = |expression: &str| {
         serde_json::to_string(&DaemonRequest::Aquery(AqueryRequest {
             expression: expression.to_owned(),
+            configuration_overlay: Default::default(),
+            distdirs: Vec::new(),
             bzlmod: BzlmodRequestInputs::default(),
             repository_environment: Default::default(),
         }))
@@ -405,6 +411,154 @@ fn aquery_wire_revalidates_the_raw_expression_scope() {
         assert!(stderr_text(&valid.stderr).contains("aquery_runtime_error"));
         assert!(!stderr_text(&valid.stderr).contains("aquery_request_error"));
     }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn aquery_wire_applies_request_local_setting_and_distdirs() {
+    let workspace = scratch("aquery-setting-distdirs").canonicalize().unwrap();
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = 'demo')\n");
+    write(
+        &workspace.join("defs.bzl"),
+        "\
+def _setting(ctx): return []
+setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _writer(ctx):
+    out = ctx.actions.declare_file(ctx.attr.name_part + '.txt')
+    ctx.actions.write(out, ctx.attr.name_part)
+    return [DefaultInfo(files = depset([out]))]
+writer = rule(implementation = _writer, attrs = {'name_part': attr.string()})
+",
+    );
+    write(
+        &workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'setting')\nsetting(name = 'setting', build_setting_default = 'original', visibility = ['//visibility:public'])\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "\
+load('//:defs.bzl', 'writer')
+config_setting(name = 'selected', flag_values = {'//:setting': 'selected'})
+writer(name = 'probe', name_part = select({':selected': 'selected', '//conditions:default': 'original'}))
+",
+    );
+    let wire = |configuration_overlay, distdirs| {
+        serde_json::to_value(DaemonRequest::Aquery(AqueryRequest {
+            expression: "mnemonic(\"(FileWrite|Missing)\", //pkg:probe)".to_owned(),
+            configuration_overlay,
+            distdirs,
+            bzlmod: BzlmodRequestInputs {
+                registry_urls: vec![registry.clone()],
+                ..Default::default()
+            },
+            repository_environment: Default::default(),
+        }))
+        .unwrap()
+    };
+    let default = wire(Default::default(), Vec::new());
+    assert!(default["request"].get("configuration_overlay").is_none());
+    assert!(default["request"].get("distdirs").is_none());
+    let ordered = vec![
+        "./mirror/../archives".to_owned(),
+        "/absolute".to_owned(),
+        "./mirror/../archives".to_owned(),
+    ];
+    let changed = wire(root_setting_overlay(Some("selected")), ordered);
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let mut baseline = None;
+    for (request, output, paths) in [
+        (&default, "original", Vec::new()),
+        (
+            &changed,
+            "selected",
+            vec![
+                workspace.join("archives"),
+                PathBuf::from("/absolute"),
+                workspace.join("archives"),
+            ],
+        ),
+        (&default, "original", Vec::new()),
+    ] {
+        let response = handle_request(&mut daemon, &request.to_string());
+        assert_eq!(response.exit_code, 0, "{response:?}");
+        assert!(response.stderr.is_empty(), "{response:?}");
+        assert!(
+            response.stdout.contains(&format!("/bin/pkg/{output}.txt]")),
+            "{response:?}"
+        );
+        if output == "original" {
+            let baseline = baseline.get_or_insert_with(|| response.stdout.clone());
+            assert_eq!(response.stdout, *baseline);
+        }
+        let policies = daemon.take_forwarded_archive_distdirs_for_test();
+        assert_eq!(policies.len(), 1);
+        assert!(
+            policies[0]
+                .paths()
+                .iter()
+                .map(|path| path.as_path())
+                .eq(paths.iter().map(PathBuf::as_path))
+        );
+    }
+
+    let pkg_build = workspace.join("pkg/BUILD.bazel");
+    let original = fs::read_to_string(&pkg_build).unwrap();
+    write(
+        &pkg_build,
+        &format!("{original}\n# Changed before validation.\n"),
+    );
+    let malformed_paths = wire(Default::default(), vec!["bad\0path".to_owned()]);
+    let mut malformed_filter = default.clone();
+    malformed_filter["request"]["expression"] = serde_json::json!("mnemonic(\"(\", //pkg:probe)");
+    let scope = |occurrence| wire(vec![occurrence].into(), Vec::new());
+    for (request, diagnostic) in [
+        (malformed_paths, "--distdir"),
+        (malformed_filter, "invalid Slug regex"),
+        (
+            scope(CommandConfigurationOccurrence::extra_toolchains(
+                "//:setting",
+            )),
+            "only Starlark build-setting overrides",
+        ),
+        (
+            scope(CommandConfigurationOccurrence::starlark(
+                "@@//:setting",
+                Some("selected"),
+                false,
+            )),
+            "expected a direct root or apparent-external build-setting label",
+        ),
+        (
+            scope(CommandConfigurationOccurrence::starlark(
+                ":setting",
+                Some("selected"),
+                false,
+            )),
+            "expected a direct root or apparent-external build-setting label",
+        ),
+        (
+            scope(CommandConfigurationOccurrence::starlark(
+                "//:setting",
+                Some("selected"),
+                true,
+            )),
+            "Boolean no-form does not accept a joined value",
+        ),
+    ] {
+        let response = handle_request(&mut daemon, &request.to_string());
+        assert_eq!(response.exit_code, 2, "{response:?}");
+        assert!(response.stdout.is_empty(), "{response:?}");
+        assert!(
+            stderr_text(&response.stderr).contains(diagnostic),
+            "{response:?}"
+        );
+        assert_eq!(response.invalidated_files, 0, "{response:?}");
+        assert!(daemon.take_forwarded_archive_distdirs_for_test().is_empty());
+    }
+    let accepted = handle_request(&mut daemon, &default.to_string());
+    assert_eq!(accepted.exit_code, 0, "{accepted:?}");
+    assert_eq!(accepted.invalidated_files, 1, "{accepted:?}");
 }
 
 const DEFS_BZL: &str = "\
@@ -1332,6 +1486,7 @@ fn label_kind_completes_cross_package_depth_boundaries_without_changing_standard
 fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     let request = DaemonRequest::Build(BuildRequest {
         targets: vec!["//pkg:one".to_owned(), "//pkg:two".to_owned()],
+        distdirs: Vec::new(),
         configuration_overlay: root_setting_overlay(Some("Gr\u{00fc}\u{00df}e")),
         remote: crate::RemoteRequest {
             executor: Some("grpc://executor".to_owned()),
@@ -1391,6 +1546,7 @@ fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
     ];
     let request = DaemonRequest::Run(BuildRequest {
         targets: vec!["//pkg:hello".to_owned()],
+        distdirs: Vec::new(),
         configuration_overlay: CommandConfigurationOverlay::default(),
         remote: crate::RemoteRequest {
             executor: Some("grpc://executor".to_owned()),

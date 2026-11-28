@@ -38,6 +38,12 @@ pub struct RunRequest {
 impl RunRequest {
     pub fn parse(args: &[impl AsRef<str>]) -> Result<Self, CommandParseError> {
         let parsed = split_args(args);
+        if let Some(flag) = parsed.flags.iter().find(|flag| flag.name == "distdir") {
+            return Err(CommandParseError::InvalidFlagValue {
+                flag: flag.raw.clone(),
+                message: "--distdir is not supported by this run".to_owned(),
+            });
+        }
         let target = parse_single_target(CommandKind::Run, parsed.positionals.first())?;
         let mut program_args = parsed.positionals.into_iter().skip(1).collect::<Vec<_>>();
         program_args.extend(parsed.passthrough);
@@ -88,6 +94,20 @@ mod tests {
             request.program_args,
             ["--registry=file://program-argument", "tail"]
         );
+    }
+
+    #[test]
+    fn run_preserves_distdir_only_as_a_program_argument() {
+        let flag = "--distdir=archives";
+        assert_eq!(
+            RunRequest::parse(&["//pkg:bin", flag]),
+            Err(CommandParseError::InvalidFlagValue {
+                flag: flag.to_owned(),
+                message: "--distdir is not supported by this run".to_owned(),
+            })
+        );
+        let request = RunRequest::parse(&["//pkg:bin", "--", flag]).unwrap();
+        assert_eq!(request.program_args, [flag]);
     }
 
     #[test]

@@ -99,6 +99,7 @@ mod workspace_status_publication_file;
 
 pub use aquery_text::format_aquery_text_output_for_scope;
 pub use aquery_text::format_aquery_text_output_for_scope_with_context;
+pub use aquery_text::format_aquery_text_output_for_scope_with_mnemonic_filter;
 pub use configured_output::configured_output_root;
 pub use cquery_starlark::CQUERY_STARLARK_NAME_MAX_BYTES;
 pub use cquery_starlark::CQUERY_STARLARK_SOURCE_MAX_BYTES;
@@ -269,9 +270,8 @@ pub fn evaluate_workspace_build_command_with_repository_environment(
     AcceptedCommand<std::sync::Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
     BuildCommandError,
 > {
-    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
-        .map_err(BuildCommandError::infrastructure)?;
-    runtime.build_command_with_repository_environment(
+    evaluate_workspace_build_command_with_repository_environment_and_distdirs(
+        workspace,
         targets,
         command_policy,
         environment_policy,
@@ -279,6 +279,35 @@ pub fn evaluate_workspace_build_command_with_repository_environment(
         registry_urls,
         repository_environment,
         configuration_overlay,
+        ArchiveDistdirPolicy::default(),
+    )
+}
+
+pub fn evaluate_workspace_build_command_with_repository_environment_and_distdirs(
+    workspace: &std::path::Path,
+    targets: &[slug_identity_v2::TargetPattern],
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+    repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+    configuration_overlay: slug_configuration_v2::CommandConfigurationOverlay,
+    archive_distdirs: ArchiveDistdirPolicy,
+) -> Result<
+    AcceptedCommand<std::sync::Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+    BuildCommandError,
+> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
+        .map_err(BuildCommandError::infrastructure)?;
+    runtime.build_command_with_repository_environment_and_distdirs(
+        targets,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+        repository_environment,
+        configuration_overlay,
+        archive_distdirs,
     )
 }
 

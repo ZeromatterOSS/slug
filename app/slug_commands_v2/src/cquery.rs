@@ -20,6 +20,7 @@ use slug_query_v2::validate_cquery_query;
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::RepositoryEnvironmentOverride;
+use crate::common::archive_distdir_value;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
@@ -130,15 +131,7 @@ impl CqueryRequest {
                 "output" => set_once(&mut output, flag, "--output")?,
                 "starlark:expr" => set_once(&mut starlark_expression, flag, "--starlark:expr")?,
                 "output_base" => set_once(&mut output_base, flag, "--output_base")?,
-                "distdir" => distdirs.push(
-                    flag.value
-                        .clone()
-                        .filter(|value| !value.is_empty())
-                        .ok_or_else(|| CommandParseError::InvalidFlagValue {
-                            flag: flag.raw.clone(),
-                            message: "--distdir requires a non-empty directory".to_owned(),
-                        })?,
-                ),
+                "distdir" => distdirs.push(archive_distdir_value(flag)?),
                 "implicit_deps" => include_implicit = parse_bool_flag(flag, false)?,
                 "noimplicit_deps" => {
                     include_implicit = parse_bool_flag(flag, true)?;

@@ -2,6 +2,8 @@ use slug_analysis_v2::ConfiguredSymlinkActionView;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::SymlinkTarget;
 use slug_query_v2::AqueryScope;
+use slug_query_v2::QueryExpression;
+use slug_query_v2::aquery_expression_spec;
 
 use super::*;
 
@@ -177,6 +179,50 @@ async fn symlink_aquery_real_producers_have_exact_fields_and_scopes() {
     for block in &blocks {
         assert!(deps.contains(block));
     }
+    let filtered = |scope, pattern| {
+        let expression =
+            QueryExpression::parse(&format!("mnemonic(\"{pattern}\", //pkg:subject)")).unwrap();
+        let filter = aquery_expression_spec(&expression)
+            .unwrap()
+            .compile_mnemonic_filter()
+            .unwrap()
+            .unwrap();
+        crate::runtime::format_aquery_text_output_for_scope_with_mnemonic_filter(
+            evaluation,
+            scope,
+            Some(&filter),
+        )
+        .unwrap()
+    };
+    let records = literal.split_inclusive("\n\n").collect::<Vec<_>>();
+    for (pattern, indices) in [
+        ("^ExecutableSymlink$", &[2][..]),
+        ("Symlink", &[1, 3, 4][..]),
+        (".*Symlink", &[1, 2, 3, 4][..]),
+        ("^FileWrite$", &[0, 5][..]),
+        ("^NoActionMatches$", &[][..]),
+    ] {
+        let expected = indices
+            .iter()
+            .map(|index| records[*index])
+            .collect::<String>();
+        assert_eq!(filtered(AqueryScope::Literal, pattern), expected);
+    }
+    assert_eq!(owner.actions()[2].mnemonic(), "Symlink");
+    let deps_writes = deps
+        .split_inclusive("\n\n")
+        .filter(|record| record.contains("\n  Mnemonic: FileWrite\n"))
+        .collect::<String>();
+    assert_eq!(filtered(AqueryScope::Deps, "^FileWrite$"), deps_writes);
+    let no_actions = BuildCommandEvaluation {
+        targets: Arc::from([]),
+        action_closure: ValidatedActionClosure::empty(),
+        ..evaluation.clone()
+    };
+    assert_eq!(
+        crate::runtime::format_aquery_text_output_for_scope(&no_actions, AqueryScope::Deps),
+        Err("FileWrite aquery text requires at least one resolved action".to_owned())
+    );
     assert_eq!(symlink_text(evaluation, AqueryScope::Literal), literal);
     drop(transaction);
     drop(outcome);

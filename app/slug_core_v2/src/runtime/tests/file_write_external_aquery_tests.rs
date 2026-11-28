@@ -68,60 +68,12 @@ async fn external_write_transaction(
         epoch.missing(&format!("/workspace/{name}/REPO.bazel"));
         epoch.missing(&format!("/workspace/{name}/.bazelignore"));
     }
-    // Same accepted Local schema as solib_transaction; declared relative
-    // override paths remain distinct from materialized absolute logical roots.
-    let transaction = build_root_transaction(dice, epoch.build()).await;
-    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
-    let entries = [
-        (
-            "bazel_tools+",
-            "/workspace/.slug_test_builtin/bazel_tools",
-            "/workspace/.slug_test_builtin/bazel_tools",
-        ),
-        ("alpha+", "/workspace/alpha", "alpha"),
-        ("beta+", "/workspace/beta", "beta"),
-    ]
-    .map(|(repo, path, declared)| {
-        let mut attributes = SmallMap::new();
-        attributes.insert(
-            "path".into(),
-            slug_bzlmod_v2::OverrideAttributeValue::String(declared.into()),
-        );
-        slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
-            request: Arc::new(RepositoryMaterializationRequest {
-                id: RepositoryMaterializationRequestId {
-                    workspace: workspace.clone(),
-                    canonical_repo: slug_identity_v2::CanonicalRepoName::new(repo).unwrap(),
-                },
-                repo_spec: slug_bzlmod_v2::RepoSpec {
-                    rule_id: slug_bzlmod_v2::RepoRuleId {
-                        bzl_file: CanonicalLabel::parse(
-                            "@@bazel_tools//tools/build_defs/repo:local.bzl",
-                        )
-                        .unwrap(),
-                        rule_name: "local_repository".into(),
-                    },
-                    attributes: Arc::new(attributes),
-                },
-                kind: slug_bzlmod_v2::RepositoryMaterializationKind::Local {
-                    logical_root: NormalizedAbsolutePath::new(path).unwrap(),
-                },
-            }),
-            result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
-                slug_bzlmod_v2::RepositoryMaterializationSuccess::Local,
-            ),
-        }
-    });
-    let mut updater = transaction.into_updater();
-    updater
-        .changed_to(vec![(
-            RepositoryMaterializationResultEpochKey {
-                workspace: workspace.clone(),
-            },
-            RepositoryMaterializationResultEpoch::new(workspace, entries).unwrap(),
-        )])
-        .unwrap();
-    updater.commit().await
+    build_root_transaction_with_local_modules(
+        dice,
+        epoch.build(),
+        &[("alpha", "alpha"), ("beta", "beta")],
+    )
+    .await
 }
 
 fn external_write_key(target: &str) -> BuildCommandRootKey {

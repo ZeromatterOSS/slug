@@ -16,6 +16,7 @@ mod loading_environment;
 mod output;
 mod parser;
 pub(crate) mod provenance;
+mod query_regex;
 mod traversal;
 
 #[derive(
@@ -44,6 +45,7 @@ pub use evaluator::evaluate_loading_query;
 pub use evaluator::evaluate_loading_query_with_policy;
 pub use evaluator::evaluate_loading_query_with_policy_and_output_completion;
 pub use expr::AqueryExpressionSpec;
+pub use expr::AqueryMnemonicFilter;
 pub use expr::AqueryScope;
 pub use expr::BinaryOperator;
 pub use expr::QueryExpression;

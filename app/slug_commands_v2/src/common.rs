@@ -15,7 +15,6 @@ use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_configuration_v2::CommandConfigurationOccurrence;
 use slug_configuration_v2::NativeCommandOption;
-use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::TargetPattern;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -580,33 +579,50 @@ pub(crate) fn command_configuration_occurrence(
             };
             CommandConfigurationOccurrence::native(option, raw_value, false)
         }
-        name => {
-            let (label, negated) = if name.starts_with("//") || name.starts_with('@') {
-                (name, false)
-            } else if let Some(label) = name
-                .strip_prefix("no")
-                .filter(|label| label.starts_with("//") || label.starts_with('@'))
-            {
-                (label, true)
-            } else {
-                return Ok(None);
-            };
-            ApparentLabel::parse(label).map_err(|message| CommandParseError::InvalidFlagValue {
-                flag: flag.raw.clone(),
-                message: format!(
-                    "expected a direct root or apparent-external build-setting label: {message}"
-                ),
-            })?;
-            if negated && flag.value.is_some() {
-                return Err(CommandParseError::InvalidFlagValue {
-                    flag: flag.raw.clone(),
-                    message: "Boolean no-form does not accept a joined value".to_owned(),
-                });
-            }
-            CommandConfigurationOccurrence::starlark(label, flag.value.as_deref(), negated)
-        }
+        _ => return starlark_configuration_occurrence(flag),
     };
     Ok(Some(occurrence))
+}
+
+pub(crate) fn starlark_configuration_occurrence(
+    flag: &ParsedFlag,
+) -> Result<Option<CommandConfigurationOccurrence>, CommandParseError> {
+    let name = flag.name.as_str();
+    let (label, negated) = if name.starts_with("//") || name.starts_with('@') {
+        (name, false)
+    } else if let Some(label) = name
+        .strip_prefix("no")
+        .filter(|label| label.starts_with("//") || label.starts_with('@'))
+    {
+        (label, true)
+    } else {
+        return Ok(None);
+    };
+    CommandConfigurationOccurrence::validate_apparent_starlark_flag(
+        label,
+        flag.value.as_deref(),
+        negated,
+    )
+    .map_err(|message| CommandParseError::InvalidFlagValue {
+        flag: flag.raw.clone(),
+        message,
+    })?;
+    Ok(Some(CommandConfigurationOccurrence::starlark(
+        label,
+        flag.value.as_deref(),
+        negated,
+    )))
+}
+
+pub(crate) fn archive_distdir_value(flag: &ParsedFlag) -> Result<String, CommandParseError> {
+    flag.value
+        .as_deref()
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| CommandParseError::InvalidFlagValue {
+            flag: flag.raw.clone(),
+            message: "--distdir requires a non-empty directory".to_owned(),
+        })
 }
 
 fn required_joined_value<'a>(

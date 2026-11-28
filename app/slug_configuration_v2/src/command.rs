@@ -7,6 +7,7 @@ use compact_str::CompactString;
 use dupe::Dupe;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_identity_v2::ApparentLabel;
 
 /// The closed Bazel 9.2 native-option set currently admitted at the command
 /// boundary. Keeping this typed prevents command capture from becoming an
@@ -276,6 +277,21 @@ pub enum CommandConfigurationOccurrence {
 }
 
 impl CommandConfigurationOccurrence {
+    /// Validate a CLI-shaped setting supplied by either argv or a request frame.
+    pub fn validate_apparent_starlark_flag(
+        label: &str,
+        raw_value: Option<&str>,
+        negated: bool,
+    ) -> Result<(), String> {
+        ApparentLabel::parse(label).map_err(|message| {
+            format!("expected a direct root or apparent-external build-setting label: {message}")
+        })?;
+        if negated && raw_value.is_some() {
+            return Err("Boolean no-form does not accept a joined value".to_owned());
+        }
+        Ok(())
+    }
+
     pub fn starlark(
         apparent_label: impl Into<CompactString>,
         raw_value: Option<impl Into<CompactString>>,

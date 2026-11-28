@@ -29,6 +29,8 @@ use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_identity_v2::TargetPattern;
+use slug_query_v2::AqueryMnemonicFilter;
+use slug_query_v2::AqueryScope;
 use slug_reapi_v2::RemoteConfig;
 
 use crate::Daemon;
@@ -38,6 +40,8 @@ use crate::Daemon;
 #[serde(deny_unknown_fields)]
 pub struct BuildRequest {
     pub targets: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub distdirs: Vec<String>,
     #[serde(default)]
     pub configuration_overlay: CommandConfigurationOverlay,
     #[serde(default)]
@@ -123,6 +127,10 @@ pub struct QueryRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AqueryRequest {
     pub expression: String,
+    #[serde(default, skip_serializing_if = "CommandConfigurationOverlay::is_empty")]
+    pub configuration_overlay: CommandConfigurationOverlay,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub distdirs: Vec<String>,
     #[serde(default)]
     pub bzlmod: BzlmodRequestInputs,
     #[serde(default)]
@@ -455,8 +463,15 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 Ok(inputs) => inputs,
                 Err(error) => return malformed_repository_environment_response(error),
             };
+            let archive_distdirs = match slug_core_v2::runtime::ArchiveDistdirPolicy::from_request(
+                daemon.workspace(),
+                &request.distdirs,
+            ) {
+                Ok(policy) => policy,
+                Err(error) => return build_request_error(&error),
+            };
             let remote = build_remote_config(&request);
-            let result = daemon.build_with_repository_environment(
+            let result = daemon.build_with_repository_environment_and_distdirs(
                 &targets,
                 &remote,
                 &[],
@@ -466,6 +481,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 registry_urls,
                 repository_environment,
                 request.configuration_overlay.clone(),
+                archive_distdirs,
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -496,6 +512,9 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
             };
             if !request.configuration_overlay.is_empty() {
                 return run_request_error("run command configuration is unsupported");
+            }
+            if !request.distdirs.is_empty() {
+                return run_request_error("run does not support --distdir");
             }
             let remote = build_remote_config(&request);
             let (result, executable) = daemon.run_with_repository_environment(
@@ -581,30 +600,34 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 Ok(inputs) => inputs,
                 Err(error) => return malformed_repository_environment_response(error),
             };
-            let (target, scope) = match validate_aquery_expression(&request.expression) {
-                Ok(validated) => validated,
-                Err(error) => {
-                    return DaemonResponse {
-                        exit_code: 2,
-                        stdout: String::new(),
-                        stderr: format!(
-                            "{{\"error\":\"aquery_request_error\",\"message\":\"{}\"}}",
-                            slug_core_v2::error::json_escape(&error)
-                        )
-                        .into_bytes(),
-                        invalidated_files: 0,
-                        run_launch_plan: None,
-                    };
-                }
-            };
-            let result = daemon.aquery_with_repository_environment(
+            let (target, scope, mnemonic_filter) =
+                match validate_aquery_expression(&request.expression) {
+                    Ok(validated) => validated,
+                    Err(error) => {
+                        return DaemonResponse {
+                            exit_code: 2,
+                            stdout: String::new(),
+                            stderr: format!(
+                                "{{\"error\":\"aquery_request_error\",\"message\":\"{}\"}}",
+                                slug_core_v2::error::json_escape(&error)
+                            )
+                            .into_bytes(),
+                            invalidated_files: 0,
+                            run_launch_plan: None,
+                        };
+                    }
+                };
+            let result = daemon.aquery_with_selection_and_distdirs(
                 &target,
                 scope,
+                mnemonic_filter.as_ref(),
                 command_policy,
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
                 repository_environment,
+                request.configuration_overlay,
+                &request.distdirs,
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -667,7 +690,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
 
 fn validate_aquery_expression(
     expression: &str,
-) -> Result<(TargetPattern, slug_query_v2::AqueryScope), String> {
+) -> Result<(TargetPattern, AqueryScope, Option<AqueryMnemonicFilter>), String> {
     let expression =
         slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
     let spec =
@@ -679,7 +702,10 @@ fn validate_aquery_expression(
     ) {
         return Err("aquery accepts only a main-repository literal target label".to_owned());
     }
-    Ok((target, spec.scope()))
+    let mnemonic_filter = spec
+        .compile_mnemonic_filter()
+        .map_err(|error| error.to_string())?;
+    Ok((target, spec.scope(), mnemonic_filter))
 }
 fn validate_cquery_expression(
     expression: &str,
@@ -841,6 +867,8 @@ pub fn send_aquery_request(
     let json = frame::encode(
         &DaemonRequest::Aquery(AqueryRequest {
             expression: request.expression.clone(),
+            configuration_overlay: request.configuration_overlay.clone(),
+            distdirs: request.distdirs.clone(),
             bzlmod: request.bzlmod.clone(),
             repository_environment: request.repository_environment.clone(),
         }),

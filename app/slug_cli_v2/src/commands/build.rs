@@ -12,10 +12,11 @@ use slug_commands_v2::CommandParseError;
 use slug_commands_v2::build::BuildRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::ArchiveDistdirPolicy;
 use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::WorkspaceRuntime;
-use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
+use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment_and_distdirs;
 use slug_reapi_v2::ActionChainReapiTransport;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
@@ -34,6 +35,18 @@ pub fn run(argv: Vec<String>) -> i32 {
     let request = match BuildRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
         Err(error) => return emit_parse_error(&argv, error),
+    };
+    let archive_distdirs = match ArchiveDistdirPolicy::from_request(&workspace, &request.distdirs) {
+        Ok(policy) => policy,
+        Err(message) => {
+            return emit_parse_error(
+                &argv,
+                CommandParseError::InvalidFlagValue {
+                    flag: "--distdir".to_owned(),
+                    message,
+                },
+            );
+        }
     };
     let repository_environment = match super::repository_environment::capture_repository_environment(
         &workspace,
@@ -112,7 +125,7 @@ pub fn run(argv: Vec<String>) -> i32 {
             .map_err(|error| error.to_string())
             .and_then(|runtime| {
                 runtime
-                    .execute_and_publish_requested_actions_with_repository_environment(
+                    .execute_and_publish_requested_actions_with_repository_environment_and_distdirs(
                         &request.targets,
                         request.bzlmod_policy,
                         environment_policy,
@@ -120,6 +133,7 @@ pub fn run(argv: Vec<String>) -> i32 {
                         &request.registry_urls,
                         repository_environment,
                         request.configuration_overlay,
+                        archive_distdirs,
                         &transport,
                     )
                     .map_err(|error| error.to_string())
@@ -155,7 +169,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         return emit_output(code, stdout, stderr);
     }
 
-    let accepted = match evaluate_workspace_build_command_with_repository_environment(
+    let accepted = match evaluate_workspace_build_command_with_repository_environment_and_distdirs(
         &workspace,
         &request.targets,
         request.bzlmod_policy.clone(),
@@ -164,6 +178,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         &request.registry_urls,
         repository_environment,
         request.configuration_overlay.clone(),
+        archive_distdirs,
     ) {
         Ok(accepted) => accepted,
         Err(error) => {
@@ -334,6 +349,7 @@ fn run_daemon_build(
 
     let daemon_request = slug_server_v2::BuildRequest {
         targets: request.targets.iter().map(|t| t.to_string()).collect(),
+        distdirs: request.distdirs,
         configuration_overlay: request.configuration_overlay,
         remote: remote.into(),
         bzlmod,

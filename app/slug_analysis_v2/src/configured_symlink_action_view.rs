@@ -91,7 +91,12 @@ impl<'a> ConfiguredSymlinkActionView<'a> {
     }
 
     pub fn mnemonic(&self) -> &'static str {
-        match self.spec().target() {
+        Self::mnemonic_for_spec(self.spec())
+    }
+
+    /// Text mnemonic from the typed action before query view validation.
+    pub fn mnemonic_for_spec(spec: &SymlinkSpec) -> &'static str {
+        match spec.target() {
             SymlinkTarget::Artifact {
                 require_executable: true,
                 ..

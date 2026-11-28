@@ -432,6 +432,7 @@ impl WorkspaceRuntime {
             registry_urls,
             repository_environment,
             configuration_overlay,
+            crate::runtime::ArchiveDistdirPolicy::default(),
             transport,
             NoPublication,
         )
@@ -460,6 +461,38 @@ impl WorkspaceRuntime {
         AcceptedCommand<Result<RequestedActionResult<T::Output>, BuildCommandError>>,
         BuildCommandError,
     > {
+        self.execute_and_publish_requested_actions_with_repository_environment_and_distdirs(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            crate::runtime::ArchiveDistdirPolicy::default(),
+            transport,
+        )
+    }
+
+    /// Use the same requested Build session with request-local archive hints.
+    #[allow(clippy::too_many_arguments)]
+    pub fn execute_and_publish_requested_actions_with_repository_environment_and_distdirs<
+        T: ActionChainOutputTransport,
+    >(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        archive_distdirs: crate::runtime::ArchiveDistdirPolicy,
+        transport: &T,
+    ) -> Result<
+        AcceptedCommand<Result<RequestedActionResult<T::Output>, BuildCommandError>>,
+        BuildCommandError,
+    > {
         self.execute_requested_actions_with_policy(
             targets,
             command_policy,
@@ -468,6 +501,7 @@ impl WorkspaceRuntime {
             registry_urls,
             repository_environment,
             configuration_overlay,
+            archive_distdirs,
             transport,
             PublishOutputs(&self.configured_output),
         )
@@ -483,6 +517,7 @@ impl WorkspaceRuntime {
         registry_urls: &[String],
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
+        archive_distdirs: crate::runtime::ArchiveDistdirPolicy,
         transport: &T,
         publication: P,
     ) -> Result<
@@ -494,7 +529,7 @@ impl WorkspaceRuntime {
         self.configured_output
             .prepare_marker_dir()
             .map_err(BuildCommandError::infrastructure)?;
-        let (build, request) = self.prepare_build_request(
+        let (build, mut request) = self.prepare_build_request(
             targets,
             command_policy,
             environment_policy,
@@ -503,6 +538,7 @@ impl WorkspaceRuntime {
             repository_environment,
             configuration_overlay,
         )?;
+        request.archive_distdirs = archive_distdirs;
         self.drive_action_chain(
             request,
             ActionChainStagingKey::requested(build),

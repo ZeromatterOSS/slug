@@ -7314,6 +7314,33 @@ impl WorkspaceRuntime {
         AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
         BuildCommandError,
     > {
+        self.build_command_with_repository_environment_and_distdirs(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            crate::runtime::ArchiveDistdirPolicy::default(),
+        )
+    }
+
+    /// Evaluate the same analysis terminal with ordered archive acquisition hints.
+    pub fn build_command_with_repository_environment_and_distdirs(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        archive_distdirs: crate::runtime::ArchiveDistdirPolicy,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+        BuildCommandError,
+    > {
         begin_probe_phase!(request_phase, self, RequestConfiguration);
         let (root, request) = self.prepare_build_request(
             targets,
@@ -7324,6 +7351,10 @@ impl WorkspaceRuntime {
             repository_environment,
             configuration_overlay,
         )?;
+        let request = NativeDemandRequestInputBundle {
+            archive_distdirs,
+            ..request
+        };
         finish_probe_phase!(request_phase);
         let accepted = if let Some(observed) = BuildCommandRootObservationKey::new(root.clone()) {
             self.drive_command(request, observed)
@@ -10022,6 +10053,10 @@ mod tests {
         WorkspaceRuntime::new(workspace, ProcessHostOwner::native())
     }
 
+    const FIXTURE_PLATFORM_BUILD: &str =
+        "exports_files([\"constraints.bzl\"])\nplatform(name = \"host\")\n";
+    const FIXTURE_PLATFORM_CONSTRAINTS: &str = "HOST_CONSTRAINTS = []\n";
+
     pub(in crate::runtime::dice) fn configured_test_command_policy(
         workspace: &Path,
     ) -> BzlmodCommandPolicyKey {
@@ -10032,14 +10067,10 @@ mod tests {
             "module(name = \"platforms\", version = \"1.0.0\")\n",
         )
         .unwrap();
-        fs::write(
-            platforms.join("host/BUILD.bazel"),
-            "exports_files([\"constraints.bzl\"])\nplatform(name = \"host\")\n",
-        )
-        .unwrap();
+        fs::write(platforms.join("host/BUILD.bazel"), FIXTURE_PLATFORM_BUILD).unwrap();
         fs::write(
             platforms.join("host/constraints.bzl"),
-            "HOST_CONSTRAINTS = []\n",
+            FIXTURE_PLATFORM_CONSTRAINTS,
         )
         .unwrap();
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap()
@@ -14084,6 +14115,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
     }
 
     impl BuildRootEpoch {
+        const ROOT_MODULE: &str = "/workspace/MODULE.bazel";
+
         fn demand(path: &str, operation: PathObservationOperation) -> PathObservationDemand {
             PathObservationDemand::new(
                 PathObservationNamespace::Host,
@@ -14122,25 +14155,10 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             let mut epoch = Self::default();
             epoch.node("/", PathNodeKind::Directory, variant);
             epoch.node("/workspace", PathNodeKind::Directory, variant);
-            epoch.file("/workspace/MODULE.bazel", "", variant);
+            epoch.file(Self::ROOT_MODULE, "", variant);
             epoch.missing("/workspace/MODULE.bazel.lock");
             epoch.missing("/workspace/REPO.bazel");
             epoch.missing("/workspace/.bazelignore");
-            epoch.node(
-                "/workspace/.slug_test_builtin",
-                PathNodeKind::Directory,
-                variant,
-            );
-            epoch.node(
-                "/workspace/.slug_test_builtin/bazel_tools",
-                PathNodeKind::Directory,
-                variant,
-            );
-            epoch.file(
-                "/workspace/.slug_test_builtin/bazel_tools/MODULE.bazel",
-                "module(name = \"bazel_tools\")\n",
-                variant,
-            );
             epoch.package(".slug_test_host", "platform(name = \"host\")\n", variant);
             epoch
         }
@@ -14159,7 +14177,125 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         }
 
         fn build(self) -> PathObservationEpoch {
+            self.build_with_supplied_builtin_modules(&[])
+        }
+
+        fn build_with_supplied_builtin_modules(
+            mut self,
+            supplied: &[&str],
+        ) -> PathObservationEpoch {
+            let metadata = Self::demand(Self::ROOT_MODULE, PathObservationOperation::Lstat);
+            let source = Self::demand(Self::ROOT_MODULE, PathObservationOperation::FileBytes);
+            if matches!(
+                self.entries.get(&metadata),
+                Some(PathObservationResult::Lstat(PathOperationResult::Present(stat)))
+                    if stat.kind() == PathNodeKind::RegularFile
+            ) && let Some(PathObservationResult::FileBytes(PathOperationResult::Present(bytes))) =
+                self.entries.get(&source)
+            {
+                let mut module = std::str::from_utf8(bytes).unwrap().to_owned();
+                module.push('\n');
+                self.node("/workspace/.slug_test_builtin", PathNodeKind::Directory, 1);
+                for (name, version) in build_root_builtin_prerequisites() {
+                    if supplied.contains(&name) {
+                        continue;
+                    }
+                    let relative = build_root_builtin_module_path(name);
+                    let root = format!("/workspace/{relative}");
+                    self.node(&root, PathNodeKind::Directory, 1);
+                    self.file(
+                        &format!("{root}/MODULE.bazel"),
+                        &format!("module(name='{name}',version='{version}')\n"),
+                        1,
+                    );
+                    if name == "platforms" {
+                        self.package(&format!("{relative}/host"), FIXTURE_PLATFORM_BUILD, 1);
+                        self.file(
+                            &format!("{root}/host/constraints.bzl"),
+                            FIXTURE_PLATFORM_CONSTRAINTS,
+                            1,
+                        );
+                        self.missing(&format!("{root}/REPO.bazel"));
+                        self.missing(&format!("{root}/.bazelignore"));
+                    }
+                    module.push_str(&format!(
+                        "local_path_override(module_name='{name}',path='{relative}')\n"
+                    ));
+                    // The pinned builtin has four version-only dependencies. Explicit root
+                    // edges admit their local fixtures through the ordinary module resolver.
+                    if matches!(
+                        name,
+                        "platforms"
+                            | "bazel_features"
+                            | "rules_apple"
+                            | "rules_swift"
+                            | "abseil-cpp"
+                    ) {
+                        module.push_str(&format!("bazel_dep(name='{name}',version='{version}')\n"));
+                    }
+                }
+                self.entries.insert(
+                    source,
+                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                        module.into_bytes(),
+                    ))),
+                );
+            }
+            self.build_from_authored_module_inputs()
+        }
+
+        fn build_from_authored_module_inputs(self) -> PathObservationEpoch {
             PathObservationEpoch::new(self.entries).unwrap()
+        }
+    }
+
+    fn build_root_builtin_prerequisites() -> impl Iterator<Item = (&'static str, &'static str)> {
+        std::iter::once(("platforms", "1.0.0")).chain(
+            general_repository_archive_tests::BUILTIN_MODULE_PREREQUISITES
+                .iter()
+                .copied(),
+        )
+    }
+
+    fn build_root_builtin_module_path(name: &str) -> String {
+        format!(".slug_test_builtin/{name}")
+    }
+
+    fn build_root_local_materialization(
+        workspace: &NormalizedAbsolutePath,
+        canonical_repo: &str,
+        relative: &str,
+    ) -> slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
+        let mut attributes = SmallMap::new();
+        attributes.insert(
+            "path".into(),
+            slug_bzlmod_v2::OverrideAttributeValue::String(relative.into()),
+        );
+        slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
+            request: Arc::new(RepositoryMaterializationRequest {
+                id: RepositoryMaterializationRequestId {
+                    workspace: workspace.dupe(),
+                    canonical_repo: slug_identity_v2::CanonicalRepoName::new(canonical_repo)
+                        .unwrap(),
+                },
+                repo_spec: slug_bzlmod_v2::RepoSpec {
+                    rule_id: slug_bzlmod_v2::RepoRuleId {
+                        bzl_file: CanonicalLabel::parse(
+                            "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                        )
+                        .unwrap(),
+                        rule_name: "local_repository".into(),
+                    },
+                    attributes: Arc::new(attributes),
+                },
+                kind: slug_bzlmod_v2::RepositoryMaterializationKind::Local {
+                    logical_root: NormalizedAbsolutePath::new(workspace.as_path().join(relative))
+                        .unwrap(),
+                },
+            }),
+            result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
+                slug_bzlmod_v2::RepositoryMaterializationSuccess::Local,
+            ),
         }
     }
 
@@ -14167,17 +14303,36 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         dice: &Arc<Dice>,
         epoch: PathObservationEpoch,
     ) -> dice::DiceTransaction {
-        let user_data = UserComputationData {
-            cycle_detector: Some(analysis_cycle_detector()),
-            ..Default::default()
-        };
-        build_root_transaction_with_data(dice, epoch, user_data).await
+        build_root_transaction_with_local_modules(dice, epoch, &[]).await
+    }
+
+    async fn build_root_transaction_with_local_modules(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        local_modules: &[(&str, &str)],
+    ) -> dice::DiceTransaction {
+        build_root_transaction_with_inputs(
+            dice,
+            epoch,
+            UserComputationData::default(),
+            local_modules,
+        )
+        .await
     }
 
     async fn build_root_transaction_with_data(
         dice: &Arc<Dice>,
         epoch: PathObservationEpoch,
+        user_data: UserComputationData,
+    ) -> dice::DiceTransaction {
+        build_root_transaction_with_inputs(dice, epoch, user_data, &[]).await
+    }
+
+    async fn build_root_transaction_with_inputs(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
         mut user_data: UserComputationData,
+        local_modules: &[(&str, &str)],
     ) -> dice::DiceTransaction {
         let mut text_files = Vec::new();
         let mut raw_files = Vec::new();
@@ -14233,54 +14388,46 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         updater
             .changed_to(slug_workspace_v2::path_observation_shards(&epoch))
             .unwrap();
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let stub_modules = build_root_builtin_prerequisites()
+            .filter_map(|(name, _)| {
+                let relative = build_root_builtin_module_path(name);
+                let module = BuildRootEpoch::demand(
+                    &format!("/workspace/{relative}/MODULE.bazel"),
+                    PathObservationOperation::FileBytes,
+                );
+                epoch.get(&module).map(|_| (name, relative))
+            })
+            .flat_map(|(name, relative)| {
+                let legacy = build_root_local_materialization(
+                    &workspace,
+                    &slug_bzlmod_v2::bazel_canonical_module_repo_name(name),
+                    &relative,
+                );
+                // These fixtures exercise both the legacy route and selected
+                // toolchain resolution, which reserves the bare platforms spelling.
+                let selected = (name == "platforms")
+                    .then(|| build_root_local_materialization(&workspace, name, &relative));
+                std::iter::once(legacy).chain(selected)
+            });
+        let materializations = RepositoryMaterializationResultEpoch::new(
+            workspace.dupe(),
+            stub_modules.chain(local_modules.iter().map(|&(name, relative)| {
+                build_root_local_materialization(
+                    &workspace,
+                    &slug_bzlmod_v2::bazel_canonical_module_repo_name(name),
+                    relative,
+                )
+            })),
+        )
+        .unwrap();
         updater
             .changed_to(vec![(PathObservationEpochKey, epoch)])
             .unwrap();
-        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
-        let mut attributes = SmallMap::new();
-        attributes.insert(
-            "path".into(),
-            slug_bzlmod_v2::OverrideAttributeValue::String(
-                "/workspace/.slug_test_builtin/bazel_tools".into(),
-            ),
-        );
-        let request = Arc::new(RepositoryMaterializationRequest {
-            id: RepositoryMaterializationRequestId {
-                workspace: workspace.clone(),
-                canonical_repo: slug_identity_v2::CanonicalRepoName::new("bazel_tools+").unwrap(),
-            },
-            repo_spec: slug_bzlmod_v2::RepoSpec {
-                rule_id: slug_bzlmod_v2::RepoRuleId {
-                    bzl_file: CanonicalLabel::parse(
-                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
-                    )
-                    .unwrap(),
-                    rule_name: "local_repository".into(),
-                },
-                attributes: Arc::new(attributes),
-            },
-            kind: slug_bzlmod_v2::RepositoryMaterializationKind::Local {
-                logical_root: NormalizedAbsolutePath::new(
-                    "/workspace/.slug_test_builtin/bazel_tools",
-                )
-                .unwrap(),
-            },
-        });
         updater
             .changed_to(vec![(
-                RepositoryMaterializationResultEpochKey {
-                    workspace: workspace.clone(),
-                },
-                RepositoryMaterializationResultEpoch::new(
-                    workspace,
-                    [slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
-                        request,
-                        result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
-                            slug_bzlmod_v2::RepositoryMaterializationSuccess::Local,
-                        ),
-                    }],
-                )
-                .unwrap(),
+                RepositoryMaterializationResultEpochKey { workspace },
+                materializations,
             )])
             .unwrap();
         slug_bzlmod_v2::inject_root_package_policy_inputs(
@@ -14298,13 +14445,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         inject_root_module_request_inputs(
             &mut updater,
             Path::new("/workspace"),
-            BzlmodCommandPolicyKey::from_flags_with_module_overrides(
-                None,
-                false,
-                Path::new("/workspace"),
-                ["bazel_tools=/workspace/.slug_test_builtin/bazel_tools"],
-            )
-            .unwrap(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
         )
@@ -14714,7 +14855,7 @@ ordinary_rule(
 
     fn complete_build_evaluation(outcome: &BuildCommandOutcome) -> &BuildCommandEvaluation {
         let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = outcome else {
-            panic!("build command retained Needs")
+            panic!("build command retained Needs: {outcome:?}")
         };
         value.as_ref().as_ref().unwrap()
     }

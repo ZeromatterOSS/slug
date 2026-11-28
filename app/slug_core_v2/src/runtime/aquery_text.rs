@@ -9,6 +9,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 
 use slug_analysis_v2::ConfigurationKind;
+use slug_analysis_v2::ConfiguredAction;
 use slug_analysis_v2::ConfiguredActionView;
 use slug_analysis_v2::ConfiguredBuildInfoActionView;
 use slug_analysis_v2::ConfiguredCppCompileActionView;
@@ -19,6 +20,7 @@ use slug_analysis_v2::ConfiguredSpawnActionView;
 use slug_analysis_v2::ConfiguredSymlinkActionView;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputKind;
+use slug_query_v2::AqueryMnemonicFilter;
 use slug_query_v2::AqueryScope;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark_map::small_set::SmallSet;
@@ -54,19 +56,64 @@ pub fn format_aquery_text_output_for_scope_with_context(
     scope: AqueryScope,
     args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
 ) -> Result<String, String> {
+    render_aquery_text(evaluation, scope, None, args_context)
+}
+
+/// Select by the mnemonic shown in action-query text.
+pub fn format_aquery_text_output_for_scope_with_mnemonic_filter(
+    evaluation: &BuildCommandEvaluation,
+    scope: AqueryScope,
+    filter: Option<&AqueryMnemonicFilter>,
+) -> Result<String, String> {
+    render_aquery_text(
+        evaluation,
+        scope,
+        filter,
+        &slug_build_api_v2::NoopArgsDirectoryContext,
+    )
+}
+
+fn render_aquery_text(
+    evaluation: &BuildCommandEvaluation,
+    scope: AqueryScope,
+    filter: Option<&AqueryMnemonicFilter>,
+    args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
+) -> Result<String, String> {
+    let selected = |action: &&ConfiguredAction| {
+        filter.is_none_or(|filter| filter.is_match(text_mnemonic(action)))
+    };
     // Preserve the old FileWrite guard-before-render error priority across all
     // selected owners. This pass only constructs borrowed views.
     visit_owners(evaluation, scope, |owner| {
-        validate_owner(owner, evaluation.workspace()).map_err(str::to_owned)
+        validate_actions(
+            owner.actions().iter().filter(&selected),
+            evaluation.workspace(),
+        )
+        .map_err(str::to_owned)
     })?;
     let mut output = String::new();
     visit_owners(evaluation, scope, |owner| {
-        append_owner(&mut output, owner, evaluation.workspace(), args_context)
+        append_actions(
+            &mut output,
+            owner.actions().iter().filter(&selected),
+            evaluation.workspace(),
+            args_context,
+        )
     })?;
-    if output.is_empty() {
+    if output.is_empty() && filter.is_none() {
         return Err("FileWrite aquery text requires at least one resolved action".into());
     }
     Ok(output)
+}
+
+fn text_mnemonic(action: &ConfiguredAction) -> &str {
+    if matches!(action.kind(), ActionKind::Write { .. }) {
+        "FileWrite"
+    } else if let Some(spec) = action.symlink_spec() {
+        ConfiguredSymlinkActionView::mnemonic_for_spec(spec)
+    } else {
+        action.mnemonic()
+    }
 }
 
 fn visit_owners(
@@ -85,11 +132,11 @@ fn visit_owners(
     }
 }
 
-fn validate_owner(
-    owner: &ConfiguredNodeResult,
+fn validate_actions<'a>(
+    actions: impl Iterator<Item = &'a ConfiguredAction>,
     workspace: &NormalizedAbsolutePath,
 ) -> Result<(), &'static str> {
-    for action in owner.actions() {
+    for action in actions {
         if matches!(action.kind(), ActionKind::Write { .. }) {
             validate_file_write_query_context(&ConfiguredActionView::from_configured_action(
                 action,
@@ -111,13 +158,13 @@ fn validate_owner(
     Ok(())
 }
 
-fn append_owner(
+fn append_actions<'a>(
     output: &mut String,
-    owner: &ConfiguredNodeResult,
+    actions: impl Iterator<Item = &'a ConfiguredAction>,
     workspace: &NormalizedAbsolutePath,
     args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
 ) -> Result<(), String> {
-    for action in owner.actions() {
+    for action in actions {
         if matches!(action.kind(), ActionKind::Write { .. }) {
             let view = ResolvedFileWriteSemanticView::from_configured_action(
                 ConfiguredActionView::from_configured_action(action)?,

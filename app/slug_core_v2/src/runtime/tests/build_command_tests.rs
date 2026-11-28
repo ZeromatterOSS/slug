@@ -1732,7 +1732,8 @@ async fn build_command_root_anchor_need_and_error_suppress_target_branches() {
 
     let mut invalid_epoch = BuildRootEpoch::base(20);
     invalid_epoch.file("/workspace/MODULE.bazel", "this is invalid (", 20);
-    let mut invalid_anchor = build_root_transaction(&dice, invalid_epoch.build()).await;
+    let mut invalid_anchor =
+        build_root_transaction(&dice, invalid_epoch.build_from_authored_module_inputs()).await;
     let invalid = invalid_anchor.compute(&key).await.unwrap();
     assert!(matches!(
         invalid,

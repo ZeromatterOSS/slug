@@ -45,6 +45,7 @@ impl Workspace {
     fn request(&self, targets: &[&str], remote: &RemoteConfig) -> BuildRequest {
         BuildRequest {
             targets: targets.iter().map(|value| (*value).to_owned()).collect(),
+            distdirs: Vec::new(),
             configuration_overlay: Default::default(),
             remote: remote.into(),
             bzlmod: BzlmodRequestInputs {
@@ -74,6 +75,73 @@ fn dispatch(daemon: &mut Daemon, request: BuildRequest) -> DaemonResponse {
 
 fn terminal(response: &DaemonResponse) -> serde_json::Value {
     serde_json::from_str(stderr_text(&response.stderr).lines().last().unwrap()).unwrap()
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn requested_build_distdirs_round_trip_and_validate_before_observation() {
+    let workspace = Workspace::new();
+    let mut daemon = Daemon::new(&workspace.0).unwrap();
+    let mut request = workspace.request(&["//:empty"], &remote_execute());
+    let omitted = serde_json::to_value(DaemonRequest::Build(request.clone())).unwrap();
+    assert!(omitted["request"].get("distdirs").is_none());
+    let DaemonRequest::Build(defaulted) = serde_json::from_value(omitted).unwrap() else {
+        panic!("expected a Build request");
+    };
+    assert!(defaulted.distdirs.is_empty());
+
+    for malformed in ["", "path\0suffix"] {
+        request.distdirs = vec![malformed.to_owned()];
+        let response = dispatch(&mut daemon, request.clone());
+        assert_eq!(response.exit_code, 2);
+        assert_eq!(terminal(&response)["error"], "build_request_error");
+        assert!(
+            terminal(&response)["message"]
+                .as_str()
+                .unwrap()
+                .contains("--distdir requires a nonempty path without NUL")
+        );
+        assert!(response.stdout.is_empty());
+        assert_eq!(response.invalidated_files, 0);
+        assert!(daemon.observations.previous.is_none());
+        assert!(daemon.take_forwarded_archive_distdirs_for_test().is_empty());
+    }
+
+    request.distdirs = ["child/../archives", "/absolute", "./archives"]
+        .map(str::to_owned)
+        .to_vec();
+    let json = serde_json::to_string(&DaemonRequest::Build(request.clone())).unwrap();
+    let DaemonRequest::Build(decoded) = serde_json::from_str(&json).unwrap() else {
+        panic!("expected a Build request");
+    };
+    assert_eq!(decoded.distdirs, request.distdirs);
+
+    let run = serde_json::to_string(&DaemonRequest::Run(request)).unwrap();
+    let response = handle_request(&mut daemon, &run);
+    assert_eq!(response.exit_code, 2);
+    assert!(stderr_text(&response.stderr).contains("run does not support --distdir"));
+    assert!(daemon.observations.previous.is_none());
+    assert!(daemon.take_forwarded_archive_distdirs_for_test().is_empty());
+
+    let response = handle_request(&mut daemon, &json);
+    assert_eq!(response.exit_code, 0, "{response:?}");
+    let evidence = terminal(&response);
+    assert_eq!(evidence["completed_boundary"], "reapi_native_execution");
+    assert_eq!(evidence["reapi_actions"], 0);
+    let policies = daemon.take_forwarded_archive_distdirs_for_test();
+    assert_eq!(policies.len(), 1);
+    assert_eq!(
+        policies[0]
+            .paths()
+            .iter()
+            .map(|path| path.as_path().to_owned())
+            .collect::<Vec<_>>(),
+        [
+            workspace.0.join("archives"),
+            PathBuf::from("/absolute"),
+            workspace.0.join("archives"),
+        ]
+    );
 }
 
 #[test]

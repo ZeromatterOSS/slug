@@ -12,9 +12,11 @@ use slug_commands_v2::CommandKind;
 use slug_commands_v2::aquery::AqueryRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::ArchiveDistdirPolicy;
+use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
-use slug_core_v2::runtime::format_aquery_text_output_for_scope;
+use slug_core_v2::runtime::WorkspaceRuntime;
+use slug_core_v2::runtime::format_aquery_text_output_for_scope_with_mnemonic_filter;
 use slug_server_v2::AqueryRequest as DaemonAqueryRequest;
 
 pub fn run(argv: Vec<String>) -> i32 {
@@ -25,6 +27,10 @@ pub fn run(argv: Vec<String>) -> i32 {
     let request = match AqueryRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Aquery, argv, Err(error)),
+    };
+    let archive_distdirs = match ArchiveDistdirPolicy::from_request(&workspace, &request.distdirs) {
+        Ok(policy) => policy,
+        Err(error) => return emit_error(2, &error, "one-shot"),
     };
     let repository_environment = match super::repository_environment::capture_repository_environment(
         &workspace,
@@ -56,16 +62,23 @@ pub fn run(argv: Vec<String>) -> i32 {
         return run_daemon(&output_base, request, bzlmod, repository_environment);
     }
 
-    let accepted = match evaluate_workspace_build_command_with_repository_environment(
-        &workspace,
-        std::slice::from_ref(&request.target),
-        request.bzlmod_policy,
-        environment_policy,
-        request.lockfile_mode,
-        &request.registry_urls,
-        repository_environment,
-        Default::default(),
-    ) {
+    let accepted = {
+        let runtime = match WorkspaceRuntime::new(workspace, ProcessHostOwner::native()) {
+            Ok(runtime) => runtime,
+            Err(error) => return emit_error(2, &error.to_string(), "one-shot"),
+        };
+        runtime.build_command_with_repository_environment_and_distdirs(
+            std::slice::from_ref(&request.target),
+            request.bzlmod_policy,
+            environment_policy,
+            request.lockfile_mode,
+            &request.registry_urls,
+            repository_environment,
+            request.configuration_overlay,
+            archive_distdirs,
+        )
+    };
+    let accepted = match accepted {
         Ok(accepted) => accepted,
         Err(error) => {
             let (_, exit_code) = error.terminal_error();
@@ -75,7 +88,11 @@ pub fn run(argv: Vec<String>) -> i32 {
     let published = accepted
         .project(|terminal| match terminal.as_ref() {
             Ok(evaluation) => {
-                match format_aquery_text_output_for_scope(evaluation, request.scope) {
+                match format_aquery_text_output_for_scope_with_mnemonic_filter(
+                    evaluation,
+                    request.scope,
+                    request.mnemonic_filter.as_ref(),
+                ) {
                     Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
                     Err(error) => {
                         TerminalOutput::new(2, String::new(), error_json(&error, "one-shot"))
@@ -120,6 +137,8 @@ fn run_daemon(
         &socket,
         &DaemonAqueryRequest {
             expression: request.expression,
+            configuration_overlay: request.configuration_overlay,
+            distdirs: request.distdirs,
             bzlmod,
             repository_environment,
         },

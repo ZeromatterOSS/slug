@@ -51,7 +51,7 @@ fn solib_epoch(revision: i64, filename: &str) -> PathObservationEpoch {
     epoch.missing("/workspace/rules_cc/REPO.bazel");
     epoch.missing("/workspace/rules_cc/.bazelignore");
     epoch.package("", &format!("load('@rules_cc//:defs.bzl','library','consumer','wrapper')\nplatform(name='platform')\nlibrary(name='library',out='{filename}')\nconsumer(name='consumer',library=':library')\nwrapper(name='wrapper',dep=':consumer')\n"), revision);
-    epoch.build()
+    epoch.build_with_supplied_builtin_modules(&["rules_cc"])
 }
 
 async fn solib_transaction(
@@ -59,57 +59,12 @@ async fn solib_transaction(
     revision: i64,
     filename: &str,
 ) -> dice::DiceTransaction {
-    let transaction = build_root_transaction(dice, solib_epoch(revision, filename)).await;
-    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
-    let entries = [
-        (
-            "bazel_tools+",
-            "/workspace/.slug_test_builtin/bazel_tools",
-            "/workspace/.slug_test_builtin/bazel_tools",
-        ),
-        ("rules_cc+", "/workspace/rules_cc", "rules_cc"),
-    ]
-    .map(|(repo, path, declared_path)| {
-        let mut attributes = SmallMap::new();
-        attributes.insert(
-            "path".into(),
-            slug_bzlmod_v2::OverrideAttributeValue::String(declared_path.into()),
-        );
-        slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
-            request: Arc::new(RepositoryMaterializationRequest {
-                id: RepositoryMaterializationRequestId {
-                    workspace: workspace.clone(),
-                    canonical_repo: slug_identity_v2::CanonicalRepoName::new(repo).unwrap(),
-                },
-                repo_spec: slug_bzlmod_v2::RepoSpec {
-                    rule_id: slug_bzlmod_v2::RepoRuleId {
-                        bzl_file: CanonicalLabel::parse(
-                            "@@bazel_tools//tools/build_defs/repo:local.bzl",
-                        )
-                        .unwrap(),
-                        rule_name: "local_repository".into(),
-                    },
-                    attributes: Arc::new(attributes),
-                },
-                kind: slug_bzlmod_v2::RepositoryMaterializationKind::Local {
-                    logical_root: NormalizedAbsolutePath::new(path).unwrap(),
-                },
-            }),
-            result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
-                slug_bzlmod_v2::RepositoryMaterializationSuccess::Local,
-            ),
-        }
-    });
-    let mut updater = transaction.into_updater();
-    updater
-        .changed_to(vec![(
-            RepositoryMaterializationResultEpochKey {
-                workspace: workspace.clone(),
-            },
-            RepositoryMaterializationResultEpoch::new(workspace, entries).unwrap(),
-        )])
-        .unwrap();
-    updater.commit().await
+    build_root_transaction_with_local_modules(
+        dice,
+        solib_epoch(revision, filename),
+        &[("rules_cc", "rules_cc")],
+    )
+    .await
 }
 
 fn solib_key(target: &str) -> BuildCommandRootKey {

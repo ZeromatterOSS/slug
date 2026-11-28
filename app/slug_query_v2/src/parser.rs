@@ -437,11 +437,15 @@ fn function_expression(input: Span<'_>) -> Parsed<'_, QueryExpression> {
     spanned(|input| {
         let (input, name) = spanned(function_name).parse(input)?;
         let (input, _) = char('(').parse(input)?;
-        let (input, args) = cut(terminated(
-            separated_list0(terminated(char(','), multispace0), expression),
-            char(')'),
-        ))
-        .parse(input)?;
+        let (input, args) = if name.value.fragment() == "mnemonic" {
+            cut(terminated(mnemonic_arguments, char(')'))).parse(input)?
+        } else {
+            cut(terminated(
+                separated_list0(terminated(char(','), multispace0), expression),
+                char(')'),
+            ))
+            .parse(input)?
+        };
         Ok((
             input,
             QueryExpressionKind::Function {
@@ -455,6 +459,12 @@ fn function_expression(input: Span<'_>) -> Parsed<'_, QueryExpression> {
         kind: value.value,
     })
     .parse(input)
+}
+
+fn mnemonic_arguments(input: Span<'_>) -> Parsed<'_, Vec<QueryExpression>> {
+    let (input, pattern) = delimited(multispace0, word_expression, multispace0).parse(input)?;
+    let (input, operand) = preceded(char(','), expression).parse(input)?;
+    Ok((input, vec![pattern, operand]))
 }
 
 fn function_name(input: Span<'_>) -> Parsed<'_, Span<'_>> {

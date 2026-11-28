@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use slug_query_v2::AqueryMnemonicFilter;
 use slug_query_v2::AqueryScope;
 use slug_query_v2::BinaryOperator;
 use slug_query_v2::QueryError;
@@ -17,6 +18,10 @@ use slug_query_v2::QueryFunctionStatus;
 use slug_query_v2::SourceSpan;
 use slug_query_v2::aquery_expression_spec;
 use slug_query_v2::cquery_literals;
+use slug_query_v2::loading_query_functions;
+use slug_query_v2::validate_cquery_query;
+use slug_query_v2::validate_loading_query;
+
 #[test]
 fn aquery_scope_accepts_only_literal_or_unbounded_top_level_deps_literal() {
     for (source, scope) in [
@@ -29,6 +34,8 @@ fn aquery_scope_accepts_only_literal_or_unbounded_top_level_deps_literal() {
         let spec = aquery_expression_spec(&expression).unwrap();
         assert_eq!(spec.target(), "//pkg:bin");
         assert_eq!(spec.scope(), scope);
+        assert!(spec.mnemonic_pattern().is_none());
+        assert!(spec.compile_mnemonic_filter().unwrap().is_none());
     }
 
     for source in [
@@ -43,9 +50,125 @@ fn aquery_scope_accepts_only_literal_or_unbounded_top_level_deps_literal() {
     }
 }
 
-use slug_query_v2::loading_query_functions;
-use slug_query_v2::validate_cquery_query;
-use slug_query_v2::validate_loading_query;
+#[test]
+fn aquery_mnemonic_wraps_one_existing_operand_and_keeps_structural_identity() {
+    for (source, scope) in [
+        ("mnemonic(Rustc, //pkg:bin)", AqueryScope::Literal),
+        ("mnemonic('Rustc', deps((//pkg:bin)))", AqueryScope::Deps),
+    ] {
+        let expression = QueryExpression::parse(source).unwrap();
+        let spec = aquery_expression_spec(&expression).unwrap();
+        assert_eq!(spec.target(), "//pkg:bin");
+        assert_eq!(spec.scope(), scope);
+        assert_eq!(spec.mnemonic_pattern(), Some("Rustc"));
+        assert!(
+            spec.compile_mnemonic_filter()
+                .unwrap()
+                .unwrap()
+                .is_match("Rustc")
+        );
+    }
+
+    let spec = |source: &str| aquery_expression_spec(&QueryExpression::parse(source).unwrap());
+    let left = spec("mnemonic(Rustc, deps(//pkg:bin))").unwrap();
+    let right = spec("(mnemonic(\"Rustc\", deps((//pkg:bin))))").unwrap();
+    let different = spec("mnemonic(Rust., deps(//pkg:bin))").unwrap();
+    assert_eq!(left, right);
+    assert_eq!(
+        left.compile_mnemonic_filter().unwrap(),
+        right.compile_mnemonic_filter().unwrap()
+    );
+    assert_ne!(left, different);
+    assert_ne!(
+        left.compile_mnemonic_filter().unwrap(),
+        different.compile_mnemonic_filter().unwrap()
+    );
+
+    let digits = spec("mnemonic(007, //pkg:bin)").unwrap();
+    assert_eq!(digits.mnemonic_pattern(), Some("007"));
+    let digits = digits.compile_mnemonic_filter().unwrap().unwrap();
+    assert!(digits.is_match("007"));
+    assert!(!digits.is_match("7"));
+
+    for source in [
+        "mnemonic((Rustc), //pkg:bin)",
+        "mnemonic('Rustc')",
+        "mnemonic('Rustc', //pkg:bin, //pkg:lib)",
+        "mnemonic(deps(//pkg:lib), //pkg:bin)",
+        "mnemonic('Rustc', deps(//pkg:bin, 1))",
+        "mnemonic('Rustc', //pkg:bin union //pkg:lib)",
+        "deps(mnemonic('Rustc', //pkg:bin))",
+        "mnemonic('Rustc', mnemonic('Rustc', //pkg:bin))",
+    ] {
+        let result = QueryExpression::parse(source)
+            .and_then(|expression| aquery_expression_spec(&expression));
+        assert!(result.is_err(), "{source}");
+    }
+}
+
+fn compile_aquery_mnemonic(
+    pattern: &str,
+) -> Result<AqueryMnemonicFilter, slug_query_v2::QueryParseError> {
+    let expression = QueryExpression::parse(&format!("mnemonic('{pattern}', //pkg:bin)")).unwrap();
+    aquery_expression_spec(&expression)?
+        .compile_mnemonic_filter()
+        .map(|filter| filter.unwrap())
+}
+
+#[test]
+fn aquery_mnemonic_matches_the_whole_string_with_inline_flags_and_comments() {
+    for (pattern, matches, misses) in [
+        ("a|ab", "ab", "xab"),
+        ("a", "a", "ab"),
+        ("(?x) a | ab # EOF comment", "ab", "ab "),
+        ("(?x: a | ab)#literal", "ab#literal", "ab"),
+        ("(?m)a$", "a", "a\n"),
+    ] {
+        let filter = compile_aquery_mnemonic(pattern).unwrap();
+        assert!(
+            filter.is_match(matches),
+            "{pattern:?} must match {matches:?}"
+        );
+        assert!(
+            !filter.is_match(misses),
+            "{pattern:?} must refuse {misses:?}"
+        );
+    }
+}
+
+#[test]
+fn aquery_mnemonic_uses_shared_regex_limits_and_reports_pattern_span() {
+    let exact = "a".repeat(4096);
+    assert!(compile_aquery_mnemonic(&exact).unwrap().is_match(&exact));
+
+    let oversized = "a".repeat(4097);
+    let nested = format!("{}a{}", "(".repeat(129), ")".repeat(129));
+    for (pattern, message) in [
+        (
+            oversized.as_str(),
+            "Slug regex resource limit exceeded: pattern is longer than 4096 bytes",
+        ),
+        (
+            "(?:a|b){100000}",
+            "Slug regex resource limit exceeded: compiled program is larger than 1048576 bytes",
+        ),
+        (
+            nested.as_str(),
+            "invalid Slug regex: unsupported or malformed syntax",
+        ),
+        ("(", "invalid Slug regex: unsupported or malformed syntax"),
+    ] {
+        let error = compile_aquery_mnemonic(pattern).unwrap_err();
+        assert_eq!(error.message, message);
+        assert_eq!(
+            error.span,
+            SourceSpan {
+                start: 9,
+                end: 11 + pattern.len(),
+            }
+        );
+    }
+}
 
 // Bazel 9.2 QueryParser.java: all binary operators have equal precedence and
 // are left-associative. QueryParserTest.testMultipleBinaryOperatorParsing

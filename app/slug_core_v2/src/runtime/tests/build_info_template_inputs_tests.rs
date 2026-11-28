@@ -76,7 +76,7 @@ fn template_epoch() -> PathObservationEpoch {
     wrapper.push_str("target_wrapper=rule(implementation=_impl,attrs={'dep':attr.label()})\n");
     epoch.file("/workspace/wrapper.bzl", &wrapper, 1);
     epoch.package("", "load('@bazel_tools//tools/build_defs/build_info:bazel_cc_build_info.bzl','bazel_cc_build_info')\nload(':wrapper.bzl','wrapper','target_wrapper')\nplatform(name='platform')\nbazel_cc_build_info(name='info')\nwrapper(name='wrapper',dep=':info')\ntarget_wrapper(name='external_target',dep='@abseil-cpp//:info')\nwrapper(name='external_exec',dep='@abseil-cpp//:info')\n", 1);
-    epoch.build()
+    epoch.build_from_authored_module_inputs()
 }
 
 fn ready(

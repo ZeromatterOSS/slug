@@ -12,29 +12,33 @@ Native retention stayed within the fixed bank and teardown refunded all credits.
 Scoped HTTPS freshness with an omitted checksum, repeated Workspace publication
 with retained readers, and the native Archive exact/+1 envelope passed.
 
-The protected launcher candidate passed confinement on unprivileged Linux.
-The [Stage 8 public cquery formatter][stage8] matched all four pinned CrateInfo
-cases on each route, with empty stderr and one daemon generation.
+Protected review cut `21f271d4b` passed one-shot and retained confinement on
+unprivileged Linux. The [Stage 8 public cquery formatter][stage8] matched four
+pinned CrateInfo cases on each route, with empty stderr and one daemon
+generation. The installed driver also passed ten retained NativeLink rows and
+all 57 CLI load-provenance rows. Generic passed those ten NativeLink rows during
+repeated timestamp changes in the workspace parent.
 
-Finish the installed sweep and review before activation. Cold, warm and restored
-Build cases passed on one installed daemon. The Generic retained oracle matches
-all ten rows while an unrelated sibling repeatedly changes the workspace
-parent's timestamps. A fresh REAPI process failure admits
-empty stdout and up to 1 MiB of inline or verified CAS stderr. Core revalidates sources before it
-publishes selected prints, the action diagnostic and process stderr at exit 1.
-The Loading and Core tests now verify dependency A/B/A, BUILD and glob changes,
-unrelated sibling silence, and final dependency order. `.bzl` compares exact
-evaluator operands. BUILD uses a fixed-size digest of its selected source,
-ordered loads and consumed glob records for print comparison. Projected
-registration results preserve warm rule reuse and keep the observed edges for
-source checks. All 57 CLI load-provenance rows passed, including the Host
-`.bzl` cycle. Query certifies that diagnostic and its selected sources through
-the completed live DICE closure. Host parent traversal records descriptor
-identity and effective search access. Explicit metadata, listing and rooted
-observations keep their exact source checks. Requalify the fresh installed cut.
-Public action comparison and Rust REAPI follow. Keep atomic
-publication, existing readers, native quotas, clocks, launcher/PID1, rooted
-reads, codec and history checks. Compare equal work for timing.
+A fresh REAPI process failure admits empty stdout and up to 1 MiB of inline or
+verified CAS stderr. Core revalidates sources before publishing selected prints,
+the action diagnostic and process stderr at exit 1. Loading and Core tests
+cover dependency A/B/A, BUILD and glob changes, unrelated sibling silence, and
+final dependency order. `.bzl` compares exact evaluator operands. BUILD uses a
+fixed-size digest of selected source, ordered loads and consumed glob records
+for print comparison. Registration projections preserve warm rule reuse and
+current observation edges. Query certifies Host `.bzl` cycles through the
+completed live DICE closure. Host parent traversal records descriptor identity
+and effective search access. Explicit metadata, listings and rooted observations
+use exact source checks.
+
+Public aquery admits bounded whole-mnemonic selection and the pinned
+Starlark configuration. Aquery and Build forward ordered distdirs. The
+same-host Bazel Rust rows preserve the host compiler's actual linker flags.
+Compare all protected action rows, prove Rust REAPI and close the full sweep.
+The older synthetic FileWrite baseline still needs builtin launcher/test
+toolchain fixture inputs. Keep atomic publication, existing readers, native
+quotas, clocks, launcher/PID1, rooted reads, codec and history checks. Compare
+equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
 diagnostic-only integration, caller pruning, Need cacheability, new repository
 routes, unselected syntax, global path caches and concurrent Archive batching

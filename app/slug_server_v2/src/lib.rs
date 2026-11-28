@@ -20,6 +20,7 @@ mod workspace_metrics;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_configuration_v2::CommandConfigurationOccurrence;
 use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::ArchiveDistdirPolicy;
@@ -27,6 +28,7 @@ use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_identity_v2::TargetPattern;
+use slug_query_v2::AqueryMnemonicFilter;
 use slug_query_v2::AqueryScope;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryOutputCompletion;
@@ -137,6 +139,33 @@ impl Daemon {
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
     ) -> BuildResult {
+        self.build_with_repository_environment_and_distdirs(
+            targets,
+            remote,
+            argv,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            ArchiveDistdirPolicy::default(),
+        )
+    }
+
+    pub(crate) fn build_with_repository_environment_and_distdirs(
+        &mut self,
+        targets: &[TargetPattern],
+        remote: &RemoteConfig,
+        argv: &[String],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        archive_distdirs: ArchiveDistdirPolicy,
+    ) -> BuildResult {
         self.build_or_run_with_bzlmod_inputs(
             targets,
             remote,
@@ -147,6 +176,7 @@ impl Daemon {
             registry_urls,
             repository_environment,
             configuration_overlay,
+            archive_distdirs,
             false,
         )
         .0
@@ -192,6 +222,7 @@ impl Daemon {
             registry_urls,
             repository_environment,
             CommandConfigurationOverlay::default(),
+            ArchiveDistdirPolicy::default(),
             true,
         )
     }
@@ -207,6 +238,7 @@ impl Daemon {
         registry_urls: Vec<String>,
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
+        archive_distdirs: ArchiveDistdirPolicy,
         run: bool,
     ) -> (BuildResult, Option<PathBuf>) {
         let invalidated = match self.observations.observe(&self.workspace) {
@@ -230,6 +262,11 @@ impl Daemon {
         #[cfg(test)]
         self.forwarded_repository_environments
             .push(repository_environment.clone());
+        #[cfg(test)]
+        if !archive_distdirs.paths().is_empty() {
+            self.forwarded_archive_distdirs
+                .push(archive_distdirs.clone());
+        }
         if !run && remote.mode() == RemoteMode::Execute {
             let transport = match slug_reapi_v2::ActionChainReapiTransport::new(remote.clone()) {
                 Ok(transport) => transport,
@@ -246,7 +283,7 @@ impl Daemon {
             };
             let accepted = match self
                 .runtime
-                .execute_and_publish_requested_actions_with_repository_environment(
+                .execute_and_publish_requested_actions_with_repository_environment_and_distdirs(
                     targets,
                     command_policy,
                     environment_policy,
@@ -254,6 +291,7 @@ impl Daemon {
                     &registry_urls,
                     repository_environment,
                     configuration_overlay,
+                    archive_distdirs,
                     &transport,
                 ) {
                 Ok(accepted) => accepted,
@@ -302,15 +340,18 @@ impl Daemon {
                 None,
             );
         }
-        let accepted = match self.runtime.build_command_with_repository_environment(
-            targets,
-            command_policy,
-            environment_policy,
-            lockfile_mode,
-            &registry_urls,
-            repository_environment,
-            configuration_overlay,
-        ) {
+        let accepted = match self
+            .runtime
+            .build_command_with_repository_environment_and_distdirs(
+                targets,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+                &registry_urls,
+                repository_environment,
+                configuration_overlay,
+                archive_distdirs,
+            ) {
             Ok(accepted) => accepted,
             Err(error) => {
                 return (
@@ -748,6 +789,62 @@ impl Daemon {
         registry_urls: Vec<String>,
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
     ) -> QueryResult {
+        self.aquery_with_selection_and_distdirs(
+            target,
+            scope,
+            None,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            CommandConfigurationOverlay::default(),
+            &[],
+        )
+    }
+
+    pub(crate) fn aquery_with_selection_and_distdirs(
+        &mut self,
+        target: &TargetPattern,
+        scope: AqueryScope,
+        mnemonic_filter: Option<&AqueryMnemonicFilter>,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        raw_distdirs: &[String],
+    ) -> QueryResult {
+        for occurrence in configuration_overlay.iter() {
+            let CommandConfigurationOccurrence::Starlark {
+                apparent_label,
+                raw_value,
+                negated,
+            } = occurrence
+            else {
+                return aquery_error_result(
+                    2,
+                    "aquery accepts only Starlark build-setting overrides",
+                    0,
+                );
+            };
+            if let Err(error) = CommandConfigurationOccurrence::validate_apparent_starlark_flag(
+                apparent_label,
+                raw_value.as_deref(),
+                *negated,
+            ) {
+                return aquery_error_result(2, &error, 0);
+            }
+        }
+        let archive_distdirs =
+            match ArchiveDistdirPolicy::from_request(&self.workspace, raw_distdirs) {
+                Ok(policy) => policy,
+                Err(error) => return aquery_error_result(2, &error, 0),
+            };
+        #[cfg(test)]
+        self.forwarded_archive_distdirs
+            .push(archive_distdirs.clone());
         let invalidated = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => return aquery_error_result(2, &error.to_string(), 0),
@@ -764,15 +861,18 @@ impl Daemon {
         #[cfg(test)]
         self.forwarded_repository_environments
             .push(repository_environment.clone());
-        let accepted = match self.runtime.build_command_with_repository_environment(
-            &[target.clone()],
-            command_policy,
-            environment_policy,
-            lockfile_mode,
-            &registry_urls,
-            repository_environment,
-            CommandConfigurationOverlay::default(),
-        ) {
+        let accepted = match self
+            .runtime
+            .build_command_with_repository_environment_and_distdirs(
+                &[target.clone()],
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+                &registry_urls,
+                repository_environment,
+                configuration_overlay,
+                archive_distdirs,
+            ) {
             Ok(accepted) => accepted,
             Err(error) => {
                 let (_, exit_code) = error.terminal_error();
@@ -782,8 +882,8 @@ impl Daemon {
         let published = accepted
             .project(|terminal| match terminal.as_ref() {
                 Ok(evaluation) => {
-                    match slug_core_v2::runtime::format_aquery_text_output_for_scope(
-                        evaluation, scope,
+                    match slug_core_v2::runtime::format_aquery_text_output_for_scope_with_mnemonic_filter(
+                        evaluation, scope, mnemonic_filter,
                     ) {
                         Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
                         Err(error) => TerminalOutput::new(

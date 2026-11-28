@@ -19,7 +19,6 @@ use compact_str::CompactString;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use regex::Regex;
-use regex::RegexBuilder;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -29,6 +28,11 @@ use crate::QueryExpressionKind;
 use crate::QueryPolicy;
 use crate::graph::QueryError;
 use crate::loading_query_function;
+#[cfg(test)]
+use crate::query_regex::SLUG_REGEX_NEST_LIMIT;
+#[cfg(test)]
+use crate::query_regex::SLUG_REGEX_PATTERN_LIMIT;
+use crate::query_regex::compile_search_regex;
 use crate::traversal::reverse_dependencies;
 use crate::traversal::some_path;
 use crate::traversal::transitive_closure;
@@ -985,37 +989,8 @@ enum RegexFunction {
     Kind,
 }
 
-const SLUG_REGEX_PATTERN_LIMIT: usize = 4_096;
-const SLUG_REGEX_PROGRAM_LIMIT: usize = 1_048_576;
-const SLUG_REGEX_NEST_LIMIT: u32 = 128;
-
 fn compile_slug_regex(pattern: &str) -> Result<Regex, QueryError> {
-    if pattern.len() > SLUG_REGEX_PATTERN_LIMIT {
-        return Err(QueryError::syntax(
-            "Slug regex resource limit exceeded: pattern is longer than 4096 bytes",
-        ));
-    }
-
-    let mut builder = RegexBuilder::new(pattern);
-    builder
-        .size_limit(SLUG_REGEX_PROGRAM_LIMIT)
-        .dfa_size_limit(SLUG_REGEX_PROGRAM_LIMIT)
-        .nest_limit(SLUG_REGEX_NEST_LIMIT)
-        .case_insensitive(false)
-        .multi_line(false)
-        .dot_matches_new_line(false)
-        .crlf(false)
-        .line_terminator(b'\n')
-        .swap_greed(false)
-        .ignore_whitespace(false)
-        .unicode(true)
-        .octal(false);
-    builder.build().map_err(|error| match error {
-        regex::Error::CompiledTooBig(_) => QueryError::syntax(
-            "Slug regex resource limit exceeded: compiled program is larger than 1048576 bytes",
-        ),
-        _ => QueryError::syntax("invalid Slug regex: unsupported or malformed syntax"),
-    })
+    compile_search_regex(pattern).map_err(QueryError::syntax)
 }
 
 /// The only configured-query function is also a loading-query function. Keep
