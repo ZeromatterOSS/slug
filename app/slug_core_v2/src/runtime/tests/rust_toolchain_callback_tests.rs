@@ -131,6 +131,7 @@ fn source(root: &std::path::Path, marker: &str) {
 
 fn workspace() -> (PathBuf, tempfile::TempDir) {
     let (root, archives) = assemble_callback_base_workspace();
+    let root = root.keep();
     source(&root, "A");
     let exports: Vec<_> = LIBS
         .iter()
@@ -273,7 +274,7 @@ fn configured(dynamic: bool) -> ConfigurationKey {
 // Legacy MODULE/package keys consume the existing immutable source snapshots.
 // Refresh actual source inputs on the same runtime before every request; normal
 // demand driving still owns all generated repositories and their receipts.
-fn refresh_callback_sources(runtime: &WorkspaceRuntime) {
+pub(super) fn refresh_callback_sources(runtime: &WorkspaceRuntime) {
     let observations = observe_workspace(&runtime.workspace).unwrap();
     let files = observations
         .files
@@ -524,9 +525,8 @@ fn prove_callback_mode(observed: bool) {
     let (root, _archives) = workspace();
     let runtime = test_runtime(&root).unwrap();
     let fast = configured(false);
-    // Cold materialization creates immutable roots under /tmp and changes
-    // genuinely observed ancestor metadata. Establish the warm-source
-    // baseline once; never retry publication equality until it succeeds.
+    // Establish the warm-source baseline once before comparing the selected
+    // Host observations and published values across consumers.
     let warm = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
     check(&warm, "rust_consumer", "A", false);
     let first = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
@@ -582,10 +582,14 @@ fn prove_callback_mode(observed: bool) {
             .any(
                 |demand| demand.namespace() == PathObservationNamespace::Host
                     && demand.path().as_path() == Path::new("/tmp")
-                    && demand.operation() == PathObservationOperation::Lstat
+                    && matches!(
+                        demand.operation(),
+                        PathObservationOperation::DirectoryTraversal
+                            | PathObservationOperation::Lstat
+                    )
                     && fresh_inputs.path_observations.get(demand).is_some()
             ),
-        "the previously changing ancestor remains observed"
+        "the Host ancestor remains observed through traversal or its metadata fallback"
     );
     check(&fresh, "rust_fresh_consumer", "A", false);
     assert!(

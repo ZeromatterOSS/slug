@@ -42,11 +42,12 @@ have retired. The inactive Native Rust cquery matched the pinned CrateInfo and
 action projection across cold, warm, edition change and restoration on one
 runtime within the fixed bank. Same-URL HTTPS freshness with an omitted
 checksum, repeated Workspace publication and the native Archive envelope passed.
-The installed candidate matched the pinned Rust cquery rows through both
-ordinary routes. Continue the installed integration sweep and activation gates.
+The installed candidate matched pinned Rust cquery and same-host Rust aquery
+through both ordinary routes. Continue the installed integration sweep and
+activation gates.
 
-Production activation, required action comparison, Rust REAPI execution,
-complete Slug closure, Stage 10 and whole-goal memory fit remain open.
+Production activation, Rust REAPI execution, complete Slug closure, Stage 10
+and whole-goal memory fit remain open.
 
 ### Bootstrap command queue
 

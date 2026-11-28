@@ -10056,6 +10056,7 @@ mod tests {
     const FIXTURE_PLATFORM_BUILD: &str =
         "exports_files([\"constraints.bzl\"])\nplatform(name = \"host\")\n";
     const FIXTURE_PLATFORM_CONSTRAINTS: &str = "HOST_CONSTRAINTS = []\n";
+    const FIXTURE_HOST_BUILD: &str = "platform(name = \"host\")\n";
 
     pub(in crate::runtime::dice) fn configured_test_command_policy(
         workspace: &Path,
@@ -14159,7 +14160,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             epoch.missing("/workspace/MODULE.bazel.lock");
             epoch.missing("/workspace/REPO.bazel");
             epoch.missing("/workspace/.bazelignore");
-            epoch.package(".slug_test_host", "platform(name = \"host\")\n", variant);
+            epoch.package(".slug_test_host", FIXTURE_HOST_BUILD, variant);
             epoch
         }
 
@@ -14744,13 +14745,14 @@ def _empty_write(ctx): return [DefaultInfo()]
 empty_write = rule(implementation = _empty_write, toolchains = ["//:type"])
 "#;
 
-    fn resolved_write_epoch(
-        variant: i64,
+    fn resolved_write_sources(
+        module: &str,
         setting: &str,
         replacements: &[(&str, &str)],
-    ) -> PathObservationEpoch {
-        let mut epoch = BuildRootEpoch::base(variant);
-        let mut module = "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n".to_owned();
+    ) -> (String, String, String) {
+        let mut module = format!(
+            "{module}register_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n"
+        );
         let mut defs = RESOLVED_WRITE_DEFS.to_owned();
         let mut build = format!(
             "load(\":defs.bzl\", \"empty_write\", \"ordered_write\", \"toolchain_impl\", \"write\")\nconstraint_setting(name = \"setting_a\")\nconstraint_setting(name = \"setting_b\")\nconstraint_value(name = \"value\", constraint_setting = \":{setting}\")\nplatform(name = \"platform\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\nplatform(name = \"platform_alt\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\ntoolchain_type(name = \"type\")\ntoolchain_impl(name = \"implementation\", marker = \"toolchain\")\ntoolchain(name = \"toolchain\", toolchain_type = \":type\", toolchain = \":implementation\")\nwrite(name = \"write\")\nwrite(name = \"other\")\nordered_write(name = \"ordered\", deps = [\":other\"])\nempty_write(name = \"empty\")\n"
@@ -14760,6 +14762,17 @@ empty_write = rule(implementation = _empty_write, toolchains = ["//:type"])
             defs = defs.replace(from, to);
             build = build.replace(from, to);
         }
+        (module, defs, build)
+    }
+
+    fn resolved_write_epoch(
+        variant: i64,
+        setting: &str,
+        replacements: &[(&str, &str)],
+    ) -> PathObservationEpoch {
+        let mut epoch = BuildRootEpoch::base(variant);
+        let (module, defs, build) =
+            resolved_write_sources("module(name = \"root\")\n", setting, replacements);
         epoch.file("/workspace/MODULE.bazel", &module, variant);
         epoch.file("/workspace/defs.bzl", &defs, variant);
         epoch.package("", &build, variant);
