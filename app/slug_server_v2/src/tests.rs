@@ -241,6 +241,16 @@ fn write_configured_module(workspace: &Path, source: &str) {
     );
 }
 
+fn configured_cli_registry(root: &Path) -> String {
+    let assembly = root.join("fixture");
+    fixture_support::assemble_configured_cli_fixture(
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        &assembly,
+    )
+    .unwrap();
+    fixture_support::configured_cli_registry_url(&assembly)
+}
+
 fn remote_disabled() -> RemoteConfig {
     RemoteConfig {
         executor: None,
@@ -270,7 +280,7 @@ fn daemon_new_retains_only_its_runtime_and_test_process_host_arcs() {
     let workspace = scratch("process-host-owner");
     let daemon = Daemon::new(&workspace).unwrap();
     assert_eq!(
-        std::sync::Arc::strong_count(&daemon.process_host_for_test),
+        std::sync::Arc::strong_count(daemon.process_host_for_test.as_ref().unwrap()),
         2
     );
 }
@@ -1611,14 +1621,16 @@ fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
 #[test]
 fn tagged_cquery_protocol_is_narrow_and_round_trips() {
     for (output, wire_name) in [
+        (CqueryOutput::Label, "label"),
         (CqueryOutput::Graph, "graph"),
         (CqueryOutput::LabelKind, "label_kind"),
+        (CqueryOutput::StarlarkLabel, "starlark_label"),
     ] {
         let request = DaemonRequest::Cquery(CqueryRequest {
             expression: "//pkg:probe".to_owned(),
             include_implicit: false,
             include_tool: false,
-            output,
+            output: output.clone(),
             distdirs: Vec::new(),
             configuration_overlay: root_setting_overlay(Some("Gr\u{00fc}\u{00df}e")),
             bzlmod: BzlmodRequestInputs::default(),
@@ -1659,6 +1671,14 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     )
     .unwrap_err();
     assert!(unknown.to_string().contains("unknown variant `unknown`"));
+    let missing_source =
+        serde_json::from_str::<CqueryOutput>(r#"{"starlark_file":{"name":"format.bzl"}}"#)
+            .unwrap_err();
+    assert!(
+        missing_source
+            .to_string()
+            .contains("missing field `source`")
+    );
     let old_shape = serde_json::from_str::<DaemonRequest>(
         r#"{"kind":"cquery","request":{"target":"//pkg:probe","output":"label"}}"#,
     )
@@ -1907,6 +1927,70 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
                 "{expression} {output}: {filtered:?}"
             );
         }
+    }
+}
+
+#[test]
+fn cquery_starlark_file_uses_supplied_source_on_the_retained_daemon() {
+    let root = scratch("cquery-starlark-file");
+    let registry = configured_cli_registry(&root);
+    let workspace = root.join("workspace");
+    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let name = "cquery_format.bzl";
+    assert!(!workspace.join(name).exists());
+    let run = |daemon: &mut Daemon, source: &str| {
+        let request = DaemonRequest::Cquery(CqueryRequest {
+            expression: "//pkg:probe".to_owned(),
+            include_implicit: true,
+            include_tool: true,
+            output: CqueryOutput::StarlarkFile {
+                name: name.to_owned(),
+                source: source.to_owned(),
+            },
+            configuration_overlay: Default::default(),
+            bzlmod: BzlmodRequestInputs {
+                registry_urls: vec![registry.clone()],
+                ..Default::default()
+            },
+            repository_environment: Default::default(),
+            distdirs: Vec::new(),
+        });
+        let wire = serde_json::to_value(&request).unwrap();
+        assert_eq!(
+            wire["request"]["output"],
+            serde_json::json!({"starlark_file": {"name": name, "source": source}})
+        );
+        handle_request(daemon, &wire.to_string())
+    };
+
+    let oversized = "a".repeat(slug_core_v2::runtime::CQUERY_STARLARK_SOURCE_MAX_BYTES + 1);
+    let refused = run(&mut daemon, &oversized);
+    assert_eq!(refused.exit_code, 2, "{refused:?}");
+    assert!(refused.stdout.is_empty());
+    assert!(stderr_text(&refused.stderr).contains("source byte limit"));
+    assert_eq!(refused.invalidated_files, 0);
+    assert!(daemon.take_forwarded_bzlmod_inputs_for_test().is_empty());
+
+    let invalid = run(&mut daemon, "def format(target):\n    return (\n");
+    assert_eq!(invalid.exit_code, 1, "{invalid:?}");
+    assert!(invalid.stdout.is_empty());
+    assert!(stderr_text(&invalid.stderr).contains("invalid --starlark:file"));
+
+    for prefix in ["initial", "warm"] {
+        let source = format!("def format(target):\n    return '{prefix}=%s' % target.label\n");
+        let result = run(&mut daemon, &source);
+        assert_eq!(result.exit_code, 0, "{result:?}");
+        assert_eq!(result.stdout, format!("{prefix}=@@//pkg:probe\n"));
+        assert!(result.stderr.is_empty());
     }
 }
 
@@ -2538,7 +2622,9 @@ fn retained_cquery_missing_executable_recovers_after_rule_edit() {
 
 #[test]
 fn retained_cquery_starlark_formats_ordered_sets() {
-    let workspace = scratch("cquery-starlark-sets");
+    let root = scratch("cquery-starlark-sets");
+    let registry = configured_cli_registry(&root);
+    let workspace = root.join("workspace");
     write_configured_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
@@ -2557,7 +2643,7 @@ fn retained_cquery_starlark_formats_ordered_sets() {
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
-        Vec::new(),
+        vec![registry.clone()],
         root_setting_overlay(None),
     );
     assert_eq!(result.exit_code, 0, "{result:?}");
@@ -2573,7 +2659,7 @@ fn retained_cquery_starlark_formats_ordered_sets() {
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
         LockfileMode::Update,
-        Vec::new(),
+        vec![registry],
         root_setting_overlay(None),
     );
     assert_eq!(filtered.exit_code, 0, "{filtered:?}");
@@ -3808,4 +3894,123 @@ fn cquery_distdirs_round_trip_defaults_and_normalize_per_request() {
 
 fn stderr_text(bytes: &[u8]) -> &str {
     std::str::from_utf8(bytes).expect("this fixture expects text-only stderr")
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn managed_listener_checks_the_retained_workspace_on_the_command_stream() {
+    use std::io::Read;
+    use std::io::Write;
+    use std::net::Shutdown;
+    use std::os::unix::net::UnixListener;
+    use std::os::unix::net::UnixStream;
+
+    use slug_core_v2::runtime::ProcessHostOwner;
+    use slug_core_v2::runtime::WorkspaceRuntime;
+
+    fn open_directory(path: &Path) -> std::io::Result<fs::File> {
+        // The fixture owns its path mutations and never replaces a directory
+        // with a special file. Production supplies its O_PATH opener.
+        let file = fs::File::open(path)?;
+        if !file.metadata()?.is_dir() {
+            return Err(std::io::Error::other("expected fixture directory"));
+        }
+        Ok(file)
+    }
+
+    let home = tempfile::tempdir().unwrap();
+    let fixture = FixtureWorkspace::new("query-path-topology").unwrap();
+    let workspace = fixture.path().to_path_buf();
+    let retired = tempfile::tempdir_in(workspace.parent().unwrap()).unwrap();
+    let moved = retired.path().join("moved");
+    let foreign = tempfile::tempdir().unwrap();
+    let socket = home.path().join("s");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let server_path = socket.clone();
+    let server_workspace = workspace.clone();
+    let server = std::thread::spawn(move || {
+        let runtime = WorkspaceRuntime::new(&server_workspace, ProcessHostOwner::native()).unwrap();
+        let workspace = crate::ManagedWorkspace::pin(
+            runtime.workspace(),
+            open_directory(runtime.workspace()).unwrap(),
+            open_directory,
+        )
+        .unwrap();
+        crate::serve_managed_listener(listener, &server_path, runtime, workspace).unwrap();
+    });
+    let connect = |path: &Path| {
+        let workspace =
+            crate::ManagedWorkspace::pin(path, open_directory(path).unwrap(), open_directory)
+                .unwrap();
+        crate::ManagedDaemonConnection::connect(&socket, workspace)
+    };
+    let query = || {
+        DaemonRequest::Query(QueryRequest {
+            expression: "allpaths(//:linear_start, //:linear_end)".into(),
+            order_output: "full".into(),
+            output: "label".into(),
+            graph_factored: true,
+            strict_test_suite: false,
+            bzlmod: Default::default(),
+            repository_environment: Default::default(),
+        })
+    };
+    let cold = connect(&workspace).unwrap().send(query()).unwrap();
+    assert_eq!(cold.exit_code, 0, "{cold:?}");
+    assert_eq!(
+        cold.stdout,
+        "//:linear_start\n//:linear_mid\n//:linear_end\n"
+    );
+    assert!(cold.stderr.is_empty());
+
+    let mismatch = |path: &Path| {
+        let error = connect(path).err().expect("foreign workspace refused");
+        assert_eq!(error.to_string(), "managed daemon workspace mismatch");
+    };
+    mismatch(foreign.path());
+
+    // Empty readiness probes and the legacy raw command body carry no
+    // workspace proof. The managed listener must not dispatch either.
+    drop(UnixStream::connect(&socket).unwrap());
+    let mut raw = UnixStream::connect(&socket).unwrap();
+    raw.write_all(b"{").unwrap();
+    raw.shutdown(Shutdown::Write).unwrap();
+    let mut refusal = [0; 5];
+    raw.read_exact(&mut refusal).unwrap();
+    assert_eq!(&refusal, b"SWK\x01\x01");
+
+    // The old stream was admitted while A still occupied this name. Swap the
+    // binding before sending its body, then also try new connections to both
+    // physical directories. Neither route may use the old retained runtime.
+    let admitted = connect(&workspace).unwrap();
+    fs::rename(&workspace, &moved).unwrap();
+    fs::create_dir(&workspace).unwrap();
+    let stale = admitted.send(query()).unwrap();
+    assert_eq!(stale.exit_code, 2);
+    assert!(stale.stdout.is_empty());
+    assert_eq!(stale.invalidated_files, 0);
+    assert_eq!(
+        stale.stderr,
+        b"{\"error\":\"daemon_workspace_binding_changed\"}\n"
+    );
+    mismatch(&workspace);
+    mismatch(&moved);
+
+    fs::remove_dir(&workspace).unwrap();
+    fs::rename(&moved, &workspace).unwrap();
+    let warm = connect(&workspace).unwrap().send(query()).unwrap();
+    assert_eq!(warm.exit_code, 0, "{warm:?}");
+    assert_eq!(warm.stdout, cold.stdout);
+    assert_eq!(warm.invalidated_files, 0);
+    assert!(warm.stderr.is_empty());
+
+    // The owner can retire its server after the workspace binding is stale.
+    fs::rename(&workspace, &moved).unwrap();
+    crate::send_shutdown(&socket).unwrap();
+    server.join().unwrap();
+    fs::rename(&moved, &workspace).unwrap();
+    assert!(
+        socket.exists(),
+        "managed listener leaves pathname cleanup to its owner"
+    );
 }

@@ -29,6 +29,31 @@ const PROJECTIONS: &[(&str, &str)] = &[
     ("query-some-selection", "9c0422b184f725508bd598d6b554f635a0f6ceeb507ac79c2bc59d2a3b1bc121"),
 ];
 
+// This module is also included by loading-only test suites.
+#[allow(dead_code)]
+pub fn assemble_configured_cli_fixture(
+    manifest_dir: &Path,
+    destination: &Path,
+) -> Result<(), String> {
+    let script = manifest_dir.join("../../tools/v2_oracle/configured_cli_fixture.py");
+    let output = std::process::Command::new("python3")
+        .arg(script)
+        .arg("assemble")
+        .arg("--output")
+        .arg(destination)
+        .output()
+        .map_err(|error| format!("assemble configured CLI fixture: {error}"))?;
+    if !output.status.success() {
+        return Err(format!("assemble configured CLI fixture: {output:?}"));
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn configured_cli_registry_url(assembly: &Path) -> String {
+    format!("file://{}", assembly.join("registry").display())
+}
+
 #[derive(Debug)]
 struct Entry<'a> {
     path: &'a str,

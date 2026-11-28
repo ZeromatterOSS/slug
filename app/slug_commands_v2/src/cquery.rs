@@ -33,11 +33,12 @@ use crate::common::validate_bare_boolean_flag;
 
 const LABEL_EXPRESSION: &str = "str(target.label)";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CqueryOutputMode {
     Label,
     LabelKind,
     StarlarkLabel,
+    StarlarkFile(String),
     Graph,
 }
 
@@ -114,6 +115,7 @@ impl CqueryRequest {
 
         let mut output = None;
         let mut starlark_expression = None;
+        let mut starlark_file = None;
         let mut output_base = None;
         let mut distdirs = Vec::new();
         let mut configuration = Vec::new();
@@ -130,6 +132,7 @@ impl CqueryRequest {
             match flag.name.as_str() {
                 "output" => set_once(&mut output, flag, "--output")?,
                 "starlark:expr" => set_once(&mut starlark_expression, flag, "--starlark:expr")?,
+                "starlark:file" => set_once(&mut starlark_file, flag, "--starlark:file")?,
                 "output_base" => set_once(&mut output_base, flag, "--output_base")?,
                 "distdir" => distdirs.push(archive_distdir_value(flag)?),
                 "implicit_deps" => include_implicit = parse_bool_flag(flag, false)?,
@@ -164,11 +167,24 @@ impl CqueryRequest {
                 "deps() requires --noimplicit_deps in this cquery",
             ));
         }
-        let output_mode = match (output.as_deref(), starlark_expression.as_deref()) {
-            (None | Some("label"), None) => CqueryOutputMode::Label,
-            (Some("label_kind"), None) => CqueryOutputMode::LabelKind,
-            (Some("starlark"), Some(LABEL_EXPRESSION)) => CqueryOutputMode::StarlarkLabel,
-            (Some("graph"), None) => {
+        let output_mode = match (
+            output.as_deref(),
+            starlark_expression.as_deref(),
+            starlark_file,
+        ) {
+            (_, Some(_), Some(_)) => {
+                return Err(unsupported(
+                    "You must not specify both --starlark:expr and --starlark:file",
+                ));
+            }
+            (Some("starlark"), None, Some(path)) => CqueryOutputMode::StarlarkFile(path),
+            (_, _, Some(_)) => {
+                return Err(unsupported("--starlark:file requires --output=starlark"));
+            }
+            (None | Some("label"), None, None) => CqueryOutputMode::Label,
+            (Some("label_kind"), None, None) => CqueryOutputMode::LabelKind,
+            (Some("starlark"), Some(LABEL_EXPRESSION), None) => CqueryOutputMode::StarlarkLabel,
+            (Some("graph"), None, None) => {
                 let Some(_) = parsed_expression.cquery_preactivation_deps_spec() else {
                     return Err(unsupported(
                         "--output=graph requires a top-level deps() cquery expression",
@@ -185,7 +201,7 @@ impl CqueryRequest {
             _ => {
                 return Err(unsupported(
                     "expected default output, --output=label, --output=label_kind, or --output=starlark \
-                     --starlark:expr=str(target.label)",
+                     with --starlark:expr=str(target.label) or --starlark:file=<path>",
                 ));
             }
         };
@@ -266,6 +282,99 @@ mod tests {
             Err(CommandParseError::InvalidFlagValue { flag, .. })
                 if flag == "--noshow_progress=false"
         ));
+    }
+
+    #[test]
+    fn starlark_file_preserves_path_and_pinned_query_inputs() {
+        let baseline = CqueryRequest::parse(&[
+            "//pkg:probe",
+            "--@rules_rust//rust/toolchain/channel=nightly",
+            "--lockfile_mode=off",
+        ])
+        .unwrap();
+        let request = CqueryRequest::parse(&[
+            "//pkg:probe",
+            "--output=starlark",
+            "--starlark:file=cquery_format.bzl",
+            "--noshow_progress",
+            "--@rules_rust//rust/toolchain/channel=nightly",
+            "--lockfile_mode=off",
+        ])
+        .unwrap();
+        assert_eq!(
+            request,
+            CqueryRequest {
+                output_mode: CqueryOutputMode::StarlarkFile("cquery_format.bzl".into()),
+                ..baseline
+            }
+        );
+        let request = CqueryRequest::parse(&[
+            "//pkg:probe",
+            "--starlark:file=./format dir/cquery=output.bzl",
+            "--output=starlark",
+        ])
+        .unwrap();
+        assert_eq!(
+            request.output_mode,
+            CqueryOutputMode::StarlarkFile("./format dir/cquery=output.bzl".into()),
+        );
+    }
+
+    #[test]
+    fn starlark_file_rejects_conflicting_or_incomplete_options() {
+        let cases: &[(&[&str], &str)] = &[
+            (
+                &[
+                    "--output=starlark",
+                    "--starlark:file=first.bzl",
+                    "--starlark:expr=str(target.label)",
+                ],
+                "must not specify both --starlark:expr and --starlark:file",
+            ),
+            (
+                &["--starlark:file=first.bzl"],
+                "--starlark:file requires --output=starlark",
+            ),
+            (
+                &["--output=label", "--starlark:file=first.bzl"],
+                "--starlark:file requires --output=starlark",
+            ),
+            (
+                &["--output=starlark", "--starlark:file"],
+                "--starlark:file requires a non-empty value",
+            ),
+            (
+                &["--output=starlark", "--starlark:file="],
+                "--starlark:file requires a non-empty value",
+            ),
+            (
+                &[
+                    "--output=starlark",
+                    "--starlark:file=first.bzl",
+                    "--starlark:file=second.bzl",
+                ],
+                "--starlark:file may be specified only once",
+            ),
+            (
+                &["--noshow_progress=false"],
+                "Unexpected value after boolean option",
+            ),
+        ];
+        for &(options, message) in cases {
+            let args = ["//pkg:probe"].into_iter().chain(options.iter().copied());
+            let error = CqueryRequest::parse(&args.collect::<Vec<_>>()).unwrap_err();
+            assert!(error.to_string().contains(message), "{error}");
+        }
+        assert_eq!(
+            CqueryRequest::parse(&[
+                "//pkg:probe",
+                "--output=starlark",
+                "--starlark:expr=str(target.label)",
+            ])
+            .unwrap()
+            .output_mode,
+            CqueryOutputMode::StarlarkLabel,
+        );
     }
 
     #[test]

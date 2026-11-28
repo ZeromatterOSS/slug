@@ -1,5 +1,5 @@
 {
-  "checksum": "da6c70152d29b1dbcde3aa8a4abd4c88aaf4a4c6e2aeacb4e41c59dbcd37f15c",
+  "checksum": "37b408d66e07e9879fbd0885270aa228f20f5368ab5f9218599305c83a1f3b9d",
   "crates": {
     "Inflector 0.11.4": {
       "name": "Inflector",
@@ -21991,6 +21991,10 @@
             {
               "id": "anyhow 1.0.104",
               "target": "anyhow"
+            },
+            {
+              "id": "libc 0.2.189",
+              "target": "libc"
             },
             {
               "id": "tokio 1.53.1",

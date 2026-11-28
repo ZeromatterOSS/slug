@@ -37,12 +37,15 @@ use crate::runtime::probe_observer::Observer;
 use crate::runtime::probe_observer::workspace_progress::Stage;
 #[path = "repository_process_owner/capture.rs"]
 mod capture;
+#[path = "repository_process_owner/installation.rs"]
+mod installation;
 #[path = "repository_process_owner/lifecycle.rs"]
 mod lifecycle;
 #[path = "repository_process_owner/spawn.rs"]
 mod spawn;
 pub(super) use capture::ReapedBinding;
 pub(super) use capture::ReapedCapture;
+pub(in crate::runtime) use installation::InstalledProcessPlatform;
 
 /// Only the closed bootstrap/first/continuation owners in command glue implement
 /// this private trait. No consumer can substitute an immutable process result.
@@ -136,9 +139,7 @@ fn failure(message: &'static str) -> PhysicalRootError {
 /// Paths are chosen by Slug's trusted installation, never by an Execute argv.
 /// Current executable startup must be protected against external writers.
 pub(super) struct ProcessPlatform {
-    bwrap: PathBuf,
-    helper: PathBuf,
-    test_images: bool,
+    images: ProcessImages,
     #[cfg(test)]
     observer: Option<Arc<AtomicUsize>>,
     #[cfg(test)]
@@ -146,24 +147,33 @@ pub(super) struct ProcessPlatform {
     #[cfg(test)]
     hold_after_view_transfer: bool,
 }
+enum ProcessImages {
+    Installed(InstalledProcessPlatform),
+    #[cfg(any(test, feature = "repository-workspace-test-support"))]
+    Fixture {
+        bwrap: PathBuf,
+        helper: PathBuf,
+    },
+}
+
 impl ProcessPlatform {
-    pub(super) fn current() -> io::Result<Self> {
-        let bwrap = if Path::new("/usr/bin/bwrap").is_file() {
-            PathBuf::from("/usr/bin/bwrap")
-        } else {
-            PathBuf::from("/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap")
-        };
-        Ok(Self {
-            bwrap,
-            helper: std::env::current_exe()?,
-            test_images: false,
+    fn new(images: ProcessImages) -> Self {
+        Self {
+            images,
             #[cfg(test)]
             observer: None,
             #[cfg(test)]
             hold_before_hello: false,
             #[cfg(test)]
             hold_after_view_transfer: false,
-        })
+        }
+    }
+    fn launcher_path(&self) -> &Path {
+        match &self.images {
+            ProcessImages::Installed(_) => Path::new(installation::SYSTEM_BWRAP),
+            #[cfg(any(test, feature = "repository-workspace-test-support"))]
+            ProcessImages::Fixture { bwrap, .. } => bwrap,
+        }
     }
     /// Observation/gate only: no execution plan, payload bytes or policy is
     /// changed. Native tests can cancel an actually armed owner deterministically.
@@ -186,17 +196,7 @@ impl ProcessPlatform {
     }
     #[cfg(any(test, feature = "repository-workspace-test-support"))]
     pub(super) fn compiled_cli(helper: PathBuf, bwrap: PathBuf) -> Self {
-        Self {
-            bwrap,
-            helper,
-            test_images: true,
-            #[cfg(test)]
-            observer: None,
-            #[cfg(test)]
-            hold_before_hello: false,
-            #[cfg(test)]
-            hold_after_view_transfer: false,
-        }
+        Self::new(ProcessImages::Fixture { bwrap, helper })
     }
 }
 
@@ -392,6 +392,11 @@ pub(super) async fn run<L: ProcessLaunch>(
     active: &(dyn Fn() -> bool + Sync),
 ) -> Result<L::Output, PhysicalRootError> {
     check(launch.scope(), active)?;
+    match &platform.images {
+        ProcessImages::Installed(images) => images.verify_resources(launch.resources())?,
+        #[cfg(any(test, feature = "repository-workspace-test-support"))]
+        ProcessImages::Fixture { .. } => {}
+    }
     #[cfg(test)]
     let platform = match launch.process_probe() {
         Some(probe) => platform.observe_for_test(probe.stage, probe.hold_before_hello),

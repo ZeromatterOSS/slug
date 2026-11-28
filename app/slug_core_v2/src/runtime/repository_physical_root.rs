@@ -38,6 +38,8 @@ use mount_lease::readonly_quota::FrozenArchiveQuota;
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 #[path = "repository_process_owner.rs"]
 mod process_owner;
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+pub(in crate::runtime) use process_owner::InstalledProcessPlatform;
 #[path = "repository_workspace_progress.rs"]
 mod progress;
 pub(in crate::runtime) use progress::command::RepositoryWorkspaceCommand;
@@ -72,6 +74,15 @@ pub(in crate::runtime) use view_data::NativeReadViewData;
 pub(in crate::runtime) use view_data::NativeReadViewDependencies;
 pub(in crate::runtime) use view_data::NativeWorkspaceHistoryGuard;
 
+/// Native launch authority retained by the configured runtime and unfinished commands.
+#[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
+#[derive(Clone)]
+pub(in crate::runtime) enum RepositoryWorkspaceLauncher {
+    Installed(InstalledProcessPlatform),
+    #[cfg(any(test, feature = "repository-workspace-test-support"))]
+    TestFixture,
+}
+
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 pub(in crate::runtime) async fn run_selected_process(
     decision: mount_lease::launch::SelectedExecuteDecision,
@@ -79,8 +90,8 @@ pub(in crate::runtime) async fn run_selected_process(
 ) -> Result<RepositoryWorkspaceCommand, PhysicalRootError> {
     match decision {
         mount_lease::launch::SelectedExecuteDecision::Replay(command) => Ok(command),
-        mount_lease::launch::SelectedExecuteDecision::Launch(launch) => {
-            process_owner::run(launch, initialize::platform()?, active).await
+        mount_lease::launch::SelectedExecuteDecision::Launch(launch, launcher) => {
+            process_owner::run(launch, launcher.platform()?, active).await
         }
     }
 }

@@ -1432,6 +1432,105 @@ def test_slug_epoch_observation_refuses_before_workspace_copy(
         )
 
 
+@pytest.mark.parametrize("failure", [None, "unpublished", "replacement", "timeout"])
+def test_installed_runner_verifies_and_cleans_exact_daemon(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str | None
+) -> None:
+    workspace = tmp_path / "source"
+    workspace.mkdir()
+    fixture = Fixture(
+        name="installed",
+        root=tmp_path,
+        workspace=workspace,
+        expected=tmp_path / "expected",
+        daemon=True,
+        commands=(
+            FixtureCommand(name="version", argv=("version",), compare="semantic"),
+            FixtureCommand(name="cold", argv=("query", "//:cold"), compare="semantic"),
+            FixtureCommand(name="warm", argv=("query", "//:warm"), compare="semantic"),
+        ),
+    )
+    run_root = tmp_path / "run"
+    base = run_root / "ob" / fixture.name / "slug"
+    endpoint = base / ".slugd-installed" / "live" / "s"
+    tool = ToolConfig("slug", tmp_path / "slug")
+    events: list[str] = []
+
+    class Witness:
+        def __init__(self, output_base: Path, executable: Path) -> None:
+            assert output_base == base and executable == tool.executable
+            assert not output_base.exists()
+            self.endpoint = endpoint
+
+        def __enter__(self):
+            base.mkdir(mode=0o700)
+            events.append("enter")
+            return self
+
+        def __exit__(self, *_exc):
+            events.append("retire")
+
+        def sample(self) -> int:
+            events.append("sample")
+            if failure == "unpublished":
+                raise FileNotFoundError("installed daemon was never published")
+            if failure == "replacement" and events.count("sample") == 2:
+                raise RuntimeError("installed daemon generation changed")
+            return 73
+
+    def command(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        assert argv[1] == f"--output_base={base}"
+        assert kwargs["cwd"] != workspace
+        assert base.stat().st_mode & 0o777 == 0o700
+        events.append(argv[-1])
+        if argv[-1] == "//:cold" and failure != "unpublished":
+            endpoint.parent.mkdir(parents=True)
+            endpoint.touch()
+        if argv[-1] == "//:warm" and failure == "timeout":
+            raise subprocess.TimeoutExpired(argv, 1)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    def generic_shutdown(*_args: object) -> None:
+        pytest.fail("installed run must not contact or unlink generic endpoint")
+
+    monkeypatch.setattr("tools.v2_oracle.installed_daemon_witness.InstalledDaemon", Witness)
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.subprocess.run", command)
+    monkeypatch.setattr("tools.v2_oracle_lib.runner._shutdown_slug_daemon", generic_shutdown)
+    options = RunOptions(run_root, timeout_seconds=1, slug_daemon_route="installed")
+    if failure == "unpublished":
+        with pytest.raises(RuntimeError, match="installed daemon was never published"):
+            run_fixture(fixture, tool, options)
+    elif failure == "replacement":
+        with pytest.raises(RuntimeError, match="installed daemon generation changed"):
+            run_fixture(fixture, tool, options)
+    elif failure == "timeout":
+        with pytest.raises(subprocess.TimeoutExpired):
+            run_fixture(fixture, tool, options)
+    else:
+        result = run_fixture(fixture, tool, options)
+        assert result["slug_daemon_route"] == "installed"
+        assert [record.get("installed_daemon_pid") for record in result["commands"]] == [None, 73, 73]
+    cold = [] if failure == "unpublished" else ["sample"]
+    warm = [] if failure == "timeout" else ["sample"]
+    assert events == ["enter", "version", "//:cold", *cold, "//:warm", *warm, "retire"]
+
+
+@pytest.mark.parametrize("flag", ["--output_base", "--output_base=/outside"])
+def test_installed_runner_refuses_output_base_overrides(tmp_path: Path, flag: str) -> None:
+    fixture = Fixture(
+        name="override",
+        root=tmp_path,
+        workspace=tmp_path,
+        expected=tmp_path / "expected",
+        commands=(FixtureCommand(name="query", argv=("query", flag), compare="semantic"),),
+    )
+    with pytest.raises(ValueError, match="harness-owned output base"):
+        run_fixture(
+            fixture, ToolConfig("slug", tmp_path / "slug"),
+            RunOptions(tmp_path / "run", slug_daemon_route="installed"),
+        )
+
+
 def test_bazel_shutdown_reuses_fixture_baseline_environment_cwd_and_waits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

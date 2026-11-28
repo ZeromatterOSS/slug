@@ -8,20 +8,13 @@
  * above-listed licenses.
  */
 
-use std::process::Command;
-
 #[path = "../../../tests/v2_fixture_support/src/lib.rs"]
 mod fixture_support;
 use fixture_support::FixtureWorkspace;
 
-fn slug() -> Command {
-    let executable = std::path::PathBuf::from(env!("CARGO_BIN_EXE_slug"));
-    Command::new(if executable.is_absolute() {
-        executable
-    } else {
-        std::env::current_dir().unwrap().join(executable)
-    })
-}
+#[path = "support/executable.rs"]
+mod executable;
+use executable::slug;
 
 fn workspace() -> FixtureWorkspace {
     FixtureWorkspace::new("query-build-load-files-provenance").unwrap()

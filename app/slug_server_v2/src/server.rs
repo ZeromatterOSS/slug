@@ -21,6 +21,9 @@ use std::path::PathBuf;
 use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
+use serde::de;
+use serde::de::DeserializeSeed;
+use serde_json::value::RawValue;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -28,6 +31,8 @@ use slug_bzlmod_v2::RepositoryEnvironmentEntry;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_configuration_v2::CommandConfigurationOverlay;
+use slug_core_v2::runtime::CQUERY_STARLARK_NAME_MAX_BYTES;
+use slug_core_v2::runtime::CQUERY_STARLARK_SOURCE_MAX_BYTES;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::AqueryMnemonicFilter;
 use slug_query_v2::AqueryScope;
@@ -213,12 +218,13 @@ impl RepositoryEnvironmentRequestInputs {
 }
 
 /// The complete daemon-wire output surface admitted by configured query.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CqueryOutput {
     Label,
     LabelKind,
     StarlarkLabel,
+    StarlarkFile { name: String, source: String },
     Graph,
 }
 
@@ -369,6 +375,246 @@ pub enum DaemonRequest {
     Cquery(CqueryRequest),
 }
 
+// The socket decoder keeps formatter strings borrowed until their decoded
+// sizes are admitted. The public request types retain their ordinary serde API.
+#[derive(Deserialize)]
+struct IncomingCquery<'a> {
+    expression: String,
+    #[serde(default = "default_true")]
+    include_implicit: bool,
+    #[serde(default = "default_true")]
+    include_tool: bool,
+    #[serde(borrow)]
+    output: IncomingCqueryOutput<'a>,
+    #[serde(default)]
+    configuration_overlay: CommandConfigurationOverlay,
+    #[serde(default)]
+    bzlmod: BzlmodRequestInputs,
+    #[serde(default)]
+    repository_environment: RepositoryEnvironmentRequestInputs,
+    #[serde(default)]
+    distdirs: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+enum IncomingCqueryOutput<'a> {
+    Label,
+    LabelKind,
+    StarlarkLabel,
+    StarlarkFile {
+        #[serde(borrow)]
+        name: &'a RawValue,
+        #[serde(borrow)]
+        source: &'a RawValue,
+    },
+    Graph,
+}
+
+#[derive(Debug)]
+enum RequestDecodeError {
+    Malformed,
+    FormatterInput(&'static str),
+}
+
+impl IncomingCqueryOutput<'_> {
+    fn admit(self) -> Result<CqueryOutput, RequestDecodeError> {
+        use RequestDecodeError::FormatterInput;
+        use RequestDecodeError::Malformed;
+        Ok(match self {
+            Self::Label => CqueryOutput::Label,
+            Self::LabelKind => CqueryOutput::LabelKind,
+            Self::StarlarkLabel => CqueryOutput::StarlarkLabel,
+            Self::Graph => CqueryOutput::Graph,
+            Self::StarlarkFile { name, source } => {
+                let (name_bytes, name_has_nul) =
+                    decoded_json_string_shape(name.get()).ok_or(Malformed)?;
+                let (source_bytes, _) = decoded_json_string_shape(source.get()).ok_or(Malformed)?;
+                if name_bytes == 0 || name_bytes > CQUERY_STARLARK_NAME_MAX_BYTES || name_has_nul {
+                    return Err(FormatterInput(
+                        "invalid --starlark:file: invalid formatter file name",
+                    ));
+                }
+                if source_bytes > CQUERY_STARLARK_SOURCE_MAX_BYTES {
+                    return Err(FormatterInput(
+                        "invalid --starlark:file: formatter source byte limit exceeded",
+                    ));
+                }
+                CqueryOutput::StarlarkFile {
+                    name: serde_json::from_str(name.get()).map_err(|_| Malformed)?,
+                    source: serde_json::from_str(source.get()).map_err(|_| Malformed)?,
+                }
+            }
+        })
+    }
+}
+
+// RawValue checked the JSON token; count actual UTF-8 bytes, including paired
+// UTF-16 escapes, without invoking serde_json's owned/unescape allocation.
+fn decoded_json_string_shape(raw: &str) -> Option<(usize, bool)> {
+    fn unicode_escape(input: &[u8]) -> Option<(u16, &[u8])> {
+        let (digits, rest) = input.split_at_checked(4)?;
+        let value = u16::from_str_radix(std::str::from_utf8(digits).ok()?, 16).ok()?;
+        Some((value, rest))
+    }
+
+    let mut remaining = raw.strip_prefix('"')?.strip_suffix('"')?.as_bytes();
+    let mut bytes = 0;
+    let mut has_nul = false;
+    while let Some(escape) = remaining.iter().position(|&byte| byte == b'\\') {
+        bytes += escape;
+        let [_, code, rest @ ..] = &remaining[escape..] else {
+            return None;
+        };
+        remaining = rest;
+        if *code != b'u' {
+            bytes += 1;
+            continue;
+        }
+        let (unit, rest) = unicode_escape(remaining)?;
+        remaining = rest;
+        match unit {
+            0..=0x7f => {
+                has_nul |= unit == 0;
+                bytes += 1;
+            }
+            0x80..=0x7ff => bytes += 2,
+            0xd800..=0xdbff => {
+                let (low, rest) = unicode_escape(remaining.strip_prefix(b"\\u")?)?;
+                if !(0xdc00..=0xdfff).contains(&low) {
+                    return None;
+                }
+                remaining = rest;
+                bytes += 4;
+            }
+            0xdc00..=0xdfff => return None,
+            _ => bytes += 3,
+        }
+    }
+    Some((bytes + remaining.len(), has_nul))
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(field_identifier, rename_all = "snake_case")]
+enum IncomingKind {
+    Build,
+    Run,
+    Query,
+    Aquery,
+    Cquery,
+}
+
+#[derive(Deserialize)]
+#[serde(field_identifier, rename_all = "snake_case")]
+enum EnvelopeField {
+    Kind,
+    Request,
+    #[serde(other)]
+    Other,
+}
+
+enum IncomingRequest<'a> {
+    Ordinary(DaemonRequest),
+    Cquery(IncomingCquery<'a>),
+}
+
+struct RequestSeed(IncomingKind);
+
+impl<'de> DeserializeSeed<'de> for RequestSeed {
+    type Value = IncomingRequest<'de>;
+
+    fn deserialize<D: de::Deserializer<'de>>(self, decoder: D) -> Result<Self::Value, D::Error> {
+        let request = match self.0 {
+            IncomingKind::Build => DaemonRequest::Build(BuildRequest::deserialize(decoder)?),
+            IncomingKind::Run => DaemonRequest::Run(BuildRequest::deserialize(decoder)?),
+            IncomingKind::Query => DaemonRequest::Query(QueryRequest::deserialize(decoder)?),
+            IncomingKind::Aquery => DaemonRequest::Aquery(AqueryRequest::deserialize(decoder)?),
+            IncomingKind::Cquery => {
+                return IncomingCquery::deserialize(decoder).map(IncomingRequest::Cquery);
+            }
+        };
+        Ok(IncomingRequest::Ordinary(request))
+    }
+}
+
+impl<'de> Deserialize<'de> for IncomingRequest<'de> {
+    fn deserialize<D: de::Deserializer<'de>>(decoder: D) -> Result<Self, D::Error> {
+        struct EnvelopeVisitor;
+        impl<'de> de::Visitor<'de> for EnvelopeVisitor {
+            type Value = IncomingRequest<'de>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a daemon request envelope")
+            }
+
+            fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let kind = seq
+                    .next_element::<IncomingKind>()?
+                    .ok_or_else(|| de::Error::missing_field("kind"))?;
+                seq.next_element_seed(RequestSeed(kind))?
+                    .ok_or_else(|| de::Error::missing_field("request"))
+            }
+
+            fn visit_map<A: de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+                let mut kind = None;
+                let mut request = None;
+                let mut pending = None::<&'de RawValue>;
+                while let Some(field) = map.next_key()? {
+                    match field {
+                        EnvelopeField::Kind => {
+                            if kind.is_some() {
+                                return Err(de::Error::duplicate_field("kind"));
+                            }
+                            kind = Some(map.next_value()?);
+                        }
+                        EnvelopeField::Request => {
+                            if request.is_some() || pending.is_some() {
+                                return Err(de::Error::duplicate_field("request"));
+                            }
+                            if let Some(kind) = kind {
+                                request = Some(map.next_value_seed(RequestSeed(kind))?);
+                            } else {
+                                // Preserve either field order without collecting
+                                // an owned serde value for a pending request.
+                                pending = Some(map.next_value()?);
+                            }
+                        }
+                        EnvelopeField::Other => {
+                            map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let kind = kind.ok_or_else(|| de::Error::missing_field("kind"))?;
+                if let Some(request) = request {
+                    return Ok(request);
+                }
+                let pending = pending.ok_or_else(|| de::Error::missing_field("request"))?;
+                let mut decoder = serde_json::Deserializer::from_str(pending.get());
+                RequestSeed(kind)
+                    .deserialize(&mut decoder)
+                    .map_err(de::Error::custom)
+            }
+        }
+        decoder.deserialize_struct("DaemonRequest", &["kind", "request"], EnvelopeVisitor)
+    }
+}
+
+fn decode_request(input: &str) -> Result<DaemonRequest, RequestDecodeError> {
+    match serde_json::from_str(input).map_err(|_| RequestDecodeError::Malformed)? {
+        IncomingRequest::Ordinary(request) => Ok(request),
+        IncomingRequest::Cquery(request) => Ok(DaemonRequest::Cquery(CqueryRequest {
+            expression: request.expression,
+            include_implicit: request.include_implicit,
+            include_tool: request.include_tool,
+            output: request.output.admit()?,
+            configuration_overlay: request.configuration_overlay,
+            bzlmod: request.bzlmod,
+            repository_environment: request.repository_environment,
+            distdirs: request.distdirs,
+        })),
+    }
+}
+
 /// Common response envelope for all daemon commands.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DaemonResponse {
@@ -382,7 +628,15 @@ pub struct DaemonResponse {
 
 pub type BuildResponse = DaemonResponse;
 
+#[cfg(test)]
+mod formatter_input_tests;
 mod frame;
+#[cfg(target_os = "linux")]
+mod managed_workspace;
+#[cfg(target_os = "linux")]
+pub use managed_workspace::ManagedDaemonConnection;
+#[cfg(target_os = "linux")]
+pub use managed_workspace::ManagedWorkspace;
 
 /// Run the daemon server on the given Unix socket path. Blocks until a
 /// `shutdown` request is received or the process is killed.
@@ -391,17 +645,90 @@ pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyh
     serve_daemon(socket_path.as_ref(), daemon)
 }
 
-fn serve_daemon(socket_path: &Path, mut daemon: Daemon) -> anyhow::Result<()> {
+fn serve_daemon(socket_path: &Path, daemon: Daemon) -> anyhow::Result<()> {
     let _ = std::fs::remove_file(socket_path);
     let listener = UnixListener::bind(socket_path)
         .with_context(|| format!("binding daemon socket {}", socket_path.display()))?;
+    serve_listener(
+        listener,
+        socket_path,
+        daemon,
+        true,
+        #[cfg(target_os = "linux")]
+        None,
+    )
+}
+
+/// Serve an already published listener. The caller owns path retirement.
+#[doc(hidden)]
+pub fn serve_published_listener(
+    listener: UnixListener,
+    socket_path: &Path,
+    runtime: slug_core_v2::runtime::WorkspaceRuntime,
+) -> anyhow::Result<()> {
+    let daemon = Daemon::from_runtime(
+        runtime,
+        #[cfg(test)]
+        None,
+    );
+    serve_listener(
+        listener,
+        socket_path,
+        daemon,
+        false,
+        #[cfg(target_os = "linux")]
+        None,
+    )
+}
+
+#[cfg(target_os = "linux")]
+#[doc(hidden)]
+pub fn serve_managed_listener(
+    listener: UnixListener,
+    socket_path: &Path,
+    runtime: slug_core_v2::runtime::WorkspaceRuntime,
+    workspace: ManagedWorkspace,
+) -> anyhow::Result<()> {
+    workspace.require_runtime_workspace(runtime.workspace())?;
+    let daemon = Daemon::from_runtime(
+        runtime,
+        #[cfg(test)]
+        None,
+    );
+    serve_listener(listener, socket_path, daemon, false, Some(&workspace))
+}
+
+fn serve_listener(
+    listener: UnixListener,
+    socket_path: &Path,
+    mut daemon: Daemon,
+    unlink_on_shutdown: bool,
+    #[cfg(target_os = "linux")] binding: Option<&ManagedWorkspace>,
+) -> anyhow::Result<()> {
     eprintln!(
         "{{\"daemon\":\"started\",\"socket\":\"{}\"}}",
         socket_path.display()
     );
     for stream in listener.incoming() {
         let mut stream = stream.context("accepting daemon connection")?;
-        let line = match read_line(&mut stream) {
+        #[cfg(target_os = "linux")]
+        let line = if let Some(workspace) = binding {
+            match workspace.admit(&mut stream) {
+                Ok(managed_workspace::Ingress::Shutdown) => {
+                    eprintln!("{{\"daemon\":\"shutdown\"}}");
+                    return Ok(());
+                }
+                Ok(managed_workspace::Ingress::Request(deadline)) => {
+                    managed_workspace::read_request(&mut stream, deadline)
+                }
+                Ok(managed_workspace::Ingress::Closed) | Err(_) => continue,
+            }
+        } else {
+            read_line(&mut stream)
+        };
+        #[cfg(not(target_os = "linux"))]
+        let line = read_line(&mut stream);
+        let line = match line {
             Ok(line) => line,
             Err(error) => {
                 eprintln!("{{\"daemon\":\"read_error\",\"message\":\"{error}\"}}");
@@ -409,10 +736,17 @@ fn serve_daemon(socket_path: &Path, mut daemon: Daemon) -> anyhow::Result<()> {
             }
         };
         if line == "shutdown" {
-            let _ = std::fs::remove_file(socket_path);
+            if unlink_on_shutdown {
+                let _ = std::fs::remove_file(socket_path);
+            }
             eprintln!("{{\"daemon\":\"shutdown\"}}");
             return Ok(());
         }
+        #[cfg(target_os = "linux")]
+        let response = binding
+            .and_then(ManagedWorkspace::stale_response)
+            .unwrap_or_else(|| handle_request(&mut daemon, &line));
+        #[cfg(not(target_os = "linux"))]
         let response = handle_request(&mut daemon, &line);
         let Ok(json) = frame::response(&response, frame::MAX_FRAME_BYTES) else {
             continue;
@@ -425,9 +759,19 @@ fn serve_daemon(socket_path: &Path, mut daemon: Daemon) -> anyhow::Result<()> {
 }
 
 pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
-    let request: DaemonRequest = match serde_json::from_str(request_json) {
+    let request = match decode_request(request_json) {
         Ok(req) => req,
-        Err(_) => {
+        Err(RequestDecodeError::FormatterInput(message)) => {
+            let result = crate::cquery_error_result(message, 0);
+            return DaemonResponse {
+                exit_code: result.exit_code,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                invalidated_files: result.invalidated_files,
+                run_launch_plan: None,
+            };
+        }
+        Err(RequestDecodeError::Malformed) => {
             return DaemonResponse {
                 exit_code: 2,
                 stdout: String::new(),
@@ -650,7 +994,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
             if let Err(error) = validate_cquery_expression(
                 &request.expression,
                 request.include_implicit,
-                request.output,
+                &request.output,
             ) {
                 return DaemonResponse {
                     exit_code: 2,
@@ -710,7 +1054,7 @@ fn validate_aquery_expression(
 fn validate_cquery_expression(
     expression: &str,
     include_implicit: bool,
-    output: CqueryOutput,
+    output: &CqueryOutput,
 ) -> Result<(), String> {
     let expression =
         slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
@@ -718,7 +1062,7 @@ fn validate_cquery_expression(
     if expression.cquery_preactivation_deps_spec().is_some() && include_implicit {
         return Err("deps() requires --noimplicit_deps in this cquery".to_owned());
     }
-    if output == CqueryOutput::Graph {
+    if matches!(output, CqueryOutput::Graph) {
         let Some(_) = expression.cquery_preactivation_deps_spec() else {
             return Err("graph output requires a top-level deps() cquery expression".to_owned());
         };
@@ -893,7 +1237,7 @@ pub fn send_cquery_request(
             expression: request.expression.clone(),
             include_implicit: request.include_implicit,
             include_tool: request.include_tool,
-            output: request.output,
+            output: request.output.clone(),
             configuration_overlay: request.configuration_overlay.clone(),
             distdirs: request.distdirs.clone(),
             bzlmod: request.bzlmod.clone(),

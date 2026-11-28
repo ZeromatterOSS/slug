@@ -13,13 +13,17 @@ use slug_commands_v2::aquery::AqueryRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::ArchiveDistdirPolicy;
-use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_core_v2::runtime::format_aquery_text_output_for_scope_with_mnemonic_filter;
 use slug_server_v2::AqueryRequest as DaemonAqueryRequest;
 
+use super::RuntimeStartup;
+
 pub fn run(argv: Vec<String>) -> i32 {
+    run_with_startup(argv, RuntimeStartup::Generic)
+}
+
+pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i32 {
     let workspace = match std::env::current_dir() {
         Ok(workspace) => workspace,
         Err(error) => return emit_error(2, &error.to_string(), "one-shot"),
@@ -59,13 +63,20 @@ pub fn run(argv: Vec<String>) -> i32 {
             slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
                 &repository_environment,
             );
-        return run_daemon(&output_base, request, bzlmod, repository_environment);
+        return run_daemon(
+            &output_base,
+            &workspace,
+            request,
+            bzlmod,
+            repository_environment,
+            startup,
+        );
     }
 
     let accepted = {
-        let runtime = match WorkspaceRuntime::new(workspace, ProcessHostOwner::native()) {
+        let runtime = match startup.new_runtime(&workspace) {
             Ok(runtime) => runtime,
-            Err(error) => return emit_error(2, &error.to_string(), "one-shot"),
+            Err(error) => return emit_error(2, &error, "one-shot"),
         };
         runtime.build_command_with_repository_environment_and_distdirs(
             std::slice::from_ref(&request.target),
@@ -119,30 +130,27 @@ pub fn run(argv: Vec<String>) -> i32 {
 
 fn run_daemon(
     output_base: &str,
+    workspace: &std::path::Path,
     request: AqueryRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
+    startup: RuntimeStartup,
 ) -> i32 {
     let output_base = std::path::Path::new(output_base);
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return emit_error(2, &error.to_string(), "daemon");
     }
-    let socket = slug_server_v2::socket_path(output_base);
-    if std::os::unix::net::UnixStream::connect(&socket).is_err()
-        && let Err(error) = super::build::start_daemon(output_base)
-    {
-        return emit_error(2, &error.to_string(), "daemon");
-    }
-    match slug_server_v2::send_aquery_request(
-        &socket,
-        &DaemonAqueryRequest {
-            expression: request.expression,
-            configuration_overlay: request.configuration_overlay,
-            distdirs: request.distdirs,
-            bzlmod,
-            repository_environment,
-        },
-    ) {
+    let daemon = match startup.daemon_connection(output_base, workspace) {
+        Ok(daemon) => daemon,
+        Err(error) => return emit_error(2, &error.to_string(), "daemon"),
+    };
+    match daemon.send(slug_server_v2::DaemonRequest::Aquery(DaemonAqueryRequest {
+        expression: request.expression,
+        configuration_overlay: request.configuration_overlay,
+        distdirs: request.distdirs,
+        bzlmod,
+        repository_environment,
+    })) {
         Ok(response) => {
             print!("{}", response.stdout);
             if super::write_stderr(&response.stderr).is_err() {

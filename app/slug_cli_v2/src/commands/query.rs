@@ -16,9 +16,14 @@ use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::QueryError;
 use slug_core_v2::runtime::QueryOutputCompletion;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_query_command_with_repository_environment;
+
+use super::RuntimeStartup;
 
 pub fn run(argv: Vec<String>) -> i32 {
+    run_with_startup(argv, RuntimeStartup::Generic)
+}
+
+pub(super) fn run_with_startup(argv: Vec<String>, startup: RuntimeStartup) -> i32 {
     let workspace = match std::env::current_dir() {
         Ok(workspace) => workspace,
         Err(error) => return emit_error(7, &error.to_string(), "one-shot"),
@@ -54,25 +59,36 @@ pub fn run(argv: Vec<String>) -> i32 {
             slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
                 &repository_environment,
             );
-        return run_daemon_query(&output_base, request, bzlmod, repository_environment);
+        return run_daemon_query(
+            &output_base,
+            &workspace,
+            request,
+            bzlmod,
+            repository_environment,
+            startup,
+        );
     }
     let completion = if request.output == QueryOutputFormat::LabelKind {
         QueryOutputCompletion::LabelKind
     } else {
         QueryOutputCompletion::Standard
     };
-    let accepted = match evaluate_workspace_query_command_with_repository_environment(
-        &workspace,
-        &request.expression,
-        request.order,
-        request.policy,
-        request.bzlmod_policy,
-        environment_policy,
-        request.lockfile_mode,
-        &request.registry_urls,
-        repository_environment,
-        completion,
-    ) {
+    let accepted = match startup
+        .new_runtime(&workspace)
+        .map_err(QueryError::evaluation)
+        .and_then(|runtime| {
+            runtime.query_command_with_repository_environment(
+                &request.expression,
+                request.order,
+                request.policy,
+                request.bzlmod_policy,
+                environment_policy,
+                request.lockfile_mode,
+                &request.registry_urls,
+                repository_environment,
+                completion,
+            )
+        }) {
         Ok(accepted) => accepted,
         Err(error) => return emit_query_error(&error, "one-shot"),
     };
@@ -111,20 +127,20 @@ pub fn run(argv: Vec<String>) -> i32 {
 
 fn run_daemon_query(
     output_base: &str,
+    workspace: &std::path::Path,
     request: QueryRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
+    startup: RuntimeStartup,
 ) -> i32 {
     let output_base = std::path::Path::new(output_base);
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return emit_error(7, &error.to_string(), "daemon");
     }
-    let socket = slug_server_v2::socket_path(output_base);
-    if std::os::unix::net::UnixStream::connect(&socket).is_err() {
-        if let Err(error) = super::build::start_daemon(output_base) {
-            return emit_error(7, &error.to_string(), "daemon");
-        }
-    }
+    let daemon = match startup.daemon_connection(output_base, workspace) {
+        Ok(daemon) => daemon,
+        Err(error) => return emit_error(7, &error.to_string(), "daemon"),
+    };
     let request = slug_server_v2::QueryRequest {
         expression: request.expression,
         order_output: request.order.to_string(),
@@ -134,7 +150,7 @@ fn run_daemon_query(
         bzlmod,
         repository_environment,
     };
-    match slug_server_v2::send_query_request(&socket, &request) {
+    match daemon.send(slug_server_v2::DaemonRequest::Query(request)) {
         Ok(response) => {
             if !response.stdout.is_empty() {
                 print!("{}", response.stdout);

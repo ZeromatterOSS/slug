@@ -5,24 +5,28 @@ use super::process_owner::ProcessPlatform;
 use super::process_owner::{self};
 use super::progress::command::RepositoryWorkspaceCommand;
 use super::*;
+impl RepositoryWorkspaceLauncher {
+    pub(super) fn platform(&self) -> io::Result<ProcessPlatform> {
+        match self {
+            Self::Installed(installed) => Ok(installed.platform()),
+            #[cfg(any(test, feature = "repository-workspace-test-support"))]
+            Self::TestFixture => platform(),
+        }
+    }
+}
+
+#[cfg(any(test, feature = "repository-workspace-test-support"))]
 pub(super) fn platform() -> io::Result<ProcessPlatform> {
-    #[cfg(any(test, feature = "repository-workspace-test-support"))]
-    {
-        let image = std::env::var_os("SLUG_V2_BIN").ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::Unsupported,
-                "actual compiled CLI required for native workspace initialization",
-            )
-        })?;
-        Ok(ProcessPlatform::compiled_cli(
-            image.into(),
-            "/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap".into(),
-        ))
-    }
-    #[cfg(not(any(test, feature = "repository-workspace-test-support")))]
-    {
-        ProcessPlatform::current()
-    }
+    let image = std::env::var_os("SLUG_V2_BIN").ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::Unsupported,
+            "actual compiled CLI required for native workspace initialization",
+        )
+    })?;
+    Ok(ProcessPlatform::compiled_cli(
+        image.into(),
+        "/home/linuxbrew/.linuxbrew/Cellar/bubblewrap/0.11.2/bin/bwrap".into(),
+    ))
 }
 impl RepositoryWorkspaceCommand {
     pub(in crate::runtime) async fn initialize_claimed_root(
@@ -45,7 +49,8 @@ impl RepositoryWorkspaceCommand {
         .with_retirement_observer(self.retirement_observer());
         #[cfg(test)]
         let producer = producer.with_process_probe(self.process_probe());
-        let (builder, initial) = process_owner::run(producer, platform()?, active).await?;
+        let (builder, initial) =
+            process_owner::run(producer, self.launcher().platform()?, active).await?;
         self.reserve_root(builder, initial, &scope, active)
     }
 }
