@@ -205,7 +205,7 @@ fn extension_label_uses_original_module_and_refuses_missing_mapping_or_context()
     let state = RepositoryRuleInvocationState::new().with_bzl_manifest(&unrelated);
     assert_eq!(
         invoke(&loaded, "direct", &state).unwrap(),
-        "Label(\"@@//ext:caller\")"
+        "Label(\"//ext:caller\")"
     );
     assert!(state.records().is_empty());
 

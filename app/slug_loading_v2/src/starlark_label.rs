@@ -63,7 +63,18 @@ impl StarlarkLabel {
     }
 
     fn write_repr(&self, output: &mut (impl fmt::Write + ?Sized)) -> fmt::Result {
-        write!(output, "Label(\"{}\")", self.0)
+        let package = self.0.package();
+        if package.repo().is_root() {
+            // Bazel's Label.repr uses the default canonical form for the main repo.
+            write!(
+                output,
+                "Label(\"//{}:{}\")",
+                package.package(),
+                self.0.target()
+            )
+        } else {
+            write!(output, "Label(\"{}\")", self.0)
+        }
     }
 }
 

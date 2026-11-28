@@ -167,7 +167,7 @@ fn cpp_grte_top_method_checks_current_caller_even_when_transferred() {
         (configured(None, false), "None"),
         (
             configured_grte_top("//trusted:discarded"),
-            "Label(\"@@//trusted:everything\")",
+            "Label(\"//trusted:everything\")",
         ),
     ] {
         let call = "def call():\n    return cpp.grte_top()\nresult = call()";
