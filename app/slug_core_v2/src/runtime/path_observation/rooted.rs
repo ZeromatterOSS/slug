@@ -15,14 +15,18 @@ use std::os::unix::ffi::OsStringExt;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
+use sha2::Digest;
+use sha2::Sha256;
 use slug_workspace_v2::MaterializationPathAnchor;
 
 use super::*;
+use crate::runtime::dice::source_service::HOST_FILE_OBJECT_BYTES;
 use crate::runtime::dice::source_service::SourceBufferReservation;
 use crate::runtime::dice::source_service::SourceCounter;
 use crate::runtime::dice::source_service::read_open_regular_file_after_attempt;
 use crate::runtime::repository_physical_root::PendingArchiveDigestReceipts;
 use crate::runtime::repository_physical_root::SealedGeneralObservation;
+use crate::runtime::repository_physical_root::source::SealedSourceObservation;
 use crate::runtime::repository_root_io::RootIo;
 
 mod owned;
@@ -178,7 +182,7 @@ pub(in crate::runtime) fn observe_rooted(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<PathObservationEpoch, RootedObservationError> {
-    observe_batch(root, anchor, demands, scope, active, None, None)
+    observe_batch(root, anchor, demands, scope, active, None, None, None)
 }
 
 /// A separate closed entrypoint: generic RootIo callers cannot supply modeled
@@ -209,9 +213,27 @@ pub(in crate::runtime) fn observe_sealed_general(
         owner.active(),
         Some(owner),
         tracking,
+        None,
     )
 }
 
+pub(in crate::runtime) fn observe_sealed_source(
+    owner: &SealedSourceObservation<'_>,
+    demands: &[PathObservationDemand],
+) -> Result<PathObservationEpoch, RootedObservationError> {
+    observe_batch(
+        owner.io(),
+        owner.anchor(),
+        demands,
+        owner.scope(),
+        owner.active(),
+        None,
+        None,
+        Some(owner),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
 fn observe_batch(
     root: &RootIo<'_>,
     anchor: &MaterializationPathAnchor,
@@ -223,6 +245,7 @@ fn observe_batch(
         &mut PendingArchiveDigestReceipts<'_>,
         Option<&PathObservationEpoch>,
     )>,
+    source: Option<&SealedSourceObservation<'_>>,
 ) -> Result<PathObservationEpoch, RootedObservationError> {
     check(scope, active)?;
     let paths = validate_rooted_demands(anchor, demands)?;
@@ -310,6 +333,13 @@ fn observe_batch(
                 }
                 result
             }
+        } else if let Some(result) = source
+            .filter(|_| content)
+            .map(|owner| reobserve_source_certificate(owner, path, demand))
+            .transpose()?
+            .flatten()
+        {
+            result
         } else {
             if content {
                 scope.charge(SourceCounter::SourceAttempts, 1)?;
@@ -323,6 +353,50 @@ fn observe_batch(
     let epoch = PathObservationEpoch::new(observations).map_err(RootedObservationError::Epoch)?;
     check(scope, active)?;
     Ok(epoch)
+}
+
+fn reobserve_source_certificate(
+    owner: &SealedSourceObservation<'_>,
+    path: &Path,
+    demand: &PathObservationDemand,
+) -> Result<Option<PathObservationResult>, RootedObservationError> {
+    let Some(previous) = owner.certificate().get(demand) else {
+        return Ok(None);
+    };
+    let Some((digest, frame)) = owner.file(path) else {
+        return Ok(None);
+    };
+    if !certificate_content_matches(digest, previous, owner.scope(), owner.active())? {
+        return Ok(None);
+    }
+    owned::verify_prior_frame(owner.io(), path, frame, owner.scope(), owner.active())?;
+    Ok(Some(previous.as_ref().clone()))
+}
+
+fn certificate_content_matches(
+    manifest: FileContentDigest,
+    previous: &PathObservationResult,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<bool, RootedObservationError> {
+    Ok(match previous {
+        PathObservationResult::FileDigest(PathOperationResult::Present(digest)) => {
+            *digest == manifest
+        }
+        PathObservationResult::FileBytes(PathOperationResult::Present(bytes))
+            if bytes.len() <= HOST_FILE_OBJECT_BYTES
+                && bytes.len() as u64 == manifest.size_bytes() =>
+        {
+            let mut hash = Sha256::new();
+            for chunk in bytes.chunks(64 * 1024) {
+                check(scope, active)?;
+                hash.update(chunk);
+            }
+            let actual: [u8; 32] = hash.finalize().into();
+            actual == *manifest.sha256()
+        }
+        _ => false,
+    })
 }
 
 fn kind(stat: &libc::stat) -> PathNodeKind {

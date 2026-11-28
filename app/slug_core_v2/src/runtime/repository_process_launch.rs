@@ -632,7 +632,10 @@ impl FinalizeLaunch {
             .map_err(PhysicalRootError::mount)?;
         let writable_archive_parent = (admission.builder().mode
             == RepositoryWorkspaceMode::Archive)
-            .then(|| WritableArchiveParent::before_launch(admission.builder(), &incoming))
+            .then(|| {
+                let builder = admission.builder();
+                WritableArchiveParent::before_launch(&builder.file, builder.identity, &incoming)
+            })
             .transpose()?;
         Ok(Self {
             admission,
@@ -708,7 +711,8 @@ impl ProcessLaunch for FinalizeLaunch {
             .check_clone(incoming, self.scope(), &|| true)
             .map_err(PhysicalRootError::mount)?;
         if let Some(parent) = &self.writable_archive_parent {
-            parent.check_before_transfer(self.admission.builder())?;
+            let builder = self.admission.builder();
+            parent.check_before_transfer(&builder.file, builder.identity)?;
         }
         send_incoming(
             socket,

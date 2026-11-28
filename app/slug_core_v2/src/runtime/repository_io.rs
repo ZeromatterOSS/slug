@@ -328,6 +328,23 @@ fn native_comparison_error(
     }
 }
 
+#[cfg(target_os = "linux")]
+fn native_root_observation_error(
+    error: super::repository_physical_root::PhysicalRootError,
+    fallback: impl FnOnce() -> RepositorySessionError,
+) -> RepositorySessionError {
+    use super::path_observation::rooted::RootedObservationError;
+    use super::repository_physical_root::PhysicalRootError;
+
+    match error {
+        PhysicalRootError::SourceService(cause)
+        | PhysicalRootError::Observation(RootedObservationError::SourceService(cause)) => {
+            RepositorySessionError::SourceService(cause)
+        }
+        _ => fallback(),
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum RepositorySessionValidation {
@@ -1403,7 +1420,9 @@ impl RepositoryMaterializer {
         let observed = observed
             .and_then(|legacy| physical.observe(self, token, legacy, certificate))
             .and_then(|(current, pending)| {
-                sources.observe(self, token, current).map(|epoch| (epoch, pending))
+                sources
+                    .observe(self, token, current, certificate)
+                    .map(|epoch| (epoch, pending))
             });
         self.check_source_scope(self.source_scope.as_ref())?;
         let state = self

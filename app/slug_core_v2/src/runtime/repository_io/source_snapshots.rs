@@ -302,7 +302,7 @@ impl RepositoryMaterializer {
         self.check_command_scope(token, scope)?;
         row.root
             .check_origin(scope, &|| self.session_is_active(token))
-            .map_err(|_| refusal())?;
+            .map_err(|error| native_root_observation_error(error, refusal))?;
         let state = self.state.lock().map_err(|_| refusal())?;
         let active = matching_validated_active(&state, token)?;
         if active.workspace_lease != row.root.reservation().lease()
@@ -411,6 +411,7 @@ impl SourceObservationBatch {
         actor: &RepositoryMaterializer,
         token: RepositorySessionToken,
         previous: PathObservationEpoch,
+        certificate: Option<&PathObservationEpoch>,
     ) -> Result<PathObservationEpoch, RepositorySessionError> {
         if self.rows.is_empty() {
             return Ok(previous);
@@ -424,8 +425,13 @@ impl SourceObservationBatch {
         for (row, batch) in &self.rows {
             epochs.push(
                 row.root
-                    .observe(batch, scope, &|| actor.session_is_active(token))
-                    .map_err(|_| refusal())?,
+                    .observe_with_certificate(
+                        batch,
+                        scope,
+                        &|| actor.session_is_active(token),
+                        certificate,
+                    )
+                    .map_err(|error| native_root_observation_error(error, refusal))?,
             );
         }
         let result = PathObservationEpoch::from_shared(epochs.iter().flat_map(|epoch| {

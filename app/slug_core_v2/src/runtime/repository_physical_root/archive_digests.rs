@@ -3,6 +3,7 @@
 use std::fmt;
 use std::mem::size_of;
 
+use slug_workspace_v2::FileContentDigest;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 
@@ -72,6 +73,14 @@ impl ArchiveDigestReceipts {
         self.rows = rows;
         self.credit = Some(credit);
         true
+    }
+}
+
+impl RepositoryPhysicalRoot {
+    /// The complete prior byte comparison also verifies the canonical body.
+    pub(super) fn observed_archive_digest(&self, path: &str) -> Option<FileContentDigest> {
+        let (entry, _, _) = self.canonical_file(path)?;
+        Some(self.archive_digests.lock().ok()?.get(entry)?.digest())
     }
 }
 

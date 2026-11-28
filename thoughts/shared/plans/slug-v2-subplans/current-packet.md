@@ -44,8 +44,15 @@ staging. It started at 1,867,997,193 bytes and selected 794,211,606 bytes across
 `EROFS`, live-writer `EBUSY`, retirement and Source/Process controls. Certified
 Archive repeats reuse prior actual digests after fresh descriptor, name and
 scope checks. Ordinary reads and mismatched digests still hash the payload.
-Native tests also reject foreign receipt owners and keep mutable-source
-publication checks. Rerun the original Build under the existing limits.
+Native tests reject foreign receipt owners and preserve mutable-source checks.
+At cut `af078ea71`, a detached trace passed the first precheck and exhausted
+SourceAttempts64 on the second. Two Source snapshots contributed 14 repeat
+content requests per check. The Source snapshot seal passed original-FD
+`EROFS`, live-writer `EBUSY`, pre-seal drift, retirement and Process controls.
+Sealed Source certificate repeats passed at exactly 64 acquisitions without
+reading payloads. A missing certificate still refused acquisition 65. Cold
+native admission ran close to the 27-second deadline. Measure both routes
+under the existing limits.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,

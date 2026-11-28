@@ -39,6 +39,21 @@ fn facts(fd: i32) -> Facts {
         used_inodes: (value.f_files - value.f_ffree) as u64,
     }
 }
+
+fn open_source_writer(root: i32) -> io::Result<File> {
+    let writer = unsafe {
+        libc::openat(
+            root,
+            c"payload".as_ptr(),
+            libc::O_WRONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if writer < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(unsafe { File::from_raw_fd(writer) })
+}
+
 // A frozen Source is data-only even when its physical class still equals the
 // original Archive quota. Same canonical association cannot reauthorize setup.
 pub(super) fn assert_frozen_source(root: &RepositorySourceRoot, expected: FrozenArchiveQuota) {
@@ -236,6 +251,12 @@ impl ProcessLaunch for CheckedFinalize {
         socket: BorrowedFd<'_>,
         nonce: &[u8; 16],
     ) -> Result<(), PhysicalRootError> {
+        if self.fault == Fault::DriftBeforeSeal {
+            // Drift the private file after the initial manifest and before
+            // the helper receives the mount. Close the writer before remount.
+            let _writer_credit = self.resources().reserve(0, 1, 0)?;
+            open_source_writer(self.original_fd)?.write_all(b"changed data")?;
+        }
         self.inner.transfer(socket, nonce)
     }
     fn verify_successor(
@@ -284,33 +305,6 @@ impl ProcessLaunch for CheckedFinalize {
         self.inner
             .verify_successor(attached, token, userns, words, quota)?;
         self.verified.store(true, Ordering::Release);
-        if self.fault == Fault::DriftBeforeSeal {
-            let _duplicate_credit = self.resources().reserve(1024, 1, 0)?;
-            let duplicate = unsafe { libc::fcntl(self.original_fd, libc::F_DUPFD_CLOEXEC, 0) };
-            if duplicate < 0 {
-                return Err(std::io::Error::last_os_error().into());
-            }
-            let original = unsafe { File::from_raw_fd(duplicate) };
-            let io = RootIo::new(
-                &original,
-                RootIoLimits {
-                    max_path_bytes: 256,
-                    max_name_bytes: 255,
-                    max_depth: 32,
-                    max_entries: 8192,
-                    max_directory_name_bytes: 1024 * 1024,
-                    max_file_bytes: 64 * 1024 * 1024,
-                    max_link_bytes: 256,
-                },
-            )?;
-            io.write_file(
-                Path::new("payload"),
-                b"changed after captured tree",
-                0o644,
-                crate::runtime::repository_root_io::WriteMode::ReplaceRegular,
-                &|| true,
-            )?;
-        }
         if self.fault == Fault::CancelAfterSuccessor {
             self.scope().cancel();
         }
@@ -545,6 +539,12 @@ fn native_small_source_contraction_keeps_original_identity_old_debit_until_reap_
     assert_eq!(root.file.as_raw_fd(), fd);
     assert_eq!(root.identity, identity);
     assert_frozen_source(root, expected);
+    let writer_credit = fixture.resources.reserve(0, 1, 0).unwrap();
+    assert_eq!(
+        open_source_writer(fd).unwrap_err().raw_os_error(),
+        Some(libc::EROFS)
+    );
+    drop(writer_credit);
     assert_eq!(fixture.resources.snapshot().backing_bytes, expected.bytes());
     assert!(!root.anchor().root().as_path().exists());
     let mut reader = root
@@ -597,6 +597,31 @@ fn native_small_source_contraction_keeps_original_identity_old_debit_until_reap_
 }
 
 #[test]
+#[ignore = "actual CLI Source freeze refuses an outstanding original-mount writer"]
+fn native_source_global_freeze_refuses_a_live_original_writer() {
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::write(workspace.path().join("payload"), b"source bytes").unwrap();
+    let mut fixture = Fixture::new(workspace.path());
+    let builder = fixture.builder.as_ref().unwrap();
+    let backing = builder.backing.clone();
+    let writer_credit = fixture.resources.reserve(0, 1, 0).unwrap();
+    let writer = open_source_writer(builder.file.as_raw_fd()).unwrap();
+
+    let (output, verified, _, _) = fixture.finalize(FrozenArchiveQuota::TINY, Fault::None);
+    assert!(matches!(
+        output,
+        Err(PhysicalRootError::Io(error))
+            if error.to_string() == format!("repository helper stage 6 errno {}", libc::EBUSY)
+    ));
+    assert!(!verified.load(Ordering::Acquire));
+    assert!(fixture.resources.snapshot().backing_bytes >= ARCHIVE_BYTES);
+    drop(writer);
+    drop(writer_credit);
+    drop(backing);
+    fixture.cleanup(Fault::None);
+}
+
+#[test]
 #[ignore = "actual CLI Source quota nonce/facts/refusal/cancel/full-seal failure retirement"]
 fn native_source_contraction_refusals_reap_without_publishing_or_refunding_live_backing() {
     for fault in [
@@ -622,6 +647,9 @@ fn native_source_contraction_refusals_reap_without_publishing_or_refunding_live_
                 verified.load(Ordering::Acquire),
                 "{fault:?}: successor verification must precede the fault"
             );
+        }
+        if fault == Fault::DriftBeforeSeal {
+            assert!(matches!(output, Err(PhysicalRootError::Snapshot)));
         }
         fixture.cleanup(fault);
     }
@@ -879,4 +907,121 @@ fn native_source_contraction_cannot_borrow_another_reservations_claim() {
     other.discard(other_token).unwrap();
     drop(other);
     fixture.cleanup(Fault::None);
+}
+
+#[test]
+#[ignore = "actual CLI Source snapshot and certified read through its selected owner"]
+fn native_source_certificate_reuses_manifest_frames_at_the_acquisition_limit() {
+    use slug_workspace_v2::NormalizedAbsolutePath;
+    use slug_workspace_v2::PathObservationOperation;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
+
+    use crate::runtime::dice::source_service::SourceCounter;
+    use crate::runtime::dice::source_service::SourceServiceError;
+    use crate::runtime::repository_root_io::read_work_for_test;
+
+    const BODY: &[u8] = b"source bytes";
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::write(workspace.path().join("payload"), BODY).unwrap();
+    let mut fixture = Fixture::new(workspace.path());
+    let (output, _, _, _) = fixture.finalize(FrozenArchiveQuota::TINY, Fault::None);
+    let output = output.unwrap();
+    let anchor = output.receipt.root().anchor();
+    let path = NormalizedAbsolutePath::new(anchor.root().as_path().join("payload")).unwrap();
+    let bytes = PathObservationDemand::new(
+        anchor.namespace(),
+        path.clone(),
+        PathObservationOperation::FileBytes,
+    );
+    let hash = PathObservationDemand::new(
+        anchor.namespace(),
+        path,
+        PathObservationOperation::FileDigest,
+    );
+    fixture
+        .actor
+        .adopt_source_snapshot(
+            fixture.token,
+            &fixture.ticket,
+            output.receipt,
+            &fixture.scope,
+        )
+        .unwrap();
+    let demands = [bytes.clone(), hash.clone()];
+    let certify = |demands, certificate: &PathObservationEpoch| {
+        fixture.actor.observe_native_certificate(
+            fixture.token,
+            demands,
+            certificate,
+            &mut |_| {},
+            &mut |_, _, _| {},
+        )
+    };
+    let before = fixture.scope.snapshot();
+    let first = fixture
+        .actor
+        .observe_native(fixture.token, demands.clone())
+        .unwrap();
+    let after = fixture.scope.snapshot();
+    assert_eq!(after.source_attempts - before.source_attempts, 2);
+    assert_eq!(
+        after.decoded_bytes - before.decoded_bytes,
+        2 * BODY.len() as u64
+    );
+    let PathObservationResult::FileBytes(PathOperationResult::Present(selected_body)) =
+        first.get(&bytes).unwrap().as_ref()
+    else {
+        panic!("expected selected Source body");
+    };
+    assert_eq!(selected_body.as_ref(), BODY);
+
+    let wrong = PathObservationEpoch::new([(
+        bytes.clone(),
+        PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+            b"wrong bytes!".as_slice(),
+        ))),
+    )])
+    .unwrap();
+    let fallback = certify(vec![bytes.clone()], &wrong).unwrap();
+    assert_eq!(fallback.get(&bytes), first.get(&bytes));
+    assert_eq!(
+        fixture.scope.snapshot().source_attempts,
+        after.source_attempts + 1
+    );
+
+    let charged = fixture.scope.snapshot().source_attempts;
+    let limit = fixture.scope.limits().source_attempts;
+    fixture
+        .scope
+        .charge(SourceCounter::SourceAttempts, limit - charged)
+        .unwrap();
+    let before = fixture.scope.snapshot();
+    let read_work = read_work_for_test::begin();
+    let certified = certify(demands.to_vec(), &first).unwrap();
+    assert_eq!(certified, first);
+    assert_eq!(
+        read_work.snapshot(),
+        read_work_for_test::Snapshot::default()
+    );
+    let PathObservationResult::FileBytes(PathOperationResult::Present(certified_body)) =
+        certified.get(&bytes).unwrap().as_ref()
+    else {
+        panic!("expected certified Source body");
+    };
+    assert!(Arc::ptr_eq(certified_body, selected_body));
+    assert_eq!(fixture.scope.snapshot().source_attempts, limit);
+    assert_eq!(fixture.scope.snapshot().decoded_bytes, before.decoded_bytes);
+    drop(read_work);
+
+    let refused = certify(vec![hash], &PathObservationEpoch::empty());
+    assert!(matches!(
+        refused,
+        Err(
+            crate::runtime::repository_io::RepositorySessionError::SourceService(
+                SourceServiceError::Limit(SourceCounter::SourceAttempts)
+            )
+        )
+    ));
+    fixture.actor.discard(fixture.token).unwrap();
 }

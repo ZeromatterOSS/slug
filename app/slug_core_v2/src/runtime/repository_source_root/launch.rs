@@ -8,6 +8,7 @@ use super::super::process_owner::ReapedCapture;
 use super::super::process_owner::{self};
 use super::super::source::SealedSourceSnapshot;
 use super::super::source::SourceRootBuilder;
+use super::readonly_quota::WritableArchiveParent;
 use super::*;
 use crate::runtime::repository_process_wire::RunMode;
 
@@ -196,6 +197,7 @@ pub(in crate::runtime::repository_physical_root) struct SourceFinalize {
     state: Arc<State>,
     state_credit: ResourceCredit,
     incoming: Option<SourceMountSeed>,
+    writable_archive_parent: WritableArchiveParent,
     pending: Option<readonly::ReadOnlyMountClone>,
     compaction: Option<PendingSourceReadOnlyCompaction>,
     nonce: Option<[u8; 16]>,
@@ -219,11 +221,14 @@ impl SourceFinalize {
             0,
         )?;
         let incoming = builder.seed.take().ok_or(PhysicalRootError::Mode)?;
+        let writable_archive_parent =
+            WritableArchiveParent::before_launch(&builder.file, builder.identity, &incoming.clone)?;
         Ok(Self {
             builder,
             state,
             state_credit,
             incoming: Some(incoming),
+            writable_archive_parent,
             pending: None,
             compaction: None,
             nonce: None,
@@ -282,6 +287,8 @@ impl ProcessLaunch for SourceFinalize {
             .domain
             .check_clone(incoming, &self.builder.scope, &|| true)
             .map_err(PhysicalRootError::mount)?;
+        self.writable_archive_parent
+            .check_before_transfer(&self.builder.file, self.builder.identity)?;
         send_incoming(
             socket,
             &self.builder.file,
@@ -328,6 +335,7 @@ impl ProcessLaunch for SourceFinalize {
         }
         self.compaction = Some(PendingSourceReadOnlyCompaction::receive(
             &self.builder,
+            &self.writable_archive_parent,
             &successor,
             &attached,
             quota.ok_or(PhysicalRootError::Mode)?,

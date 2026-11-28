@@ -189,12 +189,21 @@ pub(super) fn verify_prior_digest(
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
 ) -> Result<PathObservationResult, RootedObservationError> {
-    check(scope, active)?;
-    let verified =
-        root.verify_regular_frame(path, &receipt.frame, &|| active() && scope.check().is_ok());
-    check(scope, active)?;
-    verified.map_err(framed)?;
+    verify_prior_frame(root, path, &receipt.frame, scope, active)?;
     Ok(PathObservationResult::FileDigest(
         PathOperationResult::Present(receipt.digest),
     ))
+}
+
+pub(super) fn verify_prior_frame(
+    root: &RootIo<'_>,
+    path: &Path,
+    frame: &libc::stat,
+    scope: &Arc<SourceServiceScope>,
+    active: &dyn Fn() -> bool,
+) -> Result<(), RootedObservationError> {
+    check(scope, active)?;
+    let verified = root.verify_regular_frame(path, frame, &|| active() && scope.check().is_ok());
+    check(scope, active)?;
+    verified.map_err(framed)
 }

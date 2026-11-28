@@ -8614,18 +8614,8 @@ impl NativeDemandCommand<'_> {
             if !new_demands.is_empty() {
                 let observed = input_image_bridge::observe_command_paths(self, new_demands)?;
                 self.check_source_scope()?;
-                let merged = self
-                    .path_observations
-                    .observations()
-                    .iter()
-                    .map(|(demand, result)| (demand.clone(), result.dupe()))
-                    .chain(
-                        observed
-                            .observations()
-                            .iter()
-                            .map(|(demand, result)| (demand.clone(), result.dupe())),
-                    );
-                self.path_observations = PathObservationEpoch::from_shared(merged)
+                self.path_observations
+                    .try_union_assign(&observed)
                     .map_err(NativeDemandSessionError::PathEpoch)?;
                 finish_probe_phase!(need_phase);
                 return Ok(NativeDemandProgress::Paths);

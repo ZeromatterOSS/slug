@@ -235,13 +235,7 @@ async fn finish_source_input(
             );
         }
     };
-    let observations = match PathObservationEpoch::from_shared(
-        prefix
-            .observations()
-            .iter()
-            .chain(observed.observations().observations().iter())
-            .map(|(demand, result)| (demand.dupe(), result.dupe())),
-    ) {
+    let observations = match prefix.try_union(observed.observations()) {
         Ok(epoch) => epoch,
         Err(error) => return LoadingPreparationOutcome::Complete(Err(error.into())),
     };

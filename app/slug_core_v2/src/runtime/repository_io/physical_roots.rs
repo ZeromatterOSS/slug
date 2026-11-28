@@ -828,11 +828,11 @@ impl PhysicalObservationBatch {
                 .map_err(|error| {
                     #[cfg(any(test, feature = "repository-workspace-test-support"))]
                     report_physical_observation_refusal(&error);
-                    #[cfg(not(any(test, feature = "repository-workspace-test-support")))]
-                    let _ = error;
-                    RepositorySessionError::NativeWorkspace(
-                        "physical root observation refused".into(),
-                    )
+                    native_root_observation_error(error, || {
+                        RepositorySessionError::NativeWorkspace(
+                            "physical root observation refused".into(),
+                        )
+                    })
                 })?;
             epochs.push(epoch);
             pending.push(receipts);
