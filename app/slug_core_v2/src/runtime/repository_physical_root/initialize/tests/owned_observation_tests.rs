@@ -136,6 +136,20 @@ fn verify_native_owned_observation(finalize_archive: bool) {
     assert!(
         matches!(first.get(&hash).unwrap().as_ref(),PathObservationResult::FileDigest(PathOperationResult::Present(value)) if *value==digest(BODY))
     );
+    {
+        let remaining = 512 * 1024 * 1024 - resources.snapshot().retained_bytes;
+        let _guard = resources.reserve(remaining, 0, 0).unwrap();
+        let direct = root.verify_direct_body_digest("input", digest(BODY));
+        if finalize_archive {
+            direct.unwrap();
+            assert!(matches!(
+                root.verify_direct_body_digest("input", digest(&[0; BODY.len()])),
+                Err(PhysicalRootError::Snapshot)
+            ));
+        } else {
+            assert!(matches!(direct, Err(PhysicalRootError::Resource)));
+        }
+    }
     let ordinary = actor
         .observe_native(token, [bytes.clone(), hash.clone()])
         .unwrap();

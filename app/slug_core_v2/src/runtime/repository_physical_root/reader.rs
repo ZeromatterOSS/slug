@@ -240,6 +240,11 @@ impl RepositoryPhysicalRoot {
         relative: &str,
         expected: FileContentDigest,
     ) -> Result<(), PhysicalRootError> {
+        if let Some(actual) = self.observed_archive_digest(relative) {
+            return (actual == expected)
+                .then_some(())
+                .ok_or(PhysicalRootError::Snapshot);
+        }
         let _working =
             self.resources
                 .reserve(RepositoryWorkspaceBody::decode_scratch_bytes(), 0, 0)?;
@@ -321,19 +326,21 @@ impl RepositoryPhysicalRoot {
                 .ok()
                 .and_then(|path| path.to_str())
                 .ok_or(PhysicalRootError::Snapshot)?;
-            let Some(RepositoryWorkspaceNode::File(body)) =
-                self.state.entry(relative).map(|entry| entry.node())
-            else {
-                return Err(PhysicalRootError::Snapshot);
-            };
-            let mut hash = Sha256::new();
-            body.try_for_each_chunk(&mut |chunk| {
-                self.check_origin(scope, &|| true)?;
-                hash.update(chunk);
-                Ok::<_, PhysicalRootError>(())
-            })?;
-            FileContentDigest::new(hash.finalize().into(), body.len() as u64)
-                .ok_or(PhysicalRootError::Snapshot)?
+            if let Some(observed) = self.observed_archive_digest(relative) {
+                observed
+            } else {
+                let Some((_, body, _)) = self.canonical_file(relative) else {
+                    return Err(PhysicalRootError::Snapshot);
+                };
+                let mut hash = Sha256::new();
+                body.try_for_each_chunk(&mut |chunk| {
+                    self.check_origin(scope, &|| true)?;
+                    hash.update(chunk);
+                    Ok::<_, PhysicalRootError>(())
+                })?;
+                FileContentDigest::new(hash.finalize().into(), body.len() as u64)
+                    .ok_or(PhysicalRootError::Snapshot)?
+            }
         } else {
             let owner = self
                 .source_dependencies

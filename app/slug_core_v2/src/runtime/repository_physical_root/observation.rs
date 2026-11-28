@@ -52,8 +52,16 @@ impl<'a> SealedGeneralObservation<'a> {
         &self,
         relative: &Path,
     ) -> Option<(usize, &RepositoryWorkspaceBody, u16)> {
-        let path = relative.to_str()?;
-        let entries = self.root.state.entries();
+        self.root.canonical_file(relative.to_str()?)
+    }
+}
+
+impl RepositoryPhysicalRoot {
+    pub(super) fn canonical_file(
+        &self,
+        path: &str,
+    ) -> Option<(usize, &RepositoryWorkspaceBody, u16)> {
+        let entries = self.state.entries();
         let index = entries
             .binary_search_by(|entry| entry.path().cmp(path))
             .ok()?;
