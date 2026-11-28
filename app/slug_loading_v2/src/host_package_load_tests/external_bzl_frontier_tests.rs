@@ -59,7 +59,7 @@ impl ActivationTracker for FrontierTracker {
         {
             if let Some(batch) = activation
                 .evaluation_data()
-                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .and_then(LoadingEventBatch::batch_from_evaluation_data)
             {
                 self.events
                     .lock()

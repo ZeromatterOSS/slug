@@ -373,7 +373,7 @@ impl ActivationTracker for AnalysisTracker {
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
         if let Some(batch) = activation
             .evaluation_data()
-            .and_then(|data| data.downcast_ref::<EventBatch>())
+            .and_then(slug_loading_v2::bzl_module::LoadingEventBatch::batch_from_evaluation_data)
         {
             self.batches.lock().unwrap().push(TrackedBatch(
                 key.to_string(),

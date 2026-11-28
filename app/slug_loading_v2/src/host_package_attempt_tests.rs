@@ -93,7 +93,7 @@ impl Key for HostPackageAttemptTestKey {
                 ),
                 package_dir: package_dir(&self.package),
                 build_file: package_dir(&self.package).join("BUILD.bazel"),
-                source: self.source.clone(),
+                source: Arc::from(self.source.as_bytes()),
                 package_label: self.package.as_str().into(),
                 loaded_modules: &loaded_modules,
                 capture_events: true,
@@ -123,8 +123,8 @@ fn build_module_metadata_accepts_empty_root_projection() {
         package_identifier: PackageIdentifier::new(CanonicalRepoName::root(), package.clone()),
         package_dir: package_dir(&package),
         build_file: package_dir(&package).join("BUILD.bazel"),
-        source: Arc::new(
-            "filegroup(name='empty_' + module_name() + module_version())\n".to_owned(),
+        source: Arc::from(
+            b"filegroup(name='empty_' + module_name() + module_version())\n".as_slice(),
         ),
         package_label: package.as_str().into(),
         loaded_modules: &[],
@@ -168,7 +168,7 @@ fn build_module_metadata_calls_fail_closed_for_generated_and_builtin_repositorie
                 ),
                 package_dir: PathBuf::from("/workspace"),
                 build_file: PathBuf::from("/workspace/BUILD.bazel"),
-                source: Arc::new(format!("filegroup(name={call})\n")),
+                source: Arc::from(format!("filegroup(name={call})\n").into_bytes()),
                 package_label: package.as_str().into(),
                 loaded_modules: &[],
                 capture_events: false,
@@ -463,6 +463,63 @@ print("done")
         ]
     );
     assert_eq!(filegroup_srcs(package, "lead"), ["@@//pkg:@lead"]);
+}
+
+#[tokio::test]
+async fn identical_build_print_origin_tracks_consumed_glob_a_b_a() {
+    let sources: Arc<[u8]> = Arc::from(
+        b"print('same print')\nfilegroup(name='files', srcs=glob(['*.txt']))\n".as_slice(),
+    );
+    let package = PackagePath::parse("pkg").unwrap();
+    let mut stamps = Vec::new();
+    for name in ["a.txt", "b.txt", "a.txt"] {
+        let mut script = prelude();
+        script.extend([
+            present("/workspace/pkg", PathNodeKind::Directory),
+            listing(
+                "/workspace/pkg",
+                vec![(name.as_bytes(), PathDirectoryEntryKind::File)],
+            ),
+            present(&format!("/workspace/pkg/{name}"), PathNodeKind::RegularFile),
+        ]);
+        let mut transaction = new_transaction(script).await;
+        let input = HostPackageAttemptInput {
+            repository_features: Arc::from([]),
+            associated_module_metadata: None,
+            workspace: path("/workspace"),
+            logical_package_root: path("/workspace"),
+            package: package.clone(),
+            package_identifier: PackageIdentifier::new(CanonicalRepoName::root(), package.clone()),
+            package_dir: package_dir(&package),
+            build_file: package_dir(&package).join("BUILD.bazel"),
+            source: sources.dupe(),
+            package_label: "pkg".into(),
+            loaded_modules: &[],
+            capture_events: true,
+        };
+        let SourcePreparationOutcome::Complete(Ok(completed)) =
+            evaluate_host_package_attempts_driver(
+                &mut transaction,
+                input,
+                HostPackageLoadMode::Legacy,
+                Arc::new(RunfilesRepositoryMapping::empty()),
+                HostGlobBoundaryScope::Root,
+                true,
+            )
+            .await
+        else {
+            panic!("the prepared glob must complete");
+        };
+        assert_eq!(events(&completed.terminal), ["same print"]);
+        assert_eq!(
+            filegroup_srcs(completed.terminal.result.as_ref().unwrap(), "files"),
+            [format!("@@//pkg:{name}")],
+        );
+        stamps.push(completed.events.expect("nonempty BUILD print origin"));
+    }
+    assert_eq!(stamps[0].batch(), stamps[1].batch());
+    assert_ne!(stamps[0], stamps[1]);
+    assert_eq!(stamps[0], stamps[2]);
 }
 
 #[tokio::test]
@@ -948,7 +1005,7 @@ async fn package_attempt_call_sources_share_within_driver_scope() {
             package_identifier: PackageIdentifier::new(CanonicalRepoName::root(), package.clone()),
             package_dir: package_dir(&package),
             build_file: package_dir(&package).join("BUILD.bazel"),
-            source: Arc::new(source.to_owned()),
+            source: Arc::from(source.as_bytes()),
             package_label: package.as_str().into(),
             loaded_modules: modules,
             capture_events: true,
@@ -991,6 +1048,7 @@ async fn package_attempt_call_sources_share_within_driver_scope() {
     let terminal = loop {
         let step = evaluate_host_package_attempt_with_call_sources(
             &input,
+            input.source_text(),
             prepared.dupe(),
             mapping.dupe(),
             &mut sources,
@@ -1084,6 +1142,7 @@ async fn package_attempt_call_sources_share_within_driver_scope() {
     let mut fresh = None;
     let pending = evaluate_host_package_attempt_with_call_sources(
         &changed_input,
+        changed_input.source_text(),
         Arc::new(SmallMap::new()),
         mapping.dupe(),
         &mut fresh,
@@ -1097,6 +1156,7 @@ async fn package_attempt_call_sources_share_within_driver_scope() {
     let mut independent = None;
     let original_pending = evaluate_host_package_attempt_with_call_sources(
         &input,
+        input.source_text(),
         Arc::new(SmallMap::new()),
         mapping.dupe(),
         &mut independent,
@@ -1120,6 +1180,7 @@ async fn package_attempt_call_sources_share_within_driver_scope() {
     let HostPackageAttemptStep::Terminal(terminal) =
         evaluate_host_package_attempt_with_call_sources(
             &no_loads,
+            no_loads.source_text(),
             Arc::new(SmallMap::new()),
             mapping.dupe(),
             &mut empty,
@@ -1149,6 +1210,7 @@ async fn package_attempt_call_sources_share_within_driver_scope() {
         let HostPackageAttemptStep::Terminal(terminal) =
             evaluate_host_package_attempt_with_call_sources(
                 &denied,
+                denied.source_text(),
                 Arc::new(SmallMap::new()),
                 mapping.dupe(),
                 &mut untouched,

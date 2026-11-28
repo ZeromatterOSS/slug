@@ -10,6 +10,8 @@ use starlark::syntax::Dialect;
 use starlark::syntax::StringEncoding;
 
 use super::*;
+use crate::bzl_module::event_origin::EventOperand;
+use crate::bzl_module::event_origin::EventOriginMemo;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::FirstLedger;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::PeakContext;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::PeakOwner;
@@ -40,6 +42,23 @@ impl std::hash::Hash for BuiltinSourceCatalog {
         self.hash.hash(h);
     }
 }
+impl BuiltinSourceCatalog {
+    pub(super) fn event_stamp<'a>(&'a self, memo: &mut EventOriginMemo<'a>) -> [u8; 32] {
+        memo.stamp(EventOperand::BuiltinCatalog, self, |_, writer| {
+            writer.text(&self.tag);
+            writer.count(self.entries.len());
+            for entry in &*self.entries {
+                writer.text(&entry.path);
+                writer.bytes(&entry.source);
+                writer.count(entry.loads.len());
+                for load in &*entry.loads {
+                    writer.text(load);
+                }
+            }
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 pub(crate) enum BuiltinCatalogSnapshot {
     Bazel9_2,

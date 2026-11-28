@@ -2163,7 +2163,7 @@ impl ActivationTracker for ObservedBuildTracker {
             kind: activation.kind(),
             batch: activation
                 .evaluation_data()
-                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .and_then(slug_loading_v2::bzl_module::LoadingEventBatch::batch_from_evaluation_data)
                 .map(Dupe::dupe),
         });
     }
@@ -3686,7 +3686,9 @@ impl ActivationTracker for NeutralFamilyTracker {
             key: text,
             batch: activation
                 .evaluation_data()
-                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .and_then(
+                    slug_loading_v2::bzl_module::LoadingEventBatch::batch_from_evaluation_data,
+                )
                 .map(Dupe::dupe),
         });
     }

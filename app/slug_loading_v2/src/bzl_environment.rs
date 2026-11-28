@@ -16,6 +16,7 @@ use starlark::values::OwnedFrozenValue;
 use crate::BzlLoadManifest;
 use crate::BzlModuleIdentity;
 use crate::BzlModuleSourceProvenance;
+use crate::bzl_module::event_origin::EventOriginWriter;
 use crate::bzl_module::semantic_evaluation::budget::Budget;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::FirstLedger;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::PeakContext;
@@ -103,6 +104,22 @@ impl BzlEnvironmentInputs {
         self.native_revision.hash(h);
         self.selections.hash(h);
     }
+    fn write_event_descriptor(&self, writer: &mut EventOriginWriter) {
+        writer.tag(match self.mode {
+            BzlEnvironmentMode::Build => 0,
+            BzlEnvironmentMode::Bzlmod => 1,
+            BzlEnvironmentMode::BzlmodBootstrap => 2,
+            BzlEnvironmentMode::Builtin => 3,
+        });
+        writer.count(self.native_revision as usize);
+        writer.count(self.selections.len());
+        for export in &*self.selections {
+            writer.text(&export.global);
+            writer.text(&export.export);
+            writer.identity(&export.module);
+        }
+    }
+
     pub(crate) fn payload(&self) -> Option<references::PayloadRef<'_>> {
         self.proof
             .as_ref()

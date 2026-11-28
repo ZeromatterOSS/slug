@@ -6,6 +6,8 @@ use std::hash::Hasher;
 use starlark_map::small_map::SmallMap;
 
 use super::*;
+use crate::bzl_module::event_origin::EventOperand;
+use crate::bzl_module::event_origin::EventOriginMemo;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::FirstLedger;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::PeakContext;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::PeakOwner;
@@ -25,15 +27,40 @@ pub(crate) struct PreparedSemanticBzlEvaluation {
     pub(crate) source_proof: Option<Arc<crate::bzl_environment::EnvironmentSourceFacts>>,
     references: Arc<crate::bzl_environment::references::EnvironmentReferencePlan>,
 }
+
+/// The existing semantic operands without frozen modules, instantiated
+/// globals or source observations from an outer activation.
+#[derive(Debug, Clone, Allocative, Dupe)]
+pub(crate) struct BzlEventOrigin {
+    rows: Arc<[Arc<facts::LocalFacts>]>,
+    references: Arc<crate::bzl_environment::references::EnvironmentReferencePlan>,
+}
+
+fn semantic_inputs_equal(
+    left_rows: &Arc<[Arc<facts::LocalFacts>]>,
+    left_references: &Arc<crate::bzl_environment::references::EnvironmentReferencePlan>,
+    right_rows: &Arc<[Arc<facts::LocalFacts>]>,
+    right_references: &Arc<crate::bzl_environment::references::EnvironmentReferencePlan>,
+) -> bool {
+    (Arc::ptr_eq(left_references, right_references) || left_references == right_references)
+        && (Arc::ptr_eq(left_rows, right_rows)
+            || (left_rows.len() == right_rows.len()
+                && left_rows
+                    .iter()
+                    .zip(right_rows.iter())
+                    .all(|(a, b)| Arc::ptr_eq(a, b) || facts::local_fields_eq(a, b))))
+}
+
+impl PartialEq for BzlEventOrigin {
+    fn eq(&self, other: &Self) -> bool {
+        semantic_inputs_equal(&self.rows, &self.references, &other.rows, &other.references)
+    }
+}
+impl Eq for BzlEventOrigin {}
+
 impl PartialEq for PreparedSemanticBzlEvaluation {
     fn eq(&self, other: &Self) -> bool {
-        self.references == other.references
-            && self.rows.len() == other.rows.len()
-            && self
-                .rows
-                .iter()
-                .zip(other.rows.iter())
-                .all(|(a, b)| facts::local_fields_eq(a, b))
+        semantic_inputs_equal(&self.rows, &self.references, &other.rows, &other.references)
     }
 }
 impl Eq for PreparedSemanticBzlEvaluation {}
@@ -48,6 +75,20 @@ impl Hash for PreparedSemanticBzlEvaluation {
 }
 
 impl PreparedSemanticBzlEvaluation {
+    pub(super) fn event_origin(&self) -> BzlEventOrigin {
+        BzlEventOrigin {
+            rows: self.rows.dupe(),
+            references: self.references.dupe(),
+        }
+    }
+
+    pub(crate) fn event_stamp<'a>(&'a self, memo: &mut EventOriginMemo<'a>) -> [u8; 32] {
+        memo.stamp(EventOperand::BzlInputs, self, |memo, writer| {
+            facts::write_event_rows(&self.rows, writer);
+            self.references.write_event_origin(writer, memo);
+        })
+    }
+
     pub(crate) fn logical_budget(&self) -> budget::Budget {
         self.budget
     }

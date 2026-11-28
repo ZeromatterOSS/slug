@@ -30,6 +30,7 @@ use dupe::Dupe;
 use slug_events_v2::EvaluationDiagnosticLevel;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
+use slug_loading_v2::bzl_module::LoadingEventBatch;
 use starlark_map::small_map::SmallMap;
 
 use super::demands::DemandProvenanceError;
@@ -58,7 +59,31 @@ struct AttemptRoot {
 #[derive(Debug)]
 struct EventBatchTransition {
     version: VersionNumber,
-    batch: Option<EventBatch>,
+    batch: Option<TrackedEventBatch>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
+pub(super) enum TrackedEventBatch {
+    Plain(EventBatch),
+    Loading(Arc<LoadingEventBatch>),
+}
+
+impl TrackedEventBatch {
+    fn batch(&self) -> &EventBatch {
+        match self {
+            Self::Plain(batch) => batch,
+            Self::Loading(batch) => batch.batch(),
+        }
+    }
+
+    fn is_loading(&self) -> bool {
+        matches!(self, Self::Loading(_))
+    }
+
+    #[cfg(test)]
+    pub(super) fn events(&self) -> &[EvaluationEvent] {
+        self.batch().events()
+    }
 }
 
 #[derive(Debug)]
@@ -111,7 +136,7 @@ pub(super) struct SelectedTerminalToken {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SelectedEventTransition {
     NoTransition,
-    Known(Option<EventBatch>),
+    Known(Option<TrackedEventBatch>),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -131,13 +156,13 @@ pub(super) struct SelectedEventState {
 #[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
 pub(super) struct AcceptedEventEpoch {
     roots: Arc<[DiceNodeId]>,
-    pub(super) entries: Arc<[(DiceNodeId, EventBatch)]>,
+    pub(super) entries: Arc<[(DiceNodeId, TrackedEventBatch)]>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
 pub(super) struct ProvisionalEventEpoch {
     roots: Arc<[DiceNodeId]>,
-    entries: Arc<[(DiceNodeId, Option<EventBatch>)]>,
+    entries: Arc<[(DiceNodeId, Option<TrackedEventBatch>)]>,
 }
 
 /// Ordered event batches selected for publication by the current command.
@@ -323,8 +348,8 @@ impl SelectedEventState {
             }
         }
         let mut final_by_node = SmallMap::new();
-        for (node, transition) in self.nodes.iter() {
-            final_by_node.insert(*node, transition.clone());
+        for (index, (node, transition)) in self.nodes.iter().enumerate() {
+            final_by_node.insert(*node, (index, transition));
             if ordered.insert(*node, ()).is_none() {
                 order.push(*node);
             }
@@ -348,19 +373,22 @@ impl SelectedEventState {
         let mut batches = Vec::new();
         let mut accepted = Vec::new();
         let mut provisional = Vec::new();
+        let mut publishes_loading = false;
         for node in order {
             let fallback = || match carried {
                 Some(_) => carried_by_node.get(&node).cloned(),
                 None => prior_by_node.get(&node).map(|batch| Some(batch.dupe())),
             };
-            let effective = if source_association {
-                match final_by_node.get(&node) {
+            let final_entry = final_by_node.get(&node).copied();
+            let transition = final_entry.map(|(_, transition)| transition);
+            let mut effective = if source_association {
+                match transition {
                     Some(Known(Some(batch))) => Some(Some(batch.dupe())),
                     Some(Known(None) | NoTransition) => fallback(),
                     None => Some(None),
                 }
             } else {
-                match final_by_node.get(&node) {
+                match transition {
                     Some(Known(Some(batch))) => Some(Some(batch.dupe())),
                     Some(Known(None)) => (carried_by_node.contains_key(&node)
                         || prior_by_node.contains_key(&node))
@@ -372,20 +400,42 @@ impl SelectedEventState {
                     None => carried_by_node.get(&node).cloned(),
                 }
             };
+            let selected_batch = effective.as_ref().and_then(Option::as_ref);
+            if transition.is_none() && selected_batch.is_some_and(TrackedEventBatch::is_loading) {
+                // A provisional Loading capture needs a node in the final closure.
+                effective = Some(None);
+            } else if source_association && matches!(transition, Some(Known(None))) {
+                let prior_loading = prior_by_node.get(&node).filter(|batch| batch.is_loading());
+                if selected_batch.is_some_and(TrackedEventBatch::is_loading)
+                    || (selected_batch.is_none() && prior_loading.is_some())
+                {
+                    // An unavailable activation shadows a provisional capture. Retain
+                    // the accepted comparison so it cannot replay on the next command.
+                    effective = Some(prior_loading.map(Dupe::dupe));
+                }
+            }
             let Some(effective) = effective else {
                 continue;
             };
             if let Some(batch) = &effective {
-                if prior_by_node.get(&node) != Some(batch) && !batch.events().is_empty() {
-                    batches.push(batch.dupe());
+                if prior_by_node.get(&node) != Some(batch) && !batch.batch().events().is_empty() {
+                    publishes_loading |= batch.is_loading();
+                    let rank =
+                        final_entry.map_or((false, batches.len()), |(index, _)| (true, index));
+                    batches.push((rank, batch.batch().dupe()));
                 }
                 accepted.push((node, batch.dupe()));
             }
             provisional.push((node, effective));
         }
+        if publishes_loading && carried.is_some() && !source_association {
+            // Plain provisional-only output retains its prefix. Current output follows
+            // dependency order even if a parent was already captured in an earlier attempt.
+            batches.sort_unstable_by_key(|(rank, _)| *rank);
+        }
         (
             SelectedEventBatches {
-                batches: batches.into(),
+                batches: batches.into_iter().map(|(_, batch)| batch).collect(),
             },
             AcceptedEventEpoch {
                 roots: self.roots.dupe(),
@@ -827,10 +877,14 @@ impl CommandEffectOwner {
         if activation.kind() != ActivationKind::Evaluated {
             return;
         }
-        let batch = activation
-            .evaluation_data()
-            .and_then(|data| data.downcast_ref::<EventBatch>())
-            .map(Dupe::dupe);
+        let batch = activation.evaluation_data().and_then(|data| {
+            if let Some(batch) = data.downcast_ref::<Arc<LoadingEventBatch>>() {
+                Some(TrackedEventBatch::Loading(batch.dupe()))
+            } else {
+                data.downcast_ref::<EventBatch>()
+                    .map(|batch| TrackedEventBatch::Plain(batch.dupe()))
+            }
+        });
         if !state.lineage.contains_key(&activation.node()) {
             state.lineage.insert(activation.node(), Vec::new());
         }
@@ -1053,7 +1107,7 @@ impl CommandEffectOwner {
             if let SelectedEventTransition::Known(Some(batch)) = &transition
                 && !batch.events().is_empty()
             {
-                batches.push(batch.dupe());
+                batches.push(batch.batch().dupe());
             }
             nodes.push((node.node(), transition));
         }
@@ -1191,6 +1245,9 @@ impl Drop for SealedCommandAttempt {
     }
 }
 #[cfg(test)]
+pub(super) use tests::assert_loading_carry_selection;
+
+#[cfg(test)]
 mod tests {
     use std::fmt;
     use std::hash::Hash;
@@ -1230,6 +1287,7 @@ mod tests {
     use super::SelectedEventTransition;
     use super::SelectedTerminalToken;
     use super::TerminalOutput;
+    use super::TrackedEventBatch;
     use crate::runtime::demands::WorkspaceDemandOwner;
 
     fn terminal_owner(id: u64) -> (Arc<CommandEffectOwner>, CommandAttemptId) {
@@ -1751,6 +1809,68 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
             .collect()
     }
 
+    pub(in crate::runtime) fn assert_loading_carry_selection(observed: &AcceptedEventEpoch) {
+        let captured_print = |marker| {
+            observed.entries.iter().find(|(_, batch)| {
+                batch.events().iter().any(|event| {
+                    matches!(event, EvaluationEvent::StarlarkPrint { text, .. } if text.as_str() == marker)
+                })
+            }).unwrap()
+        };
+        let (plain_node, plain) = captured_print("MODULE_EVENT");
+        let (child_node, child) = captured_print("ENTRY_ONE");
+        let (parent_node, parent) = captured_print("BZL_EVENT");
+        assert!(matches!(plain, TrackedEventBatch::Plain(_)));
+        assert!(child.is_loading() && parent.is_loading());
+
+        let state = |nodes: Vec<_>| SelectedEventState {
+            roots: observed.roots.clone(),
+            nodes: nodes.into(),
+            batches: Arc::from([]),
+        };
+        let captured =
+            |batch: &TrackedEventBatch| SelectedEventTransition::Known(Some(batch.clone()));
+        let reused = SelectedEventTransition::NoTransition;
+        let empty = AcceptedEventEpoch::empty();
+        let strict = EventReconciliationPolicy::Strict;
+        let (_, _, carried) = state(vec![
+            (*plain_node, captured(plain)),
+            (*parent_node, captured(parent)),
+        ])
+        .reconcile_revision(&empty, None, strict);
+
+        let (ordered, _, _) = state(vec![
+            (*child_node, captured(child)),
+            (*parent_node, reused.clone()),
+        ])
+        .reconcile_revision(&empty, Some(&carried), strict);
+        assert_eq!(
+            selected_text(&ordered),
+            ["MODULE_EVENT", "ENTRY_ONE", "BZL_EVENT"]
+        );
+        let (unselected, accepted, _) = state(vec![(*child_node, captured(child))])
+            .reconcile_revision(&empty, Some(&carried), strict);
+        assert_eq!(selected_text(&unselected), ["MODULE_EVENT", "ENTRY_ONE"]);
+        assert!(accepted.entries.iter().all(|(node, _)| node != parent_node));
+
+        let certified = EventReconciliationPolicy::SourceCertifiedCurrentClosure;
+        let (_, _, stale) = state(vec![(*parent_node, captured(child))])
+            .reconcile_revision(observed, None, certified);
+        let (shadowed, accepted, carried) = state(vec![(
+            *parent_node,
+            SelectedEventTransition::Known(None),
+        )])
+        .reconcile_revision(observed, Some(&stale), certified);
+        assert!(selected_text(&shadowed).is_empty());
+        assert_eq!(accepted.entries.as_ref(), &[(*parent_node, parent.clone())]);
+        let (reused, _, _) = state(vec![(*parent_node, reused)]).reconcile_revision(
+            observed,
+            Some(&carried),
+            certified,
+        );
+        assert!(selected_text(&reused).is_empty());
+    }
+
     #[tokio::test]
     async fn accepted_epoch_distinguishes_reuse_none_and_empty() -> anyhow::Result<()> {
         let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -1861,7 +1981,7 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
             .entries
             .iter()
             .cloned()
-            .chain([(*removed, batch("removed"))])
+            .chain([(*removed, TrackedEventBatch::Plain(batch("removed")))])
             .collect();
         let leaf = prior.entries[0].0;
         let parent = prior.entries[1].0;
@@ -1898,14 +2018,21 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
                 (leaf, SelectedEventTransition::NoTransition),
                 (
                     parent,
-                    SelectedEventTransition::Known(Some(batch("changed"))),
+                    SelectedEventTransition::Known(Some(TrackedEventBatch::Plain(batch(
+                        "changed",
+                    )))),
                 ),
                 (*removed, SelectedEventTransition::NoTransition),
                 (
                     *empty,
-                    SelectedEventTransition::Known(Some(EventBatch::empty())),
+                    SelectedEventTransition::Known(Some(TrackedEventBatch::Plain(
+                        EventBatch::empty(),
+                    ))),
                 ),
-                (*new, SelectedEventTransition::Known(Some(batch("new")))),
+                (
+                    *new,
+                    SelectedEventTransition::Known(Some(TrackedEventBatch::Plain(batch("new")))),
+                ),
             ]),
             batches: Arc::from([]),
         };

@@ -6,6 +6,8 @@ use std::mem::size_of;
 use starlark_map::small_map::SmallMap;
 
 use super::*;
+use crate::bzl_module::event_origin::EventOriginMemo;
+use crate::bzl_module::event_origin::EventOriginWriter;
 use crate::bzl_module::semantic_evaluation::budget::admit_peak;
 use crate::bzl_module::semantic_evaluation::budget::limit;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::FirstLedger;
@@ -186,6 +188,36 @@ impl Hash for EnvironmentReferencePlan {
     }
 }
 impl EnvironmentReferencePlan {
+    pub(crate) fn write_event_origin<'a>(
+        &'a self,
+        writer: &mut EventOriginWriter,
+        memo: &mut EventOriginMemo<'a>,
+    ) {
+        // Only the logical tables participate in exact equality.
+        writer.count(self.payloads.len());
+        for payload in &*self.payloads {
+            match payload {
+                Payload::Catalog(catalog) => {
+                    writer.tag(0);
+                    writer.append_stamp(&catalog.event_stamp(memo));
+                }
+                Payload::Sources(source) => {
+                    writer.tag(1);
+                    writer.append_stamp(&source.event_stamp(memo));
+                }
+            }
+        }
+        writer.count(self.descriptors.len());
+        for descriptor in &*self.descriptors {
+            writer.optional(descriptor.payload, EventOriginWriter::count);
+            descriptor.environment.write_event_descriptor(writer);
+        }
+        writer.count(self.ordinals.len());
+        for ordinal in &*self.ordinals {
+            writer.count(*ordinal);
+        }
+    }
+
     pub(crate) fn budget(&self) -> Budget {
         self.logical
     }

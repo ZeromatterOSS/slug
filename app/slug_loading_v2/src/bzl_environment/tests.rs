@@ -392,7 +392,20 @@ async fn actual_mapping_transitive_environment_aba_and_child_effective_provenanc
         .await
         .unwrap();
     let restored = consumer(&mut tx, &restored_env).await;
+    // consumer uses the identical source and identity in every lane.
+    let mut origins = crate::bzl_module::event_origin::EventOriginMemo::default();
+    let original_stamp = original
+        .semantic_input_facts()
+        .unwrap()
+        .event_stamp(&mut origins);
     for alternative in [&mapped, &changed, &root_changed] {
+        assert_ne!(
+            original_stamp,
+            alternative
+                .semantic_input_facts()
+                .unwrap()
+                .event_stamp(&mut origins),
+        );
         assert_ne!(owner(&original), owner(alternative));
         assert!(
             !original
@@ -403,6 +416,13 @@ async fn actual_mapping_transitive_environment_aba_and_child_effective_provenanc
                 .ptr_eq(alternative.module.get("VALUE").unwrap().value())
         );
     }
+    assert_eq!(
+        original_stamp,
+        restored
+            .semantic_input_facts()
+            .unwrap()
+            .event_stamp(&mut origins),
+    );
     assert_eq!(owner(&original), owner(&restored));
 
     assert_eq!(

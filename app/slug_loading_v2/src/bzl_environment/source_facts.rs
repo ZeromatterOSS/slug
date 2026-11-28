@@ -4,6 +4,8 @@ use std::hash::Hasher;
 
 use super::references::EnvironmentReferencePlan;
 use super::*;
+use crate::bzl_module::event_origin::EventOperand;
+use crate::bzl_module::event_origin::EventOriginMemo;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::FirstLedger;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::PeakContext;
 use crate::bzl_module::semantic_evaluation::budget::peak_context::PeakOwner;
@@ -36,6 +38,14 @@ impl PreparedSourcePublication {
     }
 }
 impl EnvironmentSourceFacts {
+    pub(super) fn event_stamp<'a>(&'a self, memo: &mut EventOriginMemo<'a>) -> [u8; 32] {
+        memo.stamp(EventOperand::BuiltinSource, self, |memo, writer| {
+            facts::write_event_rows(&self.rows, writer);
+            // Source proofs are admitted only with a catalog-only plan.
+            self.plan.write_event_origin(writer, memo);
+        })
+    }
+
     /// Called on borrowed parent inputs BEFORE its first row/guard copies.
     pub(crate) fn prepare_publication(
         plan: &EnvironmentReferencePlan,

@@ -21,10 +21,16 @@ Build cases passed on one installed daemon. The Generic retained oracle matches
 both failure rows. A fresh REAPI process failure admits empty stdout and up to
 1 MiB of inline or verified CAS stderr. Core revalidates sources before it
 publishes selected prints, the action diagnostic and process stderr at exit 1.
-Two retained event rows remain. Loading must associate identical prints with
-changed evaluator inputs while keeping unrelated refreshes silent. A warm
-Build after failures also replays a rule print. An earlier installed restoration
-refusal needs a deterministic reproduction.
+The Loading and Core tests now verify dependency A/B/A, BUILD and glob changes,
+unrelated sibling silence, and final dependency order. `.bzl` compares exact
+evaluator operands. BUILD uses a fixed-size digest of its selected source,
+ordered loads and consumed glob records for print comparison. Verify this
+behavior in the full retained oracle.
+A retained Build trace ties unchanged rule reevaluation to observed
+registration. Project semantic expansion results and keep the observed edges
+for source checks. The CLI sweep also exposed a transient `.bzl` cycle whose
+query closure cannot publish its typed diagnostic. An earlier installed
+restoration refusal needs a deterministic reproduction.
 Public action comparison and Rust REAPI follow. Keep atomic
 publication, existing readers, native quotas, clocks, launcher/PID1, rooted
 reads, codec and history checks. Compare equal work for timing.

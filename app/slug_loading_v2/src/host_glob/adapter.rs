@@ -26,6 +26,7 @@ use super::traversal::HostGlobTraversalKeyError;
 use super::traversal::HostGlobTraversalObservationKey;
 use super::traversal::HostGlobTraversalOperation;
 use super::traversal::HostGlobTraversalOutcome;
+use crate::bzl_module::event_origin::EventOriginWriter;
 use crate::glob::GlobPattern;
 use crate::glob::GlobPatternError;
 
@@ -46,6 +47,15 @@ pub(crate) struct HostGlobLoadingRequest {
 impl HostGlobLoadingRequest {
     pub(crate) fn new(pattern: GlobPattern, operation: HostGlobLoadingOperation) -> Self {
         Self { pattern, operation }
+    }
+
+    /// The checked fragments are derived from these immutable input facts.
+    pub(crate) fn write_event_origin(&self, writer: &mut EventOriginWriter) {
+        writer.text(self.pattern.raw());
+        writer.tag(match self.operation {
+            HostGlobLoadingOperation::Files => 0,
+            HostGlobLoadingOperation::FilesAndDirs => 1,
+        });
     }
 }
 
@@ -74,6 +84,25 @@ pub(super) type HostGlobLoadingOutcome =
 /// Opaque crate-local preservation of request-construction diagnostics.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub(crate) struct HostGlobRequestInputError(HostGlobLoadingInputError);
+
+impl HostGlobRequestInputError {
+    pub(crate) fn write_event_origin(&self, writer: &mut EventOriginWriter) {
+        match &self.0 {
+            HostGlobLoadingInputError::Pattern(error) => {
+                writer.tag(0);
+                let (pattern, reason) = error.pattern_and_reason();
+                writer.text(pattern);
+                writer.text(reason);
+            }
+            HostGlobLoadingInputError::Key(
+                HostGlobTraversalKeyError::NonLatin1PackagePathScalar { scalar },
+            ) => {
+                writer.tag(1);
+                writer.count(*scalar as usize);
+            }
+        }
+    }
+}
 
 /// Opaque crate-local preservation of a complete traversal diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]

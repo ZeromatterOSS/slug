@@ -37,14 +37,20 @@ fn query_test_registry() -> tempfile::TempDir {
         )
         .unwrap();
         fs::create_dir(workspace.path().join("pkg")).unwrap();
+        let entry = workspace.path().join("pkg/entry.bzl");
+        let original = "print(\"ENTRY_ONE\")\nENTRY = \"one.txt\"\n";
+        fs::write(&entry, original).unwrap();
+        for name in ["one.txt", "two.txt"] {
+            fs::write(workspace.path().join("pkg").join(name), "source").unwrap();
+        }
         fs::write(
             workspace.path().join("pkg/defs.bzl"),
-            "print(\"BZL_EVENT\")\nNAME = \"probe\"\n",
+            "load(\":entry.bzl\", _ENTRY = \"ENTRY\")\nprint(\"BZL_EVENT\")\nENTRY = _ENTRY\n",
         )
         .unwrap();
         fs::write(
             workspace.path().join("pkg/BUILD.bazel"),
-            "load(\":defs.bzl\", \"NAME\")\nprint(\"BUILD_EVENT\")\nfilegroup(name = NAME)\n",
+            "load(\":defs.bzl\", \"ENTRY\")\nprint(\"BUILD_EVENT\")\nfilegroup(name = \"probe\", srcs = [ENTRY] + glob([\"*.probe\"], allow_empty = True))\n",
         )
         .unwrap();
         let runtime = test_runtime(workspace.path()).unwrap();
@@ -69,11 +75,14 @@ fn query_test_registry() -> tempfile::TempDir {
                 .as_ref()
                 .unwrap()
                 .stdout(),
-            "//pkg:probe\n"
+            "//pkg:one.txt\n//pkg:probe\n"
         );
         assert_eq!(
             accepted_output_text(&accepted),
-            ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT"]
+            ["MODULE_EVENT", "ENTRY_ONE", "BZL_EVENT", "BUILD_EVENT"]
+        );
+        crate::runtime::events::assert_loading_carry_selection(
+            &accepted_native_snapshot(&runtime).events,
         );
 
         let warm = query(&runtime, "deps(//pkg:probe)").unwrap();
@@ -95,6 +104,40 @@ fn query_test_registry() -> tempfile::TempDir {
             ""
         );
 
+        let empty_query = "//pkg:probe except //pkg:probe";
+        let assert_empty = |expected: &[&str]| {
+            let accepted = query(&runtime, empty_query).unwrap();
+            assert_eq!(
+                accepted
+                    .terminal_for_test()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .stdout(),
+                ""
+            );
+            assert_eq!(accepted_output_text(&accepted), expected);
+        };
+        assert_empty(&[]);
+        for (source, marker) in [
+            ("print(\"ENTRY_TWO\")\nENTRY = \"two.txt\"\n", "ENTRY_TWO"),
+            (original, "ENTRY_ONE"),
+        ] {
+            fs::write(&entry, source).unwrap();
+            assert_empty(&[marker, "BZL_EVENT", "BUILD_EVENT"]);
+            assert_empty(&[]);
+        }
+
+        fs::write(workspace.path().join("pkg/unmatched.txt"), "unmatched").unwrap();
+        assert_empty(&[]);
+        let matched = workspace.path().join("pkg/selected.probe");
+        fs::write(&matched, "glob match").unwrap();
+        assert_empty(&["BUILD_EVENT"]);
+        assert_empty(&[]);
+        fs::remove_file(matched).unwrap();
+        assert_empty(&["BUILD_EVENT"]);
+        assert_empty(&[]);
+
         let missing_runtime = test_runtime(workspace.path()).unwrap();
         let missing = query(&missing_runtime, "//pkg:missing").unwrap();
         let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
@@ -104,7 +147,7 @@ fn query_test_registry() -> tempfile::TempDir {
         );
         assert_eq!(
             accepted_output_text(&missing),
-            ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT"]
+            ["MODULE_EVENT", "ENTRY_ONE", "BZL_EVENT", "BUILD_EVENT"]
         );
     }
 

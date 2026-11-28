@@ -36,6 +36,58 @@ fn hash(key: &SemanticBzlEvaluationKey) -> u64 {
     state.finish()
 }
 
+#[tokio::test]
+async fn loading_event_origin_shares_only_semantic_facts_and_distinguishes_transitive_edits() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = dice.updater().commit().await;
+    let child = identity("child");
+    let parent = identity("parent");
+    let child_a = transaction
+        .compute(&leaf_key(&child, &Arc::from(b"value = 1\n".as_slice())))
+        .await
+        .unwrap();
+    let child_b = transaction
+        .compute(&leaf_key(&child, &Arc::from(b"value = 2\n".as_slice())))
+        .await
+        .unwrap();
+    let source = Arc::from(
+        b"load(':child.bzl', 'value')\nprint('same loading print')\nmarker = value\n".as_slice(),
+    );
+    let evaluate_parent = |child: &FrozenBzlModule| {
+        let key = prepare(
+            &parent,
+            "/semantic-inputs/parent.bzl",
+            &source,
+            BzlModuleContext::Build,
+            &test_environment(),
+            std::iter::once((":child.bzl", child)),
+        )
+        .unwrap();
+        let prepared = Arc::downgrade(&key.0);
+        let evaluated = evaluate::evaluate(key.0, false);
+        assert!(evaluated.result().is_ok());
+        let batch = Arc::new(evaluated.captured_loading_events().unwrap());
+        assert!(std::ptr::eq(
+            LoadingEventBatch::batch_from_evaluation_data(&batch).unwrap(),
+            batch.batch(),
+        ));
+        drop(evaluated);
+        assert!(prepared.upgrade().is_none(), "sidecar kept a frozen owner");
+        batch
+    };
+    let first = evaluate_parent(child_a.result().unwrap());
+    let changed = evaluate_parent(child_b.result().unwrap());
+    let restored = evaluate_parent(child_a.result().unwrap());
+    assert_eq!(first.batch(), changed.batch());
+    assert_ne!(first, changed);
+    assert_eq!(first, restored);
+    assert_eq!(first, first.dupe());
+    assert!(
+        child_a.captured_loading_events().is_none(),
+        "empty batches need no retained origin"
+    );
+}
+
 #[test]
 fn complete_source_mapping_label_provenance_and_modes_determine_keys() {
     let identity = identity("root");

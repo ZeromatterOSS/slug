@@ -145,6 +145,8 @@ async fn multiple_actual_catalogs_keep_canonical_proof_budgets_and_events_equal(
     assert_eq!(counts(ai.logical_budget()), counts(bi.logical_budget()));
     assert_eq!(counts(ap.budget()), counts(bp.budget()));
     assert!(ap == bp);
+    let mut origins = crate::bzl_module::event_origin::EventOriginMemo::default();
+    assert_eq!(ai.event_stamp(&mut origins), bi.event_stamp(&mut origins));
     assert_eq!(av.events(), bv.events());
     assert_eq!(av.events().events().len(), 1);
     assert!(bp.physical_budget().bytes > ap.physical_budget().bytes);

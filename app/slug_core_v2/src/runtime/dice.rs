@@ -14405,7 +14405,9 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
                 activation.kind(),
                 activation
                     .evaluation_data()
-                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .and_then(
+                        slug_loading_v2::bzl_module::LoadingEventBatch::batch_from_evaluation_data,
+                    )
                     .map(Dupe::dupe),
             ));
         }

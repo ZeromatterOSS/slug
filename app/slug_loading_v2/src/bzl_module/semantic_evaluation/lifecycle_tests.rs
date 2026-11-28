@@ -42,6 +42,10 @@ fn assert_activation(tracker: &BzlEventTracker, capture: bool, kind: ActivationK
     assert_eq!(activations.len(), 1);
     let activation = &activations[0];
     assert_eq!(activation.kind, kind);
+    assert_eq!(
+        activation.has_loading_origin,
+        capture && kind == ActivationKind::Evaluated
+    );
     if capture && kind == ActivationKind::Evaluated {
         assert!(matches!(activation.batch.as_ref().map(EventBatch::events),
             Some([slug_events_v2::EvaluationEvent::StarlarkPrint { text, .. }])

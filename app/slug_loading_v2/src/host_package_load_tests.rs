@@ -118,6 +118,7 @@ use super::ForceRootPackageObservationOuter;
 use super::HostBzlModuleError;
 use super::HostBzlModuleEvalKey;
 use super::HostPackageLoadMode;
+use super::LoadingEventBatch;
 use super::LocalBzlLoader;
 use super::ObservedRootPackageLoad;
 use super::RepositoryBzlLabel;
@@ -419,6 +420,7 @@ struct TrackedBatch {
     node: dice::DiceNodeId,
     kind: ActivationKind,
     batch: Option<EventBatch>,
+    has_loading_origin: bool,
 }
 
 #[derive(Default)]
@@ -531,8 +533,11 @@ impl ActivationTracker for EventTracker {
             kind: activation.kind(),
             batch: activation
                 .evaluation_data()
-                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .and_then(LoadingEventBatch::batch_from_evaluation_data)
                 .map(Dupe::dupe),
+            has_loading_origin: activation
+                .evaluation_data()
+                .is_some_and(|data| data.is::<Arc<LoadingEventBatch>>()),
         });
     }
 }
@@ -38109,6 +38114,7 @@ async fn observed_repository_package_load_keeps_terminal_prefixes_and_error_batc
                     .starts_with("observed-repository-package-inventory:")
             })
             .unwrap();
+        assert_eq!(package_batch.has_loading_origin, *name == "evaluation");
         assert_eq!(
             event_texts(package_batch.batch.as_ref().unwrap()),
             if *name == "evaluation" {

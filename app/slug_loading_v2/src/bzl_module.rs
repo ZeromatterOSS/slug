@@ -187,6 +187,55 @@ pub struct EvaluatedBzlModule {
     pub manifest: BzlLoadManifest,
 }
 
+/// A nonempty loading print batch and the exact operands that produced it.
+/// Core reconciles this sidecar only after selecting the command's closure.
+#[derive(Clone, Eq, PartialEq, Allocative, Dupe)]
+pub struct LoadingEventBatch {
+    batch: EventBatch,
+    origin: LoadingEventOrigin,
+}
+
+pub(crate) mod event_origin;
+mod package_events;
+
+#[derive(Clone, Eq, PartialEq, Allocative, Dupe)]
+enum LoadingEventOrigin {
+    Bzl(semantic_evaluation::BzlEventOrigin),
+    Package([u8; 32]),
+}
+
+impl LoadingEventBatch {
+    pub fn batch(&self) -> &EventBatch {
+        &self.batch
+    }
+
+    /// Event payload for audits that do not reconcile command output.
+    #[doc(hidden)]
+    pub fn batch_from_evaluation_data(
+        data: &(dyn std::any::Any + Send + Sync),
+    ) -> Option<&EventBatch> {
+        data.downcast_ref::<Arc<Self>>()
+            .map(|batch| batch.batch())
+            .or_else(|| data.downcast_ref::<EventBatch>())
+    }
+}
+
+impl fmt::Debug for LoadingEventBatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LoadingEventBatch")
+            .field("event_count", &self.batch.events().len())
+            .finish_non_exhaustive()
+    }
+}
+
+fn store_loading_event_batch(ctx: &DiceComputations<'_>, batch: Option<LoadingEventBatch>) {
+    match batch {
+        Some(batch) => ctx.store_evaluation_data(Arc::new(batch)),
+        None => ctx.store_evaluation_data(EventBatch::empty()),
+    }
+    .expect("complete loading evaluation stores one local event batch");
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct LoadingPrintCapture {
     events: RefCell<Vec<EvaluationEvent>>,
@@ -726,12 +775,17 @@ struct HostPackageAttemptTerminal {
     event_batch: EventBatch,
 }
 
+struct HostPackageAttemptCompletion {
+    terminal: Arc<HostPackageAttemptTerminal>,
+    observations: PathObservationEpoch,
+    events: package_events::PackageEvents,
+}
+
 #[allow(dead_code)]
 type HostPackageAttemptOutcome = SourcePreparationOutcome<Arc<HostPackageAttemptTerminal>>;
 
-type HostPackageAttemptDriverOutcome = SourcePreparationOutcome<
-    Result<(Arc<HostPackageAttemptTerminal>, PathObservationEpoch), ObservedPathFrontierError>,
->;
+type HostPackageAttemptDriverOutcome =
+    SourcePreparationOutcome<Result<HostPackageAttemptCompletion, ObservedPathFrontierError>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)] // Private observed sibling is callerless until a later cutover packet.
@@ -753,10 +807,17 @@ struct HostPackageAttemptInput<'a> {
     package_identifier: PackageIdentifier,
     package_dir: PathBuf,
     build_file: PathBuf,
-    source: Arc<String>,
+    source: Arc<[u8]>,
     package_label: CompactString,
     loaded_modules: &'a [(String, FrozenBzlModule)],
     capture_events: bool,
+}
+
+impl HostPackageAttemptInput<'_> {
+    fn source_text(&self) -> &str {
+        std::str::from_utf8(&self.source)
+            .expect("selected BUILD source already passed UTF-8 validation")
+    }
 }
 
 #[allow(dead_code)]
@@ -805,11 +866,18 @@ fn evaluate_host_package_attempt(
     prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
     repository_mapping: Arc<RunfilesRepositoryMapping>,
 ) -> HostPackageAttemptStep {
-    evaluate_host_package_attempt_with_call_sources(input, prepared, repository_mapping, &mut None)
+    evaluate_host_package_attempt_with_call_sources(
+        input,
+        input.source_text(),
+        prepared,
+        repository_mapping,
+        &mut None,
+    )
 }
 
 fn evaluate_host_package_attempt_with_call_sources(
     input: &HostPackageAttemptInput<'_>,
+    source_text: &str,
     prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
     repository_mapping: Arc<RunfilesRepositoryMapping>,
     call_sources: &mut PackageBzlCallSourcesSlot,
@@ -817,7 +885,7 @@ fn evaluate_host_package_attempt_with_call_sources(
     let source_name = host_package_attempt_source_name(input);
     let ast = match AstModule::parse_with_string_encoding(
         &source_name,
-        input.source.as_ref().clone(),
+        source_text.to_owned(),
         &Dialect::Bazel,
         StringEncoding::BazelInternal,
     ) {
@@ -946,22 +1014,33 @@ async fn evaluate_host_package_attempts_driver(
     mode: HostPackageLoadMode,
     repository_mapping: Arc<RunfilesRepositoryMapping>,
     boundary_scope: HostGlobBoundaryScope,
+    capture_origin: bool,
 ) -> HostPackageAttemptDriverOutcome {
     // One immutable input owns this finite table until its driver invocation drops.
     let mut call_sources = None;
     let mut prepared = Arc::new(SmallMap::new());
     let mut observations = PathObservationEpoch::empty();
+    let source_text = input.source_text();
     loop {
         // The synchronous attempt returns only compact terminal state or one
         // request, so no evaluator/module/recorder borrow can cross this await.
         match evaluate_host_package_attempt_with_call_sources(
             &input,
+            source_text,
             prepared.dupe(),
             repository_mapping.dupe(),
             &mut call_sources,
         ) {
             HostPackageAttemptStep::Terminal(terminal) => {
-                return SourcePreparationOutcome::Complete(Ok((Arc::new(terminal), observations)));
+                return complete_host_package_attempt(
+                    &input,
+                    &repository_mapping,
+                    &prepared,
+                    terminal,
+                    observations,
+                    None,
+                    capture_origin,
+                );
             }
             HostPackageAttemptStep::Pending {
                 request,
@@ -980,13 +1059,18 @@ async fn evaluate_host_package_attempts_driver(
                 let outcome = match outcome {
                     Ok(outcome) => outcome,
                     Err(error) => {
-                        return SourcePreparationOutcome::Complete(Ok((
-                            Arc::new(HostPackageAttemptTerminal {
-                                result: Err(HostPackageAttemptError::Input(error)),
+                        return complete_host_package_attempt(
+                            &input,
+                            &repository_mapping,
+                            &prepared,
+                            HostPackageAttemptTerminal {
+                                result: Err(HostPackageAttemptError::Input(error.clone())),
                                 event_batch,
-                            }),
+                            },
                             observations,
-                        )));
+                            Some((&request, &error)),
+                            capture_origin,
+                        );
                     }
                 };
                 match outcome {
@@ -1013,6 +1097,33 @@ async fn evaluate_host_package_attempts_driver(
     }
 }
 
+fn complete_host_package_attempt(
+    input: &HostPackageAttemptInput<'_>,
+    repository_mapping: &RunfilesRepositoryMapping,
+    prepared: &SmallMap<HostGlobLoadingRequest, HostGlobPrepared>,
+    terminal: HostPackageAttemptTerminal,
+    observations: PathObservationEpoch,
+    input_error: Option<(&HostGlobLoadingRequest, &HostGlobRequestInputError)>,
+    capture_origin: bool,
+) -> HostPackageAttemptDriverOutcome {
+    let events = if capture_origin {
+        package_events::capture(
+            input,
+            repository_mapping,
+            prepared,
+            &terminal.event_batch,
+            input_error,
+        )
+    } else {
+        None
+    };
+    SourcePreparationOutcome::Complete(Ok(HostPackageAttemptCompletion {
+        terminal: Arc::new(terminal),
+        observations,
+        events,
+    }))
+}
+
 #[cfg(test)]
 async fn evaluate_host_package_attempts(
     ctx: &mut DiceComputations<'_>,
@@ -1024,11 +1135,16 @@ async fn evaluate_host_package_attempts(
         HostPackageLoadMode::Legacy,
         Arc::new(RunfilesRepositoryMapping::empty()),
         HostGlobBoundaryScope::Root,
+        false,
     )
     .await
     {
         SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-        SourcePreparationOutcome::Complete(Ok((terminal, observations))) => {
+        SourcePreparationOutcome::Complete(Ok(HostPackageAttemptCompletion {
+            terminal,
+            observations,
+            ..
+        })) => {
             debug_assert!(observations.observations().is_empty());
             SourcePreparationOutcome::Complete(terminal)
         }
@@ -3018,7 +3134,7 @@ async fn compute_host_bzl_module(
     context: BzlModuleContext,
     mode: HostBzlModuleMode,
     capture_events: bool,
-    event_batch: &mut Option<EventBatch>,
+    event_batch: &mut Option<LoadingEventBatch>,
 ) -> HostBzlModuleDriverOutcome {
     let source = match mode {
         HostBzlModuleMode::Legacy => match host_dice_invariant(
@@ -3289,7 +3405,9 @@ async fn compute_host_bzl_module(
         }
     };
     let semantic = host_dice_invariant(ctx.compute(&key).await);
-    *event_batch = capture_events.then(|| semantic.events().as_ref().clone());
+    if capture_events {
+        *event_batch = semantic.captured_loading_events();
+    }
     let result = semantic.result().cloned().map_err(|error| {
         use semantic_evaluation::SemanticBzlEvaluationError as Error;
         match error {
@@ -3355,8 +3473,7 @@ impl Key for HostBzlModuleEvalKey {
         )
         .await;
         if capture_events && stores_host_bzl_event_batch(&value) {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("HostBzlModuleEvalKey stores one local Complete event batch");
+            store_loading_event_batch(ctx, event_batch);
         }
         match value {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
@@ -3405,8 +3522,7 @@ impl Key for HostBzlModuleObservationKey {
         )
         .await;
         if capture_events && stores_host_bzl_event_batch(&value) {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("HostBzlModuleObservationKey stores one local Complete event batch");
+            store_loading_event_batch(ctx, event_batch);
         }
         match value {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
@@ -5440,7 +5556,7 @@ async fn compute_external_bzl_module(
     key: &ExternalBzlModuleEvalKey,
     mode: ExternalBzlModuleMode,
     capture_events: bool,
-    event_batch: &mut Option<EventBatch>,
+    event_batch: &mut Option<LoadingEventBatch>,
 ) -> ExternalBzlDriverOutcome {
     let canonical_label = key.canonical_label();
     let source = match compute_external_bzl_source(ctx, key, mode).await {
@@ -5613,7 +5729,9 @@ async fn compute_external_bzl_module(
             );
         }
     };
-    *event_batch = capture_events.then(|| semantic.events().as_ref().clone());
+    if capture_events {
+        *event_batch = semantic.captured_loading_events();
+    }
     let result = semantic.result().cloned().map_err(|error| {
         use semantic_evaluation::SemanticBzlEvaluationError as Error;
         match error {
@@ -5664,8 +5782,7 @@ impl Key for ExternalBzlModuleEvalKey {
         )
         .await;
         if capture_events && stores_external_bzl_event_batch(&value) {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("ExternalBzlModuleEvalKey stores one local Complete event batch");
+            store_loading_event_batch(ctx, event_batch);
         }
         match value {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
@@ -5713,8 +5830,7 @@ impl Key for ExternalBzlModuleObservationKey {
         )
         .await;
         if capture_events && stores_external_bzl_event_batch(&value) {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("ExternalBzlModuleObservationKey stores one local Complete event batch");
+            store_loading_event_batch(ctx, event_batch);
         }
         match value {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
@@ -6124,7 +6240,7 @@ async fn compute_root_package(
     ctx: &mut DiceComputations<'_>,
     mode: HostPackageLoadMode,
     capture_events: bool,
-    event_batch: &mut Option<EventBatch>,
+    event_batch: &mut package_events::PackageEvents,
 ) -> RootPackageLoadDriverOutcome {
     let anchor = match mode {
         HostPackageLoadMode::Legacy => host_dice_invariant(
@@ -6303,11 +6419,6 @@ async fn compute_root_package(
         .into_iter()
         .map(|(load, module)| (load.to_owned(), module))
         .collect();
-    let source_text = Arc::new(
-        host_source_text(&source)
-            .expect("source-bound syntax already validated UTF-8")
-            .to_owned(),
-    );
     let package_dir = source.package_root().as_path().join(key.package.as_str());
     let attempts = evaluate_host_package_attempts_driver(
         ctx,
@@ -6323,7 +6434,7 @@ async fn compute_root_package(
             ),
             package_dir,
             build_file: source.logical_path().as_path().to_path_buf(),
-            source: source_text,
+            source: source.bytes().dupe(),
             package_label: CompactString::new(key.package.as_str()),
             loaded_modules: &loaded_modules,
             capture_events,
@@ -6331,9 +6442,14 @@ async fn compute_root_package(
         mode,
         repository_mapping,
         HostGlobBoundaryScope::Root,
+        capture_events,
     )
     .await;
-    let (terminal, incoming) = match attempts {
+    let HostPackageAttemptCompletion {
+        terminal,
+        observations: incoming,
+        events,
+    } = match attempts {
         SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
         SourcePreparationOutcome::Complete(Err(error)) => {
             return SourcePreparationOutcome::Complete(Err(error));
@@ -6344,7 +6460,7 @@ async fn compute_root_package(
         Ok(observations) => observations,
         Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
     };
-    *event_batch = Some(terminal.event_batch.clone());
+    *event_batch = events;
     root_package_driver_complete(
         terminal
             .result
@@ -6382,8 +6498,7 @@ impl Key for RootPackageLoadKey {
         )
         .await;
         if capture_events && stores_root_package_event_batch(&value) {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("RootPackageLoadKey stores one local Complete event batch");
+            store_loading_event_batch(ctx, event_batch);
         }
         match value {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
@@ -6431,8 +6546,7 @@ impl Key for RootPackageLoadObservationKey {
         )
         .await;
         if capture_events && stores_root_package_event_batch(&value) {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("RootPackageLoadObservationKey stores one local Complete event batch");
+            store_loading_event_batch(ctx, event_batch);
         }
         match value {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
@@ -6953,7 +7067,7 @@ fn project_repository_load_resolution_error(
 
 struct PreparedRepositoryPackageEvaluation {
     repository_features: Arc<[CompactString]>,
-    source_text: Arc<String>,
+    source: Arc<[u8]>,
     glob_source: RepositoryPackageGlobSource,
     logical_package_dir: PathBuf,
     logical_build_file: PathBuf,
@@ -7020,7 +7134,7 @@ fn prepare_repository_package_evaluation(
                 )
             })?;
     let source_text = match std::str::from_utf8(source.bytes().as_ref()) {
-        Ok(source) => Arc::new(source.to_owned()),
+        Ok(source) => source,
         Err(_) => {
             let path = match source.address() {
                 RepositoryPackageSourceAddress::Host(path) => path.as_path().to_path_buf(),
@@ -7062,7 +7176,7 @@ fn prepare_repository_package_evaluation(
     };
     let ast = AstModule::parse_with_string_encoding(
         &source_name,
-        source_text.as_ref().clone(),
+        source_text.to_owned(),
         &Dialect::Bazel,
         StringEncoding::BazelInternal,
     )
@@ -7095,7 +7209,7 @@ fn prepare_repository_package_evaluation(
     ));
     Ok(PreparedRepositoryPackageEvaluation {
         repository_features: source.repository_features().dupe(),
-        source_text,
+        source: source.bytes().dupe(),
         glob_source,
         logical_package_dir,
         logical_build_file,
@@ -7155,7 +7269,7 @@ async fn evaluate_repository_package(
     mode: RepositoryPackageInventoryMode,
     observations: PathObservationEpoch,
     capture_events: bool,
-    event_batch: &mut Option<EventBatch>,
+    event_batch: &mut package_events::PackageEvents,
 ) -> RepositoryPackageInventoryDriverOutcome {
     let (logical_package_root, boundary_scope) = match &prepared.glob_source {
         RepositoryPackageGlobSource::Host(root) => (
@@ -7185,7 +7299,7 @@ async fn evaluate_repository_package(
         ),
         package_dir: prepared.logical_package_dir,
         build_file: prepared.logical_build_file,
-        source: prepared.source_text,
+        source: prepared.source,
         package_label: CompactString::new(key.package.as_str()),
         loaded_modules,
         capture_events,
@@ -7200,9 +7314,14 @@ async fn evaluate_repository_package(
         host_mode,
         external_runfiles_repository_mapping(&key.route),
         boundary_scope,
+        capture_events,
     )
     .await;
-    let (terminal, incoming) = match attempts {
+    let HostPackageAttemptCompletion {
+        terminal,
+        observations: incoming,
+        events,
+    } = match attempts {
         SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
         SourcePreparationOutcome::Complete(Err(error)) => {
             return SourcePreparationOutcome::Complete(Err(error));
@@ -7213,7 +7332,7 @@ async fn evaluate_repository_package(
         Ok(observations) => observations,
         Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
     };
-    *event_batch = Some(terminal.event_batch.clone());
+    *event_batch = events;
     let result = terminal.result.clone().map_err(|error| {
         RepositoryPackageLoadError::new(RepositoryPackageLoadErrorInner::Attempt(error))
     });
@@ -7261,7 +7380,7 @@ impl RepositoryPackageInventoryKey {
         ctx: &mut DiceComputations<'_>,
         mode: RepositoryPackageInventoryMode,
         capture_events: bool,
-        event_batch: &mut Option<EventBatch>,
+        event_batch: &mut package_events::PackageEvents,
     ) -> RepositoryPackageInventoryDriverOutcome {
         let (source, observations) = match compute_repository_package_source(ctx, self, mode).await
         {
@@ -7340,8 +7459,7 @@ impl Key for RepositoryPackageInventoryKey {
             )
             .await;
         if capture_events && matches!(value, SourcePreparationOutcome::Complete(Ok(_))) {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("RepositoryPackageInventoryKey stores one local Complete event batch");
+            store_loading_event_batch(ctx, event_batch);
         }
         project_legacy_repository_package_inventory(value)
     }
@@ -7421,10 +7539,7 @@ impl Key for RepositoryPackageInventoryObservationKey {
             )
             .await;
         if capture_events && matches!(value, SourcePreparationOutcome::Complete(Ok(_))) {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect(
-                    "RepositoryPackageInventoryObservationKey stores one local Complete event batch",
-                );
+            store_loading_event_batch(ctx, event_batch);
         }
         match value {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
@@ -8556,6 +8671,7 @@ mod module_extension_definition_loading_tests {
         label: CanonicalLabel,
         kind: ActivationKind,
         batch: Option<EventBatch>,
+        has_loading_origin: bool,
         observed: bool,
     }
 
@@ -8681,9 +8797,12 @@ mod module_extension_definition_loading_tests {
             let batch = || {
                 activation
                     .evaluation_data()
-                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .and_then(LoadingEventBatch::batch_from_evaluation_data)
                     .map(Dupe::dupe)
             };
+            let has_loading_origin = activation
+                .evaluation_data()
+                .is_some_and(|data| data.is::<Arc<LoadingEventBatch>>());
             self.activation_rows.lock().unwrap().push(BzlActivationRow {
                 key: key.to_string(),
                 family: tracker_family(key),
@@ -8696,6 +8815,7 @@ mod module_extension_definition_loading_tests {
                     label: key.label.canonical_label(),
                     kind: activation.kind(),
                     batch: batch(),
+                    has_loading_origin,
                     observed: false,
                 });
             } else if let Some(key) = key.downcast_ref::<HostBzlModuleObservationKey>() {
@@ -8704,6 +8824,7 @@ mod module_extension_definition_loading_tests {
                     label: key.label.canonical_label(),
                     kind: activation.kind(),
                     batch: batch(),
+                    has_loading_origin,
                     observed: true,
                 });
             } else if key.downcast_ref::<RootPackageSourceKey>().is_some() {
@@ -8721,6 +8842,7 @@ mod module_extension_definition_loading_tests {
                     label: CanonicalLabel::parse("@@//:module_extension_invocation").unwrap(),
                     kind: activation.kind(),
                     batch: batch(),
+                    has_loading_origin,
                     observed: false,
                 });
             }
@@ -10485,8 +10607,7 @@ mod module_extension_definition_loading_tests {
                 .iter()
                 .map(|row| row.key.as_str())
                 .collect::<Vec<_>>(),
-            rows
-                .iter()
+            rows.iter()
                 .filter(|row| row.key.starts_with(builtin_prefix) && row.batch.is_some())
                 .map(|row| row.key.as_str())
                 .collect::<Vec<_>>()

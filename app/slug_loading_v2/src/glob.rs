@@ -97,6 +97,10 @@ pub(crate) struct GlobPatternError {
 }
 
 impl GlobPatternError {
+    pub(crate) fn pattern_and_reason(&self) -> (&str, &'static str) {
+        (&self.pattern, self.message)
+    }
+
     fn public(&self) -> GlobError {
         GlobError::InvalidPattern {
             pattern: self.pattern.to_string(),

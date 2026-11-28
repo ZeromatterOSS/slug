@@ -10,6 +10,7 @@ mod evaluate;
 mod events;
 pub(crate) mod facts;
 mod inputs;
+pub(super) use inputs::BzlEventOrigin;
 pub(crate) use inputs::PreparedSemanticBzlEvaluation;
 pub(crate) use inputs::prepare;
 
@@ -54,6 +55,16 @@ impl SemanticBzlEvaluationResult {
     }
     pub(crate) fn events(&self) -> &Arc<EventBatch> {
         &self.events
+    }
+
+    pub(super) fn captured_loading_events(&self) -> Option<LoadingEventBatch> {
+        if self.events.events().is_empty() {
+            return None;
+        }
+        Some(LoadingEventBatch {
+            batch: self.events.as_ref().dupe(),
+            origin: LoadingEventOrigin::Bzl(self.inputs.event_origin()),
+        })
     }
 }
 impl PartialEq for SemanticBzlEvaluationResult {

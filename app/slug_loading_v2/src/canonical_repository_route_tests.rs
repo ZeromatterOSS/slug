@@ -244,7 +244,7 @@ ext=module_extension(implementation=impl)
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
             let batch = activation
                 .evaluation_data()
-                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .and_then(crate::bzl_module::LoadingEventBatch::batch_from_evaluation_data)
                 .map(Dupe::dupe);
             self.activations
                 .lock()

@@ -174,6 +174,33 @@ pub(crate) fn hash_local_fields<H: Hasher>(a: &LocalFacts, h: &mut H) {
     }
 }
 
+/// Write exactly the flat semantic row fields. Environments are represented
+/// separately by the reference plan, as they are in structural key equality.
+pub(crate) fn write_event_rows(
+    rows: &[Arc<LocalFacts>],
+    writer: &mut crate::bzl_module::event_origin::EventOriginWriter,
+) {
+    fn write_key(key: &StableKey, writer: &mut crate::bzl_module::event_origin::EventOriginWriter) {
+        writer.identity(&key.identity);
+        writer.text(&key.source_name);
+        writer.tag(match key.context {
+            BzlModuleContext::Build => 0,
+            BzlModuleContext::Bzlmod => 1,
+        });
+    }
+
+    writer.count(rows.len());
+    for row in rows {
+        write_key(&row.key, writer);
+        writer.bytes(&row.source);
+        writer.count(row.bindings.len());
+        for binding in &*row.bindings {
+            writer.text(&binding.raw);
+            write_key(&binding.child, writer);
+        }
+    }
+}
+
 pub(crate) fn reserve_parser_source_copy(
     budget: &mut budget::Budget,
     source_len: usize,
