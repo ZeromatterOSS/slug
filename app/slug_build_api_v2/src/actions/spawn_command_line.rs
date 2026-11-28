@@ -23,6 +23,9 @@ use crate::args_mapper::ArgsDirectoryContext;
 use crate::args_mapper::ArgsExpansionError;
 use crate::args_mapper::UnsupportedTreeArgsDirectoryContext;
 
+// Bazel 9.2 CommandLines.expand reserves this much for every command fragment.
+const PARAM_FILE_ARG_LENGTH_ESTIMATE: usize = 512;
+
 /// Action-local expansion: replacement argv and its virtual inputs are produced together.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ExpandedSpawnCommandLine {
@@ -109,32 +112,75 @@ impl SpawnSpec {
         &self,
         context: &dyn ArgsDirectoryContext,
     ) -> Result<ExpandedSpawnCommandLine, SpawnCommandLineError> {
+        self.expand_param_files(context, None)
+    }
+
+    /// Expand with the configured owner's minimum parameter-file size, using
+    /// Slug-native execution paths and the unmapped Bazel 9.2 spill rule.
+    pub fn expand_param_files_with_context(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        min_param_file_size: i32,
+    ) -> Result<ExpandedSpawnCommandLine, SpawnCommandLineError> {
+        self.expand_param_files(context, Some(min_param_file_size))
+    }
+
+    fn expand_param_files(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        min_param_file_size: Option<i32>,
+    ) -> Result<ExpandedSpawnCommandLine, SpawnCommandLineError> {
         let mut output_budget = ExpansionBudget::default();
         let mut temporary_budget = ExpansionBudget::default();
         let mut argv = self
             .invocation()
             .render_prefix_with_budget(&mut output_budget)?;
+        let segments = self.command_line().segments();
+        let conservative_limit = min_param_file_size.and_then(|limit| {
+            let split_overhead =
+                (segments.len() + 1).checked_mul(PARAM_FILE_ARG_LENGTH_ESTIMATE)?;
+            usize::try_from(limit).ok()?.checked_sub(split_overhead)
+        });
+        // Each word contributes its byte length plus a separator. Bazel's
+        // internal strings store UTF-8 bytes in Latin-1 code units.
+        let mut command_length = checked_add(output_budget.bytes(), argv.len())?;
         // Words are prepared once, including each deferred callback. All file
         // content sizes are checked jointly before any file is serialized.
         let mut prepared_files = Vec::new();
-        for segment in self.command_line().segments() {
+        for segment in segments {
             match segment {
                 RetainedCommandLineSegment::LiteralRun(values) => {
                     let (words, bytes) = strings_size(values.iter().map(|value| value.as_str()))?;
                     output_budget.charge(words, bytes)?;
+                    command_length = checked_add(command_length, checked_add(words, bytes)?)?;
                     argv.extend(values.iter().map(ToString::to_string));
                 }
                 RetainedCommandLineSegment::ArgsSnapshot(args) => {
+                    let recipe = args.recipe();
                     let Some(policy) = args.param_file() else {
-                        argv.extend(
-                            args.recipe()
-                                .render_with_budget(context, &mut output_budget)?,
-                        );
+                        let rendered = recipe.render_with_budget(context, &mut output_budget)?;
+                        let (words, bytes) = strings_size(rendered.iter().map(String::as_str))?;
+                        command_length = checked_add(command_length, checked_add(words, bytes)?)?;
+                        argv.extend(rendered);
                         continue;
                     };
-                    if !policy.use_always() {
-                        return Err(SpawnCommandLineError::ConditionalParamFileUnsupported);
-                    }
+                    let rendered = if policy.use_always() {
+                        None
+                    } else {
+                        if min_param_file_size.is_none() {
+                            return Err(SpawnCommandLineError::ConditionalParamFileUnsupported);
+                        }
+                        let rendered = recipe.render_with_budget(context, &mut temporary_budget)?;
+                        let (words, bytes) = strings_size(rendered.iter().map(String::as_str))?;
+                        let tentative = checked_add(command_length, checked_add(words, bytes)?)?;
+                        if conservative_limit.is_some_and(|limit| tentative <= limit) {
+                            output_budget.charge(words, bytes)?;
+                            command_length = tentative;
+                            argv.extend(rendered);
+                            continue;
+                        }
+                        Some(rendered)
+                    };
                     let primary = self
                         .outputs()
                         .first()
@@ -165,33 +211,38 @@ impl SpawnSpec {
                             });
                         }
                     }
-                    let (lines, positional) = args
-                        .recipe()
-                        .prepare_virtual_param_file(context, &mut temporary_budget)?;
-                    let (words, bytes) = args.recipe().measure_param_lines(&lines)?;
-                    output_budget.charge(words, bytes)?;
-                    let (words, bytes) = strings_size(positional.iter().map(String::as_str))?;
-                    output_budget.charge(words, bytes)?;
+                    let rendered = match rendered {
+                        Some(rendered) => rendered,
+                        None => recipe.render_with_budget(context, &mut temporary_budget)?,
+                    };
+                    let (lines, positional) = recipe.split_virtual_param_file(rendered);
+                    let (words, file_bytes) = recipe.measure_param_lines(&lines)?;
+                    output_budget.charge(words, file_bytes)?;
+                    let (positional_words, positional_bytes) =
+                        strings_size(positional.iter().map(String::as_str))?;
+                    output_budget.charge(positional_words, positional_bytes)?;
+                    command_length = checked_add(command_length, checked_add(flag_size, 1)?)?;
+                    command_length = checked_add(
+                        command_length,
+                        checked_add(positional_words, positional_bytes)?,
+                    )?;
                     argv.push(apply_validated_format_sized(
                         policy.flag_format(),
                         &path,
                         flag_size,
                     ));
                     argv.extend(positional);
-                    prepared_files.push((path, args.recipe(), lines));
+                    prepared_files.push((path, recipe, lines, file_bytes));
                 }
             }
         }
         let param_files = prepared_files
             .into_iter()
-            .map(|(path, recipe, lines)| {
-                let (_, bytes) = recipe.measure_param_lines(&lines)?;
-                Ok(VirtualParamFile {
-                    path,
-                    bytes: recipe.serialize_param_lines(&lines, bytes).into_bytes(),
-                })
+            .map(|(path, recipe, lines, bytes)| VirtualParamFile {
+                path,
+                bytes: recipe.serialize_param_lines(&lines, bytes).into_bytes(),
             })
-            .collect::<Result<Vec<_>, ArgsExpansionError>>()?;
+            .collect();
         Ok(ExpandedSpawnCommandLine { argv, param_files })
     }
 }

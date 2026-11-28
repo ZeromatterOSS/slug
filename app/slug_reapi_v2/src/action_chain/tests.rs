@@ -225,14 +225,19 @@ fn whole_chain_preflight_rejects_downstream_policy_and_empty_tree_param_collisio
             "execution requirements",
         ),
         (
-            DEFS.replace("use_always = True", "use_always = False"),
-            "conditional",
-        ),
-        (
             DEFS.replace(
                 "declare_directory('emptytree')",
                 "declare_directory('done-0.params')",
             ),
+            "namespace conflict",
+        ),
+        (
+            DEFS.replace("use_always = True", "use_always = False")
+                .replace("args.add('consume')", "args.add('x' * 32768)")
+                .replace(
+                    "declare_directory('emptytree')",
+                    "declare_directory('done-0.params')",
+                ),
             "namespace conflict",
         ),
     ] {
@@ -261,6 +266,47 @@ fn whole_chain_preflight_rejects_downstream_policy_and_empty_tree_param_collisio
         .len(),
         3
     );
+    workspace.assert_no_outputs();
+}
+
+#[test]
+fn whole_chain_preflight_projects_inline_and_spilled_conditional_args() {
+    let workspace = Workspace::new();
+    let conditional = DEFS.replace("use_always = True", "use_always = False");
+    let long = "x".repeat(32_768);
+    for step in ["consume", &long] {
+        std::fs::write(
+            workspace.root.join("defs.bzl"),
+            conditional.replace("args.add('consume')", &format!("args.add('{step}')")),
+        )
+        .unwrap();
+        let prepared = workspace.prepare();
+        let mut templates = Template::prepare(
+            &prepared,
+            &Default::default(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+        )
+        .unwrap();
+        let Template::Spawn {
+            command, expanded, ..
+        } = templates.pop().unwrap()
+        else {
+            panic!("selected consumer must be a Spawn");
+        };
+        let file = command.output_files[0].strip_suffix("/done").unwrap();
+        let input = format!("{file}/file");
+        if step == "consume" {
+            assert_eq!(&command.argv[1..], [step, &input]);
+            assert!(expanded.param_files().is_empty());
+        } else {
+            let [params] = expanded.param_files() else {
+                panic!("long Args must spill once");
+            };
+            assert_eq!(params.path(), format!("{file}/done-0.params"));
+            assert_eq!(&command.argv[1..], [format!("@{}", params.path())]);
+            assert_eq!(params.bytes(), format!("{step}\n{input}\n").as_bytes());
+        }
+    }
     workspace.assert_no_outputs();
 }
 

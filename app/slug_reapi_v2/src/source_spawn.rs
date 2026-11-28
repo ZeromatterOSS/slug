@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
+use slug_build_api_v2::ArgsDirectoryContext;
+use slug_build_api_v2::ExpandedSpawnCommandLine;
 use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::actions::registry::validate_output;
 use slug_core_v2::runtime::NativeSourceActionInputs;
@@ -66,6 +68,27 @@ impl SourceSpawnReapiPlan {
     pub fn identity(&self) -> &ReapiActionIdentity {
         &self.identity
     }
+}
+
+pub(crate) fn expand_spawn_command_line(
+    action: &slug_analysis_v2::ConfiguredAction,
+    args_context: &dyn ArgsDirectoryContext,
+) -> Result<ExpandedSpawnCommandLine, String> {
+    let spawn = action
+        .spawn_spec()
+        .ok_or("Spawn REAPI plan requires typed Spawn")?;
+    let configuration = action
+        .context()
+        .owner()
+        .configuration()
+        .slug_configuration()
+        .ok_or("Spawn REAPI plan requires a structural owner configuration")?;
+    let limit = configuration
+        .min_param_file_size()
+        .map_err(|error| error.to_string())?;
+    spawn
+        .expand_param_files_with_context(args_context, limit)
+        .map_err(|error| error.to_string())
 }
 
 /// Shared policy projection; argv is supplied by the single owned expansion.

@@ -686,21 +686,12 @@ impl RetainedArgsRecipe {
         let (_, bytes) = self.measure_param_lines(&lines)?;
         Ok(self.serialize_param_lines(&lines, bytes))
     }
-    // Deferred callbacks run once. Consumers retain these bounded words for a
-    // complete-command serialization preflight before constructing file bytes.
-    pub(super) fn prepare_virtual_param_file(
-        &self,
-        context: &dyn ArgsDirectoryContext,
-        budget: &mut ExpansionBudget,
-    ) -> Result<(Vec<String>, Vec<String>), ArgsExpansionError> {
-        let argv = self.render_with_budget(context, budget)?;
-        Ok(
-            if self.write_format == RetainedParamFileFormat::FlagPerLine {
-                argv.into_iter().partition(|arg| arg.starts_with("--"))
-            } else {
-                (argv, Vec::new())
-            },
-        )
+    pub(super) fn split_virtual_param_file(&self, argv: Vec<String>) -> (Vec<String>, Vec<String>) {
+        if self.write_format == RetainedParamFileFormat::FlagPerLine {
+            argv.into_iter().partition(|arg| arg.starts_with("--"))
+        } else {
+            (argv, Vec::new())
+        }
     }
     pub(super) fn measure_param_lines(
         &self,

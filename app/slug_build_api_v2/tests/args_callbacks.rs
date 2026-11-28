@@ -344,6 +344,40 @@ fn quota_spawn(segments: Vec<RetainedCommandLineSegment>) -> SpawnSpec {
 }
 
 #[test]
+fn conditional_param_file_invokes_deferred_callbacks_once_per_expansion() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mapper = mapper(
+        AnalysisValue::none(),
+        Behavior::Echo,
+        calls.clone(),
+        Arc::new(AtomicUsize::new(0)),
+    );
+    let recipe = recipe(
+        RetainedArgsInputs::Sequence(vec![AnalysisValue::string("mapped")].into()),
+        mapper,
+    );
+    let spawn = quota_spawn(vec![RetainedCommandLineSegment::ArgsSnapshot(
+        RetainedSpawnArgsSnapshot::new(
+            recipe,
+            Some(RetainedSpawnParamFilePolicy::new("@%s", false)),
+        ),
+    )]);
+    let limit = 2 * 512 + ("tool".len() + 1 + "mapped".len() + 1) as i32;
+    let inline = spawn
+        .expand_param_files_with_context(&UnsupportedTreeArgsDirectoryContext, limit)
+        .unwrap();
+    assert_eq!(inline.argv(), ["tool", "mapped"]);
+    assert!(inline.param_files().is_empty());
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+    let spilled = spawn
+        .expand_param_files_with_context(&UnsupportedTreeArgsDirectoryContext, limit - 1)
+        .unwrap();
+    assert_eq!(spilled.param_files()[0].bytes(), b"mapped\n");
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+}
+
+#[test]
 fn native_expansion_preflights_repeated_formats_prefixes_and_delimiters() {
     let calls = Arc::new(AtomicUsize::new(0));
     let inputs = RetainedArgsInputs::Sequence(vec![AnalysisValue::string("x"); 65_536].into());

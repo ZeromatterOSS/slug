@@ -31,14 +31,16 @@ completed live DICE closure. Host parent traversal records descriptor identity
 and effective search access. Explicit metadata, listings and rooted observations
 use exact source checks.
 
-Public aquery admits bounded whole-mnemonic selection and the pinned
-Starlark configuration. Aquery and Build forward ordered distdirs. The
-same-host Bazel Rust rows preserve the host compiler's actual linker flags.
-Compare all protected action rows, prove Rust REAPI and close the full sweep.
-The older synthetic FileWrite baseline still needs builtin launcher/test
-toolchain fixture inputs. Keep atomic publication, existing readers, native
-quotas, clocks, launcher/PID1, rooted reads, codec and history checks. Compare
-equal work for timing.
+Protected review cut `eb76f6abf` matched all four Rust action rows on each
+command route against same-host Bazel 9.2, with one retained daemon. The
+comparison checks ordered action fields and argv through the native
+configuration domains. Bazel ActionKey projection is deferred for these
+families. Build forwards ordered distdirs. The frozen FileWrite output passed
+using the actual builtin registry prerequisites. The first Rust Build reached
+REAPI command lowering and refused conditional parameter files. Prove the
+configured spill rule in that original Build and close the full sweep.
+Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
+rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
 diagnostic-only integration, caller pruning, Need cacheability, new repository
 routes, unselected syntax, global path caches and concurrent Archive batching
@@ -127,9 +129,9 @@ final review precedes activation.
 
 The bounded six-archive gate and authored General glob cquery are accepted.
 The authentic inactive Rust driver, scoped HTTPS freshness, repeated Workspace
-publication and Archive envelope gates have completed. Production activation,
-required public action comparison, Rust REAPI,
-full Slug closure and completed-command latency/RSS (RSS at most 1.25× Bazel)
+publication, Archive envelope and public Rust action comparison passed.
+Production activation, Rust REAPI, full Slug closure and completed-command
+latency/RSS (RSS at most 1.25× Bazel)
 remain open under the [bootstrap readiness matrix][readiness]. One cold pinned
 CrateInfo row and three retained rows matched in the latest paired resource run.
 Sampled RSS was 0.872×, 1.234×, 1.024× and 0.943× Bazel. An earlier edition change

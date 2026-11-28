@@ -278,9 +278,9 @@ observed per-module source provenance needed to authenticate imported helpers.
 WP-7-25 uses it for native-library directory and default direct/indirect link
 callbacks, with real Linux builder/parameter-byte proofs. WP-7-26 runs public
 static/PIC rules_cc constructors into those recipes and retains full CcInfo with
-empty native HeaderInfo identity. Other builder paths,
-full Cc toolchains/operations, conditional spilling and resolved-input execution
-staging remain open. The Spawn and Args/param-file rows therefore remain open;
+empty native HeaderInfo identity. The configured REAPI path also covers inline
+and spilled conditional Args. Other builder paths, full Cc toolchains and
+resolved-input execution staging remain open. The Spawn and Args/param-file rows remain open;
 these configured/component slices do not prove Rustc execution.
 
 “Accepted bounded” means only the stated slice has proof. “Open” or “configured

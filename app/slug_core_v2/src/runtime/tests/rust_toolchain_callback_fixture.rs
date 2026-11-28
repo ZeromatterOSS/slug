@@ -253,12 +253,12 @@ fn callback_registry_sources(root: &Path) -> tempfile::TempDir {
     archives
 }
 
-pub(super) fn assemble_callback_base_workspace() -> (PathBuf, tempfile::TempDir) {
-    let root = tempfile::Builder::new()
+pub(super) fn assemble_callback_base_workspace() -> (tempfile::TempDir, tempfile::TempDir) {
+    let workspace = tempfile::Builder::new()
         .prefix("wp877-callback-")
         .tempdir()
-        .unwrap()
-        .keep();
+        .unwrap();
+    let root = workspace.path();
     for &(relative, source) in RUSTC_MAP_EACH_SOURCES {
         // The old fixture's symbols snapshot is replaced by genuine extension
         // evaluation. Never create a cc_compatibility_proxy module or directory.
@@ -266,13 +266,13 @@ pub(super) fn assemble_callback_base_workspace() -> (PathBuf, tempfile::TempDir)
             continue;
         }
         let parent = Path::new(relative).parent().unwrap();
-        callback_write(&root, &parent.join("BUILD.bazel").to_string_lossy(), "");
-        callback_write(&root, relative, source);
+        callback_write(root, &parent.join("BUILD.bazel").to_string_lossy(), "");
+        callback_write(root, relative, source);
     }
-    callback_archive_members(&root);
-    callback_modules(&root);
+    callback_archive_members(root);
+    callback_modules(root);
     callback_write(
-        &root,
+        root,
         "rules_cc/cc/private/toolchain_proof.bzl",
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -280,20 +280,20 @@ pub(super) fn assemble_callback_base_workspace() -> (PathBuf, tempfile::TempDir)
         )),
     );
     callback_write(
-        &root,
+        root,
         "rules_rust/proof.bzl",
         "load('@rules_cc//cc/private:toolchain_proof.bzl','make_subject')\nload('//rust/private:rustc.bzl','get_linker_and_args')\nsubject=make_subject(get_linker_and_args)\n",
     );
     callback_write(
-        &root,
+        root,
         "rules_rust/BUILD.bazel",
         "load(':proof.bzl','subject')\nsubject(name='producer',static_file='@@//:static.a',unused='A')\n",
     );
     for name in ["header.h", "static.a", "dynamic.so", "other.a"] {
-        callback_write(&root, name, "authored inert input\n");
+        callback_write(root, name, "authored inert input\n");
     }
     callback_write(
-        &root,
+        root,
         "BUILD.bazel",
         "exports_files(['header.h','static.a','dynamic.so','other.a'])\n",
     );
@@ -314,9 +314,9 @@ pub(super) fn assemble_callback_base_workspace() -> (PathBuf, tempfile::TempDir)
             "load(':constraints.bzl','HOST_CONSTRAINTS')\npackage(default_visibility=['//visibility:public'])\nexports_files(['constraints.bzl','extension.bzl'])\nplatform(name='host',constraint_values=HOST_CONSTRAINTS)\n",
         ),
     ] {
-        callback_write(&root, path, contents);
+        callback_write(root, path, contents);
     }
     assert!(!root.join("cc_compatibility_proxy").exists());
-    let archives = callback_registry_sources(&root);
-    (root, archives)
+    let archives = callback_registry_sources(root);
+    (workspace, archives)
 }

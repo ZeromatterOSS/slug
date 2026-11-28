@@ -1797,6 +1797,112 @@ fn forced_param_files_preserve_formats_order_and_spill_numbering() {
 }
 
 #[test]
+fn conditional_param_file_reserves_every_fragment_and_counts_utf8_bytes() {
+    use slug_build_api_v2::UnsupportedTreeArgsDirectoryContext;
+
+    // Bazel 9.2's default minus executable, literal run and Args fragments.
+    let limit = 32_768;
+    let full_length = (limit - 3 * 512) as usize;
+    let prefix = RetainedCommandLineSegment::LiteralRun(Arc::from(["before".into(), "".into()]));
+    let bytes = full_length - ("tools/runner".len() + 1) - ("before".len() + 1) - 1 - 1;
+    let exact = format!("é{}", "x".repeat(bytes - "é".len()));
+    let args = |value| {
+        param_args(
+            RetainedParamFileFormat::Multiline,
+            &[(None, value)],
+            Some(("@%s", false)),
+        )
+    };
+    // Inline never needs a primary output.
+    let inline = param_spawn(vec![prefix.clone(), args(&exact)], &[])
+        .expand_param_files_with_context(&UnsupportedTreeArgsDirectoryContext, limit)
+        .unwrap();
+    assert_eq!(inline.argv(), ["tools/runner", "before", "", &exact]);
+    assert!(inline.param_files().is_empty());
+
+    let over = format!("{exact}x");
+    let spilled = param_spawn(vec![prefix, args(&over)], &["pkg/out"])
+        .expand_param_files_with_context(&UnsupportedTreeArgsDirectoryContext, limit)
+        .unwrap();
+    let path = root_support::exec_path("pkg/out-0.params");
+    assert_eq!(
+        spilled.argv(),
+        ["tools/runner", "before", "", &format!("@{path}")]
+    );
+    assert_eq!(spilled.param_files()[0].path(), path);
+    assert_eq!(
+        spilled.param_files()[0].bytes(),
+        format!("{over}\n").as_bytes()
+    );
+}
+
+#[test]
+fn conditional_param_file_accounts_for_prior_spills_and_never_looks_ahead() {
+    use RetainedParamFileFormat::FlagPerLine;
+    use RetainedParamFileFormat::Multiline;
+    use slug_build_api_v2::UnsupportedTreeArgsDirectoryContext;
+
+    let first = format!("@{}", root_support::exec_path("pkg/out-0.params"));
+    let second = format!("@{}", root_support::exec_path("pkg/out-1.params"));
+    let before_suffix = [
+        "tools/runner",
+        "early",
+        &first,
+        "positional",
+        "middle",
+        "last",
+    ];
+    let limit = 6 * 512
+        + before_suffix
+            .iter()
+            .map(|word| word.len() as i32 + 1)
+            .sum::<i32>();
+    let trailing = "x".repeat(1000);
+    let spec = param_spawn(
+        vec![
+            param_args(Multiline, &[(None, "early")], Some(("@%s", false))),
+            param_args(
+                FlagPerLine,
+                &[(Some("--value"), "two words"), (None, "positional")],
+                Some(("@%s", true)),
+            ),
+            RetainedCommandLineSegment::LiteralRun(Arc::from(["middle".into()])),
+            param_args(Multiline, &[(None, "last")], Some(("@%s", false))),
+            RetainedCommandLineSegment::LiteralRun(Arc::from([trailing.clone().into()])),
+        ],
+        &["pkg/out"],
+    );
+    let inline = spec
+        .expand_param_files_with_context(&UnsupportedTreeArgsDirectoryContext, limit)
+        .unwrap();
+    assert_eq!(inline.argv()[..6], before_suffix);
+    assert_eq!(inline.argv()[6], trailing);
+    assert_eq!(inline.param_files().len(), 1);
+    assert_eq!(inline.param_files()[0].bytes(), b"--value=two words\n");
+
+    let spilled = spec
+        .expand_param_files_with_context(&UnsupportedTreeArgsDirectoryContext, limit - 1)
+        .unwrap();
+    assert_eq!(spilled.argv()[..5], before_suffix[..5]);
+    assert_eq!(spilled.argv()[5], second);
+    assert_eq!(spilled.argv()[6], trailing);
+    assert_eq!(spilled.param_files().len(), 2);
+    assert_eq!(spilled.param_files()[1].bytes(), b"last\n");
+
+    let empty = param_spawn(
+        vec![param_args(FlagPerLine, &[], Some(("@%s", false)))],
+        &["pkg/out"],
+    );
+    for limit in [-1, 1023] {
+        let expanded = empty
+            .expand_param_files_with_context(&UnsupportedTreeArgsDirectoryContext, limit)
+            .unwrap();
+        assert_eq!(expanded.argv(), ["tools/runner", &first]);
+        assert!(expanded.param_files()[0].bytes().is_empty());
+    }
+}
+
+#[test]
 fn forced_param_files_reject_unowned_limits_invalid_paths_and_output_collisions() {
     use slug_build_api_v2::SpawnCommandLineError;
     let forced = || param_args(RetainedParamFileFormat::Multiline, &[], Some(("@%s", true)));

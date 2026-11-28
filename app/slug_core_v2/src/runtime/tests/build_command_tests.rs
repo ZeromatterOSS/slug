@@ -1069,19 +1069,54 @@ async fn resolved_file_write_view_borrows_immutable_owner_context_without_closur
     assert_eq!(restored_projection, baseline_projection);
 }
 
-#[tokio::test]
-async fn filewrite_aquery_text_matches_frozen_baseline() {
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+#[test]
+fn filewrite_aquery_text_matches_frozen_baseline() {
+    let (workspace, _archives) = rust_toolchain_callback_tests::assemble_callback_base_workspace();
+    let root = workspace.path();
+    let module_path = root.join("MODULE.bazel");
+    let (module, defs, build) =
+        resolved_write_sources(&fs::read_to_string(&module_path).unwrap(), "setting_a", &[]);
+    fs::write(module_path, module).unwrap();
+    fs::write(root.join("defs.bzl"), defs).unwrap();
+    fs::write(root.join("BUILD.bazel"), build).unwrap();
+    let host_package = root.join(".slug_test_host");
+    fs::create_dir(&host_package).unwrap();
+    fs::write(host_package.join("BUILD.bazel"), FIXTURE_HOST_BUILD).unwrap();
+
+    let runtime = test_runtime(root).unwrap();
+    rust_toolchain_callback_tests::refresh_callback_sources(&runtime);
     let key = BuildCommandRootKey::new(
-        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        NormalizedAbsolutePath::new(root).unwrap(),
         &[TargetPattern::parse("//:write").unwrap()],
         build_test_configuration("target"),
     )
     .unwrap();
-    let mut transaction =
-        build_root_transaction(&dice, resolved_write_epoch(19, "setting_a", &[])).await;
-    let outcome = transaction.compute(&key).await.unwrap();
-    let evaluation = complete_build_evaluation(&outcome);
+    let mut inputs = NativeDemandRequestInputBundle::normalized_initial();
+    inputs.registry_urls = RegistryUrls::new([format!("file://{}/registry", root.display())]);
+    let driven = runtime.drive_command(inputs, key).unwrap();
+    let evaluation = driven
+        .accepted
+        .terminal_for_test()
+        .as_ref()
+        .as_ref()
+        .unwrap();
+    let views = evaluation.resolved_file_write_semantic_views().unwrap();
+    let [view] = views.as_slice() else {
+        panic!("expected one resolved FileWrite action")
+    };
+    let [toolchain] = view.action().toolchain().unwrap().rows() else {
+        panic!("expected one resolved toolchain")
+    };
+    let selected = toolchain.selected().unwrap();
+    assert_eq!(
+        selected.implementation().label().to_string(),
+        "@@//:implementation"
+    );
+    assert_eq!(
+        selected.info().field("marker").unwrap().as_str(),
+        Some("toolchain")
+    );
+
     let text = crate::runtime::format_file_write_aquery_text_output(evaluation).unwrap();
     assert_eq!(
         text,

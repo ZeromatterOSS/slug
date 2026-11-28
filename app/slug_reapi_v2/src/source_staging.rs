@@ -31,10 +31,10 @@ impl SourceInputReapiPlan {
         prepared.check_active().map_err(|e| e.to_string())?;
         // Resolve callbacks before constructing any input-tree or digest state.
         // This execution path has no tracked tree-child metadata capability.
-        let command = prepared
-            .spawn()
-            .expand_forced_param_files_with_context(args_context)
-            .map_err(|error| error.to_string())?;
+        let command = crate::source_spawn::expand_spawn_command_line(
+            prepared.configured_action(),
+            args_context,
+        )?;
         let source_digests = prepared
             .sources()
             .map(|source| {

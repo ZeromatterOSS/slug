@@ -74,9 +74,11 @@ WP-7-25 adds native-library search and default direct/indirect link recipes,
 including their forced parameter bytes through the real Linux argument builder.
 WP753 adds the pinned Cargo runfiles mapping closure with structural captures and forced
 parameter bytes; it does not activate the full Cargo action/toolchain path.
-Other callback families, native Cc providers/toolchains, conditional spilling
-and resolved Spawn execution staging remain open. These components do not widen the bounded
-FileWrite executor or bypass `ValidatedActionClosure`.
+The configured REAPI routes now use Bazel 9.2's ordered conditional spill rule
+with the retained owner's `min_param_file_size`. The public flag is deferred.
+Other callback families, full native Cc and resolved Spawn execution staging
+remain open. The bounded FileWrite executor and `ValidatedActionClosure` gates
+still apply.
 
 Ordinary source/tool inputs have a fixed-memory content observation prerequisite
 in WP-7-27: Core streams SHA-256 with a 64 KiB buffer, retaining only a 40-byte
