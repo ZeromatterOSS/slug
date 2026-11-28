@@ -16,6 +16,10 @@ use std::time::SystemTime;
 #[path = "../../../tests/v2_fixture_support/src/lib.rs"]
 mod fixture_support;
 use fixture_support::FixtureWorkspace;
+
+#[path = "../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
+#[allow(dead_code)] // These tests use the module-only portion of the staging fixture.
+mod source_staging_workspace;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -1495,7 +1499,8 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     assert!(defaults.include_tool);
 
     let workspace = scratch("cquery-malformed-mode");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
@@ -1530,7 +1535,12 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     assert!(empty_starlark.stdout.is_empty());
     assert!(empty_starlark.stderr.is_empty());
     assert_eq!(empty_starlark.invalidated_files, 0);
-    let label_kind = handle_request(
+    let evaluate = |daemon: &mut Daemon, wire: &str| {
+        let mut request: serde_json::Value = serde_json::from_str(wire).unwrap();
+        request["request"]["bzlmod"] = serde_json::json!({ "registry_urls": [&registry] });
+        handle_request(daemon, &request.to_string())
+    };
+    let label_kind = evaluate(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"label_kind"}}"#,
     );
@@ -1541,7 +1551,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             .starts_with("probe rule //pkg:probe (slugcfg-v2:")
     );
     assert!(label_kind.stderr.is_empty());
-    let graph_non_deps = handle_request(
+    let graph_non_deps = evaluate(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"graph"}}"#,
     );
@@ -1554,7 +1564,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         "{graph_non_deps:?}"
     );
     assert_eq!(graph_non_deps.invalidated_files, 0);
-    let graph_depth_zero = handle_request(
+    let graph_depth_zero = evaluate(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"deps(//pkg:probe, 0)","include_implicit":false,"output":"graph"}}"#,
     );
@@ -1571,7 +1581,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"deps(//pkg:probe, {depth})","include_implicit":false,"output":"graph"}}}}"#,
         );
-        let graph_depth = handle_request(&mut daemon, &request);
+        let graph_depth = evaluate(&mut daemon, &request);
         assert_eq!(graph_depth.exit_code, 0, "depth {depth}: {graph_depth:?}");
         assert!(
             graph_depth
@@ -1592,7 +1602,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"rdeps(deps(//pkg:probe), //pkg:probe)","include_implicit":false,"output":"{output}"}}}}"#,
         );
-        let reverse = handle_request(&mut daemon, &request);
+        let reverse = evaluate(&mut daemon, &request);
         assert_eq!(reverse.exit_code, 0, "{output}: {reverse:?}");
         assert!(reverse.stderr.is_empty(), "{output}: {reverse:?}");
         assert!(
@@ -1602,26 +1612,26 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let direct_request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"rdeps(//pkg:probe, //pkg:probe)","include_implicit":false,"output":"{output}"}}}}"#,
         );
-        let direct = handle_request(&mut daemon, &direct_request);
+        let direct = evaluate(&mut daemon, &direct_request);
         assert_eq!(direct.exit_code, 0, "{output}: {direct:?}");
         assert!(direct.stderr.is_empty(), "{output}: {direct:?}");
         assert_eq!(direct.stdout, reverse.stdout, "{output}");
         let filtered_request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"filter('.*', rdeps(//pkg:probe, //pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
         );
-        let filtered = handle_request(&mut daemon, &filtered_request);
+        let filtered = evaluate(&mut daemon, &filtered_request);
         assert_eq!(filtered.exit_code, 0, "{output}: {filtered:?}");
         assert_eq!(filtered.stdout, direct.stdout, "{output}");
         let kind_request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"kind('^probe rule$', rdeps(//pkg:probe, //pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
         );
-        let kind = handle_request(&mut daemon, &kind_request);
+        let kind = evaluate(&mut daemon, &kind_request);
         assert_eq!(kind.exit_code, 0, "{output}: {kind:?}");
         assert_eq!(kind.stdout, direct.stdout, "{output}");
         let executable_request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"executables(rdeps(//pkg:probe, //pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
         );
-        let executable = handle_request(&mut daemon, &executable_request);
+        let executable = evaluate(&mut daemon, &executable_request);
         assert_eq!(executable.exit_code, 0, "{output}: {executable:?}");
         assert!(executable.stderr.is_empty(), "{output}: {executable:?}");
         if output == "graph" {
@@ -1639,7 +1649,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"{expression}","include_implicit":false,"output":"label"}}}}"#,
         );
-        let invalid = handle_request(&mut daemon, &request);
+        let invalid = evaluate(&mut daemon, &request);
         assert_eq!(invalid.exit_code, 2, "{invalid:?}");
         assert!(
             stderr_text(&invalid.stderr).contains("invalid Slug regex"),
@@ -1650,7 +1660,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"rdeps(deps(//pkg:probe), //pkg:probe, {depth})","include_implicit":false,"output":"label"}}}}"#,
         );
-        let reverse = handle_request(&mut daemon, &request);
+        let reverse = evaluate(&mut daemon, &request);
         assert_eq!(reverse.exit_code, 0, "{depth}: {reverse:?}");
         assert_eq!(reverse.stdout.contains("//pkg:probe"), present, "{depth}");
     }
@@ -1658,7 +1668,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"rdeps(deps(//pkg:probe, {inner}), //pkg:probe, 0)","include_implicit":false,"output":"graph"}}}}"#,
         );
-        let reverse = handle_request(&mut daemon, &request);
+        let reverse = evaluate(&mut daemon, &request);
         assert_eq!(reverse.exit_code, 0, "inner {inner}: {reverse:?}");
         assert!(reverse.stdout.contains("//pkg:probe"), "inner {inner}");
     }
@@ -1670,7 +1680,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             let request = format!(
                 r#"{{"kind":"cquery","request":{{"expression":"{expression}","include_implicit":false,"output":"{output}"}}}}"#,
             );
-            let wrapped = handle_request(&mut daemon, &request);
+            let wrapped = evaluate(&mut daemon, &request);
             assert_eq!(wrapped.exit_code, 0, "{expression} {output}: {wrapped:?}");
             assert!(
                 wrapped.stderr.is_empty(),
@@ -1693,7 +1703,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"filter('probe$', deps(//pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
         );
-        let filtered = handle_request(&mut daemon, &request);
+        let filtered = evaluate(&mut daemon, &request);
         assert_eq!(filtered.exit_code, 0, "{output}: {filtered:?}");
         assert!(filtered.stderr.is_empty(), "{output}: {filtered:?}");
         assert!(
@@ -1709,7 +1719,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             let request = format!(
                 r#"{{"kind":"cquery","request":{{"expression":"{expression}","include_implicit":false,"output":"{output}"}}}}"#,
             );
-            let filtered = handle_request(&mut daemon, &request);
+            let filtered = evaluate(&mut daemon, &request);
             assert_eq!(filtered.exit_code, 0, "{expression} {output}: {filtered:?}");
             assert!(
                 filtered.stderr.is_empty(),
@@ -1726,7 +1736,8 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
 #[test]
 fn retained_cquery_missing_recovers_without_new_invalidations() {
     let workspace = scratch("cquery-recovery");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
@@ -1745,7 +1756,7 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(None),
         )
     };
@@ -1766,7 +1777,8 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
 #[test]
 fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() {
     let workspace = scratch("cquery-executables-capability-lifecycle");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     let nonexec =
         "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n";
@@ -1786,7 +1798,7 @@ fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() 
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(None),
         )
     };
@@ -1820,7 +1832,8 @@ fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() 
 #[test]
 fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() {
     let workspace = scratch("cquery-kind-rule-class-lifecycle");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     let definition = |probe_class: &str| {
         format!(
@@ -1842,7 +1855,7 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(None),
         )
     };
@@ -1966,7 +1979,8 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
 #[test]
 fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
     let workspace = scratch("cquery-siblings-post-analysis-terminal");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     let nonexecutable =
         "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n";
@@ -1986,7 +2000,7 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(None),
         )
     };
@@ -2068,7 +2082,8 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
 #[test]
 fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
     let workspace = scratch("cquery-visible-vacuous-post-analysis");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     let nonexecutable = "def _impl(ctx):\n    return [DefaultInfo()]\ncaller = rule(implementation = _impl)\ntarget = rule(implementation = _impl)\n";
     let executable = "def _impl(ctx):\n    return [DefaultInfo()]\ndef _caller_impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name)\n    ctx.actions.write(out, \"tool\\n\")\n    return [DefaultInfo(executable = out)]\ncaller = rule(implementation = _caller_impl, executable = True)\ntarget = rule(implementation = _impl)\n";
@@ -2087,7 +2102,7 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(None),
         )
     };
@@ -2180,7 +2195,8 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
 #[test]
 fn retained_cquery_loading_files_are_post_analysis_terminals() {
     let workspace = scratch("cquery-loading-files-post-analysis-terminal");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
@@ -2199,7 +2215,7 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(None),
         )
     };
@@ -2286,7 +2302,8 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
 #[test]
 fn retained_cquery_missing_executable_recovers_after_rule_edit() {
     let workspace = scratch("cquery-missing-executable-recovery");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     let definitions = workspace.join("pkg/defs.bzl");
     write(
         &definitions,
@@ -2306,7 +2323,7 @@ fn retained_cquery_missing_executable_recovers_after_rule_edit() {
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(None),
         )
     };
@@ -2381,7 +2398,10 @@ fn retained_cquery_starlark_formats_ordered_sets() {
 #[test]
 fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidation() {
     let workspace = scratch("cquery-selection-evaluation-terminal");
-    write_configured_module(&workspace, "module(name = \"cquery_selection\")\n");
+    let registry = source_staging_workspace::write_local_module(
+        &workspace,
+        "module(name = \"cquery_selection\")\n",
+    );
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
@@ -2400,7 +2420,7 @@ fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidatio
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(None),
         )
     };
@@ -2433,7 +2453,8 @@ fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidatio
 #[test]
 fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
     let workspace = scratch("cquery-configuration-c0-c1-c0");
-    write_configured_module(&workspace, "module(name = \"demo\")\n");
+    let registry =
+        source_staging_workspace::write_local_module(&workspace, "module(name = \"demo\")\n");
     write(
         &workspace.join("settings.bzl"),
         "def _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
@@ -2460,7 +2481,7 @@ fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            Vec::new(),
+            vec![registry.clone()],
             root_setting_overlay(setting),
         )
     };

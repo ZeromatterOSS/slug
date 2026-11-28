@@ -1,22 +1,16 @@
 //! Authored tiny source-staging rule; no compiler action or copied ruleset.
 use std::path::Path;
 
+const LOCAL_PLATFORM_DIRECTIVES: &str = "bazel_dep(name='platforms', version='1.0.0')\nlocal_path_override(module_name='platforms', path='platforms')\n";
+
 pub fn write(root: &Path) {
-    std::fs::create_dir_all(root.join("platforms/host")).unwrap();
+    write_module_with_local_dependencies(
+        root,
+        format!(
+            "module(name='stage')\n{LOCAL_PLATFORM_DIRECTIVES}register_execution_platforms('//:platform')\n"
+        ),
+    );
     for (path, bytes) in [
-        (
-            "MODULE.bazel",
-            "module(name='stage')\nbazel_dep(name='platforms', version='1.0.0')\nlocal_path_override(module_name='platforms', path='platforms')\nregister_execution_platforms('//:platform')\n",
-        ),
-        (
-            "platforms/MODULE.bazel",
-            "module(name='platforms', version='1.0.0')\n",
-        ),
-        (
-            "platforms/host/BUILD.bazel",
-            "exports_files(['constraints.bzl'])\nplatform(name='host')\n",
-        ),
-        ("platforms/host/constraints.bzl", "HOST_CONSTRAINTS = []\n"),
         (
             "BUILD.bazel",
             "load(':defs.bzl', 'stage')\nplatform(name='platform')\nexports_files(['tool', 'input'])\nstage(name='one', input='input', tool='tool')\nstage(name='two', input='input', tool='tool')\n",
@@ -27,7 +21,33 @@ pub fn write(root: &Path) {
     ] {
         std::fs::write(root.join(path), bytes).unwrap();
     }
-    let mut module = std::fs::read_to_string(root.join("MODULE.bazel")).unwrap();
+}
+
+/// Prepare module metadata for authored tests with no external rule loads.
+#[allow(dead_code)] // This fixture is also included by tests using only write().
+pub fn write_local_module(root: &Path, declarations: &str) -> String {
+    write_module_with_local_dependencies(
+        root,
+        format!("{declarations}{LOCAL_PLATFORM_DIRECTIVES}"),
+    );
+    format!("file://{}/empty-registry", root.display())
+}
+
+fn write_module_with_local_dependencies(root: &Path, mut module: String) {
+    std::fs::create_dir_all(root.join("platforms/host")).unwrap();
+    for (path, bytes) in [
+        (
+            "platforms/MODULE.bazel",
+            "module(name='platforms', version='1.0.0')\n",
+        ),
+        (
+            "platforms/host/BUILD.bazel",
+            "exports_files(['constraints.bzl'])\nplatform(name='host')\n",
+        ),
+        ("platforms/host/constraints.bzl", "HOST_CONSTRAINTS = []\n"),
+    ] {
+        std::fs::write(root.join(path), bytes).unwrap();
+    }
     for (name, version) in BUILTIN_DEPENDENCIES {
         if *name == "platforms" {
             continue;

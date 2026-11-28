@@ -87,6 +87,12 @@ fn configured_cli_registry_arg(assembly: &std::path::Path) -> String {
     format!("--registry=file://{}", assembly.join("registry").display())
 }
 
+fn offline_cquery_workspace(name: &str, module: &str) -> (std::path::PathBuf, String) {
+    let workspace = scratch(name);
+    let registry = source_staging_workspace::write_local_module(&workspace, module);
+    (workspace, format!("--registry={registry}"))
+}
+
 fn fixture_workspace(name: &str) -> FixtureWorkspace {
     FixtureWorkspace::new(name).unwrap()
 }
@@ -1045,8 +1051,10 @@ fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
 
 #[test]
 fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
-    let workspace = scratch("cquery-set-expression-workspace");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"sets\")\n");
+    let (workspace, registry) = offline_cquery_workspace(
+        "cquery-set-expression-workspace",
+        "module(name = \"sets\")\n",
+    );
     write(
         &workspace.join("pkg/defs.bzl"),
         "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
@@ -1059,6 +1067,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
     let one_shot = slug()
         .current_dir(&workspace)
         .args(["cquery", expression])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(one_shot.status.success(), "{one_shot:?}");
@@ -1079,6 +1088,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
             "--output=starlark",
             "--starlark:expr=str(target.label)",
         ])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(starlark_one_shot.status.success(), "{starlark_one_shot:?}");
@@ -1092,6 +1102,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
             "--output=starlark",
             "--starlark:expr=str(target.label)",
         ])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(empty_one_shot.status.success(), "{empty_one_shot:?}");
@@ -1104,6 +1115,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
     let daemon = slug()
         .current_dir(&workspace)
         .args([output_base.as_str(), "cquery", expression])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(daemon.status.success(), "{daemon:?}");
@@ -1118,6 +1130,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
             "--output=starlark",
             "--starlark:expr=str(target.label)",
         ])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(starlark_daemon.status.success(), "{starlark_daemon:?}");
@@ -1132,6 +1145,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
             "--output=starlark",
             "--starlark:expr=str(target.label)",
         ])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(empty_daemon.status.success(), "{empty_daemon:?}");
@@ -1147,6 +1161,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
             "--output=starlark",
             "--starlark:expr=str(target.label)",
         ])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(some_one_shot.status.success(), "{some_one_shot:?}");
@@ -1161,6 +1176,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
             "--output=starlark",
             "--starlark:expr=str(target.label)",
         ])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(some_daemon.status.success(), "{some_daemon:?}");
@@ -1175,6 +1191,7 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
         }
         let empty = command
             .args(["cquery", "some(//pkg:bin, '-1')"])
+            .arg(&registry)
             .output()
             .unwrap();
         assert_eq!(empty.status.code(), Some(1), "{empty:?}");
@@ -1189,8 +1206,8 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
 
 #[test]
 fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
-    let workspace = scratch("cquery-deps-workspace");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"deps\")\n");
+    let (workspace, registry) =
+        offline_cquery_workspace("cquery-deps-workspace", "module(name = \"deps\")\n");
     write(
         &workspace.join("defs.bzl"),
         "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name + \".sh\")\n    ctx.actions.write(out, \"#!/bin/sh\\n\")\n    return [DefaultInfo(executable = out)]\nnode = rule(implementation = _impl, executable = True, attrs = {\"deps\": attr.label_list()})\n",
@@ -1209,6 +1226,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     let rejected = slug()
         .current_dir(&workspace)
         .args(["cquery", expression])
+        .arg(&registry)
         .output()
         .unwrap();
     assert_eq!(rejected.status.code(), Some(2), "{rejected:?}");
@@ -1229,6 +1247,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
             .args(["cquery", expression, "--noimplicit_deps"])
             .args(without_tools.then_some("--notool_deps"))
             .args(starlark)
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1240,6 +1259,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
         .current_dir(&workspace)
         .args(["cquery", "deps(//pkg)", "--noimplicit_deps"])
         .args(starlark)
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(shorthand.status.success(), "{shorthand:?}");
@@ -1420,6 +1440,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
         }
         command
             .args(["cquery", wrapped_expression, "--noimplicit_deps"])
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1447,6 +1468,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
         command
             .args(["cquery", expression])
             .args(label_kind)
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1506,8 +1528,8 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
 
 #[test]
 fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
-    let workspace = scratch("cquery-graph-workspace");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"deps\")\n");
+    let (workspace, registry) =
+        offline_cquery_workspace("cquery-graph-workspace", "module(name = \"deps\")\n");
     write(
         &workspace.join("defs.bzl"),
         "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name + \".sh\")\n    ctx.actions.write(out, \"#!/bin/sh\\n\")\n    return [DefaultInfo(executable = out)]\nnode = rule(implementation = _impl, executable = True, attrs = {\"deps\": attr.label_list()})\n",
@@ -1527,6 +1549,7 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
             .arg("cquery")
             .arg(expression)
             .args(graph)
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1656,9 +1679,8 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
 
 #[test]
 fn cquery_filter_matches_apparent_labels_in_one_shot_and_daemon() {
-    let workspace = scratch("cquery-filter-expression-workspace");
-    write(
-        &workspace.join("MODULE.bazel"),
+    let (workspace, registry) = offline_cquery_workspace(
+        "cquery-filter-expression-workspace",
         "module(name = \"filters\")\n",
     );
     write(
@@ -1683,6 +1705,7 @@ fn cquery_filter_matches_apparent_labels_in_one_shot_and_daemon() {
             .arg("cquery")
             .arg(expression)
             .args(starlark)
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1718,9 +1741,8 @@ fn cquery_filter_matches_apparent_labels_in_one_shot_and_daemon() {
 
 #[test]
 fn cquery_siblings_post_analysis_terminal_matches_one_shot_and_daemon() {
-    let workspace = scratch("cquery-siblings-post-analysis-terminal-workspace");
-    write(
-        &workspace.join("MODULE.bazel"),
+    let (workspace, registry) = offline_cquery_workspace(
+        "cquery-siblings-post-analysis-terminal-workspace",
         "module(name = \"siblings_terminal\")\n",
     );
     write(
@@ -1744,6 +1766,7 @@ fn cquery_siblings_post_analysis_terminal_matches_one_shot_and_daemon() {
             .arg("cquery")
             .arg(expression)
             .args(output)
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1788,9 +1811,8 @@ fn cquery_siblings_post_analysis_terminal_matches_one_shot_and_daemon() {
 
 #[test]
 fn cquery_visible_vacuous_post_analysis_matches_one_shot_and_daemon() {
-    let workspace = scratch("cquery-visible-vacuous-post-analysis-workspace");
-    write(
-        &workspace.join("MODULE.bazel"),
+    let (workspace, registry) = offline_cquery_workspace(
+        "cquery-visible-vacuous-post-analysis-workspace",
         "module(name = \"visible_terminal\")\n",
     );
     write(
@@ -1814,6 +1836,7 @@ fn cquery_visible_vacuous_post_analysis_matches_one_shot_and_daemon() {
             .arg("cquery")
             .arg(expression)
             .args(output)
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1861,9 +1884,8 @@ fn cquery_visible_vacuous_post_analysis_matches_one_shot_and_daemon() {
 
 #[test]
 fn cquery_loading_files_post_analysis_terminals_match_one_shot_and_daemon() {
-    let workspace = scratch("cquery-loading-files-post-analysis-terminal-workspace");
-    write(
-        &workspace.join("MODULE.bazel"),
+    let (workspace, registry) = offline_cquery_workspace(
+        "cquery-loading-files-post-analysis-terminal-workspace",
         "module(name = \"loading_files_terminal\")\n",
     );
     write(
@@ -1887,6 +1909,7 @@ fn cquery_loading_files_post_analysis_terminals_match_one_shot_and_daemon() {
             .arg("cquery")
             .arg(expression)
             .args(output)
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1916,6 +1939,8 @@ fn cquery_loading_files_post_analysis_terminals_match_one_shot_and_daemon() {
 
 #[test]
 fn cquery_starlark_label_daemon_recovers_after_missing() {
+    let inputs = configured_cli_fixture("cquery-starlark-label-recovery-registry");
+    let registry = configured_cli_registry_arg(&inputs);
     let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
     let output_base = scratch("cquery-starlark-output-base");
     let _cleanup = DaemonCleanup(output_base.clone());
@@ -1930,6 +1955,7 @@ fn cquery_starlark_label_daemon_recovers_after_missing() {
                 "--output=starlark",
                 "--starlark:expr=str(target.label)",
             ])
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -1962,9 +1988,8 @@ fn cquery_starlark_label_daemon_recovers_after_missing() {
 
 #[test]
 fn cquery_one_shot_and_retained_daemon_restore_label_projection() {
-    let workspace = scratch("cquery-label-configuration-workspace");
-    write(
-        workspace.join("MODULE.bazel"),
+    let (workspace, registry) = offline_cquery_workspace(
+        "cquery-label-configuration-workspace",
         "module(name = \"cquery_label\")\n",
     );
     write(
@@ -1987,6 +2012,7 @@ fn cquery_one_shot_and_retained_daemon_restore_label_projection() {
     let one_shot = slug()
         .current_dir(&workspace)
         .args(["cquery", "//pkg:probe"])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(one_shot.status.success(), "{one_shot:?}");
@@ -2003,6 +2029,7 @@ fn cquery_one_shot_and_retained_daemon_restore_label_projection() {
             .arg("cquery")
             .arg("//pkg:probe")
             .args(extra)
+            .arg(&registry)
             .output()
             .unwrap()
     };
@@ -5556,15 +5583,40 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
         let output = run(workspace, base, &["aquery", "deps(//:root)"]);
         assert!(output.status.success(), "{output:?}");
         assert!(output.stderr.is_empty(), "{output:?}");
-        let text = String::from_utf8_lossy(&output.stdout);
-        for owner in ["root", "writer_a", "writer_b"] {
-            assert_eq!(
-                text.matches(&format!("  Target: //:{owner}\n")).count(),
-                1,
-                "{text}"
-            );
-        }
-        assert_eq!(text.matches("action '").count(), 3, "{text}");
+        let text = std::str::from_utf8(&output.stdout).unwrap();
+        let mut rows = text
+            .split_terminator("\n\n")
+            .map(|record| {
+                let field = |prefix| {
+                    record
+                        .lines()
+                        .find_map(|line| line.strip_prefix(prefix))
+                        .unwrap_or_else(|| panic!("missing {prefix} in {record}"))
+                };
+                let output = field("  Outputs: [").strip_suffix(']').unwrap();
+                let (root, path) = output.rsplit_once("/bin/").unwrap();
+                assert!(root.starts_with("bazel-out/slugcfg-v2-"), "{record}");
+                (field("  Target: "), field("  Mnemonic: "), path)
+            })
+            .collect::<Vec<_>>();
+        rows.sort_unstable();
+        assert_eq!(
+            rows,
+            [
+                ("//:root", "FileWrite", "runner.sh"),
+                ("//:root", "RepoMappingManifest", "runner.sh.repo_mapping"),
+                ("//:root", "RunfilesTree", "runner.sh.runfiles"),
+                (
+                    "//:root",
+                    "SourceSymlinkManifest",
+                    "runner.sh.runfiles_manifest",
+                ),
+                ("//:root", "SymlinkTree", "runner.sh.runfiles/MANIFEST"),
+                ("//:writer_a", "FileWrite", "shared.txt"),
+                ("//:writer_b", "FileWrite", "shared.txt"),
+            ],
+            "{text}"
+        );
         output.stdout
     }
 
@@ -5608,7 +5660,11 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
     }
 
     fn cquery_control(workspace: &std::path::Path, base: Option<&str>) {
-        let cquery = run(workspace, base, &["cquery", "deps(//:root)"]);
+        let cquery = run(
+            workspace,
+            base,
+            &["cquery", "--noimplicit_deps", "deps(//:root)"],
+        );
         assert!(cquery.status.success(), "{cquery:?}");
         let labels = String::from_utf8_lossy(&cquery.stdout);
         assert!(
