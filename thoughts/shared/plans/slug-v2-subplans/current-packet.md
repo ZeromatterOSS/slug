@@ -50,9 +50,11 @@ SourceAttempts64 on the second. Two Source snapshots contributed 14 repeat
 content requests per check. The Source snapshot seal passed original-FD
 `EROFS`, live-writer `EBUSY`, pre-seal drift, retirement and Process controls.
 Sealed Source certificate repeats passed at exactly 64 acquisitions without
-reading payloads. A missing certificate still refused acquisition 65. Cold
-native admission ran close to the 27-second deadline. Measure both routes
-under the existing limits.
+reading payloads. A missing certificate still refused acquisition 65.
+Protected cut `1e87600ed` reached 67 CAS entries cold and 114 retained.
+The retained worker compiled the tinyjson prerequisite from empty AC, with
+verified action, output bytes and worker timing. Both hit the 27-second
+work deadline before probe publication. Attribute staging and execution work.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
