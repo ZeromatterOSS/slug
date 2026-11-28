@@ -338,6 +338,7 @@ pub enum SlugConfigurationError {
     UnexpectedMakeVariableOption { option: &'static str },
     UnexpectedNativeStringList { option: &'static str },
     UnexpectedNativeBoolean { option: &'static str },
+    UnexpectedNativeInteger { option: &'static str },
     UnexpectedNativeLabel { option: &'static str },
     NonVisibleNativeLabel { option: &'static str },
     InvalidCppConfiguration { reason: &'static str },
@@ -417,6 +418,9 @@ impl fmt::Display for SlugConfigurationError {
             }
             Self::UnexpectedNativeBoolean { option } => {
                 write!(formatter, "native option {option} is not a Boolean")
+            }
+            Self::UnexpectedNativeInteger { option } => {
+                write!(formatter, "native option {option} is not an integer")
             }
             Self::UnexpectedNativeLabel { option } => {
                 write!(formatter, "native option {option} is not a label value")
@@ -1215,6 +1219,14 @@ impl SlugConfiguration {
 
     pub fn check_visibility(&self) -> Result<bool, SlugConfigurationError> {
         self.core_bool("check_visibility")
+    }
+
+    pub fn min_param_file_size(&self) -> Result<i32, SlugConfigurationError> {
+        const OPTION: &str = "min_param_file_size";
+        match self.option_value(CORE_OPTIONS, OPTION)? {
+            OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Int(value))) => Ok(*value),
+            _ => Err(SlugConfigurationError::UnexpectedNativeInteger { option: OPTION }),
+        }
     }
 
     /// The admitted artifact layout merges genfiles into the bin root.

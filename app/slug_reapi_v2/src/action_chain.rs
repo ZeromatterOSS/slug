@@ -20,6 +20,7 @@ use crate::executor::StagedExecution;
 use crate::executor::cache_error;
 use crate::executor::execute_staged_metadata;
 use crate::executor::tonic_endpoint;
+use crate::source_spawn::expand_spawn_command_line;
 use crate::source_spawn::spawn_command;
 use crate::*;
 
@@ -127,9 +128,10 @@ impl Template {
             .actions()
             .iter()
             .map(|step| {
-                step.action()
+                let action = step.action();
+                action
                     .spawn_spec()
-                    .map(|spawn| spawn.expand_forced_param_files_with_context(args_context))
+                    .map(|_| expand_spawn_command_line(action, args_context))
                     .transpose()
                     .map_err(command_error)
             })
