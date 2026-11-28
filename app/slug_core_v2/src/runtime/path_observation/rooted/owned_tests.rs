@@ -15,6 +15,7 @@ use super::tests::scope;
 use super::*;
 use crate::runtime::dice::source_service::HOST_FILE_OBJECT_BYTES;
 use crate::runtime::dice::source_service::SourceServiceLimits;
+use crate::runtime::repository_root_io::read_work_for_test;
 
 struct Fixture {
     directory: tempfile::TempDir,
@@ -77,6 +78,7 @@ fn owned_kernel_verifies_payload_and_empty_eof_reuses_arc_and_charges_actual_byt
     ] {
         let fixture = Fixture::new(body);
         let resources = scope(SourceServiceLimits::default());
+        let work = read_work_for_test::begin();
         let bytes = fixture
             .verify(PathObservationOperation::FileBytes, &resources, &|| true)
             .unwrap();
@@ -98,6 +100,16 @@ fn owned_kernel_verifies_payload_and_empty_eof_reuses_arc_and_charges_actual_byt
                 .unwrap(),
         );
         let counters = resources.snapshot();
+        let bytes = fixture.body.len() as u64;
+        assert_eq!(
+            work.snapshot(),
+            read_work_for_test::Snapshot {
+                digest_payload: bytes,
+                digest_sha: bytes,
+                contents_payload: 2 * bytes,
+                contents_sha: 0,
+            }
+        );
         assert_eq!(counters.source_attempts, 0);
         assert_eq!(counters.decoded_bytes, 3 * fixture.body.len() as u64);
         assert_eq!(counters.live_buffer_bytes, 0);
@@ -353,6 +365,7 @@ fn packed_owned_kernel_materializes_only_file_bytes_with_independent_history_cha
     assert!(expected.raw_arc().is_none());
     let expected_weak = expected.downgrade();
     let resources = scope(SourceServiceLimits::default());
+    let work = read_work_for_test::begin();
     let bytes = owned::verify(
         &fixture.root(),
         Path::new("file"),
@@ -383,6 +396,16 @@ fn packed_owned_kernel_materializes_only_file_bytes_with_independent_history_cha
         matches!(digest, PathObservationResult::FileDigest(PathOperationResult::Present(value)) if value == fixture.digest())
     );
     assert_eq!(resources.snapshot().source_attempts, 0);
+    let bytes = fixture.body.len() as u64;
+    assert_eq!(
+        work.snapshot(),
+        read_work_for_test::Snapshot {
+            digest_payload: bytes,
+            digest_sha: bytes,
+            contents_payload: bytes,
+            contents_sha: 0,
+        }
+    );
     assert_eq!(
         resources.snapshot().decoded_bytes,
         2 * fixture.body.len() as u64
