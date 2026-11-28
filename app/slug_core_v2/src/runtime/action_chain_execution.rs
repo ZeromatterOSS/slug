@@ -42,6 +42,13 @@ impl fmt::Debug for CompletedActionFailure {
     }
 }
 
+/// Staging either leaves an action for execution or commits a provisional
+/// local result to the current attempt's ordered result table.
+pub enum ActionChainStage<S> {
+    RequiresExecute(S),
+    CompletedLocally,
+}
+
 /// Trusted transport extension point. Core owns selection and freshness; the
 /// implementation owns its external effects and must not publish local outputs.
 /// No callback receives graph, repository-session, or publication authority.
@@ -64,6 +71,21 @@ pub trait ActionChainTransport: Sync {
         session: &mut Self::Session,
         index: usize,
     ) -> impl std::future::Future<Output = Result<Self::Staged, Self::Error>> + Send;
+    /// A transport may complete a step locally during staging. This commits
+    /// only an attempt-local result. Remote execution and action cache lookup
+    /// require `RequiresExecute` and Core's full source revalidation.
+    fn stage_for_execution(
+        &self,
+        session: &mut Self::Session,
+        index: usize,
+    ) -> impl std::future::Future<Output = Result<ActionChainStage<Self::Staged>, Self::Error>> + Send
+    {
+        async move {
+            self.stage(session, index)
+                .await
+                .map(ActionChainStage::RequiresExecute)
+        }
+    }
     fn execute(
         &self,
         session: &mut Self::Session,
@@ -348,14 +370,19 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                     NativeDemandSessionError::Computation(anyhow::Error::new(error))
                 })?;
             for index in 0..steps {
-                let staged = self
+                let ActionChainStage::RequiresExecute(staged) = self
                     .transport
-                    .stage(&mut session, index)
+                    .stage_for_execution(&mut session, index)
                     .await
                     .map_err(|error| {
                         NativeDemandSessionError::Computation(anyhow::Error::new(error))
-                    })?;
-                // Every consumer is guarded by the complete reachable source
+                    })?
+                else {
+                    // Final source certification still gates the provisional
+                    // local result and any planned output publication.
+                    continue;
+                };
+                // Every execution is guarded by the complete reachable source
                 // frontier, including sources belonging only to its producers.
                 context
                     .validate_sources(self.source_certificate(terminal).unwrap())

@@ -54,11 +54,18 @@ reading payloads. A missing certificate still refused acquisition 65.
 Protected cut `1e87600ed` reached 67 CAS entries cold and 114 retained.
 The retained worker compiled the tinyjson prerequisite from empty AC, with
 verified action, output bytes and worker timing. Both hit the 27-second
-work deadline before probe publication. Attribute staging and execution work.
+work deadline before probe publication. A bounded trace counted 117 local
+metadata steps and four Rustc steps. The first 109 source rechecks consumed
+0.242 s. The first Rustc uploaded 606 MB in 1.385 s and expired in verified
+CAS readback, after 24.981 s of command preparation.
+REAPI now records provisional metadata in staging and checks the full source
+frontier before each remote-bound step. Nine checks passed, including stale
+source refusal, final retry and generated CAS eviction/corruption. Qualify
+the new installed cut under the same clock.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
-diagnostic-only integration, caller pruning, Need cacheability, new repository
+diagnostic-only integration, source-demand pruning, Need cacheability, new repository
 routes, unselected syntax, global path caches and concurrent Archive batching
 remain outside scope.
 
