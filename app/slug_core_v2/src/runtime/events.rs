@@ -21,6 +21,7 @@ use allocative::Allocative;
 use dice::ActivationClosure;
 use dice::ActivationClosureError;
 use dice::ActivationKind;
+use dice::DiceLiveContextId;
 use dice::DiceNodeId;
 use dice::DiceTransaction;
 use dice::RichActivation;
@@ -50,9 +51,7 @@ struct ActiveCommandAttempt {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct AttemptRoot {
-    ordinal: u64,
-    node: DiceNodeId,
-    version: VersionNumber,
+    activation: RootActivation,
     completed_transient: bool,
 }
 
@@ -122,6 +121,7 @@ pub(super) struct SealedCommandAttempt {
     version: Option<VersionNumber>,
     roots: Arc<[DiceNodeId]>,
     transient_roots: Vec<DiceNodeId>,
+    single_transient_root: Option<RootActivation>,
     allow_unavailable_roots: bool,
     armed: bool,
 }
@@ -737,6 +737,7 @@ pub(super) enum CommandEffectError {
     DemandOwnerNotInstalled,
     DemandOwnerExpired,
     NoTerminalRoots,
+    NoCompletedTransientRoot,
     RootOrdinal {
         expected: u64,
         actual: u64,
@@ -774,6 +775,9 @@ impl fmt::Display for CommandEffectError {
                 f.write_str("the installed workspace demand owner has expired")
             }
             Self::NoTerminalRoots => f.write_str("the terminal attempt has no DICE roots"),
+            Self::NoCompletedTransientRoot => {
+                f.write_str("the terminal attempt lacks one completed transient DICE root")
+            }
             Self::RootOrdinal { expected, actual } => {
                 write!(
                     f,
@@ -916,9 +920,7 @@ impl CommandEffectOwner {
             return;
         }
         active.roots.push(AttemptRoot {
-            ordinal: activation.ordinal(),
-            node: activation.node(),
-            version: activation.version(),
+            activation,
             completed_transient: false,
         });
     }
@@ -939,11 +941,11 @@ impl CommandEffectOwner {
         if active.id != id {
             return;
         }
-        if let Some(root) = active.roots.iter_mut().find(|root| {
-            root.ordinal == activation.ordinal()
-                && root.node == activation.node()
-                && root.version == activation.version()
-        }) {
+        if let Some(root) = active
+            .roots
+            .iter_mut()
+            .find(|root| root.activation == activation)
+        {
             root.completed_transient = is_transient;
         }
     }
@@ -979,32 +981,41 @@ impl CommandEffectOwner {
             return Err(CommandEffectError::StaleAttempt);
         }
         let mut roots = active.roots.clone();
-        roots.sort_by_key(|root| root.ordinal);
+        roots.sort_by_key(|root| root.activation.ordinal());
         if roots.is_empty() && !allow_empty_roots {
             return Err(CommandEffectError::NoTerminalRoots);
         }
         for (expected, root) in roots.iter().enumerate() {
             let expected =
                 u64::try_from(expected).map_err(|_| CommandEffectError::AttemptIdExhausted)?;
-            if root.ordinal != expected {
+            if root.activation.ordinal() != expected {
                 return Err(CommandEffectError::RootOrdinal {
                     expected,
-                    actual: root.ordinal,
+                    actual: root.activation.ordinal(),
                 });
             }
         }
-        let version = roots.first().map(|root| root.version);
+        let version = roots.first().map(|root| root.activation.version());
         if let Some(version) = version
-            && roots.iter().any(|root| root.version != version)
+            && roots
+                .iter()
+                .any(|root| root.activation.version() != version)
         {
             return Err(CommandEffectError::MixedRootVersions);
         }
+        let single_transient_root = match roots.as_slice() {
+            [root] if root.completed_transient => Some(root.activation),
+            _ => None,
+        };
         let transient_roots = roots
             .iter()
             .filter(|root| root.completed_transient)
-            .map(|root| root.node)
+            .map(|root| root.activation.node())
             .collect();
-        let nodes = roots.into_iter().map(|root| root.node).collect();
+        let nodes = roots
+            .into_iter()
+            .map(|root| root.activation.node())
+            .collect();
         let demands = active
             .demands
             .clone()
@@ -1020,6 +1031,7 @@ impl CommandEffectOwner {
             version,
             roots: nodes,
             transient_roots,
+            single_transient_root,
             allow_unavailable_roots,
             armed: true,
         })
@@ -1172,19 +1184,61 @@ impl SealedCommandAttempt {
     }
 
     pub(super) async fn select(
+        self,
+        transaction: &DiceTransaction,
+    ) -> Result<SelectedCommandSidecars, CommandEffectError> {
+        self.select_with_transient_root(transaction, None).await
+    }
+
+    pub(super) async fn select_with_transient_root(
         mut self,
         transaction: &DiceTransaction,
+        expected_live_context: Option<DiceLiveContextId>,
     ) -> Result<SelectedCommandSidecars, CommandEffectError> {
         let demands = self
             .demands
             .upgrade()
             .ok_or(CommandEffectError::DemandOwnerExpired)?;
-        let closure = loop {
+        let closure = if let Some(expected_live_context) = expected_live_context {
+            let completion = self
+                .single_transient_root
+                .ok_or(CommandEffectError::NoCompletedTransientRoot)?;
+            if completion.version() != transaction.version() {
+                return Err(CommandEffectError::ClosureVersion {
+                    expected: completion.version(),
+                    actual: transaction.version(),
+                });
+            }
+            transaction
+                .activation_closure_with_transient_root(completion, expected_live_context)
+                .await
+                .map_err(CommandEffectError::Closure)?
+        } else {
+            self.select_persistent_closure(transaction).await?
+        };
+        let events = self.owner.select(&self, &closure)?;
+        let selected_demands = demands
+            .select(&closure)
+            .map_err(CommandEffectError::Demand)?;
+        let terminal = SelectedTerminalToken::new(self.owner.clone(), self.id);
+        self.armed = false;
+        Ok(SelectedCommandSidecars {
+            events,
+            terminal,
+            demands: selected_demands,
+        })
+    }
+
+    async fn select_persistent_closure(
+        &mut self,
+        transaction: &DiceTransaction,
+    ) -> Result<ActivationClosure, CommandEffectError> {
+        loop {
             match transaction
                 .activation_closure(self.roots.iter().copied())
                 .await
             {
-                Ok(closure) => break closure,
+                Ok(closure) => return Ok(closure),
                 Err(ActivationClosureError::Dirty { node, version })
                     if self.allow_unavailable_roots
                         && self.version == Some(version)
@@ -1221,18 +1275,7 @@ impl SealedCommandAttempt {
                 }
                 Err(error) => return Err(CommandEffectError::Closure(error)),
             }
-        };
-        let events = self.owner.select(&self, &closure)?;
-        let selected_demands = demands
-            .select(&closure)
-            .map_err(CommandEffectError::Demand)?;
-        let terminal = SelectedTerminalToken::new(self.owner.clone(), self.id);
-        self.armed = false;
-        Ok(SelectedCommandSidecars {
-            events,
-            terminal,
-            demands: selected_demands,
-        })
+        }
     }
 }
 
@@ -1337,6 +1380,7 @@ mod tests {
             version: None,
             roots: Arc::from([]),
             transient_roots: Vec::new(),
+            single_transient_root: None,
             allow_unavailable_roots: true,
             armed: true,
         });

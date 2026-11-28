@@ -72,7 +72,7 @@ use crate::impls::transaction::TransactionUpdater;
 use crate::impls::user_cycle::KeyComputingUserCycleDetectorData;
 use crate::impls::user_cycle::UserCycleDetectorData;
 use crate::impls::value::DiceComputedValue;
-use crate::impls::value::DiceValidity;
+use crate::impls::value::MaybeValidDiceValue;
 use crate::impls::value::TrackedInvalidationPaths;
 use crate::impls::worker::DiceTaskWorker;
 use crate::impls::worker::project_for_key;
@@ -145,10 +145,7 @@ impl BaseComputeCtx {
     }
 
     pub(crate) fn live_context_id(&self) -> DiceLiveContextId {
-        let evaluator = &self.data.0.0.ctx_data().async_evaluator;
-        evaluator
-            .per_live_version_ctx
-            .live_context_id(evaluator.dice.state_handle.engine_id())
+        self.data.0.0.live_context_id()
     }
 
     pub(crate) fn into_updater(self) -> DiceTransactionUpdater {
@@ -174,7 +171,36 @@ impl BaseComputeCtx {
             .async_evaluator
             .dice
             .state_handle
-            .activation_closure(self.get_version(), roots)
+            .activation_closure(self.get_version(), roots, None)
+    }
+
+    pub(crate) async fn activation_closure_with_transient_root(
+        &self,
+        completion: RootActivation,
+        expected_live_context: DiceLiveContextId,
+    ) -> Result<ActivationClosure, ActivationClosureError> {
+        let evaluator = &self.data.0.0.ctx_data().async_evaluator;
+        let state = &evaluator.dice.state_handle;
+        let node = completion.node();
+        let version = self.get_version();
+        if node.engine() != state.engine_id() {
+            return Err(ActivationClosureError::ForeignEngine { node });
+        }
+        if completion.ordinal() != 0
+            || completion.version() != version
+            || completion.live_context() != expected_live_context
+            || expected_live_context != self.live_context_id()
+        {
+            return Err(ActivationClosureError::NotVerified { node, version });
+        }
+
+        state
+            .activation_closure(
+                version,
+                vec![node],
+                Some(evaluator.per_live_version_ctx.version_epoch),
+            )
+            .await
     }
 
     #[cfg(test)]
@@ -223,6 +249,10 @@ impl DerefMut for BaseComputeCtx {
 }
 
 impl ModernComputeCtx<'_> {
+    pub(crate) fn live_context_id(&self) -> DiceLiveContextId {
+        self.ctx_data().live_context_id()
+    }
+
     /// Gets all the result of of the given computation key.
     /// recorded as dependencies of the current computation for which this
     /// context is for.
@@ -234,8 +264,16 @@ impl ModernComputeCtx<'_> {
         K: Key,
     {
         let (ctx_data, dep_trackers) = self.unpack();
-        Self::compute_opaque_impl(ctx_data, key)
-            .map(move |r| r.map(|opaque| Self::opaque_into_value_impl(dep_trackers, opaque)))
+        ctx_data.compute_opaque(key).map(move |result| {
+            let (key, computed) = result.map_err(DiceError::cancelled)?;
+            let (value, invalidation_paths) = computed.into_parts();
+            Ok(Self::record_value::<K>(
+                dep_trackers,
+                key,
+                value,
+                invalidation_paths,
+            ))
+        })
     }
 
     /// Compute "opaque" value where the value is only accessible via projections.
@@ -259,13 +297,16 @@ impl ModernComputeCtx<'_> {
     where
         K: Key,
     {
-        ctx_data.compute_opaque(key).map(move |cancellable_result| {
-            let cancellable = cancellable_result.map(move |(dice_key, dice_value)| {
-                let (value, invalidation_paths) = dice_value.into_parts();
-                OpaqueValueModern::new(dice_key, value, invalidation_paths)
-            });
-
-            cancellable.map_err(DiceError::cancelled)
+        let live_context = ctx_data.live_context_id();
+        ctx_data.compute_opaque(key).map(move |result| {
+            let (key, computed) = result.map_err(DiceError::cancelled)?;
+            let (value, invalidation_paths) = computed.into_parts();
+            Ok(OpaqueValueModern::new(
+                live_context,
+                key,
+                value,
+                invalidation_paths,
+            ))
         })
     }
 
@@ -358,25 +399,30 @@ impl ModernComputeCtx<'_> {
         })
     }
 
-    pub(crate) fn opaque_into_value<K: Key>(&mut self, opaque: OpaqueValueModern<K>) -> K::Value {
-        Self::opaque_into_value_impl(self.unpack().1, opaque)
+    pub(crate) fn opaque_into_value<K: Key>(
+        &mut self,
+        opaque: OpaqueValueModern<K>,
+    ) -> DiceResult<K::Value> {
+        let (ctx, deps) = self.unpack();
+        ctx.check_opaque_context(opaque.live_context)?;
+        Ok(Self::record_value::<K>(
+            deps,
+            opaque.derive_from_key,
+            opaque.derive_from,
+            opaque.invalidation_paths,
+        ))
     }
 
-    fn opaque_into_value_impl<K: Key>(
+    fn record_value<K: Key>(
         deps: DepsTrackerHolder,
-        opaque: OpaqueValueModern<K>,
+        key: DiceKey,
+        value: MaybeValidDiceValue,
+        invalidation_paths: TrackedInvalidationPaths,
     ) -> K::Value {
-        let OpaqueValueModern {
-            derive_from_key,
-            derive_from,
-            invalidation_paths,
-            ..
-        } = opaque;
-
         deps.lock()
-            .record(derive_from_key, derive_from.validity(), invalidation_paths);
+            .record(key, value.validity(), invalidation_paths);
 
-        derive_from
+        value
             .downcast_maybe_transient::<K::Value>()
             .expect("type mismatch")
             .dupe()
@@ -700,6 +746,20 @@ impl ModernComputeCtx<'_> {
 }
 
 impl CoreCtx {
+    fn live_context_id(&self) -> DiceLiveContextId {
+        self.async_evaluator
+            .per_live_version_ctx
+            .live_context_id(self.async_evaluator.dice.state_handle.engine_id())
+    }
+
+    fn check_opaque_context(&self, live_context: DiceLiveContextId) -> DiceResult<()> {
+        if live_context == self.live_context_id() {
+            Ok(())
+        } else {
+            Err(DiceError::foreign_opaque_value())
+        }
+    }
+
     /// Compute "opaque" value where the value is only accessible via projections.
     /// Projections allow accessing derived results from the "opaque" value,
     /// where the dependency of reading a projection is the projection value rather
@@ -738,6 +798,7 @@ impl CoreCtx {
         base: &OpaqueValueModern<B>,
         dep_trackers: DepsTrackerHolder,
     ) -> DiceResult<K::Value> {
+        self.check_opaque_context(base.live_context)?;
         let dice_key = self
             .async_evaluator
             .dice
@@ -801,7 +862,7 @@ impl CoreCtx {
                 .root_completed(
                     DynKey::ref_cast(self.async_evaluator.dice.key_index.get(dice_key)),
                     activation,
-                    r.value().validity() == DiceValidity::Transient,
+                    r.value().validity().is_transient(),
                 );
         }
 
@@ -860,10 +921,12 @@ impl CoreCtx {
                 next.checked_add(1)
             })
             .expect("transaction root request ordinal exhausted");
+        let state = &self.async_evaluator.dice.state_handle;
         let activation = RootActivation::new(
-            self.async_evaluator.dice.state_handle.node_id(key),
+            state.node_id(key),
             self.get_version(),
             ordinal,
+            self.live_context_id(),
         );
         activation_tracker.root_activated(
             DynKey::ref_cast(self.async_evaluator.dice.key_index.get(key)),
@@ -1020,7 +1083,7 @@ impl SharedLiveTransactionCtx {
                     tracker.root_completed(
                         DynKey::ref_cast(dice.key_index.get(key)),
                         root,
-                        value.value().validity() == DiceValidity::Transient,
+                        value.value().validity().is_transient(),
                     );
                 }
                 result

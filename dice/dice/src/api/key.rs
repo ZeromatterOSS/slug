@@ -64,6 +64,13 @@ pub trait Key: Allocative + Debug + Display + Clone + Eq + Hash + Send + Sync + 
         true
     }
 
+    /// Retain this transient value's activation dependencies in the live
+    /// transaction cache. Locally valid evaluations depending on it inherit retention.
+    /// Called only when this key's own `validity` returned false.
+    fn retain_transient_activation(_x: &Self::Value) -> bool {
+        false
+    }
+
     fn storage_type() -> StorageType {
         StorageType::Normal
     }

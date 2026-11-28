@@ -78,7 +78,7 @@ impl DiceComputationsImpl<'_> {
         &mut self,
         derive_from: OpaqueValue<K>,
     ) -> DiceResult<K::Value> {
-        Ok(self.0.opaque_into_value(derive_from.implementation))
+        self.0.opaque_into_value(derive_from.implementation)
     }
 
     /// Computes all the given tasks in parallel, returning an unordered Stream

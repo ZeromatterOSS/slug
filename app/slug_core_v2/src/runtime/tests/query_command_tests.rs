@@ -840,9 +840,114 @@ fn query_test_registry() -> tempfile::TempDir {
     }
 
     #[test]
-    fn observed_external_query_accepts_closure_selected_repository_sidecars() {
+    fn observed_query_certifies_host_bzl_cycle_and_retained_repairs() {
+        let workspace = query_local_override_workspace("slug-query-cycle-selection");
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "print('PEER')\nexports_files(['target.txt'])\n",
+        )
+        .unwrap();
+        let package = workspace.path().join("pkg");
+        fs::create_dir(&package).unwrap();
+        fs::write(
+            package.join("BUILD.bazel"),
+            "load(':one.bzl', 'SRC')\nprint('BUILD_BODY')\nfilegroup(name='probe', srcs=[SRC])\n",
+        )
+        .unwrap();
+        fs::write(
+            package.join("one.bzl"),
+            "load(':two.bzl', _SRC='SOURCE')\nSRC = _SRC\n",
+        )
+        .unwrap();
+        let two = package.join("two.bzl");
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let query = || {
+            runtime.query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+                "@dep//:target.txt union loadfiles(//pkg:probe)",
+                QueryOrder::Auto,
+                QueryPolicy::default(),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                QueryOutputCompletion::Standard,
+            )
+        };
+
+        let mut first_cycle = None;
+        for expected_cycle_events in [&["PEER"][..], &[]] {
+            fs::write(&two, "load(':one.bzl', 'SRC')\nSOURCE = SRC\n").unwrap();
+            let failed = query().unwrap();
+            let error = failed.terminal_for_test().as_ref().as_ref().unwrap_err();
+            assert!(error.is_host_bzl_load_cycle());
+            assert!(error.needs_evaluation_context());
+            assert_eq!(error.error_kind(), "query_error");
+            assert_eq!(error.exit_code, 7);
+            for text in [
+                "cycle detected in extension files",
+                "//pkg:one.bzl",
+                "//pkg:two.bzl",
+            ] {
+                assert!(error.message.contains(text), "{error}");
+            }
+            let first = first_cycle.get_or_insert_with(|| error.message.dupe());
+            assert_eq!(&error.message, &*first);
+            assert_eq!(accepted_output_text(&failed), expected_cycle_events);
+
+            let snapshot = accepted_native_snapshot(&runtime);
+            for path in ["pkg/BUILD.bazel", "pkg/one.bzl", "pkg/two.bzl"] {
+                assert!(
+                    snapshot
+                        .path_observations
+                        .observations()
+                        .iter()
+                        .any(|(demand, _)| {
+                            demand.operation() == PathObservationOperation::FileBytes
+                                && demand.path().as_path().ends_with(path)
+                        }),
+                    "selected observations lack {path}"
+                );
+            }
+            assert!(!snapshot.selected.repository_requests().is_empty());
+            assert!(!snapshot.selected.repository_validations().is_empty());
+
+            fs::write(&two, "print('REPAIRED_BZL')\nSOURCE = 'source.txt'\n").unwrap();
+            let repaired = query().unwrap();
+            let stdout = repaired
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout();
+            let mut labels = stdout.lines().collect::<Vec<_>>();
+            labels.sort_unstable();
+            assert_eq!(
+                labels,
+                ["//pkg:one.bzl", "//pkg:two.bzl", "@dep//:target.txt"]
+            );
+            assert_eq!(
+                accepted_output_text(&repaired),
+                ["REPAIRED_BZL", "BUILD_BODY"]
+            );
+            let warm = query().unwrap();
+            assert!(Arc::ptr_eq(
+                repaired.terminal_for_test(),
+                warm.terminal_for_test()
+            ));
+            assert!(accepted_output_text(&warm).is_empty());
+        }
+
+        fs::write(&two, "fail('cycle detected in extension files')\n").unwrap();
+        let lookalike = query().unwrap();
+        let error = lookalike.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert!(error.message.contains("cycle detected in extension files"));
+        assert!(!error.is_host_bzl_load_cycle());
+    }
+
+    fn query_local_override_workspace(test_directory: &str) -> tempfile::TempDir {
         let target_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../target/slug-query-repository-selection");
+            .join("../../target")
+            .join(test_directory);
         fs::create_dir_all(&target_parent).unwrap();
         let workspace = tempfile::tempdir_in(target_parent).unwrap();
         fs::write(
@@ -866,6 +971,12 @@ fn query_test_registry() -> tempfile::TempDir {
         )
         .unwrap();
         fs::write(workspace.path().join("dep/target.txt"), "target\n").unwrap();
+        workspace
+    }
+
+    #[test]
+    fn observed_external_query_accepts_closure_selected_repository_sidecars() {
+        let workspace = query_local_override_workspace("slug-query-repository-selection");
         let runtime = test_runtime(workspace.path()).unwrap();
         let query = || {
             runtime.query_command_with_policy_and_bzlmod_inputs_and_output_completion(

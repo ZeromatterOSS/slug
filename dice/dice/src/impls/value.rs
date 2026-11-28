@@ -19,6 +19,7 @@ use crate::Key;
 use crate::ProjectionKey;
 use crate::api::key::InvalidationSourcePriority;
 use crate::arc::Arc;
+use crate::impls::deps::graph::SeriesParallelDeps;
 use crate::impls::key::DiceKey;
 use crate::versions::VersionNumber;
 use crate::versions::VersionRanges;
@@ -60,6 +61,8 @@ impl MaybeValidDiceValue {
     ) -> Self {
         let validity = if value.validity() {
             deps_validity
+        } else if value.retain_transient_activation() {
+            DiceValidity::TransientWithActivation
         } else {
             DiceValidity::Transient
         };
@@ -106,8 +109,23 @@ impl MaybeValidDiceValue {
     pub(crate) fn into_valid_value(self) -> Result<DiceValidValue, MaybeValidDiceValue> {
         match self.validity {
             DiceValidity::Valid => Ok(DiceValidValue(self.value)),
-            DiceValidity::Transient => Err(self),
+            DiceValidity::Transient | DiceValidity::TransientWithActivation => Err(self),
         }
+    }
+
+    pub(crate) fn with_activation_deps(self, deps: SeriesParallelDeps) -> Self {
+        debug_assert_eq!(self.validity, DiceValidity::TransientWithActivation);
+        Self {
+            value: std::sync::Arc::new(TransientActivationValue {
+                inner: self.value,
+                deps,
+            }),
+            validity: self.validity,
+        }
+    }
+
+    pub(crate) fn activation_deps(&self) -> Option<&SeriesParallelDeps> {
+        self.value.activation_deps()
     }
 }
 
@@ -117,13 +135,21 @@ pub(crate) enum DiceValidity {
     Valid,
     /// If the node is invalid or any of its deps are invalid
     Transient,
+    /// Transient with live activation dependency retention.
+    TransientWithActivation,
 }
 
 impl DiceValidity {
     pub(crate) fn and(&mut self, other: Self) {
-        if other == DiceValidity::Transient {
-            *self = DiceValidity::Transient;
+        match other {
+            Self::TransientWithActivation => *self = other,
+            Self::Transient if *self == Self::Valid => *self = other,
+            _ => {}
         }
+    }
+
+    pub(crate) fn is_transient(self) -> bool {
+        self != Self::Valid
     }
 }
 
@@ -293,11 +319,41 @@ pub(crate) trait DiceValueDyn: Allocative + Any + Send + Sync + 'static {
     /// Panics if called with incompatible values.
     fn equality(&self, other: &dyn DiceValueDyn) -> bool;
     fn validity(&self) -> bool;
+    fn retain_transient_activation(&self) -> bool {
+        false
+    }
+    fn activation_deps(&self) -> Option<&SeriesParallelDeps> {
+        None
+    }
 }
 
 impl dyn DiceValueDyn {
     pub(crate) fn downcast_ref<V: Any>(&self) -> Option<&V> {
         self.value_as_any().downcast_ref()
+    }
+}
+
+#[derive(Allocative)]
+struct TransientActivationValue {
+    inner: std::sync::Arc<dyn DiceValueDyn>,
+    deps: SeriesParallelDeps,
+}
+
+impl DiceValueDyn for TransientActivationValue {
+    fn value_as_any(&self) -> &dyn Any {
+        self.inner.value_as_any()
+    }
+
+    fn equality(&self, other: &dyn DiceValueDyn) -> bool {
+        self.inner.equality(other)
+    }
+
+    fn validity(&self) -> bool {
+        self.inner.validity()
+    }
+
+    fn activation_deps(&self) -> Option<&SeriesParallelDeps> {
+        Some(&self.deps)
     }
 }
 
@@ -329,6 +385,10 @@ where
 
     fn validity(&self) -> bool {
         K::validity(&self.value)
+    }
+
+    fn retain_transient_activation(&self) -> bool {
+        K::retain_transient_activation(&self.value)
     }
 }
 

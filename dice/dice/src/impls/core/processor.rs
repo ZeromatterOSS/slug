@@ -94,9 +94,15 @@ impl StateProcessor {
             StateRequest::ActivationClosure {
                 version,
                 roots,
+                transient_epoch,
                 resp,
             } => {
-                drop(resp.send(self.state.activation_closure(self.engine, version, roots)));
+                drop(resp.send(self.state.activation_closure(
+                    self.engine,
+                    version,
+                    roots,
+                    transient_epoch,
+                )));
             }
             #[cfg(test)]
             StateRequest::ActivationHistoryLen { key, resp } => {

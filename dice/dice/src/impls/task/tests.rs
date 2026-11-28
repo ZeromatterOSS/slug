@@ -364,7 +364,7 @@ async fn sync_complete_task_with_future() -> anyhow::Result<()> {
     assert!(
         task.depended_on_by(ParentKey::None)
             .unwrap()
-            .sync_get_or_complete(|| DiceSyncResult {
+            .sync_get_or_complete(|| DiceSyncResult::Deferred {
                 sync_result: v_sync,
                 state_future: rx
                     .map(|res| { res.map_err(|_| CancellationReason::ByTest).flatten() })

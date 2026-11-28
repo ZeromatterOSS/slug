@@ -26,10 +26,11 @@ unrelated sibling silence, and final dependency order. `.bzl` compares exact
 evaluator operands. BUILD uses a fixed-size digest of its selected source,
 ordered loads and consumed glob records for print comparison. Projected
 registration results preserve warm rule reuse and keep the observed edges for
-source checks. The Build precheck can still reject ambient directory timestamp
-changes above the workspace. Separate resolution identity from child metadata.
-The CLI sweep also exposed a transient `.bzl` cycle whose query closure cannot
-publish its typed diagnostic.
+source checks. All 57 CLI load-provenance rows passed, including the Host
+`.bzl` cycle. Query certifies that diagnostic and its selected sources through
+the completed live DICE closure. The Build precheck can still reject ambient
+directory timestamp changes above the workspace. Separate traversal identity
+from child metadata, then finish installed qualification.
 Public action comparison and Rust REAPI follow. Keep atomic
 publication, existing readers, native quotas, clocks, launcher/PID1, rooted
 reads, codec and history checks. Compare equal work for timing.

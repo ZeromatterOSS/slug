@@ -64,6 +64,7 @@ use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceComputations;
+use dice::DiceLiveContextId;
 use dice::DiceTransactionUpdater;
 #[cfg(test)]
 use dice::DynKey;
@@ -1551,6 +1552,10 @@ trait NativeCommandRoot: Clone {
         false
     }
 
+    fn requires_completed_transient_root(&self, _terminal: &Self::Terminal) -> bool {
+        false
+    }
+
     async fn compute(
         &self,
         transaction: &mut dice::DiceTransaction,
@@ -1944,6 +1949,14 @@ impl NativeCommandRoot for RootQueryCommandObservationKey {
 
     fn observed_selection_association(&self) -> ObservedSelectionAssociation {
         ObservedSelectionAssociation::ClosureRepositories
+    }
+
+    fn requires_completed_transient_root(&self, terminal: &Self::Terminal) -> bool {
+        terminal
+            .result()
+            .as_ref()
+            .as_ref()
+            .is_err_and(QueryError::is_host_bzl_load_cycle)
     }
 
     async fn compute(
@@ -6930,6 +6943,10 @@ impl WorkspaceRuntime {
                     }
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal) => {
                         let mut terminal = terminal.clone();
+                        // Bind any transient receipt to the transaction that returned this terminal.
+                        let transient_root_context = attempt_root
+                            .requires_completed_transient_root(&terminal)
+                            .then(|| transaction.live_context_id());
                         let source_certificate =
                             attempt_root.source_certificate(&terminal).cloned();
                         let terminal_demands = matches!(
@@ -6956,7 +6973,9 @@ impl WorkspaceRuntime {
                         };
                         let terminal_root_count = sealed.root_count();
                         begin_probe_phase!(selection_phase, self, TerminalSelection);
-                        let selected = sealed.select(&transaction).await?;
+                        let selected = sealed
+                            .select_with_transient_root(&transaction, transient_root_context)
+                            .await?;
                         finish_probe_phase!(selection_phase);
                         begin_probe_phase!(preparation_phase, self, AcceptancePreparation);
                         let mut prepared = match guard
@@ -9476,9 +9495,17 @@ impl NativeDemandSealedAttempt {
         self,
         transaction: &dice::DiceTransaction,
     ) -> Result<NativeDemandTerminalSelection, NativeDemandSessionError> {
+        self.select_with_transient_root(transaction, None).await
+    }
+
+    async fn select_with_transient_root(
+        self,
+        transaction: &dice::DiceTransaction,
+        expected_live_context: Option<DiceLiveContextId>,
+    ) -> Result<NativeDemandTerminalSelection, NativeDemandSessionError> {
         let sidecars = self
             .sealed
-            .select(transaction)
+            .select_with_transient_root(transaction, expected_live_context)
             .await
             .map_err(NativeDemandSessionError::Effect)?;
         Ok(NativeDemandTerminalSelection {

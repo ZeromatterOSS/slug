@@ -13,6 +13,7 @@ use std::fmt;
 
 use dupe::Dupe;
 
+use crate::DiceLiveContextId;
 use crate::DynKey;
 use crate::VersionNumber;
 
@@ -108,14 +109,21 @@ pub struct RootActivation {
     node: DiceNodeId,
     version: VersionNumber,
     ordinal: u64,
+    live_context: DiceLiveContextId,
 }
 
 impl RootActivation {
-    pub(crate) fn new(node: DiceNodeId, version: VersionNumber, ordinal: u64) -> Self {
+    pub(crate) fn new(
+        node: DiceNodeId,
+        version: VersionNumber,
+        ordinal: u64,
+        live_context: DiceLiveContextId,
+    ) -> Self {
         Self {
             node,
             version,
             ordinal,
+            live_context,
         }
     }
 
@@ -129,6 +137,10 @@ impl RootActivation {
 
     pub fn ordinal(&self) -> u64 {
         self.ordinal
+    }
+
+    pub(crate) fn live_context(&self) -> DiceLiveContextId {
+        self.live_context
     }
 }
 

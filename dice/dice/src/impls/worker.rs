@@ -53,6 +53,7 @@ use crate::impls::task::spawn_dice_task;
 use crate::impls::user_cycle::KeyComputingUserCycleDetectorData;
 use crate::impls::user_cycle::UserCycleDetectorData;
 use crate::impls::value::DiceComputedValue;
+use crate::impls::value::DiceValidity;
 use crate::impls::value::TrackedInvalidationPaths;
 use crate::impls::worker::state::ActivationInfo;
 use crate::impls::worker::state::DiceWorkerStateAwaitingPrevious;
@@ -317,11 +318,18 @@ impl DiceTaskWorker {
                         )
                         .await
                 }
-                Err(value) => Ok(DiceComputedValue::new(
-                    value,
-                    Arc::new(VersionRange::begins_with(v).into_ranges()),
-                    result.invalidation_paths,
-                )),
+                Err(value) => {
+                    let value = if value.validity() == DiceValidity::TransientWithActivation {
+                        value.with_activation_deps(result.deps)
+                    } else {
+                        value
+                    };
+                    Ok(DiceComputedValue::new(
+                        value,
+                        Arc::new(VersionRange::begins_with(v).into_ranges()),
+                        result.invalidation_paths,
+                    ))
+                }
             }
         };
 
@@ -573,23 +581,26 @@ pub(crate) fn project_for_key(
                 invalidation_paths,
             } = eval_result;
             // send the update but don't wait for it
-            let state_future = match value.dupe().into_valid_value() {
-                Ok(value) => {
+            let (value, state_future) = match value.dupe().into_valid_value() {
+                Ok(valid) => {
                     let rx = state.update_computed(
                         VersionedGraphKey::new(v, k),
                         version_epoch,
                         storage,
-                        value,
+                        valid,
                         Arc::new(deps),
                         invalidation_paths.dupe(),
                     );
 
-                    Some(rx.map(|res| res).boxed())
+                    (value, Some(rx.map(|res| res).boxed()))
+                }
+                Err(transient) if transient.validity() == DiceValidity::TransientWithActivation => {
+                    (transient.with_activation_deps(deps), None)
                 }
                 Err(_transient_result) => {
                     // transients are never stored in the state, but the result should be shared
                     // with async computations as if it were.
-                    None
+                    (value, None)
                 }
             };
 
@@ -599,15 +610,19 @@ pub(crate) fn project_for_key(
         debug!(msg = "update future completed");
         event_dispatcher.finished(k);
 
+        let retain_activation = res.validity() == DiceValidity::TransientWithActivation;
         let computed_value = DiceComputedValue::new(
             res,
             Arc::new(VersionRange::begins_with(v).into_ranges()),
             invalidation_paths,
         );
+        if retain_activation {
+            return DiceSyncResult::Immediate(computed_value);
+        }
         let state_future =
             future.unwrap_or_else(|| future::ready(Ok(computed_value.dupe())).boxed());
 
-        DiceSyncResult {
+        DiceSyncResult::Deferred {
             sync_result: computed_value,
             state_future,
         }

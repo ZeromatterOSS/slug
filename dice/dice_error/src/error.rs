@@ -34,6 +34,10 @@ impl DiceError {
         DiceError(Arc::new(DiceErrorImpl::Cancelled(reason)))
     }
 
+    pub fn foreign_opaque_value() -> Self {
+        DiceError(Arc::new(DiceErrorImpl::ForeignOpaqueValue))
+    }
+
     pub fn duplicate_activation_data() -> Self {
         DiceError(Arc::new(DiceErrorImpl::DuplicateActivationData))
     }
@@ -64,6 +68,8 @@ pub enum DiceErrorImpl {
         expected_type_name: String,
         actual_type_name: String,
     },
+    #[error("The opaque value belongs to a different live DICE context")]
+    ForeignOpaqueValue,
     #[error("Activation data was already provided for this key")]
     DuplicateActivationData,
 }

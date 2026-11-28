@@ -15,6 +15,7 @@ use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use dashmap::DashMap;
+use dice_error::result::CancellableResult;
 use dice_error::result::CancellationReason;
 use dupe::Dupe;
 use fxhash::FxBuildHasher;
@@ -74,6 +75,17 @@ impl SharedCache {
             .completed
             .lookup(hash, |task| task.key == key)
             .map(|task| task.value.dupe())
+    }
+
+    pub(crate) fn get_finished(
+        &self,
+        key: DiceKey,
+    ) -> Option<CancellableResult<DiceComputedValue>> {
+        self.try_get_computed(key)
+            .map(Ok)
+            .or_else(|| self.data.storage.get(&key)?.get_finished_value())
+            // Promotion inserts into the completed table before removing from storage.
+            .or_else(|| self.try_get_computed(key).map(Ok))
     }
 
     pub(crate) fn get(&self, key: DiceKey) -> DiceTaskRef<'_> {

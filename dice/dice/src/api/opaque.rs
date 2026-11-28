@@ -15,12 +15,12 @@ use std::fmt::Formatter;
 use crate::api::key::Key;
 use crate::impls::opaque::OpaqueValueModern;
 
-/// Computed value which is not directly visible to user.
+/// Computed value whose dependency is recorded when it is consumed.
 ///
-/// The value can be accessed only via "projection" operation,
-/// so projection result is recorded as a dependency
-/// of a computation which requested the opaqued value,
-/// but the opaque value key is not.
+/// A projection records its own dependency. Direct consumption records the underlying key.
+///
+/// Consume it only in computations that share the live context that produced it.
+/// Separate transactions sharing that cache may use the same opaque value.
 pub struct OpaqueValue<K: Key> {
     pub(crate) implementation: OpaqueValueModern<K>,
 }

@@ -154,6 +154,7 @@ impl CoreState {
         engine: u64,
         version: VersionNumber,
         roots: Vec<DiceNodeId>,
+        transient_epoch: Option<VersionEpoch>,
     ) -> Result<ActivationClosure, ActivationClosureError> {
         for root in &roots {
             if root.engine() != engine {
@@ -169,6 +170,15 @@ impl CoreState {
                 version,
             });
         }
+        let live_cache = match transient_epoch {
+            Some(epoch) => Some(self.version_tracker.live_cache(version, epoch).ok_or(
+                ActivationClosureError::NotVerified {
+                    node: roots[0],
+                    version,
+                },
+            )?),
+            None => None,
+        };
 
         let mut visiting = HashSet::default();
         let mut visited = HashSet::default();
@@ -179,40 +189,26 @@ impl CoreState {
             .map(|root| ActivationTraversalFrame::Enter {
                 key: DiceKey { index: root.node() },
                 is_root: true,
+                live_cache,
             })
             .collect::<Vec<_>>();
         while let Some(frame) = stack.pop() {
             match frame {
-                ActivationTraversalFrame::Enter { key, is_root } => {
+                ActivationTraversalFrame::Enter {
+                    key,
+                    is_root,
+                    live_cache,
+                } => {
                     if visited.contains(&key) {
                         continue;
                     }
                     let node = DiceNodeId::new(engine, key.index);
-                    if !self.graph.nodes.contains_key(&key) {
-                        return Err(if is_root {
-                            ActivationClosureError::UnavailableRoot { root: node }
-                        } else {
-                            ActivationClosureError::UnavailableNode { node }
-                        });
-                    }
                     if !visiting.insert(key) {
                         return Err(ActivationClosureError::Cycle { node });
                     }
 
-                    let dependencies = match self
-                        .graph
-                        .activation_transition_at(VersionedGraphKey::new(version, key))
-                    {
-                        Some(ActivationTransition::Verified(dependencies)) => {
-                            dependencies.iter_keys().collect::<Vec<_>>()
-                        }
-                        Some(ActivationTransition::Dirty) => {
-                            return Err(ActivationClosureError::Dirty { node, version });
-                        }
-                        None => {
-                            return Err(ActivationClosureError::NotVerified { node, version });
-                        }
-                    };
+                    let (dependencies, live_cache) =
+                        self.closure_dependencies(version, key, node, is_root, live_cache)?;
                     let dependency_ids = dependencies
                         .iter()
                         .map(|dependency| DiceNodeId::new(engine, dependency.index))
@@ -226,6 +222,7 @@ impl CoreState {
                         ActivationTraversalFrame::Enter {
                             key,
                             is_root: false,
+                            live_cache,
                         }
                     }));
                 }
@@ -242,6 +239,56 @@ impl CoreState {
             }
         }
         Ok(ActivationClosure::new(version, roots, nodes))
+    }
+
+    fn closure_dependencies<'a>(
+        &self,
+        version: VersionNumber,
+        key: DiceKey,
+        node: DiceNodeId,
+        is_root: bool,
+        live_cache: Option<&'a SharedCache>,
+    ) -> Result<(Vec<DiceKey>, Option<&'a SharedCache>), ActivationClosureError> {
+        if let Some(cache) = live_cache {
+            match cache.get_finished(key) {
+                Some(Ok(value)) if value.value().validity().is_transient() => {
+                    let dependencies = value
+                        .value()
+                        .activation_deps()
+                        .ok_or(ActivationClosureError::NotVerified { node, version })?;
+                    return Ok((dependencies.iter_keys().collect(), live_cache));
+                }
+                Some(Err(_)) => {
+                    return Err(ActivationClosureError::NotVerified { node, version });
+                }
+                _ if is_root => {
+                    return Err(ActivationClosureError::NotVerified { node, version });
+                }
+                _ => {}
+            }
+        }
+
+        if !self.graph.nodes.contains_key(&key) {
+            return Err(if is_root {
+                ActivationClosureError::UnavailableRoot { root: node }
+            } else {
+                ActivationClosureError::UnavailableNode { node }
+            });
+        }
+        match self
+            .graph
+            .activation_transition_at(VersionedGraphKey::new(version, key))
+        {
+            Some(ActivationTransition::Verified(dependencies)) => {
+                // A verified value only depends on other verified values. Do not use live
+                // transient results to fill holes in its durable dependency closure.
+                Ok((dependencies.iter_keys().collect(), None))
+            }
+            Some(ActivationTransition::Dirty) => {
+                Err(ActivationClosureError::Dirty { node, version })
+            }
+            None => Err(ActivationClosureError::NotVerified { node, version }),
+        }
     }
 
     #[cfg(test)]
@@ -326,10 +373,11 @@ impl CoreState {
     }
 }
 
-enum ActivationTraversalFrame {
+enum ActivationTraversalFrame<'a> {
     Enter {
         key: DiceKey,
         is_root: bool,
+        live_cache: Option<&'a SharedCache>,
     },
     Exit {
         key: DiceKey,

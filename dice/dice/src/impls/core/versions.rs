@@ -122,6 +122,13 @@ impl VersionTracker {
         self.active_versions.contains_key(&v)
     }
 
+    pub(crate) fn live_cache(&self, v: VersionNumber, epoch: VersionEpoch) -> Option<&SharedCache> {
+        self.active_versions
+            .get(&v)
+            .filter(|active| active.version_epoch == epoch)
+            .map(|active| &active.per_transaction_data)
+    }
+
     pub(crate) fn oldest_live_or_current(&self) -> VersionNumber {
         self.active_versions
             .keys()

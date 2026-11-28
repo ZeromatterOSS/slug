@@ -47,6 +47,7 @@ use slug_loading_v2::PackageGroupContents;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::RepositoryPackageLoadKey;
 use slug_loading_v2::RepositoryPackageLoadObservationKey;
+use slug_loading_v2::RootPackageLoadError;
 use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::RootPackageLoadObservationKey;
 use slug_loading_v2::RuleCapability;
@@ -522,6 +523,7 @@ enum QueryErrorKind {
     Evaluation,
     TargetMissing,
     PackageLoading,
+    HostBzlLoadCycle,
     UnsupportedFeature,
     PreparationRestart,
     ObservationRestart,
@@ -552,6 +554,19 @@ impl QueryError {
         }
     }
 
+    fn root_package_loading(error: &RootPackageLoadError, mode: QueryObservationMode) -> Self {
+        let mut query_error = Self::package_loading(error.to_string());
+        if mode == QueryObservationMode::Observed && error.is_host_bzl_load_cycle() {
+            query_error.kind = QueryErrorKind::HostBzlLoadCycle;
+        }
+        query_error
+    }
+
+    #[doc(hidden)]
+    pub fn is_host_bzl_load_cycle(&self) -> bool {
+        matches!(self.kind, QueryErrorKind::HostBzlLoadCycle)
+    }
+
     pub(crate) fn unsupported_feature(message: impl Into<String>) -> Self {
         Self {
             message: Arc::from(message.into()),
@@ -569,7 +584,10 @@ impl QueryError {
     }
 
     pub fn needs_evaluation_context(&self) -> bool {
-        matches!(self.kind, QueryErrorKind::PackageLoading)
+        matches!(
+            self.kind,
+            QueryErrorKind::PackageLoading | QueryErrorKind::HostBzlLoadCycle
+        )
     }
 
     /// True only for failures raised while evaluating an already prepared
@@ -759,7 +777,7 @@ async fn compute_root_unconfigured_package_graph(
         loaded
             .as_ref()
             .as_ref()
-            .map_err(|error| QueryError::package_loading(error.to_string()))
+            .map_err(|error| QueryError::root_package_loading(error, mode))
             .and_then(|loaded| {
                 package_graph_from_loaded(
                     key.workspace.as_path(),

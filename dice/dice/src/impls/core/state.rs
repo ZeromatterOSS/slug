@@ -149,12 +149,14 @@ impl CoreStateHandle {
         &self,
         version: VersionNumber,
         roots: Vec<DiceNodeId>,
+        transient_epoch: Option<VersionEpoch>,
     ) -> impl Future<Output = Result<ActivationClosure, ActivationClosureError>> + use<> {
         let (resp, recv) = oneshot::channel();
         self.call(
             StateRequest::ActivationClosure {
                 version,
                 roots,
+                transient_epoch,
                 resp,
             },
             recv,
@@ -335,6 +337,7 @@ pub(super) enum StateRequest {
     ActivationClosure {
         version: VersionNumber,
         roots: Vec<DiceNodeId>,
+        transient_epoch: Option<VersionEpoch>,
         resp: Sender<Result<ActivationClosure, ActivationClosureError>>,
     },
     #[cfg(test)]

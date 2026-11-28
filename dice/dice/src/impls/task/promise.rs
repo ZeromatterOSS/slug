@@ -51,11 +51,13 @@ pub(super) enum DicePromiseInternal {
 }
 
 /// result of a synchronous projection
-pub(crate) struct DiceSyncResult {
-    /// the value that's ready now without checking core state
-    pub(crate) sync_result: DiceComputedValue,
-    /// the future value after checking core state
-    pub(crate) state_future: BoxFuture<'static, CancellableResult<DiceComputedValue>>,
+pub(crate) enum DiceSyncResult {
+    /// A live activation receipt must be visible before returning the value.
+    Immediate(DiceComputedValue),
+    Deferred {
+        sync_result: DiceComputedValue,
+        state_future: BoxFuture<'static, CancellableResult<DiceComputedValue>>,
+    },
 }
 
 impl DiceSyncResult {
@@ -63,7 +65,7 @@ impl DiceSyncResult {
     pub(crate) fn testing(v: DiceComputedValue) -> Self {
         use futures::FutureExt;
 
-        Self {
+        Self::Deferred {
             sync_result: v.dupe(),
             state_future: futures::future::ready(Ok(v)).boxed(),
         }
@@ -125,29 +127,39 @@ impl DicePromise {
                         }
                     }
 
-                    let result = {
+                    let (sync_result, state_future) = {
                         let mut locked = task_internal.sync_value.write();
 
+                        if let Some(res) = task_internal.read_value() {
+                            return res;
+                        }
                         if let Some(res) = locked.as_ref() {
                             return Ok(res.dupe());
                         }
 
-                        let result = f();
+                        let (sync_result, state_future) = match f() {
+                            DiceSyncResult::Immediate(value) => {
+                                return task_internal.set_value(value);
+                            }
+                            DiceSyncResult::Deferred {
+                                sync_result,
+                                state_future,
+                            } => (sync_result, state_future),
+                        };
 
                         assert!(
-                            locked.replace(result.sync_result.dupe()).is_none(),
+                            locked.replace(sync_result.dupe()).is_none(),
                             "should only complete sync result once"
                         );
 
-                        result
+                        (sync_result, state_future)
                     };
 
                     tokio::spawn({
-                        let future = result.state_future;
                         let internals = task_internal.dupe();
 
                         async move {
-                            let res = future.await;
+                            let res = state_future.await;
 
                             let mut sync_value = internals.sync_value.write();
 
@@ -168,7 +180,7 @@ impl DicePromise {
                         }
                     });
 
-                    Ok(result.sync_result)
+                    Ok(sync_result)
                 }
             }
             DicePromiseInternal::Done => panic!("poll after ready"),

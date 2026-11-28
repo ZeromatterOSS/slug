@@ -17,6 +17,7 @@ use crate::DiceComputations;
 use crate::DiceLiveContextId;
 use crate::DiceNodeId;
 use crate::DiceTransactionUpdater;
+use crate::RootActivation;
 use crate::impls::ctx::BaseComputeCtx;
 use crate::versions::VersionNumber;
 
@@ -50,6 +51,16 @@ impl DiceTransactionImpl {
     ) -> impl std::future::Future<Output = Result<ActivationClosure, ActivationClosureError>> + use<>
     {
         self.0.activation_closure(roots)
+    }
+
+    pub(crate) async fn activation_closure_with_transient_root(
+        &self,
+        completion: RootActivation,
+        expected_live_context: DiceLiveContextId,
+    ) -> Result<ActivationClosure, ActivationClosureError> {
+        self.0
+            .activation_closure_with_transient_root(completion, expected_live_context)
+            .await
     }
 
     #[cfg(test)]

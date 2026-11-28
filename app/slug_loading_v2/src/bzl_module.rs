@@ -458,6 +458,40 @@ impl Key for BzlLoadCyclePoisonKey {
     }
 }
 
+/// Leaves a live activation receipt only for a completed observed Host BUILD load cycle.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct ObservedHostBzlCyclePoisonKey;
+
+impl fmt::Display for ObservedHostBzlCyclePoisonKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("observed-host-bzl-cycle-poison")
+    }
+}
+
+#[async_trait]
+impl Key for ObservedHostBzlCyclePoisonKey {
+    type Value = ();
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+    }
+
+    fn equality(_x: &Self::Value, _y: &Self::Value) -> bool {
+        true
+    }
+
+    fn validity(_value: &Self::Value) -> bool {
+        false
+    }
+
+    fn retain_transient_activation(_value: &Self::Value) -> bool {
+        true
+    }
+}
+
 #[async_trait]
 impl Key for PackageListingKey {
     type Value = LoadResult<PackageListing>;
@@ -1715,6 +1749,14 @@ impl fmt::Display for HostBzlModuleError {
 
 impl std::error::Error for HostBzlModuleError {}
 
+impl HostBzlLoadCycle {
+    fn has_build_sources(&self) -> bool {
+        self.keys
+            .first()
+            .is_some_and(|key| key.context == BzlModuleContext::Build)
+    }
+}
+
 #[allow(dead_code)]
 impl HostBzlModuleError {
     fn cycle(&self) -> Option<&HostBzlLoadCycle> {
@@ -2274,6 +2316,11 @@ pub struct RootPackageLoadError {
 impl RootPackageLoadError {
     fn new(inner: RootPackageLoadErrorInner) -> Self {
         Self { inner }
+    }
+
+    #[doc(hidden)]
+    pub fn is_host_bzl_load_cycle(&self) -> bool {
+        matches!(&self.inner, RootPackageLoadErrorInner::Bzl { error, .. } if error.cycle().is_some_and(HostBzlLoadCycle::has_build_sources))
     }
 
     /// Slug-native presentation stage; never a semantic identity or input.
@@ -3084,7 +3131,6 @@ async fn complete_observed_host_bzl_cycle(
     cycle: &HostBzlLoadCycle,
     mut observations: PathObservationEpoch,
 ) -> HostBzlModuleDriverOutcome {
-    let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
     if !cycle.keys.is_empty() {
         let current_index = cycle
             .keys
@@ -3095,24 +3141,35 @@ async fn complete_observed_host_bzl_cycle(
             let identity = &cycle.keys[(current_index + offset) % cycle.keys.len()];
             let source = match host_dice_invariant(ctx.compute(&identity.source_key()).await) {
                 SourcePreparationOutcome::Need(need) => {
+                    // The source observation already makes this attempt transient.
                     return SourcePreparationOutcome::Need(need);
                 }
                 SourcePreparationOutcome::Complete(Err(error)) => {
+                    let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
                     return SourcePreparationOutcome::Complete(Err(error));
                 }
                 SourcePreparationOutcome::Complete(Ok(source)) => source,
             };
             observations = match union_host_observations(&observations, source.observations()) {
                 Ok(observations) => observations,
-                Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                Err(error) => {
+                    let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
             };
             if let Err(error) = source.result() {
+                let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
                 return host_bzl_complete(
                     Err(HostBzlModuleError::Source(error.clone())),
                     observations,
                 );
             }
         }
+    }
+    if cycle.has_build_sources() {
+        let _unused = ctx.compute(&ObservedHostBzlCyclePoisonKey).await;
+    } else {
+        let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
     }
     host_bzl_complete(Err(HostBzlModuleError::Cycle(cycle.clone())), observations)
 }

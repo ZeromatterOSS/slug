@@ -14,8 +14,10 @@ use std::sync::Mutex;
 use allocative::Allocative;
 use async_trait::async_trait;
 use derive_more::Display;
+use dice_error::DiceErrorImpl;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use futures::FutureExt;
 use tokio::sync::Notify;
 
 use crate::ActivationClosureError;
@@ -98,6 +100,7 @@ impl ActivationTracker for Tracker {
             node: activation.node(),
             version: activation.version(),
             ordinal: activation.ordinal(),
+            activation,
         });
     }
 
@@ -107,6 +110,7 @@ impl ActivationTracker for Tracker {
             node: activation.node(),
             version: activation.version(),
             ordinal: activation.ordinal(),
+            activation,
         };
         assert!(self.roots.lock().unwrap().contains(&event));
         self.completed.lock().unwrap().push((event, is_transient));
@@ -127,6 +131,7 @@ enum Kind {
     MaybeTransient,
     InheritedTransient,
     TransientProjection,
+    RetainedTransient,
 }
 
 impl Kind {
@@ -175,6 +180,9 @@ impl Kind {
         if key.key_type_name() == TransientProjection::key_type_name() {
             return Self::TransientProjection;
         }
+        if key.downcast_ref::<RetainedTransientKey>().is_some() {
+            return Self::RetainedTransient;
+        }
 
         panic!("Unexpected key: {key}")
     }
@@ -196,6 +204,7 @@ struct RootEvent {
     node: DiceNodeId,
     version: VersionNumber,
     ordinal: u64,
+    activation: RootActivation,
 }
 
 #[derive(PartialEq, Eq, Debug, Dupe, Clone, Allocative)]
@@ -411,22 +420,37 @@ impl Key for MaybeTransientKey {
     fn validity(value: &i32) -> bool {
         *value >= 0
     }
+
+    fn retain_transient_activation(value: &i32) -> bool {
+        *value == -2
+    }
 }
 
 #[derive(Clone, Dupe, Debug, Display, Eq, Hash, PartialEq, Allocative)]
 #[display("{:?}", self)]
-struct InheritedTransientKey;
+struct InheritedTransientKey {
+    independently_transient: bool,
+}
 
 #[async_trait]
 impl Key for InheritedTransientKey {
     type Value = i32;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> i32 {
-        ctx.compute(&MaybeTransientKey).await.unwrap()
+        let value = ctx.compute(&MaybeTransientKey).await.unwrap();
+        if self.independently_transient {
+            i32::MIN
+        } else {
+            value
+        }
     }
 
     fn equality(x: &i32, y: &i32) -> bool {
         x == y
+    }
+
+    fn validity(value: &i32) -> bool {
+        *value != i32::MIN
     }
 }
 
@@ -448,6 +472,42 @@ impl ProjectionKey for TransientProjection {
 
     fn validity(value: &i32) -> bool {
         *value >= 0
+    }
+}
+
+#[derive(Clone, Dupe, Debug, Display, Eq, Hash, PartialEq, Allocative)]
+#[display("{:?}", self)]
+struct RetainedTransientKey {
+    include_unmarked: bool,
+}
+
+#[async_trait]
+impl Key for RetainedTransientKey {
+    type Value = i32;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> i32 {
+        let (projected, stable) = ctx
+            .compute2(
+                |ctx| {
+                    async move {
+                        let base = ctx.compute_opaque(&MaybeTransientKey).await.unwrap();
+                        ctx.projection(&base, &TransientProjection(false)).unwrap()
+                    }
+                    .boxed()
+                },
+                |ctx| ctx.compute(&GraphKey::Left).boxed(),
+            )
+            .await;
+        assert_eq!(projected, 1);
+        stable.unwrap();
+        if self.include_unmarked {
+            ctx.compute(&TransientKey).await.unwrap();
+        }
+        ctx.compute(&Injected).await.unwrap()
+    }
+
+    fn equality(x: &i32, y: &i32) -> bool {
+        x == y
     }
 }
 
@@ -662,10 +722,13 @@ async fn root_completions_track_actual_validity_through_repair_and_cached_projec
         let mut updater = dice.updater_with_data(user_data(&tracker));
         updater.changed_to(vec![(Injected, value)])?;
         let mut transaction = updater.commit().await;
-        // The parent declares every value valid: its actual transience must
+        // The parent declares these values valid: its actual transience must
         // still include its dependency, including on the second cached request.
-        assert_eq!(transaction.compute(&InheritedTransientKey).await?, value);
-        assert_eq!(transaction.compute(&InheritedTransientKey).await?, value);
+        let inherited = InheritedTransientKey {
+            independently_transient: false,
+        };
+        assert_eq!(transaction.compute(&inherited).await?, value);
+        assert_eq!(transaction.compute(&inherited).await?, value);
         let opaque = transaction.compute_opaque(&MaybeTransientKey).await?;
         for transient in [false, true] {
             for _ in 0..2 {
@@ -710,6 +773,8 @@ async fn cancelled_parentless_request_has_start_without_completion() -> anyhow::
     let mut updater = dice.updater_with_data(data);
     updater.changed_to(vec![(Selector, false)])?;
     let mut transaction = updater.commit().await;
+    let closure_reader = transaction.dupe();
+    let activation;
     {
         let request = transaction.compute(&GraphKey::DelayedBranch);
         tokio::pin!(request);
@@ -719,7 +784,31 @@ async fn cancelled_parentless_request_has_start_without_completion() -> anyhow::
         }
         assert_eq!(tracker.roots.lock().unwrap().len(), 1);
         assert!(tracker.completed.lock().unwrap().is_empty());
+        activation = tracker.roots.lock().unwrap()[0].activation;
+        assert_eq!(
+            closure_reader
+                .activation_closure_with_transient_root(
+                    activation,
+                    closure_reader.live_context_id()
+                )
+                .await
+                .unwrap_err(),
+            ActivationClosureError::NotVerified {
+                node: activation.node(),
+                version: closure_reader.version(),
+            }
+        );
     }
+    assert_eq!(
+        transaction
+            .activation_closure_with_transient_root(activation, transaction.live_context_id())
+            .await
+            .unwrap_err(),
+        ActivationClosureError::NotVerified {
+            node: activation.node(),
+            version: transaction.version(),
+        }
+    );
     release.notify_one();
     transaction.compute(&ValueKey).await?;
     let roots = tracker.roots.lock().unwrap();
@@ -761,6 +850,309 @@ async fn activation_closure_preserves_roots_dependency_order_and_shared_dedup() 
     let empty = transaction.activation_closure([]).await?;
     assert!(empty.roots().is_empty());
     assert!(empty.nodes().is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn transient_activation_closure_inherits_only_through_locally_valid_serial_parent()
+-> anyhow::Result<()> {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(Tracker::new());
+    let mut updater = dice.updater_with_data(user_data(&tracker));
+    updater.changed_to(vec![(Injected, -2)])?;
+    let mut inherited = updater.commit().await;
+    let key = InheritedTransientKey {
+        independently_transient: false,
+    };
+    assert_eq!(inherited.compute(&key).await?, -2);
+    let (completion, transient) = tracker.completed.lock().unwrap()[0].clone();
+    assert!(transient);
+    let closure = inherited
+        .activation_closure_with_transient_root(completion.activation, inherited.live_context_id())
+        .await?;
+    let injected = node_for(&tracker, Kind::Injected);
+    let marked = node_for(&tracker, Kind::MaybeTransient);
+    assert_eq!(
+        closure
+            .nodes()
+            .iter()
+            .map(|node| node.node())
+            .collect::<Vec<_>>(),
+        vec![injected, marked, completion.node],
+    );
+    assert_eq!(closure.nodes()[1].dependencies(), &[injected]);
+    assert_eq!(closure.nodes()[2].dependencies(), &[marked]);
+
+    let tracker = Arc::new(Tracker::new());
+    let mut independent = dice.updater_with_data(user_data(&tracker)).commit().await;
+    assert_eq!(independent.live_context_id(), inherited.live_context_id());
+    let key = InheritedTransientKey {
+        independently_transient: true,
+    };
+    assert_eq!(independent.compute(&key).await?, i32::MIN);
+    let (completion, transient) = tracker.completed.lock().unwrap()[0].clone();
+    assert!(transient);
+    {
+        let rich = tracker.rich.lock().unwrap();
+        let root = rich
+            .iter()
+            .find(|event| event.node == completion.node)
+            .unwrap();
+        assert_eq!(root.dependencies, vec![marked]);
+    }
+    assert_eq!(
+        independent
+            .activation_closure_with_transient_root(
+                completion.activation,
+                independent.live_context_id()
+            )
+            .await
+            .unwrap_err(),
+        ActivationClosureError::NotVerified {
+            node: completion.node,
+            version: independent.version(),
+        }
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn transient_activation_closure_includes_projection_and_exact_stable_dependencies()
+-> anyhow::Result<()> {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = RetainedTransientKey {
+        include_unmarked: false,
+    };
+    let mut expected_nodes: Option<Vec<crate::ActivationClosureNode>> = None;
+    for (index, value) in [-2, 1, -2].into_iter().enumerate() {
+        let tracker = Arc::new(Tracker::new());
+        let mut updater = dice.updater_with_data(user_data(&tracker));
+        updater.changed_to(vec![(Injected, value)])?;
+        let mut transaction = updater.commit().await;
+        assert_eq!(transaction.compute(&key).await?, value);
+        let (activation, is_transient) = {
+            let completed = tracker.completed.lock().unwrap();
+            assert_eq!(completed.len(), 1);
+            (completed[0].0.activation, completed[0].1)
+        };
+        let root = activation.node();
+        let version = transaction.version();
+        assert_eq!(is_transient, value < 0);
+        if value < 0 {
+            let expected = if index == 0 {
+                ActivationClosureError::UnavailableRoot { root }
+            } else {
+                ActivationClosureError::Dirty {
+                    node: root,
+                    version,
+                }
+            };
+            assert_eq!(
+                transaction.activation_closure([root]).await.unwrap_err(),
+                expected
+            );
+            if index == 0 {
+                assert_eq!(transaction.activation_history_len(root).await, 0);
+            }
+        }
+        let closure = if value < 0 {
+            transaction
+                .activation_closure_with_transient_root(activation, transaction.live_context_id())
+                .await?
+        } else {
+            assert_eq!(
+                transaction
+                    .activation_closure_with_transient_root(
+                        activation,
+                        transaction.live_context_id()
+                    )
+                    .await
+                    .unwrap_err(),
+                ActivationClosureError::NotVerified {
+                    node: root,
+                    version,
+                }
+            );
+            transaction.activation_closure([root]).await?
+        };
+        assert_eq!(closure.roots(), &[root]);
+        assert_eq!(closure.version(), version);
+        let nodes = closure.nodes();
+        assert_eq!(nodes.len(), 6);
+        let [injected, base, projection, shared, left, terminal] = nodes else {
+            unreachable!();
+        };
+        assert_eq!(injected.node(), node_for(&tracker, Kind::Injected));
+        assert_eq!(base.node(), node_for(&tracker, Kind::MaybeTransient));
+        assert_eq!(left.node(), node_for(&tracker, Kind::Graph(GraphKey::Left)));
+        assert_eq!(terminal.node(), root);
+        assert!(injected.dependencies().is_empty());
+        assert_eq!(base.dependencies(), &[injected.node()]);
+        assert_eq!(projection.dependencies(), &[base.node()]);
+        assert!(shared.dependencies().is_empty());
+        assert_eq!(left.dependencies(), &[shared.node()]);
+        assert_eq!(
+            terminal.dependencies(),
+            &[projection.node(), left.node(), injected.node()]
+        );
+        if let Some(expected) = &expected_nodes {
+            assert_eq!(nodes, expected.as_slice());
+        } else {
+            assert_eq!(
+                shared.node(),
+                node_for(&tracker, Kind::Graph(GraphKey::Shared))
+            );
+            expected_nodes = Some(nodes.to_vec());
+        }
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn opaque_consumption_checks_origin_before_using_cached_projection() -> anyhow::Result<()> {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    updater.changed_to([(Injected, -2)])?;
+    let first = updater.commit().await;
+    let old_base = first.compute_opaque(&MaybeTransientKey).await?;
+    let mut peer = dice.updater().commit().await;
+    let projection = TransientProjection(false);
+    assert_eq!(peer.projection(&old_base, &projection)?, 1);
+    assert_eq!(
+        peer.opaque_into_value(first.compute_opaque(&MaybeTransientKey).await?)?,
+        -2
+    );
+
+    let mut updater = dice.updater();
+    updater.changed_to([(Injected, -3)])?;
+    let mut changed = updater.commit().await;
+    let current_base = changed.compute_opaque(&MaybeTransientKey).await?;
+    assert_eq!(changed.projection(&current_base, &projection)?, 1);
+    assert!(matches!(
+        &*changed.projection(&old_base, &projection).unwrap_err().0,
+        DiceErrorImpl::ForeignOpaqueValue
+    ));
+    assert!(matches!(
+        &*changed.opaque_into_value(old_base).unwrap_err().0,
+        DiceErrorImpl::ForeignOpaqueValue
+    ));
+    assert_eq!(changed.opaque_into_value(current_base)?, -3);
+    Ok(())
+}
+
+#[tokio::test]
+async fn transient_activation_closure_fences_root_receipts_and_unmarked_dependencies()
+-> anyhow::Result<()> {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = RetainedTransientKey {
+        include_unmarked: false,
+    };
+    let tracker = Arc::new(Tracker::new());
+    let mut updater = dice.updater_with_data(user_data(&tracker));
+    updater.changed_to(vec![(Injected, -2)])?;
+    let mut old = updater.commit().await;
+    assert_eq!(old.compute(&key).await?, -2);
+    let root = tracker.completed.lock().unwrap()[0].0.activation;
+    let old_context = old.live_context_id();
+    let closure = old
+        .activation_closure_with_transient_root(root, old_context)
+        .await?;
+
+    let reused_tracker = Arc::new(Tracker::new());
+    let mut reused = dice
+        .updater_with_data(user_data(&reused_tracker))
+        .commit()
+        .await;
+    assert_eq!(reused.live_context_id(), old_context);
+    assert_eq!(reused.compute(&key).await?, -2);
+    let reused_root = reused_tracker.completed.lock().unwrap()[0].0.activation;
+    assert_eq!(
+        reused
+            .activation_closure_with_transient_root(reused_root, reused.live_context_id())
+            .await?,
+        closure
+    );
+    assert_eq!(reused.compute(&key).await?, -2);
+    let second_root = reused_tracker.completed.lock().unwrap()[1].0.activation;
+    let not_verified = ActivationClosureError::NotVerified {
+        node: root.node(),
+        version: old.version(),
+    };
+    assert_eq!(
+        reused
+            .activation_closure_with_transient_root(second_root, old_context)
+            .await
+            .unwrap_err(),
+        not_verified
+    );
+    drop(reused);
+    drop(old);
+
+    let tracker = Arc::new(Tracker::new());
+    let mut reopened = dice.updater_with_data(user_data(&tracker)).commit().await;
+    assert_eq!(reopened.version(), root.version());
+    assert_ne!(reopened.live_context_id(), old_context);
+    assert_eq!(reopened.compute(&key).await?, -2);
+    let reopened_root = tracker.completed.lock().unwrap()[0].0.activation;
+    assert_eq!(
+        reopened
+            .activation_closure_with_transient_root(reopened_root, reopened.live_context_id())
+            .await?,
+        closure
+    );
+    assert_eq!(
+        reopened
+            .activation_closure_with_transient_root(root, reopened.live_context_id())
+            .await
+            .unwrap_err(),
+        not_verified
+    );
+
+    let other = Dice::builder().build(DetectCycles::Enabled);
+    let other_transaction = other.updater().commit().await;
+    assert_eq!(
+        other_transaction
+            .activation_closure_with_transient_root(root, other_transaction.live_context_id())
+            .await
+            .unwrap_err(),
+        ActivationClosureError::ForeignEngine { node: root.node() }
+    );
+
+    let tracker = Arc::new(Tracker::new());
+    let mut updater = dice.updater_with_data(user_data(&tracker));
+    updater.changed_to(vec![(Selector, true)])?;
+    let mut newer = updater.commit().await;
+    assert!(newer.version() > reopened.version());
+    assert_eq!(
+        newer
+            .activation_closure_with_transient_root(reopened_root, newer.live_context_id())
+            .await
+            .unwrap_err(),
+        ActivationClosureError::NotVerified {
+            node: root.node(),
+            version: newer.version(),
+        }
+    );
+    assert_eq!(
+        newer
+            .compute(&RetainedTransientKey {
+                include_unmarked: true
+            })
+            .await?,
+        -2
+    );
+    let includes_unmarked = tracker.completed.lock().unwrap()[0].0.activation;
+    let unmarked = node_for(&tracker, Kind::Transient);
+    assert_eq!(
+        newer
+            .activation_closure_with_transient_root(includes_unmarked, newer.live_context_id())
+            .await
+            .unwrap_err(),
+        ActivationClosureError::NotVerified {
+            node: unmarked,
+            version: newer.version(),
+        }
+    );
     Ok(())
 }
 

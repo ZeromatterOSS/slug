@@ -20,6 +20,7 @@ use crate::ActivationClosure;
 use crate::ActivationClosureError;
 use crate::DiceLiveContextId;
 use crate::DiceNodeId;
+use crate::RootActivation;
 use crate::api::computations::DiceComputations;
 use crate::api::key::Key;
 use crate::api::user_data::UserComputationData;
@@ -126,6 +127,22 @@ impl DiceTransaction {
         let response = self.0.activation_closure(roots.into_iter().collect()).await;
         let _keep_transaction_guard_live = &self.0;
         response
+    }
+
+    /// Reads the activation closure of the first and only completed root in a tracked request.
+    ///
+    /// The caller supplies the activation from its tracked request's transient `root_completed`
+    /// callback and the live context of its committed transaction. DICE checks the root's
+    /// ordinal, context and completed value. Marked transient dependencies must have completed
+    /// receipts in that same live cache. This never computes keys or waits for tasks.
+    pub async fn activation_closure_with_transient_root(
+        &self,
+        completion: RootActivation,
+        expected_live_context: DiceLiveContextId,
+    ) -> Result<ActivationClosure, ActivationClosureError> {
+        self.0
+            .activation_closure_with_transient_root(completion, expected_live_context)
+            .await
     }
 
     #[cfg(test)]
