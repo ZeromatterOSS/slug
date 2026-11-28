@@ -70,16 +70,11 @@ fn assert_slug_cquery_label(stdout: &[u8], label: &str) -> String {
 // fixtures. The smoke's authored MODULE/BUILD files remain its semantic input.
 fn configured_cli_fixture(name: &str) -> std::path::PathBuf {
     let destination = scratch(name).join("fixture");
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tools/v2_oracle/configured_cli_fixture.py");
-    let output = Command::new("python3")
-        .arg(script)
-        .arg("assemble")
-        .arg("--output")
-        .arg(&destination)
-        .output()
-        .unwrap();
-    assert!(output.status.success(), "{output:?}");
+    fixture_support::assemble_configured_registry(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")),
+        &destination,
+    )
+    .unwrap();
     destination
 }
 
@@ -788,15 +783,32 @@ fn recursive_action_fixture_reports_all_three_actions_without_execution() {
     )
     .unwrap();
     let mut outputs = Vec::new();
+    let mut configuration_component = None;
     let projected = accepted.project(|terminal| {
         let evaluation = terminal.as_ref().as_ref().unwrap();
-        outputs.extend(
-            evaluation
-                .analyses()
-                .flat_map(|analysis| analysis.actions())
-                .flat_map(|action| action.outputs())
-                .map(|output| output.path().to_owned()),
-        );
+        for action in evaluation
+            .analyses()
+            .flat_map(|analysis| analysis.actions())
+        {
+            let configuration = action
+                .context()
+                .owner()
+                .configuration()
+                .slug_configuration()
+                .unwrap();
+            let component = configuration.projection().path_component();
+            assert_eq!(
+                configuration_component
+                    .get_or_insert_with(|| component.clone())
+                    .as_str(),
+                component.as_str()
+            );
+            for output in action.outputs() {
+                assert_eq!(output.root().configuration(), configuration);
+                assert_eq!(output.root().configuration_component(), component);
+                outputs.push(output.path().to_owned());
+            }
+        }
         TerminalOutput::new(0, String::new(), String::new())
     });
     let (_terminal, exit_code, stdout, stderr) = projected.publish().into_parts();
@@ -805,9 +817,18 @@ fn recursive_action_fixture_reports_all_three_actions_without_execution() {
     assert_eq!(exit_code, 0);
     assert!(stdout.is_empty());
     assert!(stderr.is_empty(), "{stderr}");
+    let component = configuration_component.unwrap();
+    let digest = component.strip_prefix("slugcfg-v2-").unwrap();
+    assert_eq!(digest.len(), 64);
+    assert!(
+        digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
     assert_eq!(
         outputs,
         ["parent/parent.txt", "leaf/second.txt", "leaf/first.txt"]
+            .map(|path| format!("bazel-out/{component}/bin/{path}"))
     );
 
     let output = slug()
@@ -4630,8 +4651,12 @@ fn equality_form_registry_reaches_one_shot_and_daemon_build_and_query() {
         workspace.join("pkg/BUILD.bazel"),
         "filegroup(name = \"probe\")\n",
     );
-    let registry_a = "--registry=https://registry-a.example/";
-    let registry_b = "--registry=https://registry-b.example";
+    let assembly = configured_cli_fixture("registry-command-transport-inputs");
+    let empty_registry = assembly.join("empty-registry");
+    std::fs::create_dir(&empty_registry).unwrap();
+    let registry_a = format!("--registry=file://{}/", empty_registry.display());
+    let registry_b = configured_cli_registry_arg(&assembly);
+    let (registry_a, registry_b) = (registry_a.as_str(), registry_b.as_str());
     let output_base_arg = format!("--output_base={}", output_base.display());
 
     for args in [
@@ -5830,16 +5855,34 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
 
 #[test]
 fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
-    let workspace = scratch("command-module-overrides");
-    write(
-        workspace.join("MODULE.bazel"),
-        r#"module(name = "command_overrides")"#,
+    let (workspace, registry) = offline_cquery_workspace(
+        "command-module-overrides",
+        "module(name = 'command_overrides')\nbazel_dep(name = 'dep', version = '1.0.0')\nlocal_path_override(module_name = 'dep', path = 'deps/original')\n",
     );
     write(
         workspace.join("pkg/BUILD.bazel"),
         r#"filegroup(name = "probe")"#,
     );
+    for (directory, source) in [("original", "original.txt"), ("dep", "override.txt")] {
+        let repository = workspace.join("deps").join(directory);
+        write(
+            repository.join("MODULE.bazel"),
+            "module(name = 'dep', version = '1.0.0')\n",
+        );
+        write(
+            repository.join("BUILD.bazel"),
+            &format!("filegroup(name = 'probe', srcs = ['{source}'])\n"),
+        );
+        write(repository.join(source), source);
+    }
     let workspace = workspace.canonicalize().unwrap();
+    let absolute_override = format!(
+        "--override_module=dep={}",
+        workspace.join("deps/dep").display()
+    );
+    let query = "deps(//pkg:probe + @dep//:probe)";
+    let original_labels = b"//pkg:probe\n@dep//:original.txt\n@dep//:probe\n";
+    let override_labels = b"//pkg:probe\n@dep//:override.txt\n@dep//:probe\n";
 
     let one_shot_build = slug()
         .current_dir(&workspace)
@@ -5848,6 +5891,7 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
             "--override_module=dep=deps/../deps/dep",
             "//pkg:probe",
         ])
+        .arg(&registry)
         .output()
         .unwrap();
     assert_eq!(one_shot_build.status.code(), Some(2), "{one_shot_build:?}");
@@ -5859,16 +5903,31 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
 
     let one_shot_query = slug()
         .current_dir(&workspace)
-        .args([
-            "query",
-            "--override_module=dep=%workspace%/deps/dep",
-            "//pkg:probe",
-        ])
+        .args(["query", "--override_module=dep=%workspace%/deps/dep", query])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(one_shot_query.status.success(), "{one_shot_query:?}");
-    assert_eq!(one_shot_query.stdout, b"//pkg:probe\n");
+    assert_eq!(one_shot_query.stdout, override_labels);
     assert!(one_shot_query.stderr.is_empty(), "{one_shot_query:?}");
+
+    let unused = slug()
+        .current_dir(&workspace)
+        .args(["build", "--override_module=unused=deps/dep", "//pkg:probe"])
+        .arg(&registry)
+        .output()
+        .unwrap();
+    assert_eq!(unused.status.code(), Some(2), "{unused:?}");
+    assert!(unused.stdout.is_empty(), "{unused:?}");
+    let unused_terminal: serde_json::Value = serde_json::from_slice(&unused.stderr).unwrap();
+    assert_eq!(unused_terminal["error"], "build_runtime_error");
+    assert!(
+        unused_terminal["message"]
+            .as_str()
+            .unwrap()
+            .contains(r#"UnusedOverride { module_name: "unused" }"#),
+        "{unused_terminal}"
+    );
 
     let run = slug()
         .current_dir(&workspace)
@@ -5893,16 +5952,9 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
             &["build", "--override_module=dep=deps/dep", "//pkg:probe"],
         ),
         ("a-build-restored", &["build", "//pkg:probe"]),
-        ("a-query", &["query", "//pkg:probe"]),
-        (
-            "b-query",
-            &[
-                "query",
-                "--override_module=dep=/absolute/deps/dep",
-                "//pkg:probe",
-            ],
-        ),
-        ("a-query-restored", &["query", "//pkg:probe"]),
+        ("a-query", &["query", query]),
+        ("b-query", &["query", absolute_override.as_str(), query]),
+        ("a-query-restored", &["query", query]),
     ];
     let mut pid = None;
     for (name, args) in cases {
@@ -5910,11 +5962,17 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
             .current_dir(&workspace)
             .arg(&output_base_arg)
             .args(*args)
+            .arg(&registry)
             .output()
             .unwrap();
         if args[0] == "query" {
             assert!(output.status.success(), "{name}: {output:?}");
-            assert_eq!(output.stdout, b"//pkg:probe\n", "{name}");
+            let expected = if *name == "b-query" {
+                override_labels.as_slice()
+            } else {
+                original_labels.as_slice()
+            };
+            assert_eq!(output.stdout, expected, "{name}");
             assert!(output.stderr.is_empty(), "{name}: {output:?}");
         } else {
             assert_eq!(output.status.code(), Some(2), "{name}: {output:?}");
@@ -5940,6 +5998,7 @@ fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
     let subdirectory = slug()
         .current_dir(workspace.join("pkg"))
         .args(["query", "--override_module=dep=relative/dep", "//pkg:probe"])
+        .arg(&registry)
         .output()
         .unwrap();
     assert!(!subdirectory.status.success(), "{subdirectory:?}");
