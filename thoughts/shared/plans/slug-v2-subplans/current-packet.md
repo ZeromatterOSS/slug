@@ -38,10 +38,13 @@ configuration domains. Bazel ActionKey projection is deferred for these
 families. Build forwards ordered distdirs. The frozen FileWrite output passed
 with the selected builtin prerequisites. Protected cut `ad344eef7` passed
 configured conditional spill lowering and reached NativeLink capabilities.
-The first execution precheck exhausted the existing decoded-byte quota before
-CAS staging. The certificate held 189 rooted content observations. Attribute
-those bytes by sealed owner and operation, then qualify a bounded source
-certification change and rerun the original Build.
+The first execution precheck exhausted the 2 GiB decoded-byte quota before CAS
+staging. It started at 1,867,997,193 bytes and selected 794,211,606 bytes across
+56 direct Archive digests. The kernel read-only seal passed original-FD
+`EROFS`, live-writer `EBUSY`, retirement and Source/Process controls. Reuse
+prior actual digests under the same active scope and exact root, keeping fresh
+name, descriptor, mutable-source and publication checks. Rerun the original
+Build under the existing limits.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,

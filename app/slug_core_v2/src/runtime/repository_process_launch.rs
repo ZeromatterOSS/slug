@@ -12,6 +12,7 @@ use super::quota::QuotaFacts;
 use super::readonly::FinalizedRepositoryView;
 use super::readonly::ReadOnlyMountClone;
 use super::readonly_quota::PendingReadOnlyCompaction;
+use super::readonly_quota::WritableArchiveParent;
 use super::*;
 use crate::runtime::repository_process_wire::RunMode;
 
@@ -614,6 +615,7 @@ impl ProcessLaunch for BootstrapLaunch {
 pub(in crate::runtime::repository_physical_root) struct FinalizeLaunch {
     admission: NativeViewFinalization,
     incoming: Option<AttachedMountClone>,
+    writable_archive_parent: Option<WritableArchiveParent>,
     pending: Option<ReadOnlyMountClone>,
     compaction: Option<PendingReadOnlyCompaction>,
     nonce: Option<[u8; 16]>,
@@ -628,9 +630,14 @@ impl FinalizeLaunch {
             .domain()
             .check_clone(&incoming, admission.scope(), active)
             .map_err(PhysicalRootError::mount)?;
+        let writable_archive_parent = (admission.builder().mode
+            == RepositoryWorkspaceMode::Archive)
+            .then(|| WritableArchiveParent::before_launch(admission.builder(), &incoming))
+            .transpose()?;
         Ok(Self {
             admission,
             incoming: Some(incoming),
+            writable_archive_parent,
             pending: None,
             compaction: None,
             nonce: None,
@@ -700,6 +707,9 @@ impl ProcessLaunch for FinalizeLaunch {
             .domain()
             .check_clone(incoming, self.scope(), &|| true)
             .map_err(PhysicalRootError::mount)?;
+        if let Some(parent) = &self.writable_archive_parent {
+            parent.check_before_transfer(self.admission.builder())?;
+        }
         send_incoming(
             socket,
             &self.admission.builder().file,
@@ -748,6 +758,9 @@ impl ProcessLaunch for FinalizeLaunch {
             (RepositoryWorkspaceMode::Archive, Some(words)) => {
                 self.compaction = Some(PendingReadOnlyCompaction::receive(
                     root,
+                    self.writable_archive_parent
+                        .as_ref()
+                        .ok_or(PhysicalRootError::Mode)?,
                     &successor,
                     &attached,
                     words,

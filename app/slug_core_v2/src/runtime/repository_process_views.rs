@@ -37,6 +37,14 @@ pub(super) fn check_readonly(file: &File) -> Result<u64, MountLeaseError> {
     validate_flags(flags)?;
     Ok(flags)
 }
+
+pub(super) fn check_writable(file: &File) -> Result<(), MountLeaseError> {
+    if mount_flags(file)? & libc::ST_RDONLY as u64 != 0 {
+        return Err(MountLeaseError::AttachedRoot);
+    }
+    Ok(())
+}
+
 fn mount_flags(file: &File) -> Result<u64, MountLeaseError> {
     let mut value = std::mem::MaybeUninit::<libc::statvfs>::zeroed();
     if unsafe { libc::fstatvfs(file.as_raw_fd(), value.as_mut_ptr()) } != 0 {
