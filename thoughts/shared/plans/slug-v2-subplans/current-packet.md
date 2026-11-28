@@ -146,15 +146,13 @@ final review precedes activation.
 The bounded six-archive gate and authored General glob cquery are accepted.
 The authentic inactive Rust driver, scoped HTTPS freshness, repeated Workspace
 publication, Archive envelope and public Rust action comparison passed.
-Production activation, Rust REAPI, full Slug closure and completed-command
-latency/RSS (RSS at most 1.25× Bazel)
-remain open under the [bootstrap readiness matrix][readiness]. One cold pinned
-CrateInfo row and three retained rows matched in the latest paired resource run.
-Sampled RSS was 0.872×, 1.234×, 1.024× and 0.943× Bazel. An earlier edition change
-reached 1.884× raw RSS. Descendant sampling caught a matching spike at the
-bubblewrap exec, and a trace confirmed `CLONE_VM | CLONE_VFORK`. Preserve raw samples
-and count verified shared address spaces once. Reassess new ownership,
-compatibility or resource prerequisites under the orchestration skill.
+Production activation, Rust REAPI and full Slug closure remain open under the
+[bootstrap readiness matrix][readiness]. Cut `1e87600ed` matched five paired
+CrateInfo rows. Conservative RSS was 0.753×–1.118× Bazel, within 1.25×.
+Raw edition-change/restoration RSS reached 1.765×/1.798×. Keep the raw values
+and count verified shared address spaces once. Warm cquery still took 22.558 s
+against 0.051 s for Bazel. Whole Build latency and RSS remain open. Reassess
+new ownership, compatibility or resource prerequisites under the orchestration skill.
 
 ## Evidence and history
 
