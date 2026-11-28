@@ -46,6 +46,7 @@ fn build_kind(error: &BuildCommandError) -> &'static str {
         BuildCommandErrorKind::AllTargetsPattern { .. } => "all_targets_pattern",
         BuildCommandErrorKind::Infrastructure(_) => "infrastructure",
         BuildCommandErrorKind::ActionClosure(_) => "action_closure",
+        BuildCommandErrorKind::ActionFailed { .. } => "action_failed",
     }
 }
 

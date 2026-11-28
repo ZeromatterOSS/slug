@@ -265,6 +265,65 @@ fn requested_conflict_error_terminal_preserves_category_and_skips_publication() 
 }
 
 #[test]
+fn requested_completed_action_failure_ends_the_chain_after_final_certification() {
+    for (behavior, attempts) in [
+        (Behavior::CompletedFailure, 1),
+        (Behavior::RetryCompletedFailure, 2),
+    ] {
+        let workspace = Workspace::new();
+        fs::write(
+            workspace.root.path().join("defs.bzl"),
+            format!("print('ACTION_FAILURE_LOADING')\n{DEFS}"),
+        )
+        .unwrap();
+        let output = workspace.output_path();
+        fs::create_dir_all(output.parent().unwrap()).unwrap();
+        fs::write(&output, b"previous accepted output").unwrap();
+        let transport = Fake::new(workspace.root.path(), behavior);
+        let accepted = execute(
+            &workspace,
+            &[TargetPattern::parse("//:one").unwrap()],
+            &transport,
+            true,
+        )
+        .unwrap();
+        let error = accepted
+            .terminal_for_test()
+            .as_ref()
+            .err()
+            .expect("completed process failure must be accepted");
+        assert_eq!(error.terminal_error(), ("action_failed", 1));
+        assert!(error.to_string().contains("Action 2"));
+        assert!(error.to_string().contains("//:one"));
+        assert!(error.to_string().contains("exit code 23"));
+        assert_eq!(
+            error.action_failure_stderr(),
+            Some(b"process stderr: \xff\n".as_slice())
+        );
+        assert_eq!(transport.starts.load(Ordering::SeqCst), attempts);
+        assert_eq!(transport.stages.load(Ordering::SeqCst), 2 * attempts);
+        assert_eq!(transport.executions.load(Ordering::SeqCst), 2 * attempts);
+        assert_eq!(transport.session_drops.load(Ordering::SeqCst), attempts);
+        assert_eq!(transport.output_stages.load(Ordering::SeqCst), 0);
+        assert_eq!(transport.output_drops.load(Ordering::SeqCst), 0);
+        assert_eq!(fs::read(&output).unwrap(), b"previous accepted output");
+        let (_, code, stdout, stderr) = accepted
+            .project(|result| projection(result.as_ref().err()))
+            .publish()
+            .into_parts();
+        assert_eq!(code, 1);
+        assert!(stdout.is_empty());
+        let diagnostic = stderr
+            .strip_suffix(b"process stderr: \xff\n")
+            .expect("raw process stderr follows the diagnostic");
+        let text = std::str::from_utf8(diagnostic).unwrap();
+        let (prefix, failure) = text.split_once("action_failed: Action 2").unwrap();
+        assert_eq!(prefix.matches("ACTION_FAILURE_LOADING\n").count(), 1);
+        assert!(failure.ends_with("failed (exit code 23)\n"), "{failure}");
+    }
+}
+
+#[test]
 fn requested_preparation_exposes_failure_without_panicking_and_selected_still_fails() {
     let workspace = Workspace::new();
     fs::write(

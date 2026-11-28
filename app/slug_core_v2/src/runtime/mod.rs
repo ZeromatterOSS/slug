@@ -111,6 +111,7 @@ pub use dice::ActionChainResult;
 pub use dice::ActionChainTransport;
 pub use dice::BuildCommandError;
 pub use dice::BuildCommandEvaluation;
+pub use dice::CompletedActionFailure;
 pub use dice::CqueryCommandError;
 pub use dice::CqueryCommandEvaluation;
 pub use dice::PreparedActionChainInputs;

@@ -1,11 +1,46 @@
 //! One attempt-owned prerequisite plan, inside native selection and finalization.
 
+use std::num::NonZeroI32;
+
 use super::action_chain_staging::ActionChainStagingKey;
 use super::*;
 use crate::runtime::PlannedActionOutputStaging;
 use crate::runtime::PublishedActionOutputs;
 use crate::runtime::PublishedPlannedActionOutputs;
 use crate::runtime::configured_output::ConfiguredOutputOwner;
+
+/// Bounded diagnostic bytes from a completed process with a nonzero exit code.
+/// The transport verifies the bytes before handing them to the attempt owner.
+#[derive(Eq, PartialEq, Allocative)]
+pub struct CompletedActionFailure {
+    exit_code: NonZeroI32,
+    stderr: Vec<u8>,
+}
+
+impl CompletedActionFailure {
+    pub const MAX_STDERR_BYTES: usize = 1024 * 1024;
+
+    pub fn new(exit_code: NonZeroI32, stderr: Vec<u8>) -> Option<Self> {
+        (stderr.len() <= Self::MAX_STDERR_BYTES).then_some(Self { exit_code, stderr })
+    }
+
+    pub fn exit_code(&self) -> i32 {
+        self.exit_code.get()
+    }
+
+    pub fn stderr(&self) -> &[u8] {
+        &self.stderr
+    }
+}
+
+impl fmt::Debug for CompletedActionFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CompletedActionFailure")
+            .field("exit_code", &self.exit_code)
+            .field("stderr_bytes", &self.stderr.len())
+            .finish()
+    }
+}
 
 /// Trusted transport extension point. Core owns selection and freshness; the
 /// implementation owns its external effects and must not publish local outputs.
@@ -35,6 +70,20 @@ pub trait ActionChainTransport: Sync {
         index: usize,
         staged: Self::Staged,
     ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
+    /// A requested Build may stop on a completed process failure. The attempt
+    /// still needs final source validation before diagnostics can be published.
+    fn execute_requested(
+        &self,
+        session: &mut Self::Session,
+        index: usize,
+        staged: Self::Staged,
+    ) -> impl std::future::Future<Output = Result<Option<CompletedActionFailure>, Self::Error>> + Send
+    {
+        async move {
+            self.execute(session, index, staged).await?;
+            Ok(None)
+        }
+    }
     fn finish(
         &self,
         session: Self::Session,
@@ -169,6 +218,7 @@ struct ActionChainExecutionTerminal<T> {
     inputs: Arc<PreparedActionChainInputs>,
     native: Option<crate::runtime::native_source_access::NativeActionChainInputs>,
     output: Option<Arc<T>>,
+    failure: Option<BuildCommandError>,
     pending_outputs: Option<Arc<Mutex<Vec<PlannedActionOutputStaging>>>>,
     published_outputs: Option<Arc<[PublishedPlannedActionOutputs]>>,
 }
@@ -179,6 +229,7 @@ impl<T> Clone for ActionChainExecutionTerminal<T> {
             inputs: self.inputs.clone(),
             native: self.native.clone(),
             output: self.output.clone(),
+            failure: self.failure.clone(),
             pending_outputs: self.pending_outputs.clone(),
             published_outputs: self.published_outputs.clone(),
         }
@@ -241,6 +292,7 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                 inputs,
                 native: None,
                 output: None,
+                failure: None,
                 pending_outputs: None,
                 published_outputs: None,
             }))
@@ -257,25 +309,18 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                 // diagnostics, without planning or creating transport effects.
                 return Ok(());
             }
-            let steps = terminal
-                .inputs
-                .plan()
-                .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?
-                .actions()
-                .len();
-            if steps == 0 {
-                // Native finalization still validates the full build/source
-                // frontier, without inventing a backend session or result.
-                return Ok(());
-            }
             // Claim every planned physical namespace before any transport effect,
             // including execute-only attempts. Configuration equality is structural;
             // the directory token alone never authorizes reuse. claim releases its
             // registry mutex before filesystem work and no guard crosses the await.
-            {
+            let (steps, requested) = {
                 let plan = terminal.inputs.plan().map_err(|error| {
                     NativeDemandSessionError::Computation(anyhow::anyhow!("{error}"))
                 })?;
+                if plan.actions().is_empty() {
+                    // Native finalization still validates the full frontier.
+                    return Ok(());
+                }
                 let mut claimed = starlark_map::small_set::SmallSet::new();
                 for step in plan.actions() {
                     for output in step.action().outputs() {
@@ -288,7 +333,8 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                         }
                     }
                 }
-            }
+                (plan.actions().len(), plan.requested().is_some())
+            };
             let native = context.native_action_chain_inputs(terminal.inputs.clone())?;
             terminal.native = Some(native.clone());
             let args_context = super::source_execution::RequestArgsContext::new(
@@ -314,12 +360,34 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                 context
                     .validate_sources(self.source_certificate(terminal).unwrap())
                     .await?;
-                self.transport
-                    .execute(&mut session, index, staged)
-                    .await
-                    .map_err(|error| {
-                        NativeDemandSessionError::Computation(anyhow::Error::new(error))
+                let execution = if requested {
+                    self.transport
+                        .execute_requested(&mut session, index, staged)
+                        .await
+                } else {
+                    self.transport
+                        .execute(&mut session, index, staged)
+                        .await
+                        .map(|()| None)
+                };
+                if let Some(failure) = execution.map_err(|error| {
+                    NativeDemandSessionError::Computation(anyhow::Error::new(error))
+                })? {
+                    let plan = terminal.inputs.plan().map_err(|error| {
+                        NativeDemandSessionError::Computation(anyhow::anyhow!("{error}"))
                     })?;
+                    let owner = plan.actions()[index]
+                        .action()
+                        .context()
+                        .owner()
+                        .label()
+                        .clone();
+                    terminal.failure =
+                        Some(BuildCommandError::action_failed(owner, index, failure));
+                    // Drop the failed session and its prior results. Returning
+                    // normally keeps this attempt inside final certification.
+                    return Ok(());
+                }
             }
             let pending = self
                 .publication
@@ -339,8 +407,8 @@ impl WorkspaceRuntime {
     /// Execute all requested artifact prerequisites in one native attempt.
     /// Zero-action requests still receive final validation but skip transport.
     /// Results remain operation-owned; this operation publishes no outputs.
-    /// Source-certified build failures are accepted typed terminals; execution
-    /// and preparation failures remain outer errors.
+    /// Source-certified build and completed-action failures are accepted typed
+    /// terminals. Preparation and transport errors remain outer errors.
     #[allow(clippy::too_many_arguments)]
     pub fn execute_requested_actions_with_repository_environment<T: ActionChainTransport>(
         &self,
@@ -373,7 +441,8 @@ impl WorkspaceRuntime {
     /// required runfiles backing and coupled support outputs after full-frontier
     /// validation. Later rename/bookkeeping failures may leave earlier artifacts
     /// changed; no accepted result is then returned.
-    /// Source-certified build failures are accepted without transport or publication.
+    /// Source-certified build failures skip transport. Completed-action failures
+    /// skip output transfer and publication.
     #[allow(clippy::too_many_arguments)]
     pub fn execute_and_publish_requested_actions_with_repository_environment<
         T: ActionChainOutputTransport,
@@ -443,6 +512,9 @@ impl WorkspaceRuntime {
         .map(|accepted| {
             accepted.map_terminal(|terminal| {
                 terminal.inputs.evaluation().map_err(Clone::clone)?;
+                if let Some(failure) = terminal.failure {
+                    return Err(failure);
+                }
                 Ok(RequestedActionResult {
                     inputs: terminal.inputs,
                     output: terminal.output,

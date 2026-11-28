@@ -9,12 +9,14 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::ExpandedSpawnCommandLine;
 use slug_core_v2::runtime::ActionChainTransport;
+use slug_core_v2::runtime::CompletedActionFailure;
 use slug_core_v2::runtime::NativeActionChainInputs;
 use slug_core_v2::runtime::PreparedActionChainInputs;
 use slug_core_v2::runtime::PreparedRunfilesAction;
 use slug_reapi_cache_v2::CacheClient;
 use slug_reapi_cache_v2::TransferPolicy;
 
+use crate::executor::StagedExecution;
 use crate::executor::cache_error;
 use crate::executor::execute_staged_metadata;
 use crate::executor::tonic_endpoint;
@@ -499,48 +501,22 @@ impl ActionChainTransport for ActionChainReapiTransport {
         index: usize,
         staged: Self::Staged,
     ) -> Result<(), Self::Error> {
-        let native_scope = session.inputs.clone();
-        native_scope
-            .run_while_active(async move {
-                session
-                    .inputs
-                    .check_active()
-                    .map_err(|e| protocol(e.to_string()))?;
-                if index != session.results.len()
-                    || index != staged.index
-                    || !Arc::ptr_eq(&session.identity, &staged.session)
-                {
-                    return Err(protocol(
-                        "staged action belongs to another chain attempt or step",
-                    ));
-                }
-                let result = match staged.payload {
-                    StagedPayload::Local(result) => result,
-                    StagedPayload::Remote {
-                        command,
-                        identity,
-                        uploaded,
-                    } => ActionChainStepResult::Remote(
-                        execute_staged_metadata(
-                            &session.config,
-                            &command,
-                            &identity,
-                            &session.cache,
-                            session.channel.clone(),
-                            uploaded,
-                        )
-                        .await?,
-                    ),
-                };
-                session
-                    .inputs
-                    .check_active()
-                    .map_err(|e| protocol(e.to_string()))?;
-                session.results.push(result);
-                Ok(())
-            })
-            .await
-            .map_err(|e| protocol(e.to_string()))?
+        if Self::execute_step(session, index, staged, false)
+            .await?
+            .is_some()
+        {
+            unreachable!("only requested builds accept completed action failures");
+        }
+        Ok(())
+    }
+
+    async fn execute_requested(
+        &self,
+        session: &mut Self::Session,
+        index: usize,
+        staged: Self::Staged,
+    ) -> Result<Option<CompletedActionFailure>, Self::Error> {
+        Self::execute_step(session, index, staged, true).await
     }
 
     async fn finish(&self, session: Self::Session) -> Result<Self::Output, Self::Error> {
@@ -563,6 +539,69 @@ impl ActionChainTransport for ActionChainReapiTransport {
                         .map(|_| session.results.len() - 1),
                     results: session.results,
                 })
+            })
+            .await
+            .map_err(|e| protocol(e.to_string()))?
+    }
+}
+
+impl ActionChainReapiTransport {
+    async fn execute_step(
+        session: &mut ActionChainReapiSession,
+        index: usize,
+        staged: StagedChainAction,
+        requested: bool,
+    ) -> Result<Option<CompletedActionFailure>, RemoteExecutionError> {
+        let native_scope = session.inputs.clone();
+        native_scope
+            .run_while_active(async move {
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                if index != session.results.len()
+                    || index != staged.index
+                    || !Arc::ptr_eq(&session.identity, &staged.session)
+                {
+                    return Err(protocol(
+                        "staged action belongs to another chain attempt or step",
+                    ));
+                }
+                let result = match staged.payload {
+                    StagedPayload::Local(result) => result,
+                    StagedPayload::Remote {
+                        command,
+                        identity,
+                        uploaded,
+                    } => {
+                        match execute_staged_metadata(
+                            &session.config,
+                            &command,
+                            &identity,
+                            &session.cache,
+                            session.channel.clone(),
+                            uploaded,
+                            requested,
+                        )
+                        .await?
+                        {
+                            StagedExecution::Succeeded(result) => {
+                                ActionChainStepResult::Remote(result)
+                            }
+                            StagedExecution::Failed(failure) => {
+                                // run_while_active rechecks the original
+                                // scope as this result crosses back to Core.
+                                return Ok(Some(failure));
+                            }
+                        }
+                    }
+                };
+                session
+                    .inputs
+                    .check_active()
+                    .map_err(|e| protocol(e.to_string()))?;
+                session.results.push(result);
+                Ok(None)
             })
             .await
             .map_err(|e| protocol(e.to_string()))?

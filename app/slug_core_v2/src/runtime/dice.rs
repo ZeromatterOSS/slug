@@ -3471,6 +3471,7 @@ mod action_chain_execution;
 pub use action_chain_execution::ActionChainOutputTransport;
 pub use action_chain_execution::ActionChainResult;
 pub use action_chain_execution::ActionChainTransport;
+pub use action_chain_execution::CompletedActionFailure;
 pub use action_chain_execution::RequestedActionResult;
 
 #[path = "source_staging.rs"]
@@ -3628,6 +3629,11 @@ enum BuildCommandErrorKind {
     },
     Infrastructure(Arc<str>),
     ActionClosure(ConfiguredActionClosureError),
+    ActionFailed {
+        owner: CanonicalLabel,
+        index: usize,
+        failure: Arc<CompletedActionFailure>,
+    },
 }
 
 type BuildCommandOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
@@ -4377,6 +4383,21 @@ impl BuildCommandError {
         }
     }
 
+    fn action_failed(owner: CanonicalLabel, index: usize, failure: CompletedActionFailure) -> Self {
+        Self::new(BuildCommandErrorKind::ActionFailed {
+            owner,
+            index,
+            failure: Arc::new(failure),
+        })
+    }
+
+    fn action_failure_stderr(&self) -> Option<&[u8]> {
+        match &self.kind {
+            BuildCommandErrorKind::ActionFailed { failure, .. } => Some(failure.stderr()),
+            _ => None,
+        }
+    }
+
     pub fn terminal_error(&self) -> (&'static str, i32) {
         match &self.kind {
             BuildCommandErrorKind::RepositoryPackage(error) if error.is_unsupported_feature() => {
@@ -4386,6 +4407,7 @@ impl BuildCommandError {
                 ConfiguredActionClosureError::UnsupportedEquivalence { .. },
             ) => ("unsupported_action_equivalence", 2),
             BuildCommandErrorKind::ActionClosure(_) => ("configured_action_conflict", 2),
+            BuildCommandErrorKind::ActionFailed { .. } => ("action_failed", 1),
             _ => ("build_runtime_error", 2),
         }
     }
@@ -4398,8 +4420,13 @@ impl BuildCommandError {
         } else {
             self.terminal_error()
         };
-        TerminalOutput::new(code, String::new(), render(kind, &self.to_string()))
-            .with_event_prefix(prefix)
+        let diagnostic = render(kind, &self.to_string());
+        if let Some(process_stderr) = self.action_failure_stderr() {
+            let mut stderr = diagnostic.into_bytes();
+            stderr.extend_from_slice(process_stderr);
+            return TerminalOutput::from_bytes(code, String::new(), stderr);
+        }
+        TerminalOutput::new(code, String::new(), diagnostic).with_event_prefix(prefix)
     }
 }
 
@@ -4498,6 +4525,16 @@ impl fmt::Display for BuildCommandError {
                 }
             },
             BuildCommandErrorKind::Infrastructure(error) => f.write_str(error),
+            BuildCommandErrorKind::ActionFailed {
+                owner,
+                index,
+                failure,
+            } => write!(
+                f,
+                "Action {} for {owner} failed (exit code {})",
+                index + 1,
+                failure.exit_code(),
+            ),
         }
     }
 }

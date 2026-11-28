@@ -165,6 +165,8 @@ enum Behavior {
     RetrySource,
     StageError,
     ExecuteError,
+    CompletedFailure,
+    RetryCompletedFailure,
     StagePanic,
     OutputSource,
     OutputError,
@@ -350,6 +352,31 @@ impl ActionChainTransport for Fake {
         }
         session.executed.push(index);
         Ok(())
+    }
+    async fn execute_requested(
+        &self,
+        session: &mut Session,
+        index: usize,
+        staged: usize,
+    ) -> Result<Option<CompletedActionFailure>, Self::Error> {
+        self.execute(session, index, staged).await?;
+        if index != 1 {
+            return Ok(None);
+        }
+        let stderr = match self.behavior {
+            Behavior::RetryCompletedFailure if session.attempt == 0 => {
+                fs::write(self.root.join("input"), b"bbb")?;
+                b"stale failure\n".to_vec()
+            }
+            Behavior::CompletedFailure | Behavior::RetryCompletedFailure => {
+                b"process stderr: \xff\n".to_vec()
+            }
+            _ => return Ok(None),
+        };
+        Ok(CompletedActionFailure::new(
+            NonZeroI32::new(23).unwrap(),
+            stderr,
+        ))
     }
     async fn finish(&self, mut session: Session) -> Result<Output, Self::Error> {
         assert_eq!(

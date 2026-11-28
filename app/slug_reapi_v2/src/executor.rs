@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::num::NonZeroI32;
 use std::path::Path;
 
 use prost::Message;
@@ -17,6 +18,7 @@ use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
+use slug_core_v2::runtime::CompletedActionFailure;
 use slug_core_v2::runtime::ResolvedFileWriteSemanticView;
 use slug_reapi_cache_v2::CacheClient;
 use slug_reapi_cache_v2::CacheError;
@@ -342,7 +344,7 @@ pub(crate) async fn execute_staged(
     inline_output_files: Vec<String>,
     uploads: Vec<ReapiDigest>,
 ) -> Result<RemoteExecutionResult, RemoteExecutionError> {
-    execute_staged_outputs(
+    let StagedExecution::Succeeded(result) = execute_staged_outputs(
         config,
         command,
         identity,
@@ -350,9 +352,24 @@ pub(crate) async fn execute_staged(
         channel,
         inline_output_files,
         uploads,
-        true,
+        StagedOutputMode::RetainBytes,
     )
-    .await
+    .await?
+    else {
+        unreachable!("only requested builds accept completed action failures")
+    };
+    Ok(result)
+}
+
+pub(crate) enum StagedExecution {
+    Succeeded(RemoteExecutionResult),
+    Failed(CompletedActionFailure),
+}
+
+#[derive(Clone, Copy)]
+enum StagedOutputMode {
+    RetainBytes,
+    Metadata { requested: bool },
 }
 
 /// The chain keeps verified scalar content in CAS rather than accumulating bytes.
@@ -363,7 +380,8 @@ pub(crate) async fn execute_staged_metadata(
     cache: &CacheClient,
     channel: tonic::transport::Channel,
     uploads: Vec<ReapiDigest>,
-) -> Result<RemoteExecutionResult, RemoteExecutionError> {
+    requested: bool,
+) -> Result<StagedExecution, RemoteExecutionError> {
     execute_staged_outputs(
         config,
         command,
@@ -372,7 +390,7 @@ pub(crate) async fn execute_staged_metadata(
         channel,
         Vec::new(),
         uploads,
-        false,
+        StagedOutputMode::Metadata { requested },
     )
     .await
 }
@@ -385,8 +403,8 @@ async fn execute_staged_outputs(
     channel: tonic::transport::Channel,
     inline_output_files: Vec<String>,
     uploads: Vec<ReapiDigest>,
-    retain_bytes: bool,
-) -> Result<RemoteExecutionResult, RemoteExecutionError> {
+    output_mode: StagedOutputMode,
+) -> Result<StagedExecution, RemoteExecutionError> {
     let mut execution = proto::execution_client::ExecutionClient::new(channel);
     let ac_result = cache
         .get_action_result(&identity.action_digest, inline_output_files.clone())
@@ -402,7 +420,12 @@ async fn execute_staged_outputs(
             (result.0, result.1)
         }
     };
-    if result.exit_code != 0 {
+    if let Some(exit_code) = NonZeroI32::new(result.exit_code) {
+        if matches!(output_mode, StagedOutputMode::Metadata { requested: true }) {
+            return requested_action_failure(result, exit_code, cached_result, cache)
+                .await
+                .map(StagedExecution::Failed);
+        }
         return Err(RemoteExecutionError::Protocol(format!(
             "remote action exited {}: {}",
             result.exit_code,
@@ -411,7 +434,12 @@ async fn execute_staged_outputs(
     }
 
     validate_result_shape(&result, &command)?;
-    let output_blobs = fetch_outputs(&cache, &result, retain_bytes).await?;
+    let output_blobs = fetch_outputs(
+        cache,
+        &result,
+        matches!(output_mode, StagedOutputMode::RetainBytes),
+    )
+    .await?;
     let outputs = result
         .output_files
         .iter()
@@ -448,13 +476,104 @@ async fn execute_staged_outputs(
     for blob in uploads {
         evidence = evidence.record_upload(blob);
     }
-    Ok(RemoteExecutionResult {
+    Ok(StagedExecution::Succeeded(RemoteExecutionResult {
         action_digest: identity.action_digest.clone(),
         result: action_result,
         output_blobs,
         platform_properties: command.platform_properties.clone(),
         evidence,
-    })
+    }))
+}
+
+async fn requested_action_failure(
+    result: proto::ActionResult,
+    exit_code: NonZeroI32,
+    cached_result: bool,
+    cache: &CacheClient,
+) -> Result<CompletedActionFailure, RemoteExecutionError> {
+    let protocol = |message: &str| RemoteExecutionError::Protocol(message.to_owned());
+    if cached_result {
+        return Err(protocol(
+            "cached REAPI ActionResult has a nonzero exit code",
+        ));
+    }
+    // The Build output path supports raw stderr and text stdout. The admitted
+    // failed-action terminal needs empty stdout to preserve both stream order
+    // and byte identity.
+    if !result.stdout_raw.is_empty() {
+        return Err(protocol(
+            "completed remote action has unsupported nonempty stdout",
+        ));
+    }
+    if let Some(digest) = result
+        .stdout_digest
+        .as_ref()
+        .map(diagnostic_digest)
+        .transpose()?
+    {
+        if digest.size_bytes() != 0 {
+            return Err(protocol(
+                "completed remote action has unsupported nonempty stdout",
+            ));
+        }
+        if digest != ReapiDigest::of_bytes(b"") {
+            return Err(protocol("completed remote action stdout digest mismatch"));
+        }
+    }
+
+    let limit = CompletedActionFailure::MAX_STDERR_BYTES;
+    let mut stderr = result.stderr_raw;
+    let too_large = || {
+        RemoteExecutionError::Protocol(format!(
+            "completed remote action stderr exceeds the {limit}-byte limit"
+        ))
+    };
+    if stderr.len() > limit {
+        return Err(too_large());
+    }
+    if let Some(digest) = result
+        .stderr_digest
+        .as_ref()
+        .map(diagnostic_digest)
+        .transpose()?
+    {
+        if digest.size_bytes() > limit as u64 {
+            return Err(too_large());
+        }
+        if !stderr.is_empty() || digest.size_bytes() == 0 {
+            if ReapiDigest::of_bytes(&stderr) != digest {
+                return Err(protocol("completed remote action stderr digest mismatch"));
+            }
+        } else {
+            stderr
+                .try_reserve_exact(digest.size_bytes() as usize)
+                .map_err(|error| {
+                    RemoteExecutionError::Protocol(format!(
+                        "reserving completed remote action stderr: {error}"
+                    ))
+                })?;
+            // The CAS reader verifies size, SHA-256, and end of stream. Its
+            // sink never receives more than the preadmitted digest size.
+            cache
+                .read_blob_verified(&digest, |chunk| {
+                    stderr.extend_from_slice(chunk);
+                    Ok(())
+                })
+                .await
+                .map_err(cache_error)?;
+        }
+    }
+    CompletedActionFailure::new(exit_code, stderr).ok_or_else(too_large)
+}
+
+fn diagnostic_digest(digest: &proto::Digest) -> Result<ReapiDigest, RemoteExecutionError> {
+    // Bound the hash before a validating conversion can clone or format it.
+    if digest.hash.len() != 64 || digest.size_bytes < 0 {
+        return Err(RemoteExecutionError::Protocol(
+            "invalid completed remote action diagnostic digest".to_owned(),
+        ));
+    }
+    digest_from_proto(digest)
 }
 
 /// Execute an action through the Execution server (AC miss path). Returns the
@@ -492,7 +611,12 @@ async fn execute_through_server(
             break operation;
         }
     };
-    let response = decode_execute_response(operation)?;
+    completed_execute_result(decode_execute_response(operation)?)
+}
+
+fn completed_execute_result(
+    response: proto::ExecuteResponse,
+) -> Result<(proto::ActionResult, bool), RemoteExecutionError> {
     if let Some(status) = &response.status
         && status.code != 0
     {
@@ -741,6 +865,16 @@ fn decode_execute_response(
             Err(RemoteExecutionError::Protocol(status.message))
         }
         Some(proto::google::longrunning::operation::Result::Response(response)) => {
+            const EXECUTE_RESPONSE: &str = "build.bazel.remote.execution.v2.ExecuteResponse";
+            if !response
+                .type_url
+                .rsplit_once('/')
+                .is_some_and(|(_, name)| name == EXECUTE_RESPONSE)
+            {
+                return Err(RemoteExecutionError::Protocol(
+                    "completed Execute operation response has the wrong type".to_owned(),
+                ));
+            }
             proto::ExecuteResponse::decode(response.value.as_slice())
                 .map_err(|error| RemoteExecutionError::Protocol(error.to_string()))
         }
@@ -877,6 +1011,138 @@ mod tests {
     use slug_build_api_v2::ActionOutput;
 
     use super::*;
+
+    #[test]
+    fn requested_action_process_status_requires_completed_execute() {
+        let result = proto::ActionResult {
+            exit_code: 23,
+            stderr_raw: b"process output".to_vec(),
+            ..Default::default()
+        };
+        let response = proto::ExecuteResponse {
+            result: Some(result.clone()),
+            status: Some(proto::google::rpc::Status {
+                code: 4,
+                message: "deadline exceeded".to_owned(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(matches!(
+            completed_execute_result(response),
+            Err(RemoteExecutionError::Protocol(message)) if message == "deadline exceeded"
+        ));
+        assert!(matches!(
+            completed_execute_result(proto::ExecuteResponse::default()),
+            Err(RemoteExecutionError::Protocol(message)) if message.contains("omitted ActionResult")
+        ));
+        let response = proto::ExecuteResponse {
+            result: Some(result),
+            ..Default::default()
+        };
+        let operation = |type_url: &str| proto::google::longrunning::Operation {
+            done: true,
+            result: Some(proto::google::longrunning::operation::Result::Response(
+                prost_types::Any {
+                    type_url: type_url.to_owned(),
+                    value: response.encode_to_vec(),
+                },
+            )),
+            ..Default::default()
+        };
+        assert!(matches!(
+            decode_execute_response(operation("type.googleapis.com/google.rpc.Status")),
+            Err(RemoteExecutionError::Protocol(message)) if message.contains("wrong type")
+        ));
+        let decoded = decode_execute_response(operation(
+            "https://types.example/build.bazel.remote.execution.v2.ExecuteResponse",
+        ))
+        .unwrap();
+        let (completed, cached) = completed_execute_result(decoded).unwrap();
+        assert_eq!(completed.exit_code, 23);
+        assert!(!cached);
+    }
+
+    #[tokio::test]
+    async fn requested_action_failure_stderr_is_exact_bounded_and_fresh() {
+        let channel = tonic::transport::Endpoint::from_static("http://127.0.0.1:1").connect_lazy();
+        let cache = CacheClient::new(channel, String::new(), TransferPolicy::default()).unwrap();
+        let code = NonZeroI32::new(23).unwrap();
+        let bytes = vec![0xff; CompletedActionFailure::MAX_STDERR_BYTES];
+        let valid_digest = ReapiDigest::of_bytes(&bytes);
+        let result = proto::ActionResult {
+            exit_code: code.get(),
+            stderr_digest: Some(digest_to_proto(&valid_digest)),
+            stdout_digest: Some(digest_to_proto(&ReapiDigest::of_bytes(b""))),
+            stderr_raw: bytes,
+            ..Default::default()
+        };
+        let failure = requested_action_failure(result.clone(), code, false, &cache)
+            .await
+            .unwrap();
+        assert_eq!(failure.exit_code(), 23);
+        assert_eq!(failure.stderr(), result.stderr_raw);
+
+        let check_protocol = |error: RemoteExecutionError, expected: &str| {
+            assert!(
+                matches!(error, RemoteExecutionError::Protocol(message) if message.contains(expected))
+            );
+        };
+        check_protocol(
+            requested_action_failure(result, code, true, &cache)
+                .await
+                .unwrap_err(),
+            "cached REAPI ActionResult",
+        );
+        for (result, expected) in [
+            (
+                proto::ActionResult {
+                    stderr_raw: vec![0xff; CompletedActionFailure::MAX_STDERR_BYTES + 1],
+                    ..Default::default()
+                },
+                "byte limit",
+            ),
+            (
+                proto::ActionResult {
+                    stderr_digest: Some(digest_to_proto(
+                        &ReapiDigest::new(valid_digest.hash(), valid_digest.size_bytes() + 1)
+                            .unwrap(),
+                    )),
+                    ..Default::default()
+                },
+                "byte limit",
+            ),
+            (
+                proto::ActionResult {
+                    stderr_raw: vec![0xfe],
+                    stderr_digest: Some(digest_to_proto(&ReapiDigest::of_bytes(&[0xff]))),
+                    ..Default::default()
+                },
+                "stderr digest mismatch",
+            ),
+            (
+                proto::ActionResult {
+                    stdout_raw: b"stdout".to_vec(),
+                    ..Default::default()
+                },
+                "nonempty stdout",
+            ),
+            (
+                proto::ActionResult {
+                    stdout_digest: Some(digest_to_proto(&ReapiDigest::of_bytes(b"stdout"))),
+                    ..Default::default()
+                },
+                "nonempty stdout",
+            ),
+        ] {
+            check_protocol(
+                requested_action_failure(result, code, false, &cache)
+                    .await
+                    .unwrap_err(),
+                expected,
+            );
+        }
+    }
 
     #[test]
     fn configured_materialization_rejects_constant_metadata_before_writes() {
@@ -1178,6 +1444,38 @@ mod tests {
             first_plan.identity.action_digest,
             second_plan.identity.action_digest
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires SLUG_V2_NATIVELINK_ENDPOINT"]
+    async fn nativelink_requested_action_failure_reads_verified_digest_stderr() {
+        let endpoint = std::env::var("SLUG_V2_NATIVELINK_ENDPOINT")
+            .expect("SLUG_V2_NATIVELINK_ENDPOINT points at a local NativeLink server");
+        let channel = tonic::transport::Endpoint::from_shared(tonic_endpoint(&endpoint).unwrap())
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+        let cache = CacheClient::new(channel, String::new(), TransferPolicy::default()).unwrap();
+        let stderr = ReapiBlob::from_bytes(b"verified process stderr: \xff\n".to_vec());
+        cache
+            .upload_missing(std::slice::from_ref(&stderr))
+            .await
+            .unwrap();
+        let code = NonZeroI32::new(23).unwrap();
+        let failure = requested_action_failure(
+            proto::ActionResult {
+                exit_code: code.get(),
+                stderr_digest: Some(digest_to_proto(stderr.digest())),
+                ..Default::default()
+            },
+            code,
+            false,
+            &cache,
+        )
+        .await
+        .unwrap();
+        assert_eq!(failure.stderr(), stderr.data());
     }
 
     #[tokio::test]
