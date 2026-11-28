@@ -99,7 +99,13 @@ pub(crate) fn spawn_command(
     if spawn.environment().inherited().iter().next().is_some() {
         return Err("Spawn REAPI plan requires resolved inherited environment".to_owned());
     }
-    if spawn.execution_requirements().iter().next().is_some() {
+    // This projection uses unmapped exec paths. The empty marker advertises
+    // compatibility with path mapping and does not request scheduling policy.
+    if spawn
+        .execution_requirements()
+        .iter()
+        .any(|(name, value)| name != "supports-path-mapping" || !value.is_empty())
+    {
         return Err("Spawn REAPI execution requirements are not admitted".to_owned());
     }
     let mut platform_properties = if raw.exec_properties.is_empty() {

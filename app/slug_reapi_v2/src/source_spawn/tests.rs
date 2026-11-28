@@ -432,6 +432,68 @@ stage = rule(implementation = _impl, attrs = {'input': attr.label(allow_single_f
 }
 
 #[test]
+fn native_spawn_path_mapping_capability_preserves_unmapped_protocol() {
+    let workspace = Workspace::new();
+    let baseline = workspace.plan().unwrap();
+    for (requirements, expected, admitted) in [
+        (
+            "{'supports-path-mapping': ''}",
+            &[("supports-path-mapping", "")][..],
+            true,
+        ),
+        (
+            "{'supports-path-mapping': 'strip'}",
+            &[("supports-path-mapping", "strip")][..],
+            false,
+        ),
+        (
+            "{'supports-path-mapping': '', 'no-cache': '1'}",
+            &[("no-cache", "1"), ("supports-path-mapping", "")][..],
+            false,
+        ),
+        (
+            "{'supports-path-mapping-extra': ''}",
+            &[("supports-path-mapping-extra", "")][..],
+            false,
+        ),
+    ] {
+        workspace.write(
+            "defs.bzl",
+            workspace.defs.replace(
+                "ctx.actions.run(",
+                &format!("ctx.actions.run(execution_requirements={requirements}, "),
+            ),
+        );
+        let prepared = workspace.prepare();
+        let spawn = prepared.configured_action().spawn_spec().unwrap();
+        assert!(
+            spawn
+                .execution_requirements()
+                .iter()
+                .eq(expected.iter().copied())
+        );
+        let result = SourceSpawnReapiPlan::from_native(
+            prepared,
+            &defaults(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+        );
+        if admitted {
+            let marked = result.unwrap();
+            assert_eq!(
+                marked.command().serialized(),
+                baseline.command().serialized()
+            );
+            assert_eq!(marked.identity(), baseline.identity());
+        } else {
+            assert_eq!(
+                result.unwrap_err(),
+                "Spawn REAPI execution requirements are not admitted"
+            );
+        }
+    }
+}
+
+#[test]
 fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
     let workspace = Workspace::new();
     let prepared = workspace.prepare();
