@@ -1127,6 +1127,13 @@ Arc-header or live-bank coverage. This preserves an existing component accountin
 class, not a global live-memory or completed Bazel/Slug RSS guarantee. No full body is replaced by a digest, no semantic
 history is removed, and no FD/scope/credit/native setup authority enters DICE.
 
+Revision checks can reuse a direct General Archive FileDigest after the original
+backing has become read-only at the kernel level. A credited receipt retains the
+first verified raw digest and full file frame for the exact sealed owner and
+scope. Each repeat checks the current selection, rooted descriptor and name.
+Ordinary observations, missing receipts and mismatched digests use the full
+charged read. The [active packet](current-packet.md) tracks the real Build gate.
+
 Implementation scope is Core's physical-root observation seam plus a small
 borrowed carrier leaf, the shared rooted observer and a bounded owned-file
 verification leaf. Tests use the existing rooted FD fixtures and real claimed

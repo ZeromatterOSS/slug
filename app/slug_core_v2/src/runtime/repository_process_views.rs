@@ -32,7 +32,9 @@ impl ReadOnlyMountClone {
 
 /// Checks the selected mount, including an open_tree O_PATH mount descriptor.
 /// fstatvfs performs no path lookup or descriptor duplication.
-pub(super) fn check_readonly(file: &File) -> Result<u64, MountLeaseError> {
+pub(in crate::runtime::repository_physical_root) fn check_readonly(
+    file: &File,
+) -> Result<u64, MountLeaseError> {
     let flags = mount_flags(file)?;
     validate_flags(flags)?;
     Ok(flags)

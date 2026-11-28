@@ -39,16 +39,28 @@ impl<'a> SealedGeneralObservation<'a> {
     pub(in crate::runtime) fn active(&self) -> &dyn Fn() -> bool {
         self.active
     }
+
+    pub(in crate::runtime) fn owns_digest_receipts(
+        &self,
+        pending: &PendingArchiveDigestReceipts<'_>,
+    ) -> bool {
+        pending.belongs_to(self.root)
+    }
     /// Only direct canonical regular members qualify. Links, missing paths and
     /// digest-only Source snapshots never become owned-body verification.
     pub(in crate::runtime) fn file(
         &self,
         relative: &Path,
-    ) -> Option<(&RepositoryWorkspaceBody, u16)> {
-        let entry = self.root.state.entry(relative.to_str()?)?;
+    ) -> Option<(usize, &RepositoryWorkspaceBody, u16)> {
+        let path = relative.to_str()?;
+        let entries = self.root.state.entries();
+        let index = entries
+            .binary_search_by(|entry| entry.path().cmp(path))
+            .ok()?;
+        let entry = &entries[index];
         let RepositoryWorkspaceNode::File(body) = entry.node() else {
             return None;
         };
-        Some((body, entry.mode()))
+        Some((index, body, entry.mode()))
     }
 }

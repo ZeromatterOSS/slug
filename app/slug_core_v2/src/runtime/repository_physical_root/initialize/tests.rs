@@ -99,6 +99,7 @@ fn generation(
         runtime,
         body,
         false,
+        false,
     )
     .expect("matching ticket spec must adopt")
 }
@@ -111,6 +112,7 @@ fn generation_with_adoption_spec(
     runtime: &tokio::runtime::Runtime,
     body: &[u8],
     foreign_spec: bool,
+    finalize_archive: bool,
 ) -> Option<(
     crate::runtime::repository_io::RepositorySessionToken,
     Generation,
@@ -189,7 +191,11 @@ fn generation_with_adoption_spec(
         repo_spec: terminal_spec,
         kind: RepositoryMaterializationKind::GeneralWorkspace(realization),
     });
-    let sealed = command.seal_for_materialization(request.clone(), scope, &|| true);
+    let sealed = if finalize_archive {
+        runtime.block_on(command.finalize_workspace(request.clone(), scope, &|| true))
+    } else {
+        command.seal_for_materialization(request.clone(), scope, &|| true)
+    };
     if foreign_spec {
         assert!(matches!(
             sealed,
@@ -493,6 +499,28 @@ fn native_command_scope_origin_survives_acceptance_without_renewal_by_next_comma
     assert_eq!(a.source.requested_path(), b.source.requested_path());
     assert_ne!(a.source.namespace(), b.source.namespace());
     assert_eq!(resources.snapshot().backing_bytes, 2 * ARCHIVE_BYTES);
+    let lease_b = b.roots.lease_for(&b.source).unwrap().unwrap();
+    let rooted_b =
+        SealedGeneralObservation::new(lease_b.physical().unwrap(), &scope_b, &|| true).unwrap();
+    let mut receipts_a = PendingArchiveDigestReceipts::new(&root_a);
+    let digest_b = PathObservationDemand::new(
+        b.source.namespace(),
+        b.source.real_path().clone(),
+        PathObservationOperation::FileDigest,
+    );
+    let decoded_before = scope_b.snapshot().decoded_bytes;
+    assert!(matches!(
+        crate::runtime::path_observation::rooted::observe_sealed_general(
+            &rooted_b,
+            &[digest_b],
+            Some((&mut receipts_a, None)),
+        ),
+        Err(crate::runtime::path_observation::rooted::RootedObservationError::RootIo(error))
+            if error.kind() == io::ErrorKind::InvalidInput
+    ));
+    assert_eq!(scope_b.snapshot().decoded_bytes, decoded_before);
+    drop(receipts_a);
+    drop(lease_b);
     let before = resources.snapshot();
     assert!(matches!(
         root_a.check_origin(&scope_b, &|| true),
@@ -948,6 +976,7 @@ fn native_seal_rejects_foreign_spec_after_actual_history_and_releases_root() {
             &runtime,
             b"actual sealed bytes",
             true,
+            false,
         )
         .is_none()
     );

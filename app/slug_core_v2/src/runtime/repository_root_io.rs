@@ -291,6 +291,28 @@ impl<'root> RootIo<'root> {
         Ok(file)
     }
 
+    /// Verify a freshly opened no-follow regular file against an earlier
+    /// frame. This supplies metadata evidence only; the sealed caller owns
+    /// the proof of immutability and previous raw SHA-256.
+    pub(super) fn verify_regular_frame(
+        &self,
+        relative: &Path,
+        expected: &libc::stat,
+        active: &dyn Fn() -> bool,
+    ) -> io::Result<()> {
+        check_active(active)?;
+        let file = self.open_read_regular(relative)?;
+        let opened = self.check_regular(&file)?;
+        self.admit_file_size(u64::try_from(opened.st_size).map_err(|_| limit())?)?;
+        if !unchanged(expected, &opened)
+            || !unchanged(expected, &self.lstat(relative)?)
+            || !unchanged(expected, &self.check_regular(&file)?)
+        {
+            return Err(stale());
+        }
+        check_active(active)
+    }
+
     fn check_regular(&self, file: &File) -> io::Result<libc::stat> {
         let metadata = linux::stat(file)?;
         self.check_regular_metadata(&metadata)?;

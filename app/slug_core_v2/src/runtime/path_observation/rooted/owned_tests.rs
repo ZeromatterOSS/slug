@@ -118,6 +118,65 @@ fn owned_kernel_verifies_payload_and_empty_eof_reuses_arc_and_charges_actual_byt
 }
 
 #[test]
+fn prior_digest_frame_checks_actual_rooted_name_without_reading_payload() {
+    let fixture = Fixture::new(Arc::from(b"actual bytes".as_slice()));
+    let root = fixture.root();
+    let decoded_bytes = fixture.body.len() as u64;
+    let resources = scope(SourceServiceLimits {
+        decoded_bytes,
+        ..SourceServiceLimits::default()
+    });
+    let body = slug_bzlmod_v2::RepositoryWorkspaceBody::from_arc(fixture.body.clone());
+    let work = read_work_for_test::begin();
+    let path = Path::new("file");
+    let (observed, receipt) = owned::verify_with_frame(
+        &root,
+        path,
+        &body,
+        0o644,
+        PathObservationOperation::FileDigest,
+        &resources,
+        &|| true,
+    )
+    .unwrap();
+    let receipt = receipt.unwrap();
+    assert_eq!(receipt.digest(), fixture.digest());
+    assert_eq!(
+        owned::verify_prior_digest(&root, path, receipt, &resources, &|| true).unwrap(),
+        observed
+    );
+    assert_eq!(resources.snapshot().decoded_bytes, decoded_bytes);
+    assert_eq!(
+        work.snapshot(),
+        read_work_for_test::Snapshot {
+            digest_payload: decoded_bytes,
+            digest_sha: decoded_bytes,
+            contents_payload: 0,
+            contents_sha: 0,
+        }
+    );
+
+    // A new inode holds the same bytes. The rooted frame must still refuse.
+    let replacement = fixture.directory.path().join("replacement");
+    fs::write(&replacement, fixture.body.as_ref()).unwrap();
+    fs::rename(replacement, fixture.path()).unwrap();
+    assert!(matches!(
+        owned::verify_prior_digest(&root, path, receipt, &resources, &|| true),
+        Err(RootedObservationError::Unstable)
+    ));
+    assert_eq!(work.snapshot().digest_payload, decoded_bytes);
+    assert_eq!(resources.snapshot().decoded_bytes, decoded_bytes);
+
+    resources.cancel();
+    assert!(matches!(
+        owned::verify_prior_digest(&root, path, receipt, &resources, &|| true),
+        Err(RootedObservationError::SourceService(
+            SourceServiceError::Cancelled
+        ))
+    ));
+}
+
+#[test]
 fn owned_kernel_refuses_actual_byte_size_name_type_mode_and_link_count_drift_without_capture_fallback()
  {
     for mutation in [

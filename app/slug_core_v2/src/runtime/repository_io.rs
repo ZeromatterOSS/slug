@@ -673,7 +673,7 @@ impl RepositoryMaterializer {
         let demands = std::mem::take(&mut physical.legacy);
         let observed = observe(&root_owners, roots, demands).map_err(native_observation_error)?;
         #[cfg(target_os = "linux")]
-        let observed = physical.observe(self, token, observed)?;
+        let (observed, _) = physical.observe(self, token, observed, None)?;
         self.check_source_scope(self.source_scope.as_ref())?;
         let reusable = accepted
             .into_iter()
@@ -1274,14 +1274,39 @@ impl RepositoryMaterializer {
             self.observe_native_impl(
                 token,
                 demands,
+                None,
                 &mut |_| {},
                 &mut super::path_observation::report_unassociated_charge,
             )
         }
         #[cfg(not(all(test, target_os = "linux")))]
         {
-            self.observe_native_impl(token, demands)
+            self.observe_native_impl(token, demands, None)
         }
+    }
+
+    /// The revision owner has checked that these certificate rows belong to
+    /// the current full observation epoch before invoking this observer.
+    pub(super) fn observe_native_certificate(
+        &self,
+        token: RepositorySessionToken,
+        demands: Vec<PathObservationDemand>,
+        certificate: &PathObservationEpoch,
+        #[cfg(all(test, target_os = "linux"))] on_first_refusal: &mut dyn FnMut(
+            &PathObservationDemand,
+        ),
+        #[cfg(all(test, target_os = "linux"))]
+        on_charge: &mut super::path_observation::SourceChargeCallback<'_>,
+    ) -> Result<PathObservationEpoch, RepositorySessionError> {
+        self.observe_native_impl(
+            token,
+            demands,
+            Some(certificate),
+            #[cfg(all(test, target_os = "linux"))]
+            on_first_refusal,
+            #[cfg(all(test, target_os = "linux"))]
+            on_charge,
+        )
     }
 
     #[cfg(all(test, target_os = "linux"))]
@@ -1294,6 +1319,7 @@ impl RepositoryMaterializer {
         self.observe_native_impl(
             token,
             demands,
+            None,
             on_first_refusal,
             &mut super::path_observation::report_unassociated_charge,
         )
@@ -1307,13 +1333,15 @@ impl RepositoryMaterializer {
         on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
         on_charge: &mut super::path_observation::SourceChargeCallback<'_>,
     ) -> Result<PathObservationEpoch, RepositorySessionError> {
-        self.observe_native_impl(token, demands, on_first_refusal, on_charge)
+        self.observe_native_impl(token, demands, None, on_first_refusal, on_charge)
     }
 
     fn observe_native_impl(
         &self,
         token: RepositorySessionToken,
         demands: impl IntoIterator<Item = PathObservationDemand>,
+        #[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
+        certificate: Option<&PathObservationEpoch>,
         #[cfg(all(test, target_os = "linux"))] on_first_refusal: &mut dyn FnMut(
             &PathObservationDemand,
         ),
@@ -1372,16 +1400,30 @@ impl RepositoryMaterializer {
         )
         .map_err(native_observation_error);
         #[cfg(target_os = "linux")]
-        let observed = observed.and_then(|legacy| physical.observe(self, token, legacy));
-        #[cfg(target_os = "linux")]
-        let observed = observed.and_then(|current| sources.observe(self, token, current));
+        let observed = observed
+            .and_then(|legacy| physical.observe(self, token, legacy, certificate))
+            .and_then(|(current, pending)| {
+                sources.observe(self, token, current).map(|epoch| (epoch, pending))
+            });
         self.check_source_scope(self.source_scope.as_ref())?;
         let state = self
             .state
             .lock()
             .expect("repository materializer mutex poisoned");
-        matching_validated_active(&state, token)?;
-        observed
+        let active = matching_validated_active(&state, token)?;
+        #[cfg(target_os = "linux")]
+        {
+            let (epoch, pending) = observed?;
+            physical.recheck(&state, active)?;
+            drop(state);
+            physical.publish_archive_digests(pending);
+            Ok(epoch)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = active;
+            observed
+        }
     }
 
     pub(super) fn accept(
