@@ -62,7 +62,11 @@ REAPI now records provisional metadata in staging and checks the full source
 frontier before each remote-bound step. Nine checks passed, including stale
 source refusal, final retry and generated CAS eviction/corruption. Installed
 cut `4b0d3bc6c` again verified the retained tinyjson worker and reached the
-deadline on both routes. Attribute cold and warm command preparation.
+deadline on both routes. One runtime's cold/warm profile matched all four
+CrateInfo rows. Cold/warm RootCompute took 9.979/8.062 s and Archive dispatch
+8.725/8.183 s. The warm command discarded 15,096 completed module-toolchain
+prefix rows across 458 Needs. Check reuse of completed rows within the current
+scope and preserve the ordered source and event closure.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
