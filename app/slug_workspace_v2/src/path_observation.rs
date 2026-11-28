@@ -411,6 +411,7 @@ pub enum PathObservationOperation {
     DirectoryEntries,
     WindowsLongPath,
     WindowsOptionPathLongName,
+    DirectoryTraversal,
 }
 
 /// One exact operation requested from the outside-DICE observer.
@@ -556,7 +557,8 @@ impl PathObservationDemand {
             | PathObservationOperation::FileDigest
             | PathObservationOperation::DirectoryEntries
             | PathObservationOperation::WindowsLongPath
-            | PathObservationOperation::WindowsOptionPathLongName => operation == other_operation,
+            | PathObservationOperation::WindowsOptionPathLongName
+            | PathObservationOperation::DirectoryTraversal => operation == other_operation,
         };
         namespace == other_namespace
             && Arc::ptr_eq(path, other_path)
@@ -642,6 +644,11 @@ impl PathObservationDemand {
                 && operation != PathObservationOperation::WindowsOptionPathLongName
                 && !matches!(operation, PathObservationOperation::InputImage(_)),
             "Windows UTF-16 operations require their dedicated Host demand constructors"
+        );
+        assert!(
+            operation != PathObservationOperation::DirectoryTraversal
+                || namespace == PathObservationNamespace::Host,
+            "directory traversal observations require the Host namespace"
         );
         Self::from_fields(namespace, path, operation, None, None)
     }
@@ -875,6 +882,59 @@ impl PathLstat {
     }
 }
 
+/// Immutable engine capability for Host descriptor-backed directory traversal.
+#[derive(Debug, Default, Clone, Copy, Allocative, Dupe)]
+pub struct DirectoryTraversalCapability;
+
+impl DirectoryTraversalCapability {
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
+/// Descriptor identity and effective search access for a Host parent directory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+pub struct DirectoryTraversalWitness {
+    device: u64,
+    inode: u64,
+    mount_id: u64,
+    mode: u32,
+    uid: u32,
+    gid: u32,
+    searchable: bool,
+}
+
+const _: () = assert!(std::mem::size_of::<DirectoryTraversalWitness>() <= 40);
+
+impl DirectoryTraversalWitness {
+    pub const fn new(
+        device: u64,
+        inode: u64,
+        mode: u32,
+        uid: u32,
+        gid: u32,
+        mount_id: u64,
+        searchable: bool,
+    ) -> Self {
+        Self {
+            device,
+            inode,
+            mount_id,
+            mode,
+            uid,
+            gid,
+            searchable,
+        }
+    }
+}
+
+/// The Host parent traversal fact, including exact no-follow fallback metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+pub enum DirectoryTraversalObservation {
+    Directory(DirectoryTraversalWitness),
+    ExactLstat(PathLstat),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 pub enum PathObservationError {
     Io {
@@ -1035,6 +1095,7 @@ pub enum PathObservationResult {
     DirectoryEntries(PathOperationResult<PathDirectoryEntries>),
     WindowsLongPath(Arc<[u16]>),
     WindowsOptionPathLongName(WindowsOptionPathLongNameOutcome),
+    DirectoryTraversal(PathOperationResult<DirectoryTraversalObservation>),
 }
 
 impl PathObservationResult {
@@ -1052,6 +1113,7 @@ impl PathObservationResult {
             Self::WindowsOptionPathLongName(_) => {
                 PathObservationOperation::WindowsOptionPathLongName
             }
+            Self::DirectoryTraversal(_) => PathObservationOperation::DirectoryTraversal,
         }
     }
 }
@@ -1304,7 +1366,7 @@ impl InjectedKey for PathObservationInputModeKey {
 // invalidates absent-mode fallback and equal publications need no forced compute.
 // Historical recomputation still reads the original versioned injected mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
-struct PathObservationInputModeProjectionKey;
+pub(crate) struct PathObservationInputModeProjectionKey;
 impl fmt::Display for PathObservationInputModeProjectionKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("path-observation-input-mode-projection")

@@ -24,7 +24,10 @@ empty = rule(implementation=_empty)
 "#;
 
 fn workspace() -> Workspace {
-    let workspace = Workspace::new();
+    requested_workspace(Workspace::new())
+}
+
+fn requested_workspace(workspace: Workspace) -> Workspace {
     fs::write(workspace.root.path().join("standalone"), b"aaa").unwrap();
     fs::write(
         workspace.root.path().join("defs.bzl"),
@@ -77,6 +80,8 @@ fn run(
 enum RequestedBehavior {
     Normal,
     StageStandalone,
+    #[cfg(target_os = "linux")]
+    StageUnrelatedWorkspaceSibling,
     RetryStandalone,
     LateError,
     LatePanic,
@@ -139,6 +144,10 @@ impl ActionChainTransport for RequestedFake {
                 RequestedBehavior::StageStandalone => {
                     fs::write(self.inner.root.join("standalone"), b"bbb")?
                 }
+                #[cfg(target_os = "linux")]
+                RequestedBehavior::StageUnrelatedWorkspaceSibling => {
+                    change_workspace_parent(&self.inner.root, &session.inner.inputs)?;
+                }
                 RequestedBehavior::LatePanic => panic!("requested final stage panic"),
                 _ => {}
             }
@@ -176,6 +185,77 @@ impl ActionChainTransport for RequestedFake {
             standalone: session.standalone,
         })
     }
+}
+
+#[cfg(target_os = "linux")]
+fn change_workspace_parent(
+    workspace: &Path,
+    inputs: &crate::runtime::NativeActionChainInputs,
+) -> std::io::Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    use std::time::Duration;
+    use std::time::SystemTime;
+    use std::time::UNIX_EPOCH;
+
+    use slug_workspace_v2::DirectoryTraversalObservation;
+    use slug_workspace_v2::PathObservationNamespace;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
+
+    let parent = workspace.parent().unwrap();
+    // Every fixture input is inside the workspace. In particular, the parent
+    // has a traversal observation and no independent directory listing.
+    let mut parent_facts = inputs
+        .observations()
+        .observations()
+        .iter()
+        .filter(|(demand, _)| {
+            demand.namespace() == PathObservationNamespace::Host
+                && demand.path().as_path() == parent
+        });
+    let (_, observation) = parent_facts.next().expect("selected Host parent traversal");
+    assert!(matches!(
+        observation.as_ref(),
+        PathObservationResult::DirectoryTraversal(PathOperationResult::Present(
+            DirectoryTraversalObservation::Directory(_)
+        ))
+    ));
+    assert!(parent_facts.next().is_none());
+    let input = workspace.join("input");
+    let standalone = workspace.join("standalone");
+    let metadata = || {
+        [parent, workspace, input.as_path(), standalone.as_path()]
+            .map(|path| fs::symlink_metadata(path).unwrap())
+    };
+    let before = metadata();
+    assert!(before[0].is_dir());
+    // Get past the old ctime even on a filesystem with one-second timestamps.
+    let ctime = UNIX_EPOCH
+        + Duration::new(
+            before[0].ctime().try_into().unwrap(),
+            before[0].ctime_nsec().try_into().unwrap(),
+        );
+    let precision = Duration::from_secs(1);
+    if let Ok(delay) = (ctime + precision).duration_since(SystemTime::now()) {
+        assert!(delay <= precision);
+        std::thread::sleep(delay);
+    }
+    let sibling = parent.join("unrelated-sibling");
+    fs::create_dir(&sibling)?;
+    fs::remove_dir(&sibling)?;
+    let after = metadata();
+    let identity = |m: &fs::Metadata| (m.dev(), m.ino(), m.mode(), m.uid(), m.gid());
+    for (before, after) in before.iter().zip(&after) {
+        assert_eq!(identity(before), identity(after));
+    }
+    assert_eq!(before[0].len(), after[0].len());
+    assert!(before[0].modified()? < after[0].modified()?);
+    assert!(
+        (before[0].ctime(), before[0].ctime_nsec()) < (after[0].ctime(), after[0].ctime_nsec())
+    );
+    assert_eq!(fs::read(input)?, b"aaa");
+    assert_eq!(fs::read(standalone)?, b"aaa");
+    Ok(())
 }
 
 #[test]
@@ -270,6 +350,39 @@ fn requested_forest_executes_shared_producers_once_and_restores_group_bindings()
     assert_ne!(snapshots[0], snapshots[1]);
     assert_eq!(snapshots[0], snapshots[2]);
     assert!(!workspace.output_path().exists());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "requires Linux unique statx mount IDs and effective descriptor search"]
+fn requested_build_accepts_unrelated_workspace_parent_timestamp_change() {
+    let parent = Workspace::fixture_dir();
+    let root = tempfile::tempdir_in(parent.path()).unwrap();
+    fs::File::open(parent.path())
+        .unwrap()
+        .set_modified(std::time::UNIX_EPOCH)
+        .unwrap();
+    let workspace = requested_workspace(Workspace::with_root(root));
+    let normal = RequestedFake::new(&workspace, RequestedBehavior::Normal);
+    drop(run(&workspace, &["//:one"], &normal).unwrap());
+
+    let transport = RequestedFake::new(
+        &workspace,
+        RequestedBehavior::StageUnrelatedWorkspaceSibling,
+    );
+    let accepted = run(&workspace, &["//:one"], &transport)
+        .expect("expected final acceptance after the workspace parent timestamp change");
+    let result = accepted.terminal_for_test();
+    let output = result.output().unwrap();
+    assert_eq!(output.inner.executed, [0, 1, 2, 3]);
+    assert_eq!(output.inner.bytes, b"aaa");
+    assert_eq!(output.standalone, b"aaa");
+    assert!(result.published_outputs().is_empty());
+    assert_eq!(transport.inner.starts.load(Ordering::SeqCst), 1);
+    assert_eq!(transport.inner.stages.load(Ordering::SeqCst), 4);
+    assert_eq!(transport.inner.executions.load(Ordering::SeqCst), 4);
+    assert_eq!(transport.finishes.load(Ordering::SeqCst), 1);
+    assert_eq!(transport.inner.session_drops.load(Ordering::SeqCst), 1);
 }
 
 #[test]

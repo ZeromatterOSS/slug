@@ -6535,6 +6535,11 @@ impl WorkspaceRuntime {
             None => super::registry_io::install(&mut dice_builder),
         }
         super::repository_io::install(&mut dice_builder);
+        #[cfg(target_os = "linux")]
+        if source_scope.is_none() {
+            // Historical diagnostic fixtures authorize exact recorded Lstat rows.
+            dice_builder.set(slug_workspace_v2::DirectoryTraversalCapability::new());
+        }
         let dice = dice_builder.build(DetectCycles::Enabled);
         let native_demand_sessions = NativeDemandSessionOwner::new(normalized_workspace.clone());
         let demand_owner = WorkspaceDemandOwner::new(&dice, normalized_workspace);

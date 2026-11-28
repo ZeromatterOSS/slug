@@ -43,6 +43,7 @@ use slug_bzlmod_v2::RepositoryTransportError;
 use slug_bzlmod_v2::install_repository_io;
 use slug_bzlmod_v2::source_identity;
 use slug_identity_v2::CanonicalRepoName;
+use slug_workspace_v2::DirectoryTraversalObservation;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
@@ -2006,6 +2007,22 @@ fn observation_is_dirty(
             lstat_is_dirty(previous, observed, has_file_content)
         }
         (
+            PathObservationResult::DirectoryTraversal(PathOperationResult::Present(
+                DirectoryTraversalObservation::ExactLstat(previous),
+            )),
+            PathObservationResult::DirectoryTraversal(PathOperationResult::Present(
+                DirectoryTraversalObservation::ExactLstat(observed),
+            )),
+        ) => lstat_is_dirty(
+            &PathOperationResult::Present(*previous),
+            &PathOperationResult::Present(*observed),
+            has_file_content,
+        ),
+        (
+            PathObservationResult::DirectoryTraversal(previous),
+            PathObservationResult::DirectoryTraversal(observed),
+        ) => previous != observed,
+        (
             PathObservationResult::FileBytes(previous),
             PathObservationResult::FileBytes(observed),
         ) => previous != observed,
@@ -2048,6 +2065,9 @@ fn observation_has_error(result: &PathObservationResult) -> bool {
             matches!(result, PathOperationResult::Error(_))
         }
         PathObservationResult::DirectoryEntries(result) => {
+            matches!(result, PathOperationResult::Error(_))
+        }
+        PathObservationResult::DirectoryTraversal(result) => {
             matches!(result, PathOperationResult::Error(_))
         }
         PathObservationResult::InputImage(_) => true,
@@ -6299,6 +6319,43 @@ mod tests {
             NormalizedAbsolutePath::new("/observed").unwrap(),
             operation,
         )
+    }
+
+    #[test]
+    fn retained_validation_preserves_legacy_lstat_fallback_and_exact_traversal_identity() {
+        use slug_workspace_v2::DirectoryTraversalWitness;
+
+        let demand = validation_demand(PathObservationOperation::DirectoryTraversal);
+        let raw = |mtime| {
+            PathObservationResult::DirectoryTraversal(PathOperationResult::Present(
+                DirectoryTraversalObservation::ExactLstat(PathLstat::new(
+                    PathNodeKind::Directory,
+                    12,
+                    mtime,
+                    mtime,
+                    2,
+                    0o700,
+                )),
+            ))
+        };
+        let witness = |inode| {
+            PathObservationResult::DirectoryTraversal(PathOperationResult::Present(
+                DirectoryTraversalObservation::Directory(DirectoryTraversalWitness::new(
+                    1, inode, 0o40700, 1000, 1000, 3, true,
+                )),
+            ))
+        };
+        let dirty = |previous, fresh| {
+            let previous = [(demand.clone(), previous)];
+            let fresh = PathObservationEpoch::new([(demand.clone(), fresh)]).unwrap();
+            validation_epoch_is_dirty(&previous, &fresh)
+        };
+        assert_ne!(raw(1), raw(2));
+        assert!(!dirty(raw(1), raw(2)));
+        assert!(dirty(raw(1), witness(2)));
+        assert!(dirty(witness(2), raw(1)));
+        assert!(!dirty(witness(2), witness(2)));
+        assert!(dirty(witness(2), witness(3)));
     }
 
     #[test]

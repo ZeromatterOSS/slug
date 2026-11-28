@@ -10,6 +10,8 @@
  * License, Version 2.0 found in the LICENSE-APACHE file in the root directory.
  */
 
+#[cfg(target_os = "linux")]
+mod directory_traversal;
 mod file_digest;
 #[cfg(target_os = "linux")]
 pub(in crate::runtime) mod rooted;
@@ -25,6 +27,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use slug_workspace_v2::DirectoryTraversalObservation;
 use slug_workspace_v2::FileContentDigest;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathDirectoryEntries;
@@ -95,6 +98,7 @@ pub(super) enum PathObservationKernelError {
     ZeroDemandInstance(PathObservationDemand),
     UnknownDemandInstance(PathObservationDemand),
     UnsupportedLstat,
+    UnauthorizedDirectoryTraversal(PathObservationDemand),
     UnauthorizedInputImage(PathObservationDemand),
     Epoch(PathObservationEpochError),
     SourceService(SourceServiceError),
@@ -243,6 +247,17 @@ trait ObservationOperations {
 
     fn lstat(&mut self, path: &NormalizedAbsolutePath) -> PathOperationResult<PathLstat>;
 
+    fn supports_directory_traversal(&self) -> bool {
+        false
+    }
+
+    fn directory_traversal(
+        &mut self,
+        _path: &NormalizedAbsolutePath,
+    ) -> PathOperationResult<DirectoryTraversalObservation> {
+        unreachable!("directory traversal requires a validated Host observer")
+    }
+
     fn read_link(&mut self, path: &NormalizedAbsolutePath) -> Result<Arc<PathBuf>, PrimaryFailure>;
 
     fn file_bytes(&mut self, path: &NormalizedAbsolutePath) -> Result<Arc<[u8]>, PrimaryFailure>;
@@ -304,6 +319,14 @@ fn observe_with_scoped(
     }
 
     for demand in &demands {
+        if demand.operation() == PathObservationOperation::DirectoryTraversal
+            && (demand.namespace() != PathObservationNamespace::Host
+                || !operations.supports_directory_traversal())
+        {
+            return Err(PathObservationKernelError::UnauthorizedDirectoryTraversal(
+                demand.clone(),
+            ));
+        }
         if matches!(demand.operation(), PathObservationOperation::InputImage(_)) {
             return Err(PathObservationKernelError::UnauthorizedInputImage(
                 demand.clone(),
@@ -460,6 +483,9 @@ fn observe_one(
         PathObservationOperation::Lstat => {
             PathObservationResult::Lstat(operations.lstat(demand.path()))
         }
+        PathObservationOperation::DirectoryTraversal => {
+            PathObservationResult::DirectoryTraversal(operations.directory_traversal(demand.path()))
+        }
         PathObservationOperation::ReadLink => {
             PathObservationResult::ReadLink(match operations.read_link(demand.path()) {
                 Ok(target) => PathOperationResult::Present(target),
@@ -586,6 +612,19 @@ impl ObservationOperations for UnixPathObservationAdapter {
 
     fn lstat(&mut self, path: &NormalizedAbsolutePath) -> PathOperationResult<PathLstat> {
         unix_lstat(path)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn supports_directory_traversal(&self) -> bool {
+        true
+    }
+
+    #[cfg(target_os = "linux")]
+    fn directory_traversal(
+        &mut self,
+        path: &NormalizedAbsolutePath,
+    ) -> PathOperationResult<DirectoryTraversalObservation> {
+        directory_traversal::observe(path)
     }
 
     fn read_link(&mut self, path: &NormalizedAbsolutePath) -> Result<Arc<PathBuf>, PrimaryFailure> {
@@ -3493,6 +3532,11 @@ mod tests {
             path(temp.path(), "unknown"),
             PathObservationOperation::FileBytes,
         );
+        let traversal = demand(
+            PathObservationNamespace::Host,
+            path(temp.path(), "traversal"),
+            PathObservationOperation::DirectoryTraversal,
+        );
 
         for (demands, expected) in [
             (
@@ -3506,6 +3550,10 @@ mod tests {
             (
                 vec![host.clone(), unknown.clone()],
                 PathObservationKernelError::UnknownDemandInstance(unknown),
+            ),
+            (
+                vec![host.clone(), traversal.clone()],
+                PathObservationKernelError::UnauthorizedDirectoryTraversal(traversal),
             ),
         ] {
             let mut operations = ScriptedOperations::unsupported();
@@ -3883,6 +3931,7 @@ mod tests {
                     .push_back(Err(PrimaryFailure::Final(original))),
                 PathObservationOperation::InputImage(_)
                 | PathObservationOperation::Lstat
+                | PathObservationOperation::DirectoryTraversal
                 | PathObservationOperation::WindowsLongPath
                 | PathObservationOperation::WindowsOptionPathLongName => {
                     unreachable!()

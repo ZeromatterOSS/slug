@@ -861,7 +861,9 @@ async fn parse_ignore_file_observed(
                             };
                         value.dupe()
                     }
-                    PathObservationResult::Lstat(_)
+                    PathObservationResult::InputImage(_)
+                    | PathObservationResult::Lstat(_)
+                    | PathObservationResult::DirectoryTraversal(_)
                     | PathObservationResult::ReadLink(_)
                     | PathObservationResult::FileBytes(_)
                     | PathObservationResult::DirectoryEntries(_)

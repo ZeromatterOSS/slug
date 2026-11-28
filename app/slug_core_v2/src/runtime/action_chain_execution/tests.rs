@@ -32,10 +32,17 @@ struct Workspace {
     owner: ConfiguredTargetKey,
 }
 impl Workspace {
-    fn new() -> Self {
+    fn fixture_dir() -> tempfile::TempDir {
         let parent = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/wp737/fixtures");
         fs::create_dir_all(&parent).unwrap();
-        let root = tempfile::tempdir_in(parent.canonicalize().unwrap()).unwrap();
+        tempfile::tempdir_in(parent.canonicalize().unwrap()).unwrap()
+    }
+
+    fn new() -> Self {
+        Self::with_root(Self::fixture_dir())
+    }
+
+    fn with_root(root: tempfile::TempDir) -> Self {
         fixture::write(root.path());
         fs::write(root.path().join("defs.bzl"), DEFS).unwrap();
         let runtime =

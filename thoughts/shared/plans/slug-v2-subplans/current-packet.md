@@ -18,7 +18,8 @@ cases on each route, with empty stderr and one daemon generation.
 
 Finish the installed sweep and review before activation. Cold, warm and restored
 Build cases passed on one installed daemon. The Generic retained oracle matches
-all ten rows on stable workspace ancestry. A fresh REAPI process failure admits
+all ten rows while an unrelated sibling repeatedly changes the workspace
+parent's timestamps. A fresh REAPI process failure admits
 empty stdout and up to 1 MiB of inline or verified CAS stderr. Core revalidates sources before it
 publishes selected prints, the action diagnostic and process stderr at exit 1.
 The Loading and Core tests now verify dependency A/B/A, BUILD and glob changes,
@@ -28,9 +29,9 @@ ordered loads and consumed glob records for print comparison. Projected
 registration results preserve warm rule reuse and keep the observed edges for
 source checks. All 57 CLI load-provenance rows passed, including the Host
 `.bzl` cycle. Query certifies that diagnostic and its selected sources through
-the completed live DICE closure. The Build precheck can still reject ambient
-directory timestamp changes above the workspace. Separate traversal identity
-from child metadata, then finish installed qualification.
+the completed live DICE closure. Host parent traversal records descriptor
+identity and effective search access. Explicit metadata, listing and rooted
+observations keep their exact source checks. Requalify the fresh installed cut.
 Public action comparison and Rust REAPI follow. Keep atomic
 publication, existing readers, native quotas, clocks, launcher/PID1, rooted
 reads, codec and history checks. Compare equal work for timing.

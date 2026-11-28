@@ -304,6 +304,7 @@ fn path_operation_name(operation: PathObservationOperation) -> &'static str {
     match operation {
         PathObservationOperation::InputImage(_) => "input_image",
         PathObservationOperation::Lstat => "lstat",
+        PathObservationOperation::DirectoryTraversal => "directory_traversal",
         PathObservationOperation::ReadLink => "read_link",
         PathObservationOperation::FileBytes => "file_bytes",
         PathObservationOperation::FileDigest => "file_digest",

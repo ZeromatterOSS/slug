@@ -152,6 +152,11 @@ fn rooted_observation_rejects_entire_foreign_above_anchor_and_duplicate_batches_
             PathObservationOperation::Lstat,
         ),
         PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            selected.root().clone(),
+            PathObservationOperation::DirectoryTraversal,
+        ),
+        PathObservationDemand::new(
             selected.namespace(),
             NormalizedAbsolutePath::new(fixture.path().parent().unwrap()).unwrap(),
             PathObservationOperation::Lstat,

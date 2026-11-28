@@ -354,6 +354,7 @@ mod tests {
                 namespace,
                 anchor: None,
                 frames: vec![caller, parent],
+                host_directory_traversal: false,
             },
             value,
         )

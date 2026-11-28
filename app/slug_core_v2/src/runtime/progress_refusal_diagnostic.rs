@@ -89,6 +89,7 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
         }
         Some(match demand.operation() {
             PathObservationOperation::Lstat => "lstat",
+            PathObservationOperation::DirectoryTraversal => "directory_traversal",
             PathObservationOperation::ReadLink => "read_link",
             PathObservationOperation::FileBytes => "file_bytes",
             PathObservationOperation::FileDigest => "file_digest",

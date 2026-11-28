@@ -7106,6 +7106,7 @@ async fn drive_host_repository_source_from_resolved(
         }
         PathObservationResult::InputImage(_)
         | PathObservationResult::Lstat(_)
+        | PathObservationResult::DirectoryTraversal(_)
         | PathObservationResult::ReadLink(_)
         | PathObservationResult::DirectoryEntries(_)
         | PathObservationResult::WindowsLongPath(_)
@@ -8377,6 +8378,7 @@ fn finish_module_source_patch_file(
         }
         PathObservationResult::InputImage(_)
         | PathObservationResult::Lstat(_)
+        | PathObservationResult::DirectoryTraversal(_)
         | PathObservationResult::ReadLink(_)
         | PathObservationResult::DirectoryEntries(_)
         | PathObservationResult::WindowsLongPath(_)

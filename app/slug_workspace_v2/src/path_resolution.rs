@@ -28,6 +28,8 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 
+use crate::DirectoryTraversalCapability;
+use crate::DirectoryTraversalObservation;
 use crate::NormalizedAbsolutePath;
 use crate::PathDirectoryEntries;
 use crate::PathLstat;
@@ -36,6 +38,7 @@ use crate::PathObservationDemand;
 use crate::PathObservationEpoch;
 use crate::PathObservationEpochError;
 use crate::PathObservationError;
+use crate::PathObservationInputMode;
 use crate::PathObservationKey;
 use crate::PathObservationNamespace;
 use crate::PathObservationOperation;
@@ -43,6 +46,7 @@ use crate::PathObservationResult;
 use crate::PathOperationResult;
 use crate::PathOutcome;
 use crate::PathResult;
+use crate::path_observation::PathObservationInputModeProjectionKey;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -538,11 +542,21 @@ enum MachineStep {
     Complete(Result<ResolvedPath, ResolutionCause>),
 }
 
+/// The parent data needed by its caller. A traversal witness only completes a parent frame.
+struct ParentCompletion<'a> {
+    content_origin: &'a ResolvedPathContentOrigin,
+    real_path: &'a NormalizedAbsolutePath,
+    route: &'a [NormalizedAbsolutePath],
+    symlinks: &'a [ResolvedSymlink],
+    is_directory: bool,
+}
+
 /// The pure state machine. Only the async adapter below performs DICE awaits.
 struct ResolutionMachine {
     namespace: PathObservationNamespace,
     anchor: Option<MaterializationPathAnchor>,
     frames: Vec<ResolverFrame>,
+    host_directory_traversal: bool,
 }
 
 impl ResolutionMachine {
@@ -557,6 +571,7 @@ impl ResolutionMachine {
                     anchor: None,
                 },
             )],
+            host_directory_traversal: false,
         }
     }
 
@@ -576,6 +591,15 @@ impl ResolutionMachine {
             .expect("active resolver frame")
             .content_origin
             .namespace;
+        let operation = if self.host_directory_traversal
+            && self.frames.len() > 1
+            && namespace == PathObservationNamespace::Host
+            && operation == PathObservationOperation::Lstat
+        {
+            PathObservationOperation::DirectoryTraversal
+        } else {
+            operation
+        };
         MachineStep::Observe(PathObservationDemand::new(namespace, path, operation))
     }
 
@@ -664,50 +688,130 @@ impl ResolutionMachine {
         let Some(caller) = self.frames.last_mut() else {
             return Some(MachineStep::Complete(result));
         };
+        match result {
+            Err(cause) => Some(MachineStep::Complete(Err(cause))),
+            Ok(parent) => Self::resume_after_parent(
+                self.namespace,
+                caller,
+                ParentCompletion {
+                    content_origin: parent.content_origin(),
+                    real_path: parent.real_path(),
+                    route: parent.route(),
+                    symlinks: parent.symlinks(),
+                    is_directory: matches!(
+                        parent.state(),
+                        ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::Directory
+                    ),
+                },
+            ),
+        }
+    }
+
+    fn finish_traversed_parent(
+        &mut self,
+        real_path: NormalizedAbsolutePath,
+    ) -> Option<MachineStep> {
+        let parent = self.frames.pop().expect("completed traversal frame");
+        let caller = self.frames.last_mut().expect("traversal requires a caller");
+        Self::resume_after_parent(
+            self.namespace,
+            caller,
+            ParentCompletion {
+                content_origin: &parent.content_origin,
+                real_path: &real_path,
+                route: &parent.logical_chain,
+                symlinks: &parent.symlinks,
+                is_directory: true,
+            },
+        )
+    }
+
+    fn resume_after_parent(
+        namespace: PathObservationNamespace,
+        caller: &mut ResolverFrame,
+        parent: ParentCompletion<'_>,
+    ) -> Option<MachineStep> {
         let ResolverPhase::AwaitParent { basename } = &caller.phase else {
             unreachable!("only a suspended caller receives parent completion")
         };
-        let basename = basename.dupe();
+        caller.content_origin = parent.content_origin.dupe();
+        caller.symlink_bytes = caller
+            .symlink_bytes
+            .saturating_add(work::symlink_bytes(parent.symlinks));
+        caller.symlinks.extend(parent.symlinks.iter().cloned());
+        let real_child = join_normalized(parent.real_path, basename.as_ref());
+        if !parent.is_directory {
+            return Some(MachineStep::Complete(Ok(caller.completion(
+                namespace,
+                real_child,
+                ResolvedPathState::Missing,
+            ))));
+        }
+        let entries: Vec<_> = parent
+            .route
+            .iter()
+            .map(|path| join_normalized(path, basename.as_ref()))
+            .collect();
+        caller.projection_bytes = entries
+            .iter()
+            .map(work::path_bytes)
+            .fold(0, usize::saturating_add);
+        caller.phase = ResolverPhase::ReplayParentRoute {
+            entries,
+            next: 0,
+            real_child,
+        };
+        None
+    }
+
+    fn observe_lstat(
+        frame: &mut ResolverFrame,
+        namespace: PathObservationNamespace,
+        demand: PathObservationDemand,
+        real_path: NormalizedAbsolutePath,
+        result: PathOperationResult<PathLstat>,
+    ) -> Option<MachineStep> {
         match result {
-            Err(cause) => Some(MachineStep::Complete(Err(cause))),
-            Ok(parent) => {
-                caller.content_origin = parent.content_origin.dupe();
-                caller.symlink_bytes = caller
-                    .symlink_bytes
-                    .saturating_add(work::symlink_bytes(parent.symlinks()));
-                caller.symlinks.extend(parent.symlinks.iter().cloned());
-                let real_child = join_normalized(parent.real_path(), basename.as_ref());
-                match parent.state() {
-                    ResolvedPathState::Missing => Some(MachineStep::Complete(Ok(
-                        caller.completion(self.namespace, real_child, ResolvedPathState::Missing)
-                    ))),
-                    ResolvedPathState::Present(lstat)
-                        if lstat.kind() != PathNodeKind::Directory =>
-                    {
-                        Some(MachineStep::Complete(Ok(caller.completion(
-                            self.namespace,
-                            real_child,
-                            ResolvedPathState::Missing,
-                        ))))
-                    }
-                    ResolvedPathState::Present(_) => {
-                        let entries: Vec<_> = parent
-                            .route()
-                            .iter()
-                            .map(|path| join_normalized(path, basename.as_ref()))
-                            .collect();
-                        caller.projection_bytes = entries
-                            .iter()
-                            .map(work::path_bytes)
-                            .fold(0, usize::saturating_add);
-                        caller.phase = ResolverPhase::ReplayParentRoute {
-                            entries,
-                            next: 0,
-                            real_child,
-                        };
-                        None
-                    }
-                }
+            PathOperationResult::Present(lstat)
+                if frame
+                    .content_origin
+                    .anchor
+                    .as_ref()
+                    .is_some_and(|anchor| anchor.root() == &real_path)
+                    && lstat.kind() != PathNodeKind::Directory =>
+            {
+                Some(MachineStep::Complete(Err(ResolutionCause::Observation {
+                    demand,
+                    error: PathObservationError::WrongKind {
+                        expected: PathNodeKind::Directory,
+                        actual: lstat.kind(),
+                    },
+                })))
+            }
+            PathOperationResult::Present(lstat) if lstat.kind() == PathNodeKind::Symlink => {
+                frame.phase = ResolverPhase::AwaitReadLink {
+                    physical_link: real_path.dupe(),
+                    lstat,
+                };
+                Some(MachineStep::Observe(PathObservationDemand::new(
+                    frame.content_origin.namespace,
+                    real_path,
+                    PathObservationOperation::ReadLink,
+                )))
+            }
+            PathOperationResult::Present(lstat) => Some(MachineStep::Complete(Ok(
+                frame.completion(namespace, real_path, ResolvedPathState::Present(lstat))
+            ))),
+            PathOperationResult::Missing => Some(MachineStep::Complete(Ok(frame.completion(
+                namespace,
+                real_path,
+                ResolvedPathState::Missing,
+            )))),
+            PathOperationResult::Error(error) => {
+                Some(MachineStep::Complete(Err(ResolutionCause::Observation {
+                    demand,
+                    error,
+                })))
             }
         }
     }
@@ -726,45 +830,23 @@ impl ResolutionMachine {
         let anchor = frame.content_origin.anchor.as_ref();
         match (frame.phase.clone(), result.as_ref()) {
             (ResolverPhase::AwaitLstat { real_path }, PathObservationResult::Lstat(result)) => {
-                match result {
-                    PathOperationResult::Present(lstat)
-                        if anchor.is_some_and(|anchor| anchor.root() == &real_path)
-                            && lstat.kind() != PathNodeKind::Directory =>
-                    {
-                        Some(MachineStep::Complete(Err(ResolutionCause::Observation {
-                            demand,
-                            error: PathObservationError::WrongKind {
-                                expected: PathNodeKind::Directory,
-                                actual: lstat.kind(),
-                            },
-                        })))
+                Self::observe_lstat(frame, namespace, demand, real_path, result.dupe())
+            }
+            (
+                ResolverPhase::AwaitLstat { real_path },
+                PathObservationResult::DirectoryTraversal(result),
+            ) => {
+                let exact = match result {
+                    PathOperationResult::Present(DirectoryTraversalObservation::Directory(_)) => {
+                        return self.finish_traversed_parent(real_path);
                     }
-                    PathOperationResult::Present(lstat)
-                        if lstat.kind() == PathNodeKind::Symlink =>
-                    {
-                        frame.phase = ResolverPhase::AwaitReadLink {
-                            physical_link: real_path.dupe(),
-                            lstat: *lstat,
-                        };
-                        Some(MachineStep::Observe(PathObservationDemand::new(
-                            content_namespace,
-                            real_path,
-                            PathObservationOperation::ReadLink,
-                        )))
-                    }
-                    PathOperationResult::Present(lstat) => Some(MachineStep::Complete(Ok(
-                        frame.completion(namespace, real_path, ResolvedPathState::Present(*lstat))
-                    ))),
-                    PathOperationResult::Missing => Some(MachineStep::Complete(Ok(
-                        frame.completion(namespace, real_path, ResolvedPathState::Missing)
-                    ))),
-                    PathOperationResult::Error(error) => {
-                        Some(MachineStep::Complete(Err(ResolutionCause::Observation {
-                            demand,
-                            error: *error,
-                        })))
-                    }
-                }
+                    PathOperationResult::Present(DirectoryTraversalObservation::ExactLstat(
+                        lstat,
+                    )) => PathOperationResult::Present(*lstat),
+                    PathOperationResult::Missing => PathOperationResult::Missing,
+                    PathOperationResult::Error(error) => PathOperationResult::Error(*error),
+                };
+                Self::observe_lstat(frame, namespace, demand, real_path, exact)
             }
             (
                 ResolverPhase::AwaitReadLink {
@@ -896,6 +978,16 @@ async fn drive_resolution(
     mut captured: Option<&mut Vec<(PathObservationDemand, Arc<PathObservationResult>)>>,
 ) -> Result<PathResult<ResolvedPath, ResolutionCause>, PathObservationEpochError> {
     let mut machine = ResolutionMachine::new(namespace, logical_path.dupe());
+    machine.host_directory_traversal = namespace == PathObservationNamespace::Host
+        && anchor.is_none()
+        && ctx
+            .global_data()
+            .get::<DirectoryTraversalCapability>()
+            .is_ok()
+        && matches!(
+            ctx.compute(&PathObservationInputModeProjectionKey).await,
+            Ok(PathObservationInputMode::PerDemand)
+        );
     machine.set_anchor(anchor);
     let mut next = None;
     loop {
@@ -1287,6 +1379,7 @@ impl Key for PathFileBytesKey {
                 | PathObservationResult::DirectoryEntries(_)
                 | PathObservationResult::WindowsLongPath(_)
                 | PathObservationResult::FileDigest(_)
+                | PathObservationResult::DirectoryTraversal(_)
                 | PathObservationResult::WindowsOptionPathLongName(_) => {
                     unreachable!("FileBytes demand must return a FileBytes observation")
                 }
@@ -1714,6 +1807,7 @@ async fn compute_directory_listing(
         | PathObservationResult::FileBytes(_)
         | PathObservationResult::WindowsLongPath(_)
         | PathObservationResult::FileDigest(_)
+        | PathObservationResult::DirectoryTraversal(_)
         | PathObservationResult::WindowsOptionPathLongName(_) => {
             unreachable!("DirectoryEntries demand must return a DirectoryEntries observation")
         }
@@ -1828,6 +1922,9 @@ mod tests {
     use super::ResolvedPathObservationKey;
     use super::ResolvedPathState;
     use super::assemble_observed_resolution;
+    use crate::DirectoryTraversalCapability;
+    use crate::DirectoryTraversalObservation;
+    use crate::DirectoryTraversalWitness;
     use crate::NeedPathObservations;
     use crate::NormalizedAbsolutePath;
     use crate::PathDirectoryEntries;
@@ -1849,6 +1946,7 @@ mod tests {
     use crate::PathOperationResult;
     use crate::PathOutcome;
     use crate::PathResult;
+    use crate::inject_path_observation_inputs;
 
     type ScriptEntry = (PathObservationDemand, PathObservationResult);
 
@@ -2074,6 +2172,20 @@ mod tests {
         (
             demand(namespace, value, PathObservationOperation::Lstat),
             PathObservationResult::Lstat(result),
+        )
+    }
+
+    fn observed_traversal(
+        value: &str,
+        result: PathOperationResult<DirectoryTraversalObservation>,
+    ) -> ScriptEntry {
+        (
+            demand(
+                PathObservationNamespace::Host,
+                value,
+                PathObservationOperation::DirectoryTraversal,
+            ),
+            PathObservationResult::DirectoryTraversal(result),
         )
     }
 
@@ -4680,6 +4792,191 @@ mod tests {
         ));
         assert!(ResolvedPathObservationKey::validity(&conflict));
         assert!(ResolvedPathObservationKey::equality(&conflict, &conflict));
+    }
+
+    #[tokio::test]
+    async fn host_parent_traversal_preserves_symlink_route_and_terminal_lstat() {
+        let ns = PathObservationNamespace::Host;
+        let terminal = PathLstat::new(PathNodeKind::Directory, 17, 18, 19, 20, 0o711);
+        let direct_parent = PathLstat::new(PathNodeKind::Directory, 3, 4, 5, 6, 0o700);
+        let directory = DirectoryTraversalWitness::new(2, 6, 0o040700, 9, 10, 11, true);
+        let exact_parent = observed_lstat(ns, "/real", PathOperationResult::Present(direct_parent));
+        let script = [
+            observed_traversal(
+                "/",
+                PathOperationResult::Present(DirectoryTraversalObservation::ExactLstat(lstat(
+                    PathNodeKind::Directory,
+                ))),
+            ),
+            observed_traversal(
+                "/alias",
+                PathOperationResult::Present(DirectoryTraversalObservation::ExactLstat(lstat(
+                    PathNodeKind::Symlink,
+                ))),
+            ),
+            read_link(ns, "/alias", "/real"),
+            observed_traversal(
+                "/real",
+                PathOperationResult::Present(DirectoryTraversalObservation::Directory(directory)),
+            ),
+            observed_lstat(ns, "/real/leaf", PathOperationResult::Present(terminal)),
+        ];
+        let mut builder = Dice::builder();
+        builder.set(DirectoryTraversalCapability::new());
+        let dice = builder.build(DetectCycles::Enabled);
+        let key = ResolvedPathObservationKey::new(ns, path("/alias/leaf"));
+        let mut transaction = dice.updater().commit().await;
+        for prefix in 0..=script.len() {
+            let epoch = PathObservationEpoch::new(
+                script[..prefix]
+                    .iter()
+                    .chain([&exact_parent])
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            )
+            .unwrap();
+            let mut updater = transaction.into_updater();
+            inject_path_observation_inputs(&mut updater, &epoch, []).unwrap();
+            transaction = updater.commit().await;
+            let result = transaction.compute(&key).await.unwrap();
+            if let Some((next, _)) = script.get(prefix) {
+                let PathOutcome::Need(need) = result else {
+                    panic!("expected pending observation {next:?}");
+                };
+                assert_eq!(need.demands(), &[next.dupe()]);
+                continue;
+            }
+            let PathOutcome::Complete(Ok(observed)) = result else {
+                panic!("complete mixed observations must resolve");
+            };
+            let resolved = observed.result().as_ref().unwrap();
+            assert_complete(
+                resolved,
+                ns,
+                "/alias/leaf",
+                "/real/leaf",
+                ResolvedPathState::Present(terminal),
+                &["/alias/leaf", "/real/leaf"],
+            );
+            assert_symlinks(resolved, &[("/alias", "/real")]);
+            assert_eq!(resolved.content_origin().namespace(), ns);
+            assert!(resolved.content_origin().anchor().is_none());
+            let expected = PathObservationEpoch::new(script.clone()).unwrap();
+            assert_eq!(observed.observations(), &expected);
+            assert_eq!(
+                epoch.observations().len(),
+                expected.observations().len() + 1
+            );
+        }
+        let direct = transaction
+            .compute(&ResolvedPathObservationKey::new(ns, path("/real")))
+            .await
+            .unwrap();
+        let PathOutcome::Complete(Ok(direct)) = direct else {
+            panic!("the direct path must consume its own Lstat observation");
+        };
+        assert_eq!(
+            direct.result().as_ref().unwrap().state(),
+            ResolvedPathState::Present(direct_parent)
+        );
+        assert!(direct.observations().get(&exact_parent.0).is_some());
+        assert!(direct.observations().get(&script[3].0).is_none());
+    }
+
+    #[tokio::test]
+    async fn host_parent_traversal_requires_requested_per_demand_capability() {
+        for (capability, per_demand, namespace) in [
+            (true, false, PathObservationNamespace::Host),
+            (false, true, PathObservationNamespace::Host),
+            (
+                true,
+                true,
+                PathObservationNamespace::Materialization(PathObservationInstanceId::new(8)),
+            ),
+        ] {
+            let mut builder = Dice::builder();
+            if capability {
+                builder.set(DirectoryTraversalCapability::new());
+            }
+            let dice = builder.build(DetectCycles::Enabled);
+            let mut updater = dice.updater();
+            if per_demand {
+                inject_path_observation_inputs(&mut updater, &PathObservationEpoch::empty(), [])
+                    .unwrap();
+            }
+            let mut transaction = updater.commit().await;
+            let PathOutcome::Need(need) = transaction
+                .compute(&ResolvedPathKey::new(namespace, path("/parent/leaf")))
+                .await
+                .unwrap()
+            else {
+                panic!("the root Lstat must be requested");
+            };
+            assert_eq!(
+                need.demands(),
+                &[demand(namespace, "/", PathObservationOperation::Lstat)]
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn host_parent_traversal_preserves_missing_and_exact_child_access_error() {
+        let ns = PathObservationNamespace::Host;
+        let denied = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let directory = |searchable| {
+            DirectoryTraversalObservation::Directory(DirectoryTraversalWitness::new(
+                1, 2, 0o040644, 3, 4, 5, searchable,
+            ))
+        };
+        for parent in [
+            PathOperationResult::Missing,
+            PathOperationResult::Present(DirectoryTraversalObservation::ExactLstat(lstat(
+                PathNodeKind::RegularFile,
+            ))),
+            PathOperationResult::Present(directory(false)),
+        ] {
+            let use_child = matches!(
+                parent,
+                PathOperationResult::Present(DirectoryTraversalObservation::Directory(_))
+            );
+            let mut script = vec![
+                observed_traversal("/", PathOperationResult::Present(directory(true))),
+                observed_traversal("/parent", parent),
+            ];
+            let child = lstat_error(ns, "/parent/leaf", denied);
+            if use_child {
+                script.push(child.clone());
+            }
+            let mut builder = Dice::builder();
+            builder.set(DirectoryTraversalCapability::new());
+            let dice = builder.build(DetectCycles::Enabled);
+            let mut updater = dice.updater();
+            let epoch = PathObservationEpoch::new(script).unwrap();
+            inject_path_observation_inputs(&mut updater, &epoch, []).unwrap();
+            let mut transaction = updater.commit().await;
+            let PathOutcome::Complete(result) = transaction
+                .compute(&ResolvedPathKey::new(ns, path("/parent/leaf")))
+                .await
+                .unwrap()
+            else {
+                panic!("the modeled parent and child observations must complete");
+            };
+            if use_child {
+                assert_eq!(
+                    result.unwrap_err(),
+                    PathResolutionError::Observation {
+                        namespace: ns,
+                        requested_path: path("/parent/leaf"),
+                        demand: child.0,
+                        error: denied,
+                    }
+                );
+            } else {
+                assert_eq!(result.unwrap().state(), ResolvedPathState::Missing);
+            }
+        }
     }
 
     #[tokio::test]
