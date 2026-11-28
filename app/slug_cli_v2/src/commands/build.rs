@@ -136,14 +136,9 @@ pub fn run(argv: Vec<String>) -> i32 {
         };
         let published = accepted
             .project(|result| match result {
-                Err(error) => {
-                    let (kind, code) = error.terminal_error();
-                    TerminalOutput::new(
-                        code,
-                        String::new(),
-                        build_error_json(kind, &error.to_string(), "one-shot"),
-                    )
-                }
+                Err(error) => error.project_build_error(|kind, message| {
+                    build_error_json(kind, message, "one-shot")
+                }),
                 Ok(result) => {
                     match slug_reapi_v2::requested_build_success_json(result, "one-shot", None) {
                         Ok(json) => TerminalOutput::new(0, String::new(), json),
@@ -181,14 +176,9 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     let published = accepted
         .project(|terminal| match terminal.as_ref() {
-            Err(error) => {
-                let (kind, exit_code) = error.terminal_error();
-                TerminalOutput::new(
-                    exit_code,
-                    String::new(),
-                    build_error_json(kind, &error.to_string(), "one-shot"),
-                )
-            }
+            Err(error) => error.project_build_error(|kind, message| {
+                build_error_json(kind, message, "one-shot")
+            }),
             Ok(evaluation) => {
             if evaluation.is_observed_exported_source() {
                 return TerminalOutput::new(

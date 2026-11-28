@@ -578,6 +578,7 @@ fn analysis_terminal_leaf(kind: &AnalysisErrorKind) -> &'static str {
     match kind {
         AnalysisErrorKind::TargetNotFound { .. } => "analysis_target_not_found",
         AnalysisErrorKind::ExecutableRuleMissingExecutable { .. } => "analysis_executable_missing",
+        AnalysisErrorKind::StarlarkFail { .. } => "analysis_starlark_fail",
         AnalysisErrorKind::Message(_) => "analysis_message_opaque",
         AnalysisErrorKind::Registration(error) => {
             #[cfg(feature = "native-probe-observer")]

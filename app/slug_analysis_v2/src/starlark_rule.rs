@@ -137,12 +137,25 @@ use cc_context::CcContextProjection;
 pub(crate) use cc_context::selected_execution_os;
 
 /// Errors produced while synchronously evaluating a loaded rule after DICE has
-/// prepared its inputs. The executable-rule case remains distinct so command
-/// owners can classify its established terminal without inspecting text.
+/// prepared its inputs. Command owners classify explicit failure and missing
+/// executables without inspecting rendered diagnostics.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) enum LoadedRuleError {
     Message(String),
+    StarlarkFail(String),
     ExecutableRuleMissingExecutable { rule_class: CompactString },
+}
+
+impl LoadedRuleError {
+    fn from_starlark_error(error: starlark::Error) -> Self {
+        let explicit_fail = matches!(error.kind(), starlark::ErrorKind::Fail(_));
+        let message = error.to_string();
+        if explicit_fail {
+            Self::StarlarkFail(message)
+        } else {
+            Self::Message(message)
+        }
+    }
 }
 
 impl From<String> for LoadedRuleError {
@@ -154,7 +167,7 @@ impl From<String> for LoadedRuleError {
 impl fmt::Display for LoadedRuleError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Message(message) => f.write_str(message),
+            Self::Message(message) | Self::StarlarkFail(message) => f.write_str(message),
             Self::ExecutableRuleMissingExecutable { rule_class } => write!(
                 f,
                 "The rule '{rule_class}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
@@ -2493,7 +2506,7 @@ pub(crate) fn evaluate_loaded_rule(
         drop(evaluator);
         result
     }
-    .map_err(|error| error.to_string())?;
+    .map_err(LoadedRuleError::from_starlark_error)?;
 
     let mut publisher = args_callbacks::Publisher::with_resource_sets(&module)?;
     let returned = build_info_transform::returned_providers(returned);

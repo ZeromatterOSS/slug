@@ -4,10 +4,7 @@ use crate::runtime::TerminalOutput;
 
 fn projection(error: Option<&BuildCommandError>) -> TerminalOutput {
     match error {
-        Some(error) => {
-            let (kind, code) = error.terminal_error();
-            TerminalOutput::new(code, String::new(), format!("{kind}: {error}\n"))
-        }
+        Some(error) => error.project_build_error(|kind, message| format!("{kind}: {message}\n")),
         None => TerminalOutput::new(0, String::new(), "repaired\n".into()),
     }
 }
@@ -155,7 +152,13 @@ fn error_repair_error(analysis_error: bool, publish: bool) {
                 )
             );
             if analysis_error {
-                assert!(matches!(actual.kind, BuildCommandErrorKind::Analysis(_)));
+                let BuildCommandErrorKind::Analysis(error) = &actual.kind else {
+                    panic!("expected typed analysis failure, got {actual}");
+                };
+                assert!(matches!(
+                    error.kind(),
+                    AnalysisErrorKind::StarlarkFail { .. }
+                ));
                 assert!(actual.to_string().contains("REQUESTED_ANALYSIS_FAILURE"));
             } else {
                 assert!(matches!(
@@ -179,6 +182,32 @@ fn error_repair_error(analysis_error: bool, publish: bool) {
             (expected_code, expected_stdout, expected_stderr)
         );
         let stderr = String::from_utf8(stderr).expect("text-only fixture stderr");
+        if analysis_error && iteration != 1 {
+            assert_eq!(code, 1);
+            let is_prefix =
+                |line: &str| line.starts_with("DEBUG: ") && line.ends_with("REQUESTED_ANALYSIS");
+            let mut prefixes = stderr
+                .lines()
+                .enumerate()
+                .filter(|(_, line)| is_prefix(line));
+            let (prefix, _) = prefixes.next().expect("missing print");
+            let diagnostic = stderr
+                .lines()
+                .position(|line| line.starts_with("build_analysis_failure: "))
+                .expect("missing analysis terminal");
+            assert!(prefix < diagnostic);
+            assert!(prefixes.next().is_none());
+            assert!(
+                stderr
+                    .lines()
+                    .skip(diagnostic)
+                    .any(|line| line.contains("REQUESTED_ANALYSIS_FAILURE"))
+            );
+        } else if !analysis_error && iteration != 1 {
+            assert_eq!(code, 2);
+            assert!(stderr.contains("configured_action_conflict: "));
+            assert!(!stderr.contains("build_analysis_failure: "));
+        }
         if (analysis_error && iteration == 1) || (!analysis_error && iteration == 0) {
             assert!(
                 stderr.contains("REQUESTED_LOADING"),

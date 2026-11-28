@@ -236,6 +236,7 @@ use super::events::ProvisionalEventEpoch;
 use super::events::SealedCommandAttempt;
 use super::events::SelectedCommandSidecars;
 use super::events::SelectedTerminalToken;
+use super::events::TerminalOutput;
 use super::request_revision::NativeFinalization;
 use super::request_revision::RequestRevisionError;
 use super::request_revision::RequestRevisionKey;
@@ -4359,6 +4360,17 @@ impl BuildCommandError {
         }
     }
 
+    fn explicit_fail_prefix(&self) -> Option<&EventBatch> {
+        match &self.kind {
+            BuildCommandErrorKind::Analysis(error) => match error.kind() {
+                AnalysisErrorKind::StarlarkFail { prefix, .. } => Some(prefix),
+                _ => None,
+            },
+            BuildCommandErrorKind::SourceCertified { error, .. } => error.explicit_fail_prefix(),
+            _ => None,
+        }
+    }
+
     pub(super) fn infrastructure(error: impl fmt::Display) -> Self {
         Self {
             kind: BuildCommandErrorKind::Infrastructure(Arc::from(error.to_string())),
@@ -4376,6 +4388,18 @@ impl BuildCommandError {
             BuildCommandErrorKind::ActionClosure(_) => ("configured_action_conflict", 2),
             _ => ("build_runtime_error", 2),
         }
+    }
+
+    /// Project an accepted Build failure in the caller's terminal format.
+    pub fn project_build_error(&self, render: impl FnOnce(&str, &str) -> String) -> TerminalOutput {
+        let prefix = self.explicit_fail_prefix();
+        let (kind, code) = if prefix.is_some() {
+            ("build_analysis_failure", 1)
+        } else {
+            self.terminal_error()
+        };
+        TerminalOutput::new(code, String::new(), render(kind, &self.to_string()))
+            .with_event_prefix(prefix)
     }
 }
 

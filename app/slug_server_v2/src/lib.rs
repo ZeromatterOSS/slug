@@ -270,14 +270,9 @@ impl Daemon {
             };
             let published = accepted
                 .project(|terminal| match terminal {
-                    Err(error) => {
-                        let (kind, code) = error.terminal_error();
-                        TerminalOutput::new(
-                            code,
-                            String::new(),
-                            build_error_json(kind, &error.to_string(), invalidated),
-                        )
-                    }
+                    Err(error) => error.project_build_error(|kind, message| {
+                        build_error_json(kind, message, invalidated)
+                    }),
                     Ok(result) => match slug_reapi_v2::requested_build_success_json(
                         result,
                         "daemon",
@@ -331,6 +326,9 @@ impl Daemon {
         let launch_path = std::cell::RefCell::new(None);
         let published = accepted
             .project(|terminal| match terminal.as_ref() {
+                Err(error) if !run => error.project_build_error(|kind, message| {
+                    build_error_json(kind, message, invalidated)
+                }),
                 Err(error) => {
                     let (kind, exit_code) = error.terminal_error();
                     TerminalOutput::new(

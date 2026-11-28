@@ -417,11 +417,15 @@ impl CommandOutputBuffer {
     }
 
     fn write_stderr(&self, stderr: &mut impl Write) -> io::Result<()> {
+        Self::write_batches(self.batches(), stderr)
+    }
+
+    fn write_batches(batches: &[EventBatch], stderr: &mut impl Write) -> io::Result<()> {
         #[cfg(windows)]
         const LINE_SEPARATOR: &[u8] = b"\r\n";
         #[cfg(not(windows))]
         const LINE_SEPARATOR: &[u8] = b"\n";
-        for batch in self.batches.iter() {
+        for batch in batches {
             for event in batch.events() {
                 let text = match event {
                     EvaluationEvent::StarlarkPrint { location, text } => {
@@ -557,6 +561,17 @@ impl TerminalOutput {
             stdout,
             stderr,
         }
+    }
+
+    pub(super) fn with_event_prefix(mut self, prefix: Option<&EventBatch>) -> Self {
+        if let Some(prefix) = prefix.filter(|prefix| !prefix.events().is_empty()) {
+            let mut stderr = Vec::new();
+            CommandOutputBuffer::write_batches(std::slice::from_ref(prefix), &mut stderr)
+                .expect("writing into a Vec is infallible");
+            stderr.append(&mut self.stderr);
+            self.stderr = stderr;
+        }
+        self
     }
 }
 

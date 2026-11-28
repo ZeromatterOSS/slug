@@ -17,9 +17,12 @@ The [Stage 8 public cquery formatter][stage8] matched all four pinned CrateInfo
 cases on each route, with empty stderr and one daemon generation.
 
 Finish the installed sweep and review before activation. Cold, warm and restored
-Build cases passed on one installed daemon. The full fixture still misses event
-and failure-exit parity on both startup modes. An earlier installed restoration
-refusal needs a deterministic reproduction.
+Build cases passed on one installed daemon. Focused Core, CLI and Server tests
+now pass for `fail()` exit 1, ordered rule prints and conflict recovery.
+The retained fixture still needs verified remote failure and loading event
+parity. Loading must associate identical prints with changed Starlark inputs
+and preserve silence for unrelated filesystem refreshes. An earlier installed
+restoration refusal needs a deterministic reproduction.
 Public action comparison and Rust REAPI follow. Keep atomic
 publication, existing readers, native quotas, clocks, launcher/PID1, rooted
 reads, codec and history checks. Compare equal work for timing.

@@ -135,7 +135,7 @@ fn error_recovery(analysis: bool) {
         write(
             &workspace.0.join("defs.bzl"),
             &if analysis && broken {
-                good.replace("    out =", "    fail('SERVER_FAILURE')\n    out =")
+                good.replace("    out =", "    fail('SERVER_' + 'FAILURE')\n    out =")
             } else {
                 good.to_owned()
             },
@@ -157,6 +157,7 @@ fn error_recovery(analysis: bool) {
         ordinary.remote = RemoteRequest::default();
         let expected = dispatch(&mut baseline, ordinary);
         if broken {
+            assert_eq!(response.exit_code, if analysis { 1 } else { 2 });
             assert_eq!(
                 response.exit_code, expected.exit_code,
                 "iteration {iteration}: {response:?}"
@@ -166,13 +167,20 @@ fn error_recovery(analysis: bool) {
             assert_eq!(
                 actual["error"],
                 if analysis {
-                    "build_runtime_error"
+                    "build_analysis_failure"
                 } else {
                     "configured_action_conflict"
                 }
             );
             assert_eq!(actual["error"], expected["error"]);
             assert_eq!(actual["message"], expected["message"]);
+            if analysis {
+                let stderr = stderr_text(&response.stderr);
+                let prefix = stderr.find("SERVER_ANALYSIS\n").unwrap();
+                let diagnostic = stderr.find("\"error\":\"build_analysis_failure\"").unwrap();
+                assert!(prefix < diagnostic);
+                assert_eq!(stderr.matches("SERVER_ANALYSIS\n").count(), 1);
+            }
         } else {
             assert_eq!(response.exit_code, 0, "iteration {iteration}: {response:?}");
             assert_eq!(terminal(&response)["reapi_actions"], 0);

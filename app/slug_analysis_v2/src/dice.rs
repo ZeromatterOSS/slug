@@ -150,6 +150,10 @@ pub enum AnalysisErrorKind {
     ExecutableRuleMissingExecutable {
         rule_class: CompactString,
     },
+    StarlarkFail {
+        message: String,
+        prefix: EventBatch,
+    },
     Message(String),
     Registration(RegistrationAnalysisError),
 }
@@ -176,9 +180,14 @@ impl AnalysisError {
         }
     }
 
-    fn from_loaded_rule_error(error: LoadedRuleError) -> Self {
+    fn from_loaded_rule_error(error: LoadedRuleError, events: &mut Option<EventBatch>) -> Self {
         let kind = match error {
             LoadedRuleError::Message(message) => AnalysisErrorKind::Message(message),
+            // The failed node is transient, so its local prints travel with the failure.
+            LoadedRuleError::StarlarkFail(message) => AnalysisErrorKind::StarlarkFail {
+                message,
+                prefix: events.take().unwrap_or_else(EventBatch::empty),
+            },
             LoadedRuleError::ExecutableRuleMissingExecutable { rule_class } => {
                 AnalysisErrorKind::ExecutableRuleMissingExecutable { rule_class }
             }
@@ -205,7 +214,8 @@ impl fmt::Display for AnalysisError {
                 f,
                 "The rule '{rule_class}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
             ),
-            AnalysisErrorKind::Message(message) => f.write_str(message),
+            AnalysisErrorKind::Message(message)
+            | AnalysisErrorKind::StarlarkFail { message, .. } => f.write_str(message),
             AnalysisErrorKind::Registration(error) => error.fmt(f),
         }
     }
@@ -2633,7 +2643,7 @@ where
     );
     *event_batch = print_capture.map(AnalysisPrintCapture::into_batch);
     value
-        .map_err(AnalysisError::from_loaded_rule_error)
+        .map_err(|error| AnalysisError::from_loaded_rule_error(error, event_batch))
         .map(|result| result.with_edges(edges).with_exec_groups(exec_groups))
 }
 

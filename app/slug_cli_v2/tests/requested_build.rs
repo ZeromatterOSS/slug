@@ -187,6 +187,20 @@ impl Workspace {
         assert_eq!(roots.len(), 1);
         roots[0].clone()
     }
+
+    fn assert_no_action_outputs(&self) {
+        let output_root = self.root.join("bazel-out");
+        match output_root.symlink_metadata() {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            metadata => assert!(metadata.unwrap().is_dir()),
+        }
+        for entry in output_root.read_dir().unwrap() {
+            let entry = entry.unwrap();
+            assert_eq!(entry.file_name(), ".slug-configurations");
+            assert!(entry.file_type().unwrap().is_dir());
+            assert!(entry.path().read_dir().unwrap().next().is_none());
+        }
+    }
 }
 impl Drop for Workspace {
     fn drop(&mut self) {
@@ -265,7 +279,7 @@ fn source_and_analyzed_empty_builds_skip_unreachable_executor() {
             0,
         );
         zero(&json);
-        assert!(!workspace.root.join("bazel-out").exists());
+        workspace.assert_no_action_outputs();
     }
 }
 
@@ -383,30 +397,35 @@ fn typed_build_errors_repair_and_recur_without_remote_effects() {
                 DEFS.replace(
                     "CHECK_BODY",
                     if broken {
-                        "fail('WP746_ANALYSIS_FAILURE')"
+                        "print('WP746_ANALYSIS_PREFIX')\n    fail('WP746_ANALYSIS_' + 'FAILURE')"
                     } else {
                         "return []"
                     },
                 ),
             )
             .unwrap();
-            let (json, _) = terminal(
+            let (json, stderr) = terminal(
                 &workspace.run(
                     daemon,
                     &["build", "//:check", "--remote_executor=grpc://127.0.0.1:1"],
                 ),
-                if broken { 2 } else { 0 },
+                if broken { 1 } else { 0 },
             );
             if broken {
-                assert_eq!(json["error"], "build_runtime_error");
+                assert_eq!(json["error"], "build_analysis_failure");
                 assert!(
                     json["message"]
                         .as_str()
                         .unwrap()
                         .contains("WP746_ANALYSIS_FAILURE")
                 );
+                let prefix = stderr.find("WP746_ANALYSIS_PREFIX\n").unwrap();
+                let diagnostic = stderr.find("\"error\":\"build_analysis_failure\"").unwrap();
+                assert!(prefix < diagnostic);
+                assert_eq!(stderr.matches("WP746_ANALYSIS_PREFIX\n").count(), 1);
             } else {
                 zero(&json);
+                assert!(!stderr.contains("WP746_ANALYSIS_PREFIX"));
             }
         }
         for broken in [true, false, true] {
@@ -429,17 +448,28 @@ fn typed_build_errors_repair_and_recur_without_remote_effects() {
             );
             if broken {
                 assert_eq!(json["error"], "configured_action_conflict");
-                assert!(
-                    json["message"]
-                        .as_str()
-                        .unwrap()
-                        .starts_with("configured action output conflict at conflict.out:")
+                let message = json["message"].as_str().unwrap();
+                let (path, owners) = message
+                    .strip_prefix("configured action output conflict at ")
+                    .and_then(|message| message.split_once(": "))
+                    .unwrap_or_else(|| panic!("unexpected conflict diagnostic: {message}"));
+                let configuration = path
+                    .strip_prefix("bazel-out/slugcfg-v2-")
+                    .and_then(|path| path.strip_suffix("/bin/conflict.out"))
+                    .unwrap_or_else(|| panic!("unexpected conflict path: {path}"));
+                assert_eq!(configuration.len(), 64, "{configuration}");
+                assert!(configuration.bytes().all(|byte| byte.is_ascii_hexdigit()));
+                assert_eq!(
+                    owners,
+                    format!(
+                        "@@//:left [target:slugcfg-v2:{configuration}] versus @@//:right [target:slugcfg-v2:{configuration}]"
+                    )
                 );
             } else {
                 zero(&json);
             }
         }
-        assert!(!workspace.root.join("bazel-out").exists());
+        workspace.assert_no_action_outputs();
     }
 }
 
