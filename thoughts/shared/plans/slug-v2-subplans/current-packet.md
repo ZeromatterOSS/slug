@@ -60,8 +60,9 @@ metadata steps and four Rustc steps. The first 109 source rechecks consumed
 CAS readback, after 24.981 s of command preparation.
 REAPI now records provisional metadata in staging and checks the full source
 frontier before each remote-bound step. Nine checks passed, including stale
-source refusal, final retry and generated CAS eviction/corruption. Qualify
-the new installed cut under the same clock.
+source refusal, final retry and generated CAS eviction/corruption. Installed
+cut `4b0d3bc6c` again verified the retained tinyjson worker and reached the
+deadline on both routes. Attribute cold and warm command preparation.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
