@@ -10,6 +10,21 @@ pub(in crate::runtime::repository_physical_root) struct CapturedTree {
     stats: Vec<libc::stat>,
     _credit: ResourceCredit,
 }
+pub(super) struct RegularFileFrames {
+    frames: Vec<(usize, libc::stat)>,
+    _credit: ResourceCredit,
+}
+
+impl RegularFileFrames {
+    pub(super) fn get(&self, entry: usize) -> Option<&libc::stat> {
+        let index = self
+            .frames
+            .binary_search_by_key(&entry, |(index, _)| *index)
+            .ok()?;
+        Some(&self.frames[index].1)
+    }
+}
+
 impl CapturedTree {
     pub(super) fn entries(&self) -> &[Entry] {
         &self.entries
@@ -22,6 +37,39 @@ impl CapturedTree {
                 .iter()
                 .zip(&other.stats)
                 .all(|(a, b)| crate::runtime::repository_root_io::unchanged(a, b))
+    }
+    pub(super) fn retain_regular_frames(
+        &self,
+        resources: &Arc<RepositoryRootResources>,
+    ) -> Option<RegularFileFrames> {
+        let count = self
+            .entries
+            .iter()
+            .filter(|entry| matches!(entry.node(), Node::File(_)))
+            .count();
+        if count == 0 {
+            return None;
+        }
+        let allocation = count
+            .checked_mul(std::mem::size_of::<(usize, libc::stat)>())?
+            .checked_add(64)?;
+        // The complete capture remains paid during fitting and copying. A
+        // refused table leaves the sealed owner and ordinary observation intact.
+        let credit = resources.reserve(allocation, 0, 0).ok()?;
+        let mut frames = Vec::new();
+        frames.try_reserve_exact(count).ok()?;
+        if frames.capacity() != count {
+            return None;
+        }
+        frames.extend(self.entries.iter().zip(&self.stats).enumerate().filter_map(
+            |(index, (entry, frame))| {
+                matches!(entry.node(), Node::File(_)).then_some((index, *frame))
+            },
+        ));
+        Some(RegularFileFrames {
+            frames,
+            _credit: credit,
+        })
     }
     pub(in crate::runtime::repository_physical_root) fn into_state(
         self,
@@ -156,6 +204,7 @@ pub(super) fn capture(
                 if !super::super::seal::unchanged(&framed, &captured.metadata) {
                     return Err(PhysicalRootError::Snapshot);
                 }
+                stats[index] = captured.metadata;
                 if let (Some(target), Some(file)) = (destination, output.as_ref()) {
                     target.chmod_regular(file, (framed.st_mode & 0o7777) as u32)?;
                 }
@@ -193,8 +242,8 @@ pub(super) fn capture(
             }
         }
     }
-    // Preserve canonical path/frame association for the Local Host rewalk.
-    // Frames remain temporary and never enter the immutable source state.
+    // Preserve canonical path/frame association for the Local Host rewalk and
+    // the native sealed owner. Frames never enter the semantic Source state.
     let mut order = Vec::new();
     order
         .try_reserve_exact(entries.len())

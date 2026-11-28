@@ -1132,7 +1132,11 @@ backing has become read-only at the kernel level. A credited receipt retains the
 first verified raw digest and full file frame for the exact sealed owner and
 scope. Each repeat checks the current selection, rooted descriptor and name.
 Ordinary observations, missing receipts and mismatched digests use the full
-charged read. The [active packet](current-packet.md) tracks the real Build gate.
+charged read. A sealed Source snapshot can also reuse a selected FileDigest
+or FileBytes result after matching its raw SHA and size to the post-reap
+manifest and checking a freshly rooted descriptor and name against the credited
+file frame. An absent or mismatched certificate uses the charged read.
+The [active packet](current-packet.md) tracks the real Build gate.
 
 Implementation scope is Core's physical-root observation seam plus a small
 borrowed carrier leaf, the shared rooted observer and a bounded owned-file

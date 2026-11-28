@@ -908,3 +908,120 @@ fn native_source_contraction_cannot_borrow_another_reservations_claim() {
     drop(other);
     fixture.cleanup(Fault::None);
 }
+
+#[test]
+#[ignore = "actual CLI Source snapshot and certified read through its selected owner"]
+fn native_source_certificate_reuses_manifest_frames_at_the_acquisition_limit() {
+    use slug_workspace_v2::NormalizedAbsolutePath;
+    use slug_workspace_v2::PathObservationOperation;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
+
+    use crate::runtime::dice::source_service::SourceCounter;
+    use crate::runtime::dice::source_service::SourceServiceError;
+    use crate::runtime::repository_root_io::read_work_for_test;
+
+    const BODY: &[u8] = b"source bytes";
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::write(workspace.path().join("payload"), BODY).unwrap();
+    let mut fixture = Fixture::new(workspace.path());
+    let (output, _, _, _) = fixture.finalize(FrozenArchiveQuota::TINY, Fault::None);
+    let output = output.unwrap();
+    let anchor = output.receipt.root().anchor();
+    let path = NormalizedAbsolutePath::new(anchor.root().as_path().join("payload")).unwrap();
+    let bytes = PathObservationDemand::new(
+        anchor.namespace(),
+        path.clone(),
+        PathObservationOperation::FileBytes,
+    );
+    let hash = PathObservationDemand::new(
+        anchor.namespace(),
+        path,
+        PathObservationOperation::FileDigest,
+    );
+    fixture
+        .actor
+        .adopt_source_snapshot(
+            fixture.token,
+            &fixture.ticket,
+            output.receipt,
+            &fixture.scope,
+        )
+        .unwrap();
+    let demands = [bytes.clone(), hash.clone()];
+    let certify = |demands, certificate: &PathObservationEpoch| {
+        fixture.actor.observe_native_certificate(
+            fixture.token,
+            demands,
+            certificate,
+            &mut |_| {},
+            &mut |_, _, _| {},
+        )
+    };
+    let before = fixture.scope.snapshot();
+    let first = fixture
+        .actor
+        .observe_native(fixture.token, demands.clone())
+        .unwrap();
+    let after = fixture.scope.snapshot();
+    assert_eq!(after.source_attempts - before.source_attempts, 2);
+    assert_eq!(
+        after.decoded_bytes - before.decoded_bytes,
+        2 * BODY.len() as u64
+    );
+    let PathObservationResult::FileBytes(PathOperationResult::Present(selected_body)) =
+        first.get(&bytes).unwrap().as_ref()
+    else {
+        panic!("expected selected Source body");
+    };
+    assert_eq!(selected_body.as_ref(), BODY);
+
+    let wrong = PathObservationEpoch::new([(
+        bytes.clone(),
+        PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+            b"wrong bytes!".as_slice(),
+        ))),
+    )])
+    .unwrap();
+    let fallback = certify(vec![bytes.clone()], &wrong).unwrap();
+    assert_eq!(fallback.get(&bytes), first.get(&bytes));
+    assert_eq!(
+        fixture.scope.snapshot().source_attempts,
+        after.source_attempts + 1
+    );
+
+    let charged = fixture.scope.snapshot().source_attempts;
+    let limit = fixture.scope.limits().source_attempts;
+    fixture
+        .scope
+        .charge(SourceCounter::SourceAttempts, limit - charged)
+        .unwrap();
+    let before = fixture.scope.snapshot();
+    let read_work = read_work_for_test::begin();
+    let certified = certify(demands.to_vec(), &first).unwrap();
+    assert_eq!(certified, first);
+    assert_eq!(
+        read_work.snapshot(),
+        read_work_for_test::Snapshot::default()
+    );
+    let PathObservationResult::FileBytes(PathOperationResult::Present(certified_body)) =
+        certified.get(&bytes).unwrap().as_ref()
+    else {
+        panic!("expected certified Source body");
+    };
+    assert!(Arc::ptr_eq(certified_body, selected_body));
+    assert_eq!(fixture.scope.snapshot().source_attempts, limit);
+    assert_eq!(fixture.scope.snapshot().decoded_bytes, before.decoded_bytes);
+    drop(read_work);
+
+    let refused = certify(vec![hash], &PathObservationEpoch::empty());
+    assert!(matches!(
+        refused,
+        Err(
+            crate::runtime::repository_io::RepositorySessionError::SourceService(
+                SourceServiceError::Limit(SourceCounter::SourceAttempts)
+            )
+        )
+    ));
+    fixture.actor.discard(fixture.token).unwrap();
+}

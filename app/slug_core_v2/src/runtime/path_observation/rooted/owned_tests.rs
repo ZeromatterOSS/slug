@@ -177,6 +177,36 @@ fn prior_digest_frame_checks_actual_rooted_name_without_reading_payload() {
 }
 
 #[test]
+fn source_certificate_content_requires_exact_raw_sha_and_preserves_file_bytes_cap() {
+    let resources = scope(SourceServiceLimits::default());
+    let body: Arc<[u8]> = vec![7; HOST_FILE_OBJECT_BYTES].into();
+    let present = PathObservationResult::FileBytes(PathOperationResult::Present(body.clone()));
+    let manifest = |bytes: &[u8]| {
+        FileContentDigest::new(Sha256::digest(bytes).into(), bytes.len() as u64).unwrap()
+    };
+    let digest = manifest(&body);
+    assert!(certificate_content_matches(digest, &present, &resources, &|| true).unwrap());
+
+    let mut wrong = body.to_vec();
+    wrong[HOST_FILE_OBJECT_BYTES - 1] ^= 1;
+    let wrong = PathObservationResult::FileBytes(PathOperationResult::Present(wrong.into()));
+    assert!(!certificate_content_matches(digest, &wrong, &resources, &|| true).unwrap());
+    assert!(matches!(
+        certificate_content_matches(digest, &present, &resources, &|| false),
+        Err(RootedObservationError::Inactive)
+    ));
+
+    let oversized: Arc<[u8]> = vec![7; HOST_FILE_OBJECT_BYTES + 1].into();
+    let digest = manifest(&oversized);
+    let digest_result = PathObservationResult::FileDigest(PathOperationResult::Present(digest));
+    assert!(certificate_content_matches(digest, &digest_result, &resources, &|| true).unwrap());
+    let bytes_result = PathObservationResult::FileBytes(PathOperationResult::Present(oversized));
+    assert!(!certificate_content_matches(digest, &bytes_result, &resources, &|| true).unwrap());
+    assert_eq!(resources.snapshot().decoded_bytes, 0);
+    assert_eq!(resources.snapshot().source_attempts, 0);
+}
+
+#[test]
 fn owned_kernel_refuses_actual_byte_size_name_type_mode_and_link_count_drift_without_capture_fallback()
  {
     for mutation in [

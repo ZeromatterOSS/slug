@@ -31,6 +31,7 @@ pub(in crate::runtime) struct RepositorySourceRoot {
     pub(super) backing: Arc<RepositoryRootBacking>,
     pub(super) origin_scope: Arc<SourceServiceScope>,
     anchor: MaterializationPathAnchor,
+    verification_frames: Option<tree::RegularFileFrames>,
     _credit: ResourceCredit,
 }
 impl std::fmt::Debug for RepositorySourceRoot {
@@ -41,6 +42,47 @@ impl std::fmt::Debug for RepositorySourceRoot {
             .finish_non_exhaustive()
     }
 }
+
+/// Borrows the exact committed backing, manifest, rooted IO and selected
+/// certificate together. Only the Source owner can construct this carrier.
+pub(in crate::runtime) struct SealedSourceObservation<'a> {
+    root: &'a RepositorySourceRoot,
+    io: RootIo<'a>,
+    scope: &'a Arc<SourceServiceScope>,
+    active: &'a dyn Fn() -> bool,
+    certificate: &'a PathObservationEpoch,
+}
+
+impl<'a> SealedSourceObservation<'a> {
+    pub(in crate::runtime) fn io(&self) -> &RootIo<'a> {
+        &self.io
+    }
+    pub(in crate::runtime) fn anchor(&self) -> &MaterializationPathAnchor {
+        &self.root.anchor
+    }
+    pub(in crate::runtime) fn scope(&self) -> &Arc<SourceServiceScope> {
+        self.scope
+    }
+    pub(in crate::runtime) fn active(&self) -> &dyn Fn() -> bool {
+        self.active
+    }
+    pub(in crate::runtime) fn certificate(&self) -> &PathObservationEpoch {
+        self.certificate
+    }
+    pub(in crate::runtime) fn file(&self, path: &Path) -> Option<(FileContentDigest, &libc::stat)> {
+        let frames = self.root.verification_frames.as_ref()?;
+        let path = path.to_str()?;
+        let entries = self.root.state.entries();
+        let index = entries
+            .binary_search_by(|entry| entry.path().cmp(path))
+            .ok()?;
+        let Node::File(digest) = entries[index].node() else {
+            return None;
+        };
+        Some((*digest, frames.get(index)?))
+    }
+}
+
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 pub(in crate::runtime::repository_physical_root) struct SourceRootBuilder {
     pub(super) file: File,
@@ -135,25 +177,42 @@ impl RepositorySourceRoot {
             |class| class.quota(),
         )
     }
-    pub(in crate::runtime) fn observe(
+    pub(in crate::runtime) fn observe_with_certificate(
         &self,
         demands: &[PathObservationDemand],
         scope: &Arc<SourceServiceScope>,
         active: &dyn Fn() -> bool,
+        certificate: Option<&PathObservationEpoch>,
     ) -> Result<PathObservationEpoch, PhysicalRootError> {
         self.check_origin(scope, active)?;
         let _scratch = self.resources.reserve(IO_SCRATCH, 3, 0)?;
         self.validate_backing()?;
         let io = RootIo::new(&self.file, limits(self.reservation())?)?;
-        let result = crate::runtime::path_observation::rooted::observe_rooted(
-            &io,
-            &self.anchor,
-            demands,
-            scope,
-            active,
-        )
+        use crate::runtime::path_observation::rooted;
+        let certified = certificate.filter(|_| {
+            self.verification_frames.is_some()
+                && self.frozen_archive_quota.is_some()
+                && mount_lease::readonly::check_readonly(&self.file).is_ok()
+        });
+        let result = if let Some(certificate) = certified {
+            rooted::observe_sealed_source(
+                &SealedSourceObservation {
+                    root: self,
+                    io,
+                    scope,
+                    active,
+                    certificate,
+                },
+                demands,
+            )
+        } else {
+            rooted::observe_rooted(&io, &self.anchor, demands, scope, active)
+        }
         .map_err(PhysicalRootError::Observation)?;
         self.validate_backing()?;
+        if certified.is_some() {
+            mount_lease::readonly::check_readonly(&self.file).map_err(PhysicalRootError::mount)?;
+        }
         self.check_origin(scope, active)?;
         Ok(result)
     }
@@ -318,6 +377,12 @@ impl SourceRootBuilder {
             self.reservation.display_root().clone(),
         )
         .map_err(|_| PhysicalRootError::Reservation)?;
+        // Stage only the actual post-reap frames. The root cannot use them
+        // until the matching Source backing has committed compaction.
+        let verification_frames = self.frozen_archive_quota.and_then(|_| {
+            mount_lease::readonly::check_readonly(&self.file).ok()?;
+            actual.retain_regular_frames(&self.resources)
+        });
         let root = Arc::new(RepositorySourceRoot {
             file: self.file,
             state: expected,
@@ -327,6 +392,7 @@ impl SourceRootBuilder {
             backing: self.backing,
             origin_scope: self.scope,
             anchor,
+            verification_frames,
             _credit: credit,
         });
         Ok(SealedSourceSnapshot {
