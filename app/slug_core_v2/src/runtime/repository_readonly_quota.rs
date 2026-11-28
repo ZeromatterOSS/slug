@@ -15,6 +15,9 @@ const MEDIUM_BYTES: u64 = 256 * 1024 * 1024;
 const LARGE_BYTES: u64 = 1024 * 1024 * 1024;
 const COMPACT_INODES: u64 = 8192;
 const FULL_INODES: u64 = 262_144;
+// A non-bind remount changes the superblock as well as this mount.
+const ARCHIVE_REMOUNT_FLAGS: libc::c_ulong =
+    libc::MS_REMOUNT | libc::MS_RDONLY | libc::MS_NOSUID | libc::MS_NODEV;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FrozenArchiveSize {
@@ -95,7 +98,6 @@ impl FrozenArchiveQuota {
 pub(super) fn compact_attached(
     root: &AttachedSetupRoot,
     display: &Path,
-    freeze_superblock: bool,
     resources: &Arc<RepositoryRootResources>,
     scope: &Arc<SourceServiceScope>,
     active: &dyn Fn() -> bool,
@@ -105,32 +107,26 @@ pub(super) fn compact_attached(
     let before_id = identity(&root.file)?;
     path_identity(display, before_id)?;
     let _owner = current_owner(resources)?;
-    if freeze_superblock {
-        check_writable(&root.file)?;
-    }
+    check_writable(&root.file)?;
     let before = facts_for_quota(&root.file, quota(RepositoryWorkspaceMode::Archive))?;
     let class = FrozenArchiveQuota::select(before);
     let (bytes, inodes) = class.quota();
-    if let Some(flags) = remount_flags(
-        (bytes, inodes) != (before.bytes, before.inodes),
-        freeze_superblock,
-    ) {
-        let path = std::ffi::CString::new(display.as_os_str().as_bytes())
-            .map_err(|_| MountLeaseError::AttachedRoot)?;
-        let options = std::ffi::CString::new(format!("size={bytes},nr_inodes={inodes}"))
-            .map_err(|_| MountLeaseError::AttachedRoot)?;
-        if unsafe {
-            libc::mount(
-                std::ptr::null(),
-                path.as_ptr(),
-                c"tmpfs".as_ptr(),
-                flags,
-                options.as_ptr().cast(),
-            )
-        } != 0
-        {
-            return Err(io::Error::last_os_error().into());
-        }
+    // Even a full-size class must freeze the backing.
+    let path = std::ffi::CString::new(display.as_os_str().as_bytes())
+        .map_err(|_| MountLeaseError::AttachedRoot)?;
+    let options = std::ffi::CString::new(format!("size={bytes},nr_inodes={inodes}"))
+        .map_err(|_| MountLeaseError::AttachedRoot)?;
+    if unsafe {
+        libc::mount(
+            std::ptr::null(),
+            path.as_ptr(),
+            c"tmpfs".as_ptr(),
+            ARCHIVE_REMOUNT_FLAGS,
+            options.as_ptr().cast(),
+        )
+    } != 0
+    {
+        return Err(io::Error::last_os_error().into());
     }
     let after = facts_for_quota(&root.file, class.quota())?;
     if identity(&root.file)? != before_id
@@ -140,21 +136,9 @@ pub(super) fn compact_attached(
         return Err(MountLeaseError::AttachedRoot);
     }
     path_identity(display, before_id)?;
-    if freeze_superblock {
-        check_readonly(&root.file)?;
-    }
+    check_readonly(&root.file)?;
     check(scope, active)?;
     Ok((before, after))
-}
-
-fn remount_flags(quota_changed: bool, freeze_superblock: bool) -> Option<libc::c_ulong> {
-    let flags = libc::MS_REMOUNT | libc::MS_NOSUID | libc::MS_NODEV;
-    if freeze_superblock {
-        // A non-bind remount changes the superblock as well as this mount.
-        Some(flags | libc::MS_RDONLY)
-    } else {
-        quota_changed.then_some(flags)
-    }
 }
 
 /// The parent's original mount was writable before launching the finalizer.
@@ -168,33 +152,54 @@ pub(super) struct WritableArchiveParent {
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
 impl WritableArchiveParent {
     pub(super) fn before_launch(
-        builder: &RepositoryPhysicalRootBuilder,
+        file: &File,
+        original: RootIdentity,
         incoming: &AttachedMountClone,
     ) -> Result<Self, PhysicalRootError> {
         let proof = Self {
-            original: builder.identity,
+            original,
             helper: incoming.detached,
         };
-        if builder.mode != RepositoryWorkspaceMode::Archive
-            || !same_backing(proof.original, proof.helper)
-            || proof.original.mount == proof.helper.mount
+        if !same_backing(proof.original, proof.helper) || proof.original.mount == proof.helper.mount
         {
             return Err(PhysicalRootError::Backing);
         }
-        proof.check_before_transfer(builder)?;
+        proof.check_before_transfer(file, original)?;
         Ok(proof)
     }
 
     pub(super) fn check_before_transfer(
         &self,
-        builder: &RepositoryPhysicalRootBuilder,
+        file: &File,
+        original: RootIdentity,
     ) -> Result<(), PhysicalRootError> {
-        if builder.identity != self.original
-            || identity(&builder.file).map_err(PhysicalRootError::mount)? != self.original
+        if original != self.original
+            || identity(file).map_err(PhysicalRootError::mount)? != self.original
         {
             return Err(PhysicalRootError::Backing);
         }
-        check_writable(&builder.file).map_err(PhysicalRootError::mount)
+        check_writable(file).map_err(PhysicalRootError::mount)
+    }
+
+    pub(super) fn check_remounted(
+        &self,
+        file: &File,
+        original: RootIdentity,
+        successor: &AttachedMountClone,
+        attached: &File,
+    ) -> Result<(), PhysicalRootError> {
+        if self.original != original
+            || self.helper != successor.attached
+            || self.original.mount == successor.detached.mount
+            || self.helper.mount == successor.detached.mount
+        {
+            return Err(PhysicalRootError::Backing);
+        }
+        // Only the helper's distinct alias was remounted. The original FD's
+        // transition establishes that the backing itself became read-only.
+        check_readonly(file).map_err(PhysicalRootError::mount)?;
+        check_readonly(attached).map_err(PhysicalRootError::mount)?;
+        Ok(())
     }
 }
 
@@ -251,19 +256,13 @@ impl PendingReadOnlyCompaction {
             || before.used_inodes != after.used_inodes
             || facts_for_quota(&builder.file, class.quota())? != after
             || facts_for_quota(attached, class.quota())? != after
-            || parent.original != builder.identity
-            || parent.helper != successor.attached
-            || parent.original.mount == successor.detached.mount
             || backing_identity_for_quota(&builder.file, class.quota())? != builder.identity
             || backing_identity_for_quota(attached, class.quota())? != successor.attached
             || !same_backing(builder.identity, successor.attached)
         {
             return Err(PhysicalRootError::Backing);
         }
-        // This FD's distinct mount was writable before the helper remounted
-        // its own alias. Its transition proves the backing is now read-only.
-        check_readonly(&builder.file).map_err(PhysicalRootError::mount)?;
-        check_readonly(attached).map_err(PhysicalRootError::mount)?;
+        parent.check_remounted(&builder.file, builder.identity, successor, attached)?;
         let credit = builder.resources.reserve(
             add(
                 std::mem::size_of::<Self>(),
@@ -391,12 +390,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn general_archive_freezes_even_when_quota_is_unchanged() {
-        let flags = libc::MS_REMOUNT | libc::MS_NOSUID | libc::MS_NODEV;
-        assert_eq!(remount_flags(false, true), Some(flags | libc::MS_RDONLY));
-        assert_eq!(remount_flags(true, true), Some(flags | libc::MS_RDONLY));
-        assert_eq!(remount_flags(false, false), None);
-        assert_eq!(remount_flags(true, false), Some(flags));
+    fn archive_remount_freezes_the_superblock() {
+        assert_eq!(
+            ARCHIVE_REMOUNT_FLAGS,
+            libc::MS_REMOUNT | libc::MS_RDONLY | libc::MS_NOSUID | libc::MS_NODEV,
+        );
+        assert_eq!(ARCHIVE_REMOUNT_FLAGS & libc::MS_BIND, 0);
     }
 
     #[test]

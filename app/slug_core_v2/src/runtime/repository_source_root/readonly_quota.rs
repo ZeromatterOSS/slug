@@ -7,6 +7,7 @@ use super::super::quota::facts_for_quota;
 use super::super::readonly::ReadOnlyMountClone;
 use super::super::readonly::check_readonly;
 use super::super::readonly_quota::FrozenArchiveQuota;
+use super::super::readonly_quota::WritableArchiveParent;
 use super::*;
 
 pub(in crate::runtime::repository_physical_root) struct PendingSourceReadOnlyCompaction {
@@ -27,6 +28,7 @@ pub(in crate::runtime::repository_physical_root) struct PendingSourceReadOnlyCom
 impl PendingSourceReadOnlyCompaction {
     pub(super) fn receive(
         builder: &SourceRootBuilder,
+        parent: &WritableArchiveParent,
         successor: &AttachedMountClone,
         attached: &File,
         words: [u64; 8],
@@ -84,6 +86,7 @@ impl PendingSourceReadOnlyCompaction {
         {
             return Err(PhysicalRootError::Backing);
         }
+        parent.check_remounted(&builder.file, builder.identity, successor, attached)?;
         let credit = builder.resources.reserve(
             add(
                 std::mem::size_of::<Self>(),
@@ -144,6 +147,7 @@ impl PendingSourceReadOnlyCompaction {
                 &|| true,
             )
             .map_err(PhysicalRootError::mount)?;
+        check_readonly(&builder.file).map_err(PhysicalRootError::mount)?;
         builder.frozen_archive_quota = Some(self.class);
         Ok(())
     }
@@ -192,6 +196,7 @@ impl PendingSourceReadOnlyCompaction {
         self.domain
             .check_clone(&mount.clone, &self.scope, &|| true)
             .map_err(PhysicalRootError::mount)?;
+        check_readonly(&root.file).map_err(PhysicalRootError::mount)?;
         check_readonly(&mount.clone.token).map_err(PhysicalRootError::mount)?;
         if namespace_identity(&mount.clone.owner).map_err(PhysicalRootError::mount)?
             != self.namespace

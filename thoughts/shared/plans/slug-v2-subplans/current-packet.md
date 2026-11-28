@@ -47,9 +47,10 @@ scope checks. Ordinary reads and mismatched digests still hash the payload.
 Native tests reject foreign receipt owners and preserve mutable-source checks.
 At cut `af078ea71`, a detached trace passed the first precheck and exhausted
 SourceAttempts64 on the second. Two Source snapshots contributed 14 repeat
-content requests per check. Qualify globally read-only Source snapshot backing
-and reuse its verified file frames. The 27-second limit also puts cold native
-admission near the deadline. Measure both routes under the existing limits.
+content requests per check. The Source snapshot seal passed original-FD
+`EROFS`, live-writer `EBUSY`, pre-seal drift, retirement and Process controls.
+Qualify reuse of its verified file frames. Cold native admission also ran
+close to the 27-second deadline. Measure both routes under the existing limits.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
