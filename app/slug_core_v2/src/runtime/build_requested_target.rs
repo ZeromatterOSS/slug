@@ -50,9 +50,12 @@ pub(super) async fn canonical_package_input(
     Result<slug_bzlmod_v2::HostCanonicalRepositorySourceInput, BuildCommandError>,
     PathObservationEpoch,
 )> {
-    if let HostRepositorySourceRoute::Canonical(input) = source_route {
-        return Ok((Ok(input.clone()), PathObservationEpoch::empty()));
-    }
+    let apparent_route = match source_route {
+        HostRepositorySourceRoute::Root(route) => route,
+        HostRepositorySourceRoute::Canonical(input) => {
+            return Ok((Ok(input.clone()), PathObservationEpoch::empty()));
+        }
+    };
     let (route, observations) = match mode {
         BuildAnalysisMode::Legacy => {
             let key = HostCanonicalRepositoryLoadRouteKey::new(
@@ -104,9 +107,11 @@ pub(super) async fn canonical_package_input(
         .as_ref()
         .map(|route| route.input().clone())
         .map_err(|error| {
-            BuildCommandError::new(BuildCommandErrorKind::CanonicalRepositoryRoute(
-                error.clone(),
-            ))
+            let error = match error.direct_local_include_cycle(apparent_route) {
+                Some(cycle) => CanonicalBuildRouteError::DirectLocalIncludeCycle(cycle),
+                None => CanonicalBuildRouteError::Route(error.clone()),
+            };
+            BuildCommandError::new(BuildCommandErrorKind::CanonicalRepositoryRoute(error))
         });
     // Keep the canonical route's epoch even when its semantic result fails.
     Ok((input, observations))

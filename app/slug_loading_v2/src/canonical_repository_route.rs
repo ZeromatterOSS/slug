@@ -72,6 +72,15 @@ impl HostCanonicalRepositoryRouteError {
             HostCanonicalRepositoryRouteErrorKind::Missing { .. }
         )
     }
+
+    pub(super) fn selected_definition_error(
+        &self,
+    ) -> Option<&HostCanonicalSelectedModuleDefinitionError> {
+        let HostCanonicalRepositoryRouteErrorKind::Selected(error) = &self.kind else {
+            return None;
+        };
+        Some(error)
+    }
 }
 
 impl fmt::Display for HostCanonicalRepositoryRouteError {

@@ -678,6 +678,8 @@ pub use selected_source_refusal::SelectedSourceRefusalCode;
 #[doc(hidden)]
 pub use selected_source_refusal::SelectedSourceRefusalTermination;
 #[doc(hidden)]
+pub use source_preparation::DirectLocalUnsupportedCycle;
+#[doc(hidden)]
 pub use source_preparation::HostCanonicalRepositorySourceInput;
 #[doc(hidden)]
 pub use source_preparation::HostCanonicalRepositorySourceInputError;
@@ -780,6 +782,8 @@ pub use source_preparation::RepositorySourceFileError;
 pub use source_preparation::RepositorySourceFileKey;
 pub use source_preparation::RepositorySourceFileValue;
 pub use source_preparation::RepositoryTransportError;
+#[doc(hidden)]
+pub use source_preparation::SelectedNonregistryIncludeCycle;
 pub use source_preparation::SourcePreparationNeeds;
 pub use source_preparation::SourcePreparationNeedsError;
 pub use source_preparation::SourcePreparationOutcome;

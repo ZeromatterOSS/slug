@@ -1834,6 +1834,28 @@ enum HostSelectedModuleRoutesError {
     },
 }
 
+impl HostSelectedModuleRoutesError {
+    fn nonregistry_include_cycle(&self) -> Option<crate::SelectedNonregistryIncludeCycle<'_>> {
+        let Self::Graph(HostSelectedModuleGraphError::DiscoveryLeaf {
+            module: HostGraphModuleKey::Module { name, version },
+            error:
+                crate::source_preparation::HostDiscoveredModuleError::NonRegistryCycle {
+                    closure,
+                    capability,
+                },
+        }) = self
+        else {
+            return None;
+        };
+        Some(crate::SelectedNonregistryIncludeCycle {
+            name: name.as_str(),
+            version: version.normalized(),
+            closure,
+            capability,
+        })
+    }
+}
+
 impl fmt::Display for HostSelectedModuleRoutesError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self:?}")
@@ -2997,10 +3019,37 @@ impl HostCanonicalSelectedModuleDefinitionError {
             _ => HostCanonicalSelectedModuleDefinitionErrorDisposition::Terminal,
         }
     }
+
+    #[doc(hidden)]
+    pub fn nonregistry_include_cycle(&self) -> Option<crate::SelectedNonregistryIncludeCycle<'_>> {
+        let PrivateCanonicalSelectedModuleDefinitionError::Routes(routes, _) = &self.inner else {
+            return None;
+        };
+        routes.as_ref().as_ref().err()?.nonregistry_include_cycle()
+    }
+
+    #[doc(hidden)]
+    pub fn direct_local_include_cycle(
+        &self,
+        route: &crate::RootRepositoryRoute,
+    ) -> Option<crate::DirectLocalUnsupportedCycle> {
+        let PrivateCanonicalSelectedModuleDefinitionError::Routes(_, canonical_repo) = &self.inner
+        else {
+            return None;
+        };
+        if canonical_repo != route.canonical_repo() {
+            return None;
+        }
+        self.nonregistry_include_cycle()?
+            .for_direct_local_route(route)
+    }
 }
 
 impl fmt::Display for HostCanonicalSelectedModuleDefinitionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(cycle) = self.nonregistry_include_cycle() {
+            return cycle.fmt(f);
+        }
         write!(f, "{:?}", self.inner)
     }
 }
@@ -6044,6 +6093,9 @@ pub struct HostRootRepositoryMappingError {
 
 impl fmt::Display for HostRootRepositoryMappingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(cycle) = self.nonregistry_include_cycle() {
+            return cycle.fmt(f);
+        }
         write!(f, "{:?}", self.inner)
     }
 }
@@ -16740,6 +16792,16 @@ impl HostSelectedRegistryRepoSpecsObservationError {
 }
 
 impl HostRootRepositoryMappingError {
+    fn nonregistry_include_cycle(&self) -> Option<crate::SelectedNonregistryIncludeCycle<'_>> {
+        let PrivateRootRepositoryMappingError::Predecessor(predecessor) = &self.inner else {
+            return None;
+        };
+        let Err(HostSelectedExtensionMappingsError::Routes(routes)) = predecessor.as_ref() else {
+            return None;
+        };
+        routes.nonregistry_include_cycle()
+    }
+
     /// Borrows the module name, canonical version and outer registry request
     /// retained by this discovery failure. This is not completed MVS or source
     /// provenance; native transport detail may independently be unavailable.

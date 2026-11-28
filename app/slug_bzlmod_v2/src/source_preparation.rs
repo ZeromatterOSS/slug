@@ -94,6 +94,7 @@ use crate::RepoSpec;
 use crate::RootModuleBootstrapRequest;
 use crate::RootModuleOverride;
 use crate::RootRepositoryRoute;
+use crate::RootRepositorySource;
 use crate::apply_unified_patch;
 use crate::builtin_repository::BuiltinBazelToolsDirectoryListingKey;
 use crate::builtin_repository::BuiltinBazelToolsModuleError;
@@ -5130,7 +5131,8 @@ pub(crate) enum DirectLocalModuleSupport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) struct DirectLocalUnsupportedCycle {
+#[doc(hidden)]
+pub struct DirectLocalUnsupportedCycle {
     apparent_repo: ApparentRepoName,
     module_name: CompactString,
     repeated_raw_label: CompactString,
@@ -5143,17 +5145,129 @@ impl fmt::Display for DirectLocalUnsupportedCycle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Slug does not support MODULE.bazel include cycles in direct local_path_override repository '@{}' for module '{}': include {:?} at {}:{}:{} repeats ancestor include {:?} at {}:{}:{}",
+            "Slug does not support MODULE.bazel include cycles in direct local_path_override repository '@{}' for module '{}': ",
             self.apparent_repo.as_str(),
             self.module_name,
-            self.repeated_raw_label,
-            self.repeated_location.file.0,
-            self.repeated_location.start_line,
-            self.repeated_location.start_column,
-            self.ancestor_raw_label,
-            self.ancestor_location.file.0,
-            self.ancestor_location.start_line,
-            self.ancestor_location.start_column,
+        )?;
+        write_include_cycle_sites(
+            f,
+            &self.repeated_raw_label,
+            &self.repeated_location,
+            &self.ancestor_raw_label,
+            &self.ancestor_location,
+        )
+    }
+}
+
+impl std::error::Error for DirectLocalUnsupportedCycle {}
+
+fn write_include_cycle_sites(
+    f: &mut fmt::Formatter<'_>,
+    repeated_raw_label: &str,
+    repeated_location: &crate::LogicalSpan,
+    ancestor_raw_label: &str,
+    ancestor_location: &crate::LogicalSpan,
+) -> fmt::Result {
+    write!(
+        f,
+        "include {repeated_raw_label:?} at {}:{}:{} repeats ancestor include {ancestor_raw_label:?} at {}:{}:{}",
+        repeated_location.file.0,
+        repeated_location.start_line,
+        repeated_location.start_column,
+        ancestor_location.file.0,
+        ancestor_location.start_line,
+        ancestor_location.start_column,
+    )
+}
+
+/// The selected graph's current include-cycle evidence. This view carries no
+/// authority to access a repository or to choose an apparent alias.
+#[doc(hidden)]
+pub struct SelectedNonregistryIncludeCycle<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) version: &'a str,
+    pub(crate) closure: &'a HostNonregistryPreparedClosure,
+    pub(crate) capability: &'a NonregistryIncludeCycleCapability,
+}
+
+impl SelectedNonregistryIncludeCycle<'_> {
+    pub(crate) fn for_direct_local_route(
+        &self,
+        route: &RootRepositoryRoute,
+    ) -> Option<DirectLocalUnsupportedCycle> {
+        let HostNonregistryModuleSourceIdentity::Local { repo_spec } =
+            &self.closure.source_identity
+        else {
+            return None;
+        };
+        if !matches!(route.source(), RootRepositorySource::DirectLocal(_))
+            || self.name != route.module_name()
+            || !self.version.is_empty()
+            || self.closure.module.name.as_str() != self.name
+            || self.closure.module.version.as_str() != self.version
+            || repo_spec != route.repo_spec()
+        {
+            return None;
+        }
+        let policy = self.closure.local_path_policy();
+        if route.source_capability().local_path_policy() != Some(policy) {
+            return None;
+        }
+        let RepositoryMaterializationKind::Local { logical_root } =
+            request_kind(route.workspace(), repo_spec, policy).ok()?
+        else {
+            return None;
+        };
+        let capability = self.capability;
+        Some(DirectLocalUnsupportedCycle {
+            apparent_repo: route.apparent_repo().clone(),
+            module_name: self.closure.module.name.clone(),
+            repeated_raw_label: capability.repeated_raw_label.clone(),
+            repeated_location: self.local_site(&capability.repeated_location, &logical_root)?,
+            ancestor_raw_label: capability.ancestor_raw_label.clone(),
+            ancestor_location: self.local_site(&capability.ancestor_location, &logical_root)?,
+        })
+    }
+
+    fn local_site(
+        &self,
+        location: &crate::LogicalSpan,
+        logical_root: &NormalizedAbsolutePath,
+    ) -> Option<crate::LogicalSpan> {
+        // The span names the includer. The raw label names its child and cannot
+        // identify a source path for the span itself.
+        let logical_file = Path::new(location.file.0.as_str());
+        let relative = if logical_file == self.closure.root.logical_path.as_path() {
+            PathBuf::from("MODULE.bazel")
+        } else {
+            let fragment = self
+                .closure
+                .fragments
+                .iter()
+                .find(|fragment| fragment.logical_path.as_path() == logical_file)?;
+            nonregistry_fragment_relative_path(&fragment.occurrence)
+        };
+        let file = logical_root.as_path().join(relative);
+        Some(crate::LogicalSpan {
+            file: crate::LogicalModuleFileId::new(file.display().to_string()),
+            ..location.clone()
+        })
+    }
+}
+
+impl fmt::Display for SelectedNonregistryIncludeCycle<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MODULE.bazel include cycle in non-registry module '{}': ",
+            self.name
+        )?;
+        write_include_cycle_sites(
+            f,
+            &self.capability.repeated_raw_label,
+            &self.capability.repeated_location,
+            &self.capability.ancestor_raw_label,
+            &self.capability.ancestor_location,
         )
     }
 }
@@ -17397,9 +17511,65 @@ mod tests {
             true,
         )
         .await;
-        assert!(
-            matches!(cycle, SourcePreparationOutcome::Complete(value) if matches!(value.as_ref(), Err(HostDiscoveredModuleError::NonRegistryCycle { closure, .. }) if closure.fragments.len() == 2))
+        let SourcePreparationOutcome::Complete(cycle) = cycle else {
+            panic!("expected a complete include-cycle terminal");
+        };
+        let Err(HostDiscoveredModuleError::NonRegistryCycle {
+            closure,
+            capability,
+        }) = cycle.as_ref()
+        else {
+            panic!("expected the selected include-cycle capability");
+        };
+        assert_eq!(closure.fragments.len(), 2);
+        let evidence = SelectedNonregistryIncludeCycle {
+            name: "dep",
+            version: "",
+            closure,
+            capability,
+        };
+        let route = local_route_with_path("dep");
+        let bound = evidence.for_direct_local_route(&route).unwrap();
+        assert_eq!(
+            bound.repeated_location.file.0,
+            "/workspace/dep/pkg/a.MODULE.bazel"
         );
+        assert_eq!(
+            bound.ancestor_location.file.0,
+            "/workspace/dep/MODULE.bazel"
+        );
+        assert_eq!(bound.repeated_location.start_line, 1);
+        assert_eq!(bound.ancestor_location.start_line, 2);
+        let alias = RootRepositoryRoute::for_test(
+            route.workspace().clone(),
+            ApparentRepoName::new("alias").unwrap(),
+            "dep".into(),
+            route.canonical_repo().clone(),
+            route.repo_spec().clone(),
+        );
+        assert_eq!(
+            evidence
+                .for_direct_local_route(&alias)
+                .unwrap()
+                .apparent_repo
+                .as_str(),
+            "alias"
+        );
+        assert!(
+            evidence
+                .for_direct_local_route(&local_route_with_path("other"))
+                .is_none()
+        );
+        let other_key = SelectedNonregistryIncludeCycle {
+            name: "other",
+            ..evidence
+        };
+        assert!(other_key.for_direct_local_route(&route).is_none());
+        let versioned = SelectedNonregistryIncludeCycle {
+            version: "1",
+            ..evidence
+        };
+        assert!(versioned.for_direct_local_route(&route).is_none());
         let invalid = host_nonregistry_discovered_compute(
             &dice,
             Some(b"module(name='wrong')\n"),

@@ -3013,6 +3013,10 @@ fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
             slug_core_v2::error::json_escape(&message),
         )
     };
+    let build_terminal = format!(
+        "{{\"error\":\"unsupported_feature\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}\n",
+        slug_core_v2::error::json_escape(&message),
+    );
 
     let cold = daemon.query("@dep//:target.txt", QueryOrder::Auto);
     assert_eq!(cold.exit_code, 7, "{cold:?}");
@@ -3050,13 +3054,21 @@ fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
     let build = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
     assert_eq!(build.exit_code, 7, "{build:?}");
     assert!(build.stdout.is_empty(), "{build:?}");
-    assert_eq!(
-        stderr_text(&build.stderr),
-        format!(
-            "{{\"error\":\"unsupported_feature\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}\n",
-            slug_core_v2::error::json_escape(&message),
-        )
+    assert_eq!(stderr_text(&build.stderr), build_terminal);
+
+    let cold_build = Daemon::new(&workspace).unwrap().build(
+        &[target("@dep//:target.txt")],
+        &remote_disabled(),
+        &[],
     );
+    assert_eq!(cold_build.exit_code, 7, "{cold_build:?}");
+    assert!(cold_build.stdout.is_empty(), "{cold_build:?}");
+    let prefix = stderr_text(&cold_build.stderr)
+        .strip_suffix(build_terminal.as_str())
+        .unwrap_or_else(|| panic!("missing exact Build terminal: {cold_build:?}"));
+    assert_eq!(prefix.lines().count(), 1, "{cold_build:?}");
+    assert!(prefix.starts_with("DEBUG: "), "{cold_build:?}");
+    assert!(prefix.ends_with(": ROOT_EVENT\n"), "{cold_build:?}");
 
     let warm = daemon.query("buildfiles(@dep//:target.txt)", QueryOrder::Auto);
     assert_eq!(warm.exit_code, 7, "{warm:?}");

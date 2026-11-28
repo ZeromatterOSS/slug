@@ -3586,7 +3586,7 @@ enum BuildCommandErrorKind {
     RootAnchor(RootModuleLoadingAnchorError),
     Package(RootPackageLoadError),
     RepositoryRoute(HostRootRepositoryLoadRouteError),
-    CanonicalRepositoryRoute(slug_loading_v2::HostCanonicalRepositoryLoadRouteError),
+    CanonicalRepositoryRoute(CanonicalBuildRouteError),
     CanonicalRepositoryRouteObservation(
         slug_loading_v2::HostCanonicalRepositoryLoadRouteObservationError,
     ),
@@ -3634,6 +3634,12 @@ enum BuildCommandErrorKind {
         index: usize,
         failure: Arc<CompletedActionFailure>,
     },
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+enum CanonicalBuildRouteError {
+    Route(slug_loading_v2::HostCanonicalRepositoryLoadRouteError),
+    DirectLocalIncludeCycle(slug_bzlmod_v2::DirectLocalUnsupportedCycle),
 }
 
 type BuildCommandOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
@@ -4403,6 +4409,9 @@ impl BuildCommandError {
             BuildCommandErrorKind::RepositoryPackage(error) if error.is_unsupported_feature() => {
                 ("unsupported_feature", 7)
             }
+            BuildCommandErrorKind::CanonicalRepositoryRoute(
+                CanonicalBuildRouteError::DirectLocalIncludeCycle(_),
+            ) => ("unsupported_feature", 7),
             BuildCommandErrorKind::ActionClosure(
                 ConfiguredActionClosureError::UnsupportedEquivalence { .. },
             ) => ("unsupported_action_equivalence", 2),
@@ -4436,7 +4445,10 @@ impl fmt::Display for BuildCommandError {
             BuildCommandErrorKind::RootAnchor(error) => error.fmt(f),
             BuildCommandErrorKind::Package(error) => error.fmt(f),
             BuildCommandErrorKind::RepositoryRoute(error) => error.fmt(f),
-            BuildCommandErrorKind::CanonicalRepositoryRoute(error) => error.fmt(f),
+            BuildCommandErrorKind::CanonicalRepositoryRoute(error) => match error {
+                CanonicalBuildRouteError::Route(error) => error.fmt(f),
+                CanonicalBuildRouteError::DirectLocalIncludeCycle(error) => error.fmt(f),
+            },
             BuildCommandErrorKind::CanonicalRepositoryRouteObservation(error) => write!(
                 f,
                 "canonical repository package route observation failed: {error:?}"
@@ -4563,7 +4575,10 @@ impl std::error::Error for BuildCommandError {
             BuildCommandErrorKind::RootAnchor(error) => Some(error),
             BuildCommandErrorKind::Package(error) => Some(error),
             BuildCommandErrorKind::RepositoryRoute(error) => Some(error),
-            BuildCommandErrorKind::CanonicalRepositoryRoute(error) => Some(error),
+            BuildCommandErrorKind::CanonicalRepositoryRoute(error) => match error {
+                CanonicalBuildRouteError::Route(error) => Some(error),
+                CanonicalBuildRouteError::DirectLocalIncludeCycle(error) => Some(error),
+            },
             BuildCommandErrorKind::GeneratedRouteObservation { error, .. } => Some(error),
             BuildCommandErrorKind::RepositoryPackage(error) => Some(error),
             BuildCommandErrorKind::RepositorySourceObservation(error, _) => Some(error),

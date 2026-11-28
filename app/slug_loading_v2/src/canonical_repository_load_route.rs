@@ -77,10 +77,34 @@ impl HostCanonicalRepositoryLoadRouteError {
                 | HostCanonicalRepositoryLoadRouteErrorKind::EffectCompute(_)
         )
     }
+
+    #[doc(hidden)]
+    pub fn direct_local_include_cycle(
+        &self,
+        route: &slug_bzlmod_v2::RootRepositoryRoute,
+    ) -> Option<slug_bzlmod_v2::DirectLocalUnsupportedCycle> {
+        let HostCanonicalRepositoryLoadRouteErrorKind::Route(error) = &self.kind else {
+            return None;
+        };
+        if &self.canonical_repo != route.canonical_repo()
+            || &error.canonical_repo != route.canonical_repo()
+        {
+            return None;
+        }
+        error
+            .selected_definition_error()?
+            .direct_local_include_cycle(route)
+    }
 }
 
 impl fmt::Display for HostCanonicalRepositoryLoadRouteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let HostCanonicalRepositoryLoadRouteErrorKind::Route(error) = &self.kind
+            && let Some(definition) = error.selected_definition_error()
+            && let Some(cycle) = definition.nonregistry_include_cycle()
+        {
+            return cycle.fmt(f);
+        }
         let HostCanonicalRepositoryLoadRouteErrorKind::Effect(effect) = &self.kind else {
             return write!(
                 f,
