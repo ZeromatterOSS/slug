@@ -3,6 +3,7 @@ use std::io::Write;
 use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
@@ -37,6 +38,27 @@ struct Entry<'a> {
 
 pub struct FixtureWorkspace {
     root: PathBuf,
+}
+
+#[allow(dead_code)] // Only configured command fixtures need the registry mirror.
+pub fn assemble_configured_registry(package_dir: &Path, destination: &Path) -> Result<(), String> {
+    let script = package_dir.join("../../tools/v2_oracle/configured_cli_fixture.py");
+    let output = Command::new("python3")
+        .arg(script)
+        .arg("assemble")
+        .arg("--output")
+        .arg(destination)
+        .output()
+        .map_err(|error| format!("starting configured fixture assembly: {error}"))?;
+    if !output.status.success() {
+        let tail = &output.stderr[output.stderr.len().saturating_sub(4096)..];
+        return Err(format!(
+            "configured fixture assembly exited {}\n{}",
+            output.status,
+            String::from_utf8_lossy(tail)
+        ));
+    }
+    Ok(())
 }
 
 impl FixtureWorkspace {

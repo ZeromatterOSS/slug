@@ -274,15 +274,25 @@ fn daemon_new_retains_only_its_runtime_and_test_process_host_arcs() {
 #[test]
 fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
     let workspace = scratch("bzlmod-request-local");
+    source_staging_workspace::write_local_module(
+        &workspace,
+        "module(name = \"demo\")\nbazel_dep(name = \"dev_dep\", version = \"1.0.0\", dev_dependency = True)\nlocal_path_override(module_name = \"dev_dep\", path = \"dev_dep\")\n",
+    );
     write(
-        &workspace.join("MODULE.bazel"),
-        "module(name = \"demo\")\nbazel_dep(name = \"dev_dep\", version = \"1.0\", dev_dependency = True)\n",
+        &workspace.join("dev_dep/MODULE.bazel"),
+        "module(name = \"dev_dep\", version = \"1.0.0\")\n",
     );
     write(&workspace.join("BUILD.bazel"), "");
     write(
         &workspace.join("pkg/BUILD.bazel"),
         "filegroup(name = \"probe\")\n",
     );
+    // Ignoring dev dependencies also ignores MODULE.bazel overrides. Give that
+    // request its own authenticated registry for the remaining dependencies.
+    let assembly = workspace.join("configured-registry");
+    fixture_support::assemble_configured_registry(Path::new(env!("CARGO_MANIFEST_DIR")), &assembly)
+        .unwrap();
+    let registry = format!("file://{}", assembly.join("registry").display());
     let mut daemon = Daemon::new(&workspace).unwrap();
     let defaults = || {
         (
@@ -297,7 +307,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
             LockfileMode::Off,
-            vec!["https://registry.example/override/".to_owned()],
+            vec![registry.clone()],
         )
     };
     let expected = vec![
@@ -308,7 +318,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             command_module_overrides: Vec::new(),
             environment_allow_yanked_versions: Some("all".to_owned()),
             lockfile_mode: "off".to_owned(),
-            registry_urls: vec!["https://registry.example/override/".to_owned()],
+            registry_urls: vec![registry.clone()],
         },
         BzlmodRequestInputs::default(),
     ];
