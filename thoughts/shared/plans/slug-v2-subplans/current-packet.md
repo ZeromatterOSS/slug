@@ -51,7 +51,7 @@ content requests per check. The Source snapshot seal passed original-FD
 `EROFS`, live-writer `EBUSY`, pre-seal drift, retirement and Process controls.
 Sealed Source certificate repeats passed at exactly 64 acquisitions without
 reading payloads. A missing certificate still refused acquisition 65.
-Protected cut `4b0d3bc6c` reached 67 CAS entries cold and 114 retained.
+Protected cut `5e0d1f86f` reached 43 CAS entries cold and 114 retained.
 The retained worker compiled the tinyjson prerequisite from empty AC, with
 verified action, output bytes and worker timing. Both hit the 27-second
 work deadline before probe publication. A bounded trace on `1e87600ed` counted
@@ -66,8 +66,12 @@ CrateInfo rows. Cold/warm RootCompute took 9.979/8.062 s and Archive dispatch
 8.725/8.183 s. The warm command discarded 15,096 completed module-toolchain
 prefix rows across 458 Needs. Check the cost of completed package-local work
 while preserving the ordered source and event closure.
-Selected direct Archive readers reused verified packed-file frames through
-actual bytes and EOF in fifteen focused checks. Measure coverage in Rust Build.
+The direct Archive reader passed fifteen focused checks. A detached Rust Build
+trace observed 337,918,881 bytes across 22 verified direct readers before expiry.
+The deadline also covers remote I/O. Review separate finite supervision for
+remote-only CAS verification and worker waits before changing clock semantics.
+Require drained native readers and jobs, one sticky Source budget across
+retries, fresh Execute and publication checks, and local and remote cancellation.
 Keep atomic publication, existing readers, native quotas, clocks, launcher/PID1,
 rooted reads, codec and history checks. Compare equal work for timing.
 Private message parsing, blind repeats, presumed API repair,
